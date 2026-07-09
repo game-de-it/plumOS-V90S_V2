@@ -7,7 +7,7 @@ export PATH LD_LIBRARY_PATH
 
 LOG=/tmp/plumos-v90s-diag.log
 
-$bb mkdir -p /tmp /proc /sys /dev /run /mnt/diag /mnt/candidate /boot_root /new_root
+$bb mkdir -p /tmp /proc /sys /dev /run /mnt/diag /mnt/candidate /boot_root /new_root /payload_root /payload_share
 $bb mount -t proc proc /proc 2>/dev/null || true
 $bb mount -t sysfs sysfs /sys 2>/dev/null || true
 $bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || $bb mount -t tmpfs dev /dev 2>/dev/null || true
@@ -109,6 +109,25 @@ persist_logs_to_stage1_share() {
     fi
 }
 
+persist_logs_to_share() {
+    share="$1"
+    label="$2"
+
+    if [ -d "$share" ]; then
+        {
+            echo "persist_device=$label"
+            echo "persist_path=/plumos-v90s-diag.log"
+            echo
+            cat "$LOG"
+        } > "$share/plumos-v90s-diag.log" 2>/dev/null || true
+
+        if [ -d "$share/rootfs" ]; then
+            cp "$share/plumos-v90s-diag.log" "$share/rootfs/plumos-v90s-diag.log" 2>/dev/null || true
+        fi
+        $bb sync
+    fi
+}
+
 prepare_stage1_share() {
     log "stage1-share: scanning writable SD partitions"
     $bb mkdir -p /new_root/mnt/share
@@ -129,6 +148,59 @@ prepare_stage1_share() {
 
     log "stage1-share: no writable payload partition prepared"
     return 1
+}
+
+prepare_payload_share() {
+    log "payload-share: scanning writable SD partitions"
+    $bb mkdir -p /payload_share
+
+    for dev in $(partition_list); do
+        $bb umount /payload_share >/dev/null 2>&1 || true
+        for fs in ext4 vfat; do
+            if $bb mount -t "$fs" -o rw "$dev" /payload_share >/dev/null 2>&1; then
+                if [ -f /payload_share/rootfs/step1-rootfs.squashfs ]; then
+                    log "payload-share: mounted $dev as $fs on /payload_share"
+                    return 0
+                fi
+                $bb umount /payload_share >/dev/null 2>&1 || true
+            fi
+        done
+        log "payload-share: cannot use $dev"
+    done
+
+    log "payload-share: no writable payload partition prepared"
+    return 1
+}
+
+mount_payload_root() {
+    payload="/payload_share/rootfs/step1-rootfs.squashfs"
+    payload_loop=/dev/loop2
+
+    prepare_payload_share || return 1
+    persist_logs_to_share /payload_share payload-share
+
+    [ -b "$payload_loop" ] || $bb mknod "$payload_loop" b 7 2
+    $bb losetup -d "$payload_loop" >/dev/null 2>&1 || true
+    if ! $bb losetup "$payload_loop" "$payload" >> "$LOG" 2>&1; then
+        log "payload-root: losetup failed on $payload_loop"
+        persist_logs_to_share /payload_share payload-share
+        return 1
+    fi
+    log "payload-root: attached payload to $payload_loop"
+
+    $bb umount /payload_root >/dev/null 2>&1 || true
+    if ! mount -t squashfs -o ro "$payload_loop" /payload_root >> "$LOG" 2>&1; then
+        log "payload-root: squashfs mount failed"
+        persist_logs_to_share /payload_share payload-share
+        return 1
+    fi
+
+    log "payload-root: mounted Debian payload rootfs"
+    run_log ls -la /payload_root
+    run_log ls -la /payload_root/sbin
+    run_log ls -la /payload_root/usr/sbin
+    persist_logs_to_share /payload_share payload-share
+    return 0
 }
 
 run_stage1_preflight() {
@@ -260,6 +332,29 @@ log "boot: mounted $BOOT_ROOT_DEV as $fs on /boot_root"
 
 run_log ls -la /boot_root
 run_log ls -la /boot_root/boot
+
+if mount_payload_root; then
+    $bb mkdir -p /payload_root/proc /payload_root/sys /payload_root/dev /payload_root/boot /payload_root/mnt/share
+    log "boot: preparing to switch directly to payload /sbin/init"
+    persist_logs_to_share /payload_share payload-share
+
+    $bb mount --move /proc /payload_root/proc 2>/dev/null || true
+    $bb mount --move /sys /payload_root/sys 2>/dev/null || true
+    $bb mount --move /dev /payload_root/dev 2>/dev/null || true
+    $bb mount --move /boot_root /payload_root/boot 2>/dev/null || true
+    $bb mount --move /payload_share /payload_root/mnt/share 2>/dev/null || true
+
+    log "boot: switching directly to payload /sbin/init"
+    persist_logs_to_share /payload_root/mnt/share payload-share
+    exec $bb switch_root /payload_root /sbin/init
+
+    log "boot: direct payload switch_root failed"
+    persist_logs_to_share /payload_root/mnt/share payload-share
+    exec /bin/busybox sh
+fi
+
+log "boot: direct payload root unavailable; falling back to stage1"
+persist_logs
 
 if ! mount_stage1_root; then
     log "boot: failed to mount /boot_root/boot/knulli as stage1 root"

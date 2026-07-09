@@ -1,0 +1,13 @@
+stage1: init entered before tty setup
+plumOS V90S stage1: looking for userdata rootfs payload
+stage1: using pre-mounted payload on /mnt/share
+stage1: fb0 probe begin
+stage1: =
+stage1: =U:640x480p-60
+stage1: =640,960
+stage1: =32
+stage1: =2560
+stage1: /dev/fb0 not present
+stage1: attached payload to /dev/loop1
+stage1: mounted payload rootfs
+stage1: switching to payload rootfs

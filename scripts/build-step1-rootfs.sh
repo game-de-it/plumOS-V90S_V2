@@ -121,8 +121,16 @@ persist_stage1_log() {
     fi
 }
 
+ensure_fb0_node() {
+    if [ ! -c /dev/fb0 ] && [ -d /sys/class/graphics/fb0 ]; then
+        $bb mknod /dev/fb0 c 29 0 2>/dev/null || true
+        $bb chmod 600 /dev/fb0 2>/dev/null || true
+    fi
+}
+
 fb_probe() {
     log "stage1: fb0 probe begin"
+    ensure_fb0_node
     for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
         if [ -r "$info" ]; then
             log "stage1: $($bb basename "$info")=$($bb cat "$info" 2>/dev/null)"
@@ -156,7 +164,9 @@ fb_probe() {
 
 $bb mount -t proc proc /proc 2>/dev/null || true
 $bb mount -t sysfs sysfs /sys 2>/dev/null || true
-$bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || $bb mount -t tmpfs dev /dev 2>/dev/null || true
+if [ ! -c /dev/console ]; then
+    $bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || $bb mount -t tmpfs dev /dev 2>/dev/null || true
+fi
 $bb mkdir -p /dev/pts /dev/shm /run /tmp /mnt/share /new_root
 $bb mount -t tmpfs tmpfs /run 2>/dev/null || true
 $bb mount -t tmpfs tmpfs /tmp 2>/dev/null || true
@@ -268,8 +278,16 @@ persist_debian_log() {
     fi
 }
 
+ensure_fb0_node() {
+    if [ ! -c /dev/fb0 ] && [ -d /sys/class/graphics/fb0 ]; then
+        mknod /dev/fb0 c 29 0 2>/dev/null || true
+        chmod 600 /dev/fb0 2>/dev/null || true
+    fi
+}
+
 fb_probe() {
     log "debian-init: fb0 probe begin"
+    ensure_fb0_node
     for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
         if [ -r "$info" ]; then
             log "debian-init: $(basename "$info")=$(cat "$info" 2>/dev/null)"
@@ -303,7 +321,9 @@ fb_probe() {
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
-mount -t devtmpfs devtmpfs /dev 2>/dev/null || mount -t tmpfs dev /dev 2>/dev/null || true
+if [ ! -c /dev/console ]; then
+    mount -t devtmpfs devtmpfs /dev 2>/dev/null || mount -t tmpfs dev /dev 2>/dev/null || true
+fi
 mkdir -p /dev/pts /dev/shm /run /tmp
 mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true

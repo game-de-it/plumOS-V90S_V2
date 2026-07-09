@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img \
+  --name plumos-v90s-armbian-step1-20260709-11-direct-payload.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-11-direct-payload.img` です。
 
 ```text
-sha256: 370c63fd8f9953703643fea737aff762ec2ca2cca9d657303c563484908c15af
+sha256: 6644fb11cb4b8974a9d3bd9dcbe833d2cd1fb307066710fbe0138011cd06b7d7
 size: 133M
 ```
 
@@ -104,7 +104,11 @@ size: 133M
 
 `-9-stage1-share-handoff` の実機ログでは、handoff mount と `boot: switching to stage1 /sbin/init` までは確認できましたが、stage1/Debian のログはまだ出ませんでした。stage1/Debian rootfs は squashfs なので、`/tmp` を tmpfs にしないまま `/tmp/plumos-*.log` へ書くと失敗します。`-10-stage1-tmpfs-log` では stage1 と Debian init の最初に `/tmp` と `/run` を tmpfs として mount し、tty リダイレクトより前にログ保存を試します。また diagnostic 側から stage1 `/bin/sh` を chroot 実行して `plumos-v90s-stage1-preflight.log` を残します。
 
-`-10-stage1-tmpfs-log` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1-preflight.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
+`-10-stage1-tmpfs-log` の実機ログでは、stage1 init が起動し、pre-mounted userdata share を使って Debian payload を `/dev/loop1` に attach し、payload rootfs の mount まで成功しました。ただし Debian init log は出ず、stage1 から payload への2回目の `switch_root` 境界で止まっています。また stage1 では sysfs 上の fb0 情報は見えましたが、`/dev/fb0` device node が消えていました。
+
+`-11-direct-payload` では diagnostic initramfs が userdata の Debian payload を直接 `/dev/loop2` で mount し、initramfs から payload `/sbin/init` へ1回だけ `switch_root` します。stage1 は direct payload 準備に失敗した場合の fallback として残します。stage1/Debian init では、移動済みの `/dev` を保持し、sysfs に fb0 があるのに `/dev/fb0` が無い場合は `mknod /dev/fb0 c 29 0` します。
+
+`-11-direct-payload` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` を確認します。
 
 ## Git workflow
 

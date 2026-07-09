@@ -64,6 +64,10 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add tmpfs mounts for `/tmp` and `/run` before stage1/Debian init log writes.
 - [x] Add a diagnostic chroot preflight that runs stage1 `/bin/sh` and writes to the handoff share.
 - [x] Build `plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img`.
+- [x] Record device test 10: stage1 entered, used the pre-mounted share, mounted the Debian payload rootfs, then stopped before Debian logs.
+- [x] Add a diagnostic direct-payload path that mounts userdata payload and switches from initramfs to Debian rootfs in one handoff.
+- [x] Preserve moved `/dev` trees in stage1/Debian init and create `/dev/fb0` with `mknod` when sysfs exposes fb0.
+- [x] Build `plumos-v90s-armbian-step1-20260709-11-direct-payload.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -255,6 +259,25 @@ rootfs/plumos-v90s-diag.log
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img`.
 - [x] Host-verify that stage1 and Debian init mount tmpfs on `/tmp` and `/run` before writing logs.
 - [x] Host-verify that diagnostic init runs a stage1 `/bin/sh` chroot preflight and writes `plumos-v90s-stage1-preflight.log`.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
+- [x] Check whether the screen changes from the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: diagnostic log confirmed stage1 handoff mount and attempted stage1 preflight, but KNULLI busybox lacks the `chroot` applet.
+- [x] Result: stage1 log was present.
+- [x] Result: stage1 used the pre-mounted `/mnt/share` payload.
+- [x] Result: stage1 saw fb0 sysfs data but `/dev/fb0` was not present.
+- [x] Result: stage1 attached the Debian payload to `/dev/loop1`, mounted the payload rootfs, and reached `stage1: switching to payload rootfs`.
+- [x] Result: no `plumos-v90s-debian-init.log` was present.
+
+## Device Test 11
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-11-direct-payload.img`.
+- [x] Host-verify that diagnostic init mounts userdata payload directly on `/dev/loop2`.
+- [x] Host-verify that diagnostic init switches directly to payload `/sbin/init` before the stage1 fallback.
+- [x] Host-verify that stage1 and Debian init preserve existing `/dev` and can create `/dev/fb0`.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Wait at least 60 seconds at the boot logo, changed screen, or console.
 - [ ] Check whether the screen changes from the KNULLI boot logo.
@@ -265,11 +288,10 @@ rootfs/plumos-v90s-diag.log
 plumos-v90s-diag.log
 boot/plumos-v90s-diag.log
 rootfs/plumos-v90s-diag.log
-plumos-v90s-stage1-preflight.log
-plumos-v90s-stage1.log
-rootfs/plumos-v90s-stage1.log
 plumos-v90s-debian-init.log
 rootfs/plumos-v90s-debian-init.log
+plumos-v90s-stage1.log
+rootfs/plumos-v90s-stage1.log
 ```
 
 ## Console Command Check

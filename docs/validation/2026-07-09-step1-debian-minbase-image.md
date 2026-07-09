@@ -131,6 +131,18 @@ sha256: d9f2918f1e29234dce44eb70e89dea4a1a87943a1be1a09f86b6e65b5fff708a
 compression: zstd
 ```
 
+After device test 10 showed that stage1 could mount the Debian payload but did not reach Debian init logs, the payloads were rebuilt to preserve the moved `/dev` tree and repair `/dev/fb0` when sysfs exposes fb0:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: 316f279e1d192dfdd2efd75350ba0c1acd565b44b75b0a7ff0c307fa26d4776f
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: dccb0e4b95967b5b93521166befdf4edc50bb3e8c313a4ac34f043bb51ad400c
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check
