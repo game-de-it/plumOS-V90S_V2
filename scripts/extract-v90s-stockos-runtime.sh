@@ -37,7 +37,7 @@ if [ -e "$out_dir" ]; then
     exit 1
 fi
 
-mkdir -p "$out_dir/files" "$out_dir/raw-partitions"
+mkdir -p "$out_dir/files" "$out_dir/raw-partitions" "$out_dir/raw-boot-chain"
 
 file_list="$out_dir/file-list.txt"
 selected_tar="$out_dir/files/stockos-selected-files.tar.gz"
@@ -135,6 +135,11 @@ ssh -o ConnectTimeout=8 "$target" 'dd if=/dev/mmcblk0p3 bs=256K count=1 2>/dev/n
 ssh -o ConnectTimeout=8 "$target" 'dd if=/dev/mmcblk0p4 bs=1M count=64 2>/dev/null' \
     > "$out_dir/raw-partitions/mmcblk0p4-boot.bin"
 
+ssh -o ConnectTimeout=8 "$target" 'dd if=/dev/mmcblk0 bs=512 skip=256 count=128 2>/dev/null' \
+    > "$out_dir/raw-boot-chain/boot0-offset-131072.bin"
+ssh -o ConnectTimeout=8 "$target" 'dd if=/dev/mmcblk0 bs=512 skip=32800 count=9184 2>/dev/null' \
+    > "$out_dir/raw-boot-chain/boot-package-offset-16793600.bin"
+
 cat > "$out_dir/README.txt" <<EOF
 StockOS runtime extraction for plumOS V90S Armbian migration
 Created: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -147,6 +152,8 @@ Contents:
 - raw-partitions/mmcblk0p2-env.bin: raw env partition.
 - raw-partitions/mmcblk0p3-env-redund.bin: raw redundant env partition.
 - raw-partitions/mmcblk0p4-boot.bin: raw Android boot partition.
+- raw-boot-chain/boot0-offset-131072.bin: raw Allwinner boot0 area.
+- raw-boot-chain/boot-package-offset-16793600.bin: raw Allwinner boot package area.
 - file-list.txt: tar member source paths.
 - SHA256SUMS: checksums for this extraction.
 

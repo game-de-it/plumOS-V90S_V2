@@ -56,28 +56,41 @@ Armbian build framework は macOS 上で直接ではなく、Ubuntu コンテナ
 ./scripts/run-armbian-build.sh inventory-boards
 ```
 
-## Image assembly prototype
+## Docker Build Flow
 
-`scripts/assemble-v90s-image.sh` は、KNULLI の V90S boot assets と任意の rootfs squashfs から SD カードイメージを組み立てるための試作スクリプトです。rootfs 生成は別スクリプトで行います。
+現在の主経路は、StockOS/Batocera 由来の vendor runtime を入力にした
+Docker build flow です。
 
 ```sh
-./scripts/assemble-v90s-image.sh \
-  --rootfs output/rootfs/armbian-v90s-step1.squashfs \
-  --knulli-src .cache/knulli-linux \
-  --out-dir output/images \
-  --boot-vfat-size 33M \
-  --userdata-size 64M
+./scripts/docker-build.sh image
+./scripts/docker-build.sh stockos-runtime
+./scripts/docker-build.sh quicknes
+./scripts/docker-build.sh stockos-image --name plumos-v90s-stockos-smoke-20260710-1.img
 ```
 
-`genimage` などのホストツールが必要です。
+`stockos-image` は StockOS 実機スナップショットで確認したパーティション契約を
+再現します。
 
-KNULLI の元設定は boot-resource FAT を数GB確保しますが、このプロジェクトの反復テストでは不要なので、組み立てスクリプトのデフォルトは `--boot-vfat-size 33M`、`--userdata-size 64M` にしています。30MB/32MB は KNULLI 元設定の FAT32 指定では `mtools` がディレクトリを作れず失敗したため、実測で通る最小値の 33MB を使います。Armbian rootfs が 33MB に収まらない段階では、FAT を大きくするよりも rootfs を別 partition に置く方向で調整します。
+```text
+p1 boot-resource / Volumn vfat
+p2 env
+p3 env-redund
+p4 boot Android boot image
+p5 batocera squashfs
+p6 rootfs / BATOCERA ext4
+p7 rootfs_data / SHARE ext4
+```
 
-ホストに直接ツールを入れない場合は、アセンブリ用 Docker イメージを使います。
+反復テストを速くするため、p1 の FAT 領域はデフォルトで `33M` に抑えます。
+StockOS 由来の `boot0` / `boot_package` が未採取の場合は、互換性のある
+KNULLI V90S asset を fallback として使い、manifest に記録します。
+
+旧 KNULLI/Armbian レイアウトを使う場合だけ、明示的に `knulli-image` を使います。
 
 ```sh
-docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
-./scripts/run-assembly-tools.sh sh -lc 'genimage --version && mksquashfs -version'
+./scripts/docker-build.sh knulli-image \
+  --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
+  --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs
 ```
 
 ## Step 1 Debian minbase image

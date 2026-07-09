@@ -200,11 +200,16 @@ First implementation tasks:
 - [x] Add initial `scripts/docker-build.sh` entrypoint and `docker/plumos-v90s-toolchain` image scaffold.
 - [x] Rename the plumOS-facing SDL2 runtime from `sdl2-mali` to `sdl2-powervr`, while keeping old command/path compatibility where needed.
 - [x] Add a repository notice for POWKIDDY StockOS/Batocera-derived runtime reuse.
+- [x] Add a StockOS/Batocera-layout SD image assembler using vendor runtime raw env/boot partitions.
+- [x] Build `plumos-v90s-stockos-smoke-20260710-1.img` with p1 Volumn, p2/p3 env, p4 boot, p5 batocera squashfs, p6 BATOCERA, and p7 SHARE.
+- [x] Extend StockOS extraction to capture raw `boot0` and `boot_package` areas for future fallback removal.
 - [ ] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
 - [ ] If RA-only timing is insufficient, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
 - [ ] If pacing still differs, test StockOS-like CPU governor and `irqbalance` behavior.
 - [ ] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
-- [ ] Move the rootfs/image assembly path to StockOS/Batocera vendor-runtime inputs instead of KNULLI/Armbian-named inputs.
+- [x] Move the SD image assembly path to StockOS/Batocera vendor-runtime inputs instead of KNULLI/Armbian-named inputs.
+- [ ] Build a StockOS-layout RA image by placing the current RetroArch-capable rootfs on p5 instead of the smoke stage1 rootfs.
+- [ ] Boot-test the StockOS-layout smoke image on V90S and compare logs/display behavior with the existing KNULLI-layout Step 1 image.
 - [ ] Add V90S Docker targets for PicoArch, standalone emulators, and the plumOS frontend.
 
 Validation buckets:

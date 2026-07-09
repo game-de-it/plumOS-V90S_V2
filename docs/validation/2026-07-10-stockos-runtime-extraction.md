@@ -67,6 +67,19 @@ artifacts/20260710-stockos-runtime/SHA256SUMS
 
 The selected file tarball is about `273M`. The boot partition is about `65M`.
 
+The original extraction did not include the Allwinner `boot0` and
+`boot_package` areas because they live outside normal GPT partitions. The
+extraction script now also captures:
+
+```text
+raw-boot-chain/boot0-offset-131072.bin
+raw-boot-chain/boot-package-offset-16793600.bin
+```
+
+Those files will appear in future StockOS extractions and will let the image
+assembler stop falling back to the compatible KNULLI V90S boot0/boot_package
+assets.
+
 `file(1)` identifies the raw boot partition as:
 
 ```text

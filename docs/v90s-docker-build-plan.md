@@ -71,7 +71,15 @@ The V90S build entrypoint is:
 ./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh retroarch
 ./scripts/docker-build.sh rootfs ...
+./scripts/docker-build.sh stockos-image ...
 ./scripts/docker-build.sh sd-image ...
+```
+
+`sd-image` is an alias for the StockOS/Batocera layout. The older KNULLI-style
+image assembler remains available only as an explicit legacy command:
+
+```sh
+./scripts/docker-build.sh knulli-image ...
 ```
 
 Reserved next targets:
@@ -85,6 +93,33 @@ Reserved next targets:
 These should follow the MMF style: each target gets a focused script under
 `docker/plumos-v90s-toolchain/scripts/`, writes into `output/` or `dist/`, and
 records enough manifest/hash data to reproduce the build.
+
+## StockOS Image Layout
+
+The StockOS/Batocera layout observed on the user's modified V90S image is:
+
+```text
+p1 boot-resource / Volumn vfat
+p2 env
+p3 env-redund
+p4 boot Android boot image
+p5 batocera squashfs
+p6 rootfs / BATOCERA ext4
+p7 rootfs_data / SHARE ext4
+```
+
+The current assembler is:
+
+```sh
+./scripts/docker-build.sh stockos-image \
+  --name plumos-v90s-stockos-smoke-20260710-1.img
+```
+
+For fast iteration, p1 defaults to `33M` instead of StockOS's larger FAT area.
+The assembled smoke image uses the StockOS-derived p2/p3 env and p4 Android boot
+partition from `output/vendor/stockos-runtime`. If a future extraction includes
+raw StockOS `boot0` and `boot_package` captures, they are used automatically;
+until then the manifest records the KNULLI V90S fallback assets.
 
 ## Naming
 

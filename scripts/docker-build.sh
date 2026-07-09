@@ -21,7 +21,9 @@ Commands:
   sdl2-mali        Deprecated alias for sdl2-powervr.
   retroarch        Build the V90S RetroArch binary with the PowerVR fbdev context.
   rootfs           Build a V90S rootfs payload using scripts/build-step1-rootfs.sh.
-  sd-image         Assemble a V90S SD-card image using scripts/assemble-v90s-image.sh.
+  stockos-image    Assemble a StockOS/Batocera-layout V90S SD-card image.
+  sd-image         Alias for stockos-image.
+  knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
   picoarch         Reserved for the V90S PicoArch build path.
   standalone       Reserved for V90S standalone emulator builds.
   frontend         Reserved for the V90S frontend build path.
@@ -139,7 +141,11 @@ case "$cmd" in
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/build-step1-rootfs.sh "$@"
         ;;
-    sd-image|image-assemble)
+    stockos-image|stockos-sd-image|sd-image|image-assemble)
+        ensure_image
+        docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-stockos-image.sh "$@"
+        ;;
+    knulli-image|knulli-sd-image)
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-image.sh "$@"
         ;;

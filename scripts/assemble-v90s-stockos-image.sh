@@ -1,0 +1,364 @@
+#!/usr/bin/env sh
+set -eu
+
+vendor_runtime="${PLUMOS_V90S_VENDOR_RUNTIME_OUT:-output/vendor/stockos-runtime}"
+rootfs_squashfs="output/rootfs-step1/stage1-userdata-loader.squashfs"
+out_dir="output/images"
+image_name="plumos-v90s-stockos-smoke.img"
+volumn_vfat_size="33M"
+batocera_boot_size="33M"
+share_size="64M"
+boot0_img=""
+boot_package_img=""
+include_stock_overlay=0
+repack_rootfs=1
+keep_work=0
+
+usage() {
+    cat <<'USAGE'
+Usage:
+  assemble-v90s-stockos-image.sh [options]
+
+Options:
+  --vendor-runtime PATH
+                        prepared StockOS runtime; default output/vendor/stockos-runtime
+  --rootfs-squashfs PATH
+                        squashfs image for StockOS partition p5 "batocera";
+                        default output/rootfs-step1/stage1-userdata-loader.squashfs
+  --out-dir PATH        output directory, default output/images
+  --name NAME           output image name, default plumos-v90s-stockos-smoke.img
+  --volumn-vfat-size N  p1 boot-resource/Volumn FAT size, default 33M
+  --batocera-boot-size N
+                        p6 rootfs/BATOCERA ext4 size, default 33M
+  --share-size N        p7 rootfs_data/SHARE ext4 size, default 64M
+  --boot0 PATH          raw Allwinner boot0 image; default vendor runtime if present,
+                        otherwise KNULLI V90S boot0 fallback
+  --boot-package PATH   raw Allwinner boot_package.fex; default vendor runtime if
+                        present, otherwise KNULLI V90S boot package fallback
+  --include-stock-overlay
+                        include StockOS /media/BATOCERA/boot/overlay in p6
+  --no-rootfs-repack    copy --rootfs-squashfs directly instead of adding
+                        StockOS init mountpoint directories
+  --keep-work           keep temporary assembly directory
+
+This assembles the StockOS/Batocera partition contract observed on V90S:
+  p1 boot-resource / Volumn vfat
+  p2 env
+  p3 env-redund
+  p4 boot Android boot image
+  p5 batocera squashfs
+  p6 rootfs / BATOCERA ext4
+  p7 rootfs_data / SHARE ext4
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --vendor-runtime)
+            vendor_runtime="$2"
+            shift 2
+            ;;
+        --rootfs-squashfs)
+            rootfs_squashfs="$2"
+            shift 2
+            ;;
+        --out-dir)
+            out_dir="$2"
+            shift 2
+            ;;
+        --name)
+            image_name="$2"
+            shift 2
+            ;;
+        --volumn-vfat-size)
+            volumn_vfat_size="$2"
+            shift 2
+            ;;
+        --batocera-boot-size)
+            batocera_boot_size="$2"
+            shift 2
+            ;;
+        --share-size)
+            share_size="$2"
+            shift 2
+            ;;
+        --boot0)
+            boot0_img="$2"
+            shift 2
+            ;;
+        --boot-package)
+            boot_package_img="$2"
+            shift 2
+            ;;
+        --include-stock-overlay)
+            include_stock_overlay=1
+            shift
+            ;;
+        --no-rootfs-repack)
+            repack_rootfs=0
+            shift
+            ;;
+        --keep-work)
+            keep_work=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            printf 'error: unknown argument: %s\n' "$1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if ! command -v genimage >/dev/null 2>&1; then
+    printf 'error: genimage is required\n' >&2
+    exit 1
+fi
+if ! command -v rsync >/dev/null 2>&1; then
+    printf 'error: rsync is required\n' >&2
+    exit 1
+fi
+if [ "$repack_rootfs" -eq 1 ]; then
+    for tool in unsquashfs mksquashfs; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            printf 'error: %s is required when rootfs repack is enabled\n' "$tool" >&2
+            exit 1
+        fi
+    done
+fi
+
+vendor_root="$vendor_runtime/root"
+raw_dir="$vendor_runtime/raw-partitions"
+raw_boot_chain_dir="$vendor_runtime/raw-boot-chain"
+
+if [ ! -d "$vendor_root" ]; then
+    printf 'error: vendor runtime root not found: %s\n' "$vendor_root" >&2
+    printf 'hint: run ./scripts/docker-build.sh stockos-runtime first\n' >&2
+    exit 1
+fi
+if [ ! -f "$rootfs_squashfs" ]; then
+    printf 'error: rootfs squashfs not found: %s\n' "$rootfs_squashfs" >&2
+    exit 1
+fi
+for f in \
+    "$raw_dir/mmcblk0p2-env.bin" \
+    "$raw_dir/mmcblk0p3-env-redund.bin" \
+    "$raw_dir/mmcblk0p4-boot.bin"
+do
+    if [ ! -f "$f" ]; then
+        printf 'error: required StockOS raw partition is missing: %s\n' "$f" >&2
+        exit 1
+    fi
+done
+
+if [ -z "$boot0_img" ]; then
+    if [ -f "$raw_boot_chain_dir/boot0-offset-131072.bin" ]; then
+        boot0_img="$raw_boot_chain_dir/boot0-offset-131072.bin"
+    else
+        boot0_img=".cache/knulli-linux/board/allwinner/a133/powkiddy-v90s/partitions/boot0.img"
+    fi
+fi
+if [ -z "$boot_package_img" ]; then
+    if [ -f "$raw_boot_chain_dir/boot-package-offset-16793600.bin" ]; then
+        boot_package_img="$raw_boot_chain_dir/boot-package-offset-16793600.bin"
+    else
+        boot_package_img=".cache/knulli-linux/board/allwinner/a133/powkiddy-v90s/partitions/boot_package.fex"
+    fi
+fi
+if [ ! -f "$boot0_img" ]; then
+    printf 'error: boot0 image not found: %s\n' "$boot0_img" >&2
+    exit 1
+fi
+if [ ! -f "$boot_package_img" ]; then
+    printf 'error: boot package image not found: %s\n' "$boot_package_img" >&2
+    exit 1
+fi
+
+volumn_src="$vendor_root/media/Volumn"
+batocera_src="$vendor_root/media/BATOCERA"
+if [ ! -d "$volumn_src" ]; then
+    printf 'error: StockOS Volumn files not found: %s\n' "$volumn_src" >&2
+    exit 1
+fi
+if [ ! -d "$batocera_src" ]; then
+    if [ -d "$vendor_root/boot" ]; then
+        batocera_src="$vendor_root/boot"
+    else
+        printf 'error: StockOS BATOCERA boot files not found under: %s\n' "$vendor_root" >&2
+        exit 1
+    fi
+fi
+
+mkdir -p "$out_dir"
+work_dir="$out_dir/.work-v90s-stockos-image"
+root_dir="$work_dir/root"
+input_dir="$work_dir/input"
+genimage_tmp="$work_dir/genimage.tmp"
+generated_cfg="$work_dir/genimage.cfg"
+manifest="$out_dir/$image_name.manifest.txt"
+
+rm -rf "$work_dir"
+mkdir -p "$root_dir/volumn" "$root_dir/batocera" "$root_dir/share" "$input_dir"
+rm -f "$out_dir/$image_name" "$manifest" \
+    "$out_dir/plumos-v90s-stockos.img" \
+    "$out_dir/volumn.vfat" \
+    "$out_dir/batocera-boot.ext4" \
+    "$out_dir/share.ext4"
+
+rsync -a "$volumn_src"/ "$root_dir/volumn"/
+if [ "$include_stock_overlay" -eq 1 ]; then
+    rsync -a "$batocera_src"/ "$root_dir/batocera"/
+else
+    rsync -a --exclude 'boot/overlay' "$batocera_src"/ "$root_dir/batocera"/
+fi
+
+if [ "$repack_rootfs" -eq 1 ]; then
+    rootfs_unpack="$work_dir/rootfs-unpacked"
+    rm -rf "$rootfs_unpack"
+    unsquashfs -q -d "$rootfs_unpack" "$rootfs_squashfs"
+    mkdir -p "$rootfs_unpack/boot" "$rootfs_unpack/overlay" \
+        "$rootfs_unpack/proc" "$rootfs_unpack/sys" "$rootfs_unpack/dev" \
+        "$rootfs_unpack/tmp" "$rootfs_unpack/run"
+    mksquashfs "$rootfs_unpack" "$input_dir/batocera-rootfs.squashfs" \
+        -noappend -comp zstd -b 131072 -all-root >/dev/null
+else
+    cp "$rootfs_squashfs" "$input_dir/batocera-rootfs.squashfs"
+fi
+cp "$boot0_img" "$input_dir/boot0.img"
+cp "$boot_package_img" "$input_dir/boot_package.fex"
+cp "$raw_dir/mmcblk0p2-env.bin" "$input_dir/env.bin"
+cp "$raw_dir/mmcblk0p3-env-redund.bin" "$input_dir/env-redund.bin"
+cp "$raw_dir/mmcblk0p4-boot.bin" "$input_dir/boot.img"
+
+cat > "$generated_cfg" <<EOF
+image volumn.vfat {
+        vfat {
+                extraargs = "-F 16 -n Volumn"
+        }
+        size = "$volumn_vfat_size"
+        mountpoint = "/volumn"
+}
+
+image batocera-boot.ext4 {
+        ext4 {
+                label = "BATOCERA"
+                use-mke2fs = "true"
+                extraargs = "-m 0 -O ^metadata_csum"
+        }
+        size = "$batocera_boot_size"
+        mountpoint = "/batocera"
+}
+
+image share.ext4 {
+        ext4 {
+                label = "SHARE"
+                use-mke2fs = "true"
+                extraargs = "-m 0 -O ^metadata_csum"
+        }
+        size = "$share_size"
+        mountpoint = "/share"
+}
+
+image plumos-v90s-stockos.img {
+        hdimage {
+                partition-table-type = "gpt"
+                gpt-location = 1024
+        }
+
+        partition bootloader {
+                in-partition-table = "no"
+                image = "boot0.img"
+                offset = 131072
+        }
+
+        partition boot-package {
+                in-partition-table = "no"
+                image = "boot_package.fex"
+                offset = 16793600
+        }
+
+        partition boot-resource {
+                partition-type-uuid = "F"
+                bootable = "true"
+                image = "volumn.vfat"
+        }
+
+        partition env {
+                image = "env.bin"
+        }
+
+        partition env-redund {
+                image = "env-redund.bin"
+        }
+
+        partition boot {
+                image = "boot.img"
+        }
+
+        partition batocera {
+                image = "batocera-rootfs.squashfs"
+        }
+
+        partition rootfs {
+                image = "batocera-boot.ext4"
+        }
+
+        partition rootfs_data {
+                partition-type-uuid = "F"
+                image = "share.ext4"
+        }
+}
+EOF
+
+genimage \
+    --rootpath="$root_dir" \
+    --inputpath="$input_dir" \
+    --outputpath="$out_dir" \
+    --config="$generated_cfg" \
+    --tmppath="$genimage_tmp"
+
+if [ -f "$out_dir/plumos-v90s-stockos.img" ]; then
+    mv "$out_dir/plumos-v90s-stockos.img" "$out_dir/$image_name"
+fi
+
+rm -f "$out_dir/volumn.vfat" "$out_dir/batocera-boot.ext4" "$out_dir/share.ext4"
+
+sha256_img="$(sha256sum "$out_dir/$image_name" | awk '{print $1}')"
+sha256_rootfs="$(sha256sum "$rootfs_squashfs" | awk '{print $1}')"
+sha256_p5="$(sha256sum "$input_dir/batocera-rootfs.squashfs" | awk '{print $1}')"
+sha256_boot="$(sha256sum "$raw_dir/mmcblk0p4-boot.bin" | awk '{print $1}')"
+
+cat > "$manifest" <<EOF
+image=$out_dir/$image_name
+sha256=$sha256_img
+layout=stockos-batocera-v90s
+vendor_runtime=$vendor_runtime
+rootfs_squashfs=$rootfs_squashfs
+rootfs_squashfs_sha256=$sha256_rootfs
+p5_batocera_squashfs_sha256=$sha256_p5
+rootfs_repacked_for_stockos_init=$repack_rootfs
+boot0=$boot0_img
+boot_package=$boot_package_img
+stockos_boot_partition=$raw_dir/mmcblk0p4-boot.bin
+stockos_boot_partition_sha256=$sha256_boot
+volumn_vfat_size=$volumn_vfat_size
+batocera_boot_size=$batocera_boot_size
+share_size=$share_size
+include_stock_overlay=$include_stock_overlay
+partitions=p1:boot-resource/Volumn,p2:env,p3:env-redund,p4:boot,p5:batocera,p6:rootfs/BATOCERA,p7:rootfs_data/SHARE
+notice=Uses POWKIDDY V90S StockOS/Batocera-derived runtime inputs where available. boot0/boot_package fall back to KNULLI V90S assets unless raw StockOS boot-chain captures are present.
+EOF
+
+printf 'created: %s/%s\n' "$out_dir" "$image_name"
+printf 'manifest: %s\n' "$manifest"
+printf 'sha256: %s\n' "$sha256_img"
+
+if [ "$keep_work" -eq 0 ]; then
+    rm -rf "$work_dir"
+else
+    printf 'kept work directory: %s\n' "$work_dir"
+fi

@@ -57,6 +57,10 @@ mkdir -p "$out_dir/root" "$out_dir/raw-partitions"
 
 tar -C "$out_dir/root" -xzf "$selected_tar"
 cp -a "$raw_dir/." "$out_dir/raw-partitions/"
+if [ -d "$src_dir/raw-boot-chain" ]; then
+    mkdir -p "$out_dir/raw-boot-chain"
+    cp -a "$src_dir/raw-boot-chain/." "$out_dir/raw-boot-chain/"
+fi
 
 if [ -f "$src_dir/file-list.txt" ]; then
     cp "$src_dir/file-list.txt" "$out_dir/source-file-list.txt"
@@ -75,6 +79,7 @@ selected_tar=$selected_tar
 prepared_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 root=$out_dir/root
 raw_partitions=$out_dir/raw-partitions
+raw_boot_chain=$out_dir/raw-boot-chain
 notice=Includes files derived from the user's POWKIDDY V90S StockOS/Batocera image for plumOS V90S runtime compatibility.
 EOF
 

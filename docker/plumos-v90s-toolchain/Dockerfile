@@ -26,6 +26,8 @@ RUN apt-get update \
     debootstrap \
     device-tree-compiler \
     dosfstools \
+    e2fsprogs \
+    fdisk \
     file \
     flex \
     gawk \
@@ -48,6 +50,7 @@ RUN apt-get update \
     mtools \
     ninja-build \
     patch \
+    parted \
     pigz \
     pkg-config \
     python3 \
