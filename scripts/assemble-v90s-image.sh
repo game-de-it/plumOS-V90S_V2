@@ -8,6 +8,7 @@ image_name="plumos-v90s-armbian-step1.img"
 keep_work=0
 boot_vfat_size="33M"
 userdata_size="64M"
+userdata_payload=""
 
 usage() {
     cat <<'USAGE'
@@ -21,6 +22,8 @@ Options:
   --name NAME         output image name, default plumos-v90s-armbian-step1.img
   --boot-vfat-size N  FAT boot-resource size, default 33M
   --userdata-size N   userdata partition size, default 64M
+  --userdata-payload PATH
+                     copy PATH to userdata:/rootfs/step1-rootfs.squashfs
   --keep-work         keep temporary assembly directory
 USAGE
 }
@@ -51,6 +54,10 @@ while [ "$#" -gt 0 ]; do
             userdata_size="$2"
             shift 2
             ;;
+        --userdata-payload)
+            userdata_payload="$2"
+            shift 2
+            ;;
         --keep-work)
             keep_work=1
             shift
@@ -75,6 +82,11 @@ fi
 
 if [ ! -f "$rootfs" ]; then
     printf 'error: rootfs not found: %s\n' "$rootfs" >&2
+    exit 1
+fi
+
+if [ -n "$userdata_payload" ] && [ ! -f "$userdata_payload" ]; then
+    printf 'error: userdata payload not found: %s\n' "$userdata_payload" >&2
     exit 1
 fi
 
@@ -107,6 +119,11 @@ cp "$board_dir/bootlogo.bmp" "$boot_dir/bootlogo.bmp"
 cp -R "$board_dir/partitions" "$boot_dir/partitions"
 printf 'powkiddy-v90s\n' > "$boot_dir/boot/knulli.board"
 touch "$boot_dir/boot/autoresize"
+
+if [ -n "$userdata_payload" ]; then
+    mkdir -p "$root_dir/userdata/rootfs"
+    cp "$userdata_payload" "$root_dir/userdata/rootfs/step1-rootfs.squashfs"
+fi
 
 sed -n '1,/@files/p' "$board_dir/genimage.cfg" | sed '/@files/d' > "$generated_cfg"
 find "$boot_dir" -type f | sort | while IFS= read -r file; do

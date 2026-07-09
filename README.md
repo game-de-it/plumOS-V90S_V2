@@ -38,7 +38,7 @@ Armbian build も取得したい場合:
 
 ## Image assembly prototype
 
-`scripts/assemble-v90s-image.sh` は、KNULLI の V90S boot assets と任意の rootfs squashfs から SD カードイメージを組み立てるための試作スクリプトです。現時点では rootfs を作る処理は含みません。
+`scripts/assemble-v90s-image.sh` は、KNULLI の V90S boot assets と任意の rootfs squashfs から SD カードイメージを組み立てるための試作スクリプトです。rootfs 生成は別スクリプトで行います。
 
 ```sh
 ./scripts/assemble-v90s-image.sh \
@@ -59,6 +59,24 @@ KNULLI の元設定は boot-resource FAT を数GB確保しますが、このプ�
 docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
 ./scripts/run-assembly-tools.sh sh -lc 'genimage --version && mksquashfs -version'
 ```
+
+## Step 1 Debian minbase image
+
+最初の Armbian 方向の boot proof として、Debian Bookworm arm64 minbase rootfs を使った小さい console image を作ります。FAT には 3MB 程度の stage1 squashfs だけを置き、42MB 程度の Debian rootfs payload は userdata ext4 に置きます。
+
+```sh
+./scripts/run-assembly-tools.sh ./scripts/build-step1-rootfs.sh \
+  --out-dir output/rootfs-step1
+
+./scripts/run-assembly-tools.sh ./scripts/assemble-v90s-image.sh \
+  --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
+  --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
+  --out-dir output/images \
+  --name plumos-v90s-armbian-step1-20260709-1.img \
+  --userdata-size 64M
+```
+
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-1.img` です。
 
 ## Git workflow
 

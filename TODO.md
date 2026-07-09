@@ -22,40 +22,43 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add `scripts/assemble-v90s-image.sh` for KNULLI-boot-chain image generation.
 - [x] Validate host-side smoke image assembly with a tiny BusyBox squashfs.
 - [x] Reduce iteration image size from inherited multi-GB KNULLI layout to 33MB FAT plus 64MB userdata.
+- [x] Add a reproducible Step 1 rootfs builder with stage1 plus Debian Bookworm arm64 minbase payload.
+- [x] Add userdata payload support to the V90S image assembly script.
+- [x] Build `plumos-v90s-armbian-step1-20260709-1.img` for the first real-device boot attempt.
 
 ## Next: Armbian Rootfs Path
 
-- [ ] Re-check build host capacity with `./scripts/check-host.sh`.
-- [ ] Decide the first rootfs source:
+- [x] Re-check build host capacity with `./scripts/check-host.sh`.
+- [x] Decide the first rootfs source:
   - Option A: Armbian build framework rootfs output.
   - Option B: temporary Armbian-like Debian/Ubuntu aarch64 console rootfs via `debootstrap`, used only to prove the V90S boot path.
-- [ ] If using Armbian build framework, fetch/update it with `./scripts/fetch-reference-sources.sh --with-armbian`.
-- [ ] Create a reproducible script for the first minimal aarch64 console rootfs.
-- [ ] Ensure the rootfs has:
+- [ ] Later, fetch/update Armbian build framework with `./scripts/fetch-reference-sources.sh --with-armbian` when moving beyond the first boot proof.
+- [x] Create a reproducible script for the first minimal aarch64 console rootfs.
+- [x] Ensure the rootfs has:
   - `/sbin/init`
   - `/proc`, `/sys`, `/dev`, `/run` mount points
   - root shell or deterministic root login for bring-up
-  - console/getty path for `tty0`/`tty1` and `ttyS0`
+  - console shell/getty path for `tty0`/`tty1` and `ttyS0`
   - no desktop stack
-- [ ] Pack the rootfs as squashfs.
-- [ ] Record rootfs build commands, size, hash, and package basis in `docs/validation/`.
+- [x] Pack the rootfs as squashfs.
+- [x] Record rootfs build commands, size, hash, and package basis in `docs/validation/`.
 
 ## Next: Image Assembly
 
-- [ ] Assemble `plumos-v90s-armbian-step1-YYYYMMDD-1.img` with the Armbian-derived squashfs.
-- [ ] Keep the FAT partition near the current 33MB default when possible.
-- [ ] If the Armbian rootfs does not fit in the small FAT, prefer adding a rootfs partition or adjusting initramfs/root mounting over expanding FAT to a large size.
-- [ ] Verify the generated image on the host:
+- [x] Assemble `plumos-v90s-armbian-step1-YYYYMMDD-1.img` with the Armbian-derived squashfs.
+- [x] Keep the FAT partition near the current 33MB default when possible.
+- [x] If the Armbian rootfs does not fit in the small FAT, prefer adding a rootfs partition or adjusting initramfs/root mounting over expanding FAT to a large size.
+- [x] Verify the generated image on the host:
   - `ls -lh`
   - `shasum -a 256`
   - `file`
   - `gpt -r show`
   - squashfs contents check
-- [ ] Add a validation note for the generated image.
+- [x] Add a validation note for the generated image.
 
 ## Device Test 1
 
-- [ ] Provide the generated image path and sha256 to the user.
+- [x] Provide the generated image path and sha256 to the user.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Collect this report:
 
