@@ -153,6 +153,16 @@ size: 581M
 
 このイメージでは `plumos-v90s-retroarch.log` もFATへ残る想定です。RetroArchが黒画面で止まる場合でも、`plumos-v90s-retroarch-launch.log` に `attempt=1 timed out after 45s` が出るかを確認します。
 
+最新の実機作業用イメージは、Wi-Fi接続とSSHD起動を追加したものです。RetroArchが黒画面に入る前にネットワーク初期化を実行し、FATへ `plumos-v90s-network-ssh.log` と、IP取得できた場合は `ssh-connect.txt` を出します。
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-6-wifi-ssh.img
+sha256: 70cbf6e8edf837ef5d9d3e08a5ed632ba643fce094f08090feeb6276ea874bbc
+size: 581M
+```
+
+SSHは `root` で鍵認証とパスワード認証を有効にしています。公開鍵はビルド時に `/Users/example/.ssh/id_ed25519.pub` を入れています。Wi-Fi PSKとroot passwordは生成済みイメージ内だけに入れ、git管理ファイルには残しません。
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。

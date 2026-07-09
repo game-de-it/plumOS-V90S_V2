@@ -128,6 +128,17 @@ Each RetroArch attempt now writes and syncs its config before launch, mirrors bo
 
 KNULLI's local RetroArch package is the next binary route if Debian RetroArch still hangs. `.cache/knulli-linux/package/retroarch/retroarch/retroarch.mk` builds RetroArch `v1.22.2`, enables SDL2/EGL/GLES when the Buildroot target provides them, and adds `--enable-mali_fbdev` when `BR2_PACKAGE_HAS_LIBMALI=y` outside the RK3326/RK3568 exceptions. The A133 board config selects `BR2_PACKAGE_POWERVR_GE8300_DRIVER=y`, and that driver package provides libEGL/libGLES from the GE8300 fbdev/glibc payload.
 
+The real-device test of the fifth image kept `plumos-v90s-retroarch.log` on FAT. RetroArch is now known to load Nestopia and the NES ROM, set audio to 48000Hz, see the 640x480 SDL2 display, create a Mali EGL window from inside RetroArch, select the SDL2 joypad driver, and open ALSA. The remaining failure is useful visible rendering, not launch, ROM loading, SDL2 window creation, or ALSA opening.
+
+The sixth generated image adds Wi-Fi and SSHD before launching RetroArch:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-6-wifi-ssh.img
+sha256: 70cbf6e8edf837ef5d9d3e08a5ed632ba643fce094f08090feeb6276ea874bbc
+```
+
+It installs `openssh-server`, `wpasupplicant`, `isc-dhcp-client`, `iproute2`, `rfkill`, `iw`, and wireless regulatory data. It also copies KNULLI's A133/V90S Wi-Fi firmware and modules into the Debian payload. Runtime logs should include `plumos-v90s-network-ssh.log`, and if DHCP succeeds FAT should contain `ssh-connect.txt` with the detected `ssh root@<ip>` command. Build-time Wi-Fi/SSH secrets are intentionally not recorded in git.
+
 ## Runtime Investigation Targets
 
 Video:

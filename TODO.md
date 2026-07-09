@@ -147,8 +147,14 @@ First implementation tasks:
 - [x] Confirm custom SDL2 `mali` probe succeeds on real hardware and sees `adc_gamepad`.
 - [x] Add timed RetroArch launch diagnostics so `plumos-v90s-retroarch.log` survives when RA does not return.
 - [x] Build fifth Step 2 diagnostic image with timed RetroArch logging: `plumos-v90s-armbian-step2-20260709-5-retroarch-timeout-log.img`.
-- [ ] User flashes fifth Step 2 diagnostic image and returns FAT logs.
-- [ ] Analyze timed RetroArch logs from fifth Step 2 image.
+- [x] User flashes fifth Step 2 diagnostic image and returns FAT logs.
+- [x] Analyze timed RetroArch logs from fifth Step 2 image.
+- [x] Confirm Debian RetroArch reaches ROM/core/audio/SDL2-Mali window creation but still does not show useful video.
+- [x] Add Wi-Fi and SSHD bring-up support for live device iteration.
+- [x] Build sixth Step 2 image with Wi-Fi and SSHD: `plumos-v90s-armbian-step2-20260709-6-wifi-ssh.img`.
+- [ ] User flashes sixth Step 2 Wi-Fi/SSHD image and returns FAT logs.
+- [ ] Confirm Wi-Fi gets an IP address and SSH login works.
+- [ ] Use SSH to iterate on RetroArch runtime settings on the live V90S.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.
 
 Validation buckets:

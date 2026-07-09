@@ -11,6 +11,10 @@ pvr_dir=".cache/ge8300-drivers"
 sdl2_mali_dir="output/sdl2-mali"
 keep_work=0
 rom_path=""
+wifi_ssid="${PLUMOS_V90S_WIFI_SSID:-}"
+wifi_psk="${PLUMOS_V90S_WIFI_PSK:-}"
+ssh_authorized_keys="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
+ssh_root_password="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 usage() {
@@ -29,6 +33,12 @@ Options:
   --pvr-dir PATH        GE8300 driver checkout, default .cache/ge8300-drivers
   --sdl2-mali-dir PATH  patched SDL2 payload, default output/sdl2-mali
   --rom PATH            NES ROM to copy into debian-retroarch payload
+  --wifi-ssid SSID      configure Wi-Fi SSID in the generated payload
+  --wifi-psk PSK        configure Wi-Fi WPA/WPA2 passphrase in the generated payload
+  --ssh-authorized-keys PATH
+                        copy public keys to /root/.ssh/authorized_keys
+  --ssh-root-password PASSWORD
+                        set root password for SSH password authentication
   --keep-work           keep temporary build directory
 USAGE
 }
@@ -69,6 +79,22 @@ while [ "$#" -gt 0 ]; do
             ;;
         --rom)
             rom_path="$2"
+            shift 2
+            ;;
+        --wifi-ssid)
+            wifi_ssid="$2"
+            shift 2
+            ;;
+        --wifi-psk)
+            wifi_psk="$2"
+            shift 2
+            ;;
+        --ssh-authorized-keys)
+            ssh_authorized_keys="$2"
+            shift 2
+            ;;
+        --ssh-root-password)
+            ssh_root_password="$2"
             shift 2
             ;;
         --keep-work)
@@ -136,6 +162,16 @@ if [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
         printf 'hint: run ./scripts/run-assembly-tools.sh ./scripts/build-sdl2-mali.sh first\n' >&2
         exit 1
     fi
+fi
+
+if { [ -n "$wifi_ssid" ] && [ -z "$wifi_psk" ]; } || { [ -z "$wifi_ssid" ] && [ -n "$wifi_psk" ]; }; then
+    printf 'error: --wifi-ssid and --wifi-psk must be provided together\n' >&2
+    exit 2
+fi
+
+if [ -n "$ssh_authorized_keys" ] && [ ! -f "$ssh_authorized_keys" ]; then
+    printf 'error: SSH authorized_keys source not found: %s\n' "$ssh_authorized_keys" >&2
+    exit 1
 fi
 
 mkdir -p "$out_dir"
@@ -414,6 +450,9 @@ copy_to_fat_logs() {
     if [ -f /mnt/share/plumos-v90s-pvr-probe.log ]; then
         cp /mnt/share/plumos-v90s-pvr-probe.log "$FAT_LOG_DIR/plumos-v90s-pvr-probe.log" 2>/dev/null || true
     fi
+    if [ -f /mnt/share/plumos-v90s-network-ssh.log ]; then
+        cp /mnt/share/plumos-v90s-network-ssh.log "$FAT_LOG_DIR/plumos-v90s-network-ssh.log" 2>/dev/null || true
+    fi
     sync
 }
 
@@ -552,6 +591,16 @@ if [ -x /usr/local/sbin/v90s-pvr-probe ]; then
     persist_debian_log
 fi
 
+if [ -x /usr/local/sbin/v90s-network-ssh-init ]; then
+    log "debian-init: starting network/SSH init"
+    persist_debian_log
+    sync
+    /usr/local/sbin/v90s-network-ssh-init
+    rc=$?
+    log "debian-init: network/SSH init exited rc=$rc"
+    persist_debian_log
+fi
+
 if [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
     log "debian-init: starting RetroArch launcher"
     persist_debian_log
@@ -674,6 +723,7 @@ EOF
 
 install_pvr_probe() {
     root="$1"
+    pvr_standard_module_src="$knulli_a133_overlay/lib/modules/4.9.191"
     pvr_module_src="$knulli_a133_overlay/lib/modules/4.9.191_v90s"
 
     install -D -m 0755 "$script_dir/v90s-pvr-probe.sh" "$root/usr/local/sbin/v90s-pvr-probe"
@@ -686,17 +736,12 @@ install_pvr_probe() {
     fi
 
     cp -a "$pvr_dir/fbdev/glibc/lib64/firmware/." "$root/lib/firmware/" 2>/dev/null || true
-    cp -a "$knulli_a133_overlay/lib/firmware/rgx.fw.22.102.54.38" "$root/lib/firmware/" 2>/dev/null || true
-    cp -a "$knulli_a133_overlay/lib/firmware/rgx.sh.22.102.54.38" "$root/lib/firmware/" 2>/dev/null || true
+    cp -a "$knulli_a133_overlay/lib/firmware/." "$root/lib/firmware/" 2>/dev/null || true
 
-    install -m 0644 "$pvr_module_src/pvrsrvkm.ko" "$root/lib/modules/4.9.191/pvrsrvkm.ko"
-    install -m 0644 "$pvr_module_src/dc_sunxi.ko" "$root/lib/modules/4.9.191/dc_sunxi.ko"
-    if [ -f "$pvr_module_src/sunxi-backlight.ko" ]; then
-        install -m 0644 "$pvr_module_src/sunxi-backlight.ko" "$root/lib/modules/4.9.191/sunxi-backlight.ko"
+    if [ -d "$pvr_standard_module_src" ]; then
+        cp -a "$pvr_standard_module_src/." "$root/lib/modules/4.9.191/"
     fi
-    for meta in modules.alias modules.builtin modules.dep modules.devname modules.order modules.softdep modules.symbols; do
-        [ -f "$pvr_module_src/$meta" ] && install -m 0644 "$pvr_module_src/$meta" "$root/lib/modules/4.9.191/$meta"
-    done
+    cp -a "$pvr_module_src/." "$root/lib/modules/4.9.191/"
 
     mkdir -p "$root/etc/ld.so.conf.d"
     printf '/usr/lib/powervr\n' > "$root/etc/ld.so.conf.d/powervr.conf"
@@ -715,6 +760,67 @@ install_sdl2_mali() {
     fi
 }
 
+escape_wpa_value() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+install_network_ssh() {
+    root="$1"
+
+    install -D -m 0755 "$script_dir/v90s-network-ssh-init.sh" "$root/usr/local/sbin/v90s-network-ssh-init"
+
+    mkdir -p "$root/etc/ssh/sshd_config.d" "$root/root/.ssh" "$root/etc/plumos-network"
+    cat > "$root/etc/ssh/sshd_config.d/plumos-v90s.conf" <<'EOF'
+PermitRootLogin yes
+PasswordAuthentication yes
+PubkeyAuthentication yes
+KbdInteractiveAuthentication yes
+UsePAM no
+PermitEmptyPasswords no
+AuthorizedKeysFile .ssh/authorized_keys
+EOF
+
+    if [ -n "$ssh_authorized_keys" ]; then
+        install -m 0600 "$ssh_authorized_keys" "$root/root/.ssh/authorized_keys"
+    fi
+    chmod 0700 "$root/root/.ssh"
+
+    if [ -n "$ssh_root_password" ]; then
+        root_hash="$(openssl passwd -6 "$ssh_root_password")"
+        awk -F: -v OFS=: -v hash="$root_hash" '
+            $1 == "root" { $2 = hash }
+            { print }
+        ' "$root/etc/shadow" > "$root/etc/shadow.tmp"
+        mv "$root/etc/shadow.tmp" "$root/etc/shadow"
+        chmod 0640 "$root/etc/shadow"
+    fi
+
+    if [ -n "$wifi_ssid" ]; then
+        mkdir -p "$root/etc/wpa_supplicant"
+        escaped_ssid="$(escape_wpa_value "$wifi_ssid")"
+        escaped_psk="$(escape_wpa_value "$wifi_psk")"
+        cat > "$root/etc/wpa_supplicant/wpa_supplicant.conf" <<EOF
+ctrl_interface=/run/wpa_supplicant
+update_config=0
+country=JP
+
+network={
+    ssid="$escaped_ssid"
+    psk="$escaped_psk"
+    key_mgmt=WPA-PSK
+}
+EOF
+        chmod 0600 "$root/etc/wpa_supplicant/wpa_supplicant.conf"
+    fi
+
+    cat > "$root/etc/plumos-network-release" <<EOF
+name=plumOS V90S network SSH payload
+wifi_configured=$([ -n "$wifi_ssid" ] && printf yes || printf no)
+ssh_authorized_keys=$([ -n "$ssh_authorized_keys" ] && printf yes || printf no)
+ssh_password_auth=$([ -n "$ssh_root_password" ] && printf yes || printf no)
+EOF
+}
+
 build_debian_retroarch_payload() {
     payload_suffix="$1"
     profile_name="$2"
@@ -725,6 +831,9 @@ build_debian_retroarch_payload() {
     mkdir -p "$root"
 
     retroarch_packages="retroarch,libretro-nestopia,alsa-utils,input-utils,procps,psmisc,kmod"
+    if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
+        retroarch_packages="${retroarch_packages},openssh-server,wpasupplicant,isc-dhcp-client,iproute2,rfkill,iw,wireless-regdb,ca-certificates"
+    fi
     debootstrap --arch=arm64 --variant=minbase --include="$retroarch_packages" "$suite" "$root" "$mirror"
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/root" "$root/roms/nes"
@@ -736,6 +845,9 @@ build_debian_retroarch_payload() {
     fi
     if [ "$include_sdl2_mali" -eq 1 ]; then
         install_sdl2_mali "$root"
+    fi
+    if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
+        install_network_ssh "$root"
     fi
     install -m 0644 "$rom_path" "$root/roms/nes/Super Mario Bros..nes"
     printf 'plumos-v90s-step2\n' > "$root/etc/hostname"
