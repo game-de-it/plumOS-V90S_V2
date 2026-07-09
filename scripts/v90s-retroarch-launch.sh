@@ -443,7 +443,7 @@ EOF
 video_fullscreen = "true"
 video_windowed_fullscreen = "true"
 video_vsync = "true"
-video_refresh_rate = "60.000000"
+video_refresh_rate = "${PLUMOS_V90S_VIDEO_REFRESH_RATE:-60.000000}"
 video_threaded = "$video_threaded"
 video_smooth = "false"
 video_scale_integer = "false"

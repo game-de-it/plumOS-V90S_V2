@@ -147,3 +147,74 @@ lcd_ht=825, lcd_vt=506 -> about 59.994 Hz, hfront porch 65, vfront porch 6
 The second path is more direct if true 60 Hz is required, but it is also riskier:
 bad LCD timing can produce a blank or unstable panel. It should be tested as a
 small dedicated image change.
+
+## Live 59.06063 Hz RetroArch Test
+
+The first, non-reflash experiment was added to the live transfer tooling:
+
+```text
+./scripts/live-transfer-retroarch-knulli.sh 192.0.2.118 --refresh-rate 59.06063
+```
+
+`scripts/v90s-retroarch-launch.sh` now writes:
+
+```text
+video_refresh_rate = "${PLUMOS_V90S_VIDEO_REFRESH_RATE:-60.000000}"
+```
+
+The transfer helper stores the requested value in the live environment:
+
+```text
+export PLUMOS_V90S_VIDEO_REFRESH_RATE=59.06063
+```
+
+The live config on the device confirmed the intended value:
+
+```text
+RetroArch: pid=6662 running comm='retroarch-knull'
+video_driver = "gl"
+video_context_driver = "mali_fbdev"
+video_vsync = "true"
+video_refresh_rate = "59.06063"
+video_threaded = "false"
+audio_driver = "alsa"
+audio_device = "hw:0,0"
+```
+
+The display interrupt cadence stayed in the same measured range:
+
+```text
+duration=15.01s display_delta=887 display_hz=59.09394
+```
+
+RetroArch accepted the refresh override, but it also adjusted the audio input
+rate downward:
+
+```text
+[Audio] Set audio input rate to: 43409.56 Hz.
+[ALSA] Initialized PLAYBACK device "hw:0,0".
+[Audio] Started synchronous audio driver.
+```
+
+This is expected for a refresh-match test: RetroArch is aligning a 60.00 FPS NES
+core to a roughly 59.06 Hz display by resampling/slowing audio by about 1.6%.
+This may reduce scroll judder, but it is not true 60 Hz gameplay. User
+confirmation of visual smoothness and audio pitch/continuity is pending.
+
+User result:
+
+```text
+Audio stutter disappeared.
+The pitch sounded slightly low.
+```
+
+That confirms the diagnosis. Matching RetroArch to the real 59.06 Hz display
+cadence removes the buffer/pacing symptom, but it slows the game/audio enough to
+be audible. The next recommended path is a dedicated LCD timing image that makes
+the panel interrupt cadence close to 60 Hz, then returns RetroArch to:
+
+```text
+video_refresh_rate = "60.000000"
+audio_driver = "alsa"
+audio_device = "hw:0,0"
+```
