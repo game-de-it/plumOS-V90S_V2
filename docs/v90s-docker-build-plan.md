@@ -115,6 +115,15 @@ The current assembler is:
   --name plumos-v90s-stockos-smoke-20260710-1.img
 ```
 
+The first RA-capable StockOS-layout image uses the current RetroArch payload as
+p5:
+
+```sh
+./scripts/docker-build.sh stockos-image \
+  --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stocklcd-persistent-ra-config/debian-bookworm-retroarch-knulli-step2.squashfs \
+  --name plumos-v90s-stockos-ra-20260710-1.img
+```
+
 For fast iteration, p1 defaults to `33M` instead of StockOS's larger FAT area.
 The assembled smoke image uses the StockOS-derived p2/p3 env and p4 Android boot
 partition from `output/vendor/stockos-runtime`. If a future extraction includes

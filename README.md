@@ -66,6 +66,9 @@ Docker build flow です。
 ./scripts/docker-build.sh stockos-runtime
 ./scripts/docker-build.sh quicknes
 ./scripts/docker-build.sh stockos-image --name plumos-v90s-stockos-smoke-20260710-1.img
+./scripts/docker-build.sh stockos-image \
+  --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stocklcd-persistent-ra-config/debian-bookworm-retroarch-knulli-step2.squashfs \
+  --name plumos-v90s-stockos-ra-20260710-1.img
 ```
 
 `stockos-image` は StockOS 実機スナップショットで確認したパーティション契約を
@@ -84,6 +87,8 @@ p7 rootfs_data / SHARE ext4
 反復テストを速くするため、p1 の FAT 領域はデフォルトで `33M` に抑えます。
 StockOS 由来の `boot0` / `boot_package` が未採取の場合は、互換性のある
 KNULLI V90S asset を fallback として使い、manifest に記録します。
+現在のRA入りStockOSレイアウト候補は
+`output/images/plumos-v90s-stockos-ra-20260710-1.img` です。
 
 旧 KNULLI/Armbian レイアウトを使う場合だけ、明示的に `knulli-image` を使います。
 

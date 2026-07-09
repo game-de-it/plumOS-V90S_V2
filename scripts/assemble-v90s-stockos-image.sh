@@ -219,7 +219,11 @@ fi
 if [ "$repack_rootfs" -eq 1 ]; then
     rootfs_unpack="$work_dir/rootfs-unpacked"
     rm -rf "$rootfs_unpack"
-    unsquashfs -q -d "$rootfs_unpack" "$rootfs_squashfs"
+    # Docker Desktop cannot always create rootfs device nodes on bind mounts.
+    # Preserve the payload files and let the target kernel/devtmpfs repopulate /dev.
+    unsquashfs -q -no-progress -ignore-errors -no-exit-code \
+        -d "$rootfs_unpack" "$rootfs_squashfs"
+    rm -rf "$rootfs_unpack/dev"
     mkdir -p "$rootfs_unpack/boot" "$rootfs_unpack/overlay" \
         "$rootfs_unpack/proc" "$rootfs_unpack/sys" "$rootfs_unpack/dev" \
         "$rootfs_unpack/tmp" "$rootfs_unpack/run"

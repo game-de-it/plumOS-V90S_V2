@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Current Goal
 
@@ -208,8 +208,9 @@ First implementation tasks:
 - [ ] If pacing still differs, test StockOS-like CPU governor and `irqbalance` behavior.
 - [ ] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
 - [x] Move the SD image assembly path to StockOS/Batocera vendor-runtime inputs instead of KNULLI/Armbian-named inputs.
-- [ ] Build a StockOS-layout RA image by placing the current RetroArch-capable rootfs on p5 instead of the smoke stage1 rootfs.
+- [x] Build a StockOS-layout RA image by placing the current RetroArch-capable rootfs on p5 instead of the smoke stage1 rootfs.
 - [ ] Boot-test the StockOS-layout smoke image on V90S and compare logs/display behavior with the existing KNULLI-layout Step 1 image.
+- [ ] Boot-test `plumos-v90s-stockos-ra-20260710-1.img` on V90S and compare RetroArch display/input/audio behavior.
 - [ ] Add V90S Docker targets for PicoArch, standalone emulators, and the plumOS frontend.
 
 Validation buckets:
