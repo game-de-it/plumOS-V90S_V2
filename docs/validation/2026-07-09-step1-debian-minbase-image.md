@@ -119,6 +119,18 @@ sha256: 58704d22bd72960f2bf2d4224453366bf0257db810edddf158194c2b3adeef9e
 compression: zstd
 ```
 
+After device test 9 still showed no stage1 log, the payloads were rebuilt to mount tmpfs on `/tmp` and `/run` before writing stage1/Debian logs:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: 055d78005fab725fd83efbe7f2db15d533159919fa8047fee6acd987429b5006
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: d9f2918f1e29234dce44eb70e89dea4a1a87943a1be1a09f86b6e65b5fff708a
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check

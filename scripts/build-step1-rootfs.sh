@@ -158,8 +158,13 @@ $bb mount -t proc proc /proc 2>/dev/null || true
 $bb mount -t sysfs sysfs /sys 2>/dev/null || true
 $bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || $bb mount -t tmpfs dev /dev 2>/dev/null || true
 $bb mkdir -p /dev/pts /dev/shm /run /tmp /mnt/share /new_root
+$bb mount -t tmpfs tmpfs /run 2>/dev/null || true
+$bb mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 $bb mount -t devpts devpts /dev/pts 2>/dev/null || true
 $bb chmod 1777 /tmp
+
+log "stage1: init entered before tty setup"
+persist_stage1_log
 
 for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do
     if [ -c "$tty" ]; then
@@ -300,8 +305,13 @@ mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || mount -t tmpfs dev /dev 2>/dev/null || true
 mkdir -p /dev/pts /dev/shm /run /tmp
+mount -t tmpfs tmpfs /run 2>/dev/null || true
+mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 mount -t devpts devpts /dev/pts 2>/dev/null || true
 chmod 1777 /tmp
+
+log "debian-init: init entered before tty setup"
+persist_debian_log
 
 for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do
     if [ -c "$tty" ]; then

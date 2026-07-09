@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img \
+  --name plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img` です。
 
 ```text
-sha256: 049f684e0ba2b4a845282c79b16e79bef284c0c4e7f23122b8473bb941b58617
+sha256: 370c63fd8f9953703643fea737aff762ec2ca2cca9d657303c563484908c15af
 size: 133M
 ```
 
@@ -102,7 +102,9 @@ size: 133M
 
 `-8-stage1-sh-prepersist` の実機ログでは、diagnostic initramfs が `boot: preparing to switch to stage1 /sbin/init` まで到達しましたが、stage1/Debian のログはまだ出ませんでした。`-9-stage1-share-handoff` では diagnostic initramfs が userdata を `/new_root/mnt/share` に mount してから `switch_root` し、stage1 がそのまま `/mnt/share` として使えるようにしています。これで stage1 が実行された場合、block device scan の前に `plumos-v90s-stage1.log` が残るはずです。
 
-`-9-stage1-share-handoff` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
+`-9-stage1-share-handoff` の実機ログでは、handoff mount と `boot: switching to stage1 /sbin/init` までは確認できましたが、stage1/Debian のログはまだ出ませんでした。stage1/Debian rootfs は squashfs なので、`/tmp` を tmpfs にしないまま `/tmp/plumos-*.log` へ書くと失敗します。`-10-stage1-tmpfs-log` では stage1 と Debian init の最初に `/tmp` と `/run` を tmpfs として mount し、tty リダイレクトより前にログ保存を試します。また diagnostic 側から stage1 `/bin/sh` を chroot 実行して `plumos-v90s-stage1-preflight.log` を残します。
+
+`-10-stage1-tmpfs-log` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1-preflight.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
 
 ## Git workflow
 

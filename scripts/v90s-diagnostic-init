@@ -131,6 +131,16 @@ prepare_stage1_share() {
     return 1
 }
 
+run_stage1_preflight() {
+    log "stage1-preflight: running /bin/sh inside stage1 root"
+    if $bb chroot /new_root /bin/sh -c 'echo "stage1-preflight: chroot shell ok" >> /mnt/share/plumos-v90s-stage1-preflight.log; /bin/busybox sync' >> "$LOG" 2>&1; then
+        log "stage1-preflight: chroot shell ok"
+    else
+        log "stage1-preflight: chroot shell failed"
+    fi
+    persist_logs_to_stage1_share
+}
+
 find_boot_root() {
     BOOT_ROOT_DEV=
     BOOT_ROOT_FS=
@@ -269,6 +279,7 @@ log "boot: preparing to switch to stage1 /sbin/init"
 persist_logs
 prepare_stage1_share || true
 persist_logs_to_stage1_share
+run_stage1_preflight
 
 $bb mount --move /proc /new_root/proc 2>/dev/null || true
 $bb mount --move /sys /new_root/sys 2>/dev/null || true
