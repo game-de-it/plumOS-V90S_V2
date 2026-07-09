@@ -196,11 +196,16 @@ First implementation tasks:
 - [x] Compare the user's modified StockOS RA-running runtime against the current plumOS runtime over SSH.
 - [x] Confirm StockOS uses generated `retroarchcustom.cfg`, QuickNES, `video_refresh_rate=58.917103`, `vrr_runloop_enable=true`, `video_threaded=true`, Pulse/PipeWire audio, `schedutil`, and `irqbalance`.
 - [x] Extract StockOS boot/env partitions, kernel modules, PowerVR/SDL2/RetroArch/PipeWire runtime pieces, and configgen files into ignored `artifacts/20260710-stockos-runtime`.
+- [x] Decide to pivot from Armbian/Buildroot-first to a plumOS-V90S Docker toolchain using the StockOS/Batocera runtime extraction as the vendor baseline.
+- [x] Add initial `scripts/docker-build.sh` entrypoint and `docker/plumos-v90s-toolchain` image scaffold.
+- [x] Rename the plumOS-facing SDL2 runtime from `sdl2-mali` to `sdl2-powervr`, while keeping old command/path compatibility where needed.
+- [x] Add a repository notice for POWKIDDY StockOS/Batocera-derived runtime reuse.
 - [ ] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
 - [ ] If RA-only timing is insufficient, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
 - [ ] If pacing still differs, test StockOS-like CPU governor and `irqbalance` behavior.
 - [ ] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
-- [ ] Bring Armbian build framework into the workflow and use it for rootfs/userspace generation instead of the hand-maintained debootstrap-only path.
+- [ ] Move the rootfs/image assembly path to StockOS/Batocera vendor-runtime inputs instead of KNULLI/Armbian-named inputs.
+- [ ] Add V90S Docker targets for PicoArch, standalone emulators, and the plumOS frontend.
 
 Validation buckets:
 

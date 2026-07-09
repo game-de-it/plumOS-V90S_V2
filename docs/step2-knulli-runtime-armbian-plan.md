@@ -2,6 +2,12 @@
 
 Date: 2026-07-09
 
+Update 2026-07-10: this document records the KNULLI/Armbian-era reasoning that
+led to the working boot/runtime path. The current build-system direction is now
+`docs/v90s-docker-build-plan.md`: use the user's StockOS/Batocera extraction as
+the vendor runtime baseline and build plumOS userspace with a V90S-specific
+Docker toolchain.
+
 ## Goal
 
 Reproduce KNULLI's V90S video/audio runtime closely enough that RetroArch can run

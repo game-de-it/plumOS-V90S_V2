@@ -8,7 +8,7 @@ out_dir="output/rootfs-step1"
 knulli_ramdisk=".cache/v90s-ramdisk"
 knulli_a133_overlay=".cache/knulli-linux/board/allwinner/a133/fsoverlay"
 pvr_dir=".cache/ge8300-drivers"
-sdl2_mali_dir="output/sdl2-mali"
+sdl2_powervr_dir="output/sdl2-powervr"
 quicknes_dir="output/libretro-quicknes"
 retroarch_knulli_dir="output/retroarch-knulli"
 keep_work=0
@@ -35,7 +35,9 @@ Options:
   --knulli-ramdisk PATH extracted KNULLI ramdisk, default .cache/v90s-ramdisk
   --knulli-a133-overlay PATH KNULLI a133 fsoverlay, default .cache/knulli-linux/board/allwinner/a133/fsoverlay
   --pvr-dir PATH        GE8300 driver checkout, default .cache/ge8300-drivers
-  --sdl2-mali-dir PATH  patched SDL2 payload, default output/sdl2-mali
+  --sdl2-powervr-dir PATH
+                        patched SDL2/PowerVR payload, default output/sdl2-powervr
+  --sdl2-mali-dir PATH  deprecated alias for --sdl2-powervr-dir
   --quicknes-dir PATH   QuickNES libretro payload, default output/libretro-quicknes
   --retroarch-knulli-dir PATH
                         KNULLI-style RetroArch payload, default output/retroarch-knulli
@@ -82,8 +84,8 @@ while [ "$#" -gt 0 ]; do
             pvr_dir="$2"
             shift 2
             ;;
-        --sdl2-mali-dir)
-            sdl2_mali_dir="$2"
+        --sdl2-powervr-dir|--sdl2-mali-dir)
+            sdl2_powervr_dir="$2"
             shift 2
             ;;
         --quicknes-dir)
@@ -192,9 +194,9 @@ if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retro
 fi
 
 if [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
-    if [ ! -f "$sdl2_mali_dir/usr/local/lib/plumos-sdl2-mali/libSDL2-2.0.so.0" ] || [ ! -x "$sdl2_mali_dir/usr/local/bin/v90s-sdl2-video-probe" ]; then
-        printf 'error: patched SDL2 mali payload not found under: %s\n' "$sdl2_mali_dir" >&2
-        printf 'hint: run ./scripts/run-assembly-tools.sh ./scripts/build-sdl2-mali.sh first\n' >&2
+    if [ ! -f "$sdl2_powervr_dir/usr/local/lib/plumos-sdl2-powervr/libSDL2-2.0.so.0" ] || [ ! -x "$sdl2_powervr_dir/usr/local/bin/v90s-sdl2-video-probe" ]; then
+        printf 'error: patched SDL2/PowerVR payload not found under: %s\n' "$sdl2_powervr_dir" >&2
+        printf 'hint: run ./scripts/docker-build.sh sdl2-powervr first\n' >&2
         exit 1
     fi
 fi
@@ -746,16 +748,16 @@ install_pvr_probe() {
     printf '/usr/lib/powervr\n' > "$root/etc/ld.so.conf.d/powervr.conf"
 }
 
-install_sdl2_mali() {
+install_sdl2_powervr() {
     root="$1"
 
     mkdir -p "$root/usr/local" "$root/etc"
-    cp -a "$sdl2_mali_dir/usr/local/." "$root/usr/local/"
-    if [ -f "$sdl2_mali_dir/manifest.txt" ]; then
-        install -m 0644 "$sdl2_mali_dir/manifest.txt" "$root/etc/plumos-sdl2-mali-manifest.txt"
+    cp -a "$sdl2_powervr_dir/usr/local/." "$root/usr/local/"
+    if [ -f "$sdl2_powervr_dir/manifest.txt" ]; then
+        install -m 0644 "$sdl2_powervr_dir/manifest.txt" "$root/etc/plumos-sdl2-powervr-manifest.txt"
     fi
-    if [ -f "$sdl2_mali_dir/SHA256SUMS" ]; then
-        install -m 0644 "$sdl2_mali_dir/SHA256SUMS" "$root/etc/plumos-sdl2-mali-SHA256SUMS"
+    if [ -f "$sdl2_powervr_dir/SHA256SUMS" ]; then
+        install -m 0644 "$sdl2_powervr_dir/SHA256SUMS" "$root/etc/plumos-sdl2-powervr-SHA256SUMS"
     fi
 }
 
@@ -872,7 +874,7 @@ build_debian_retroarch_payload() {
     payload_suffix="$1"
     profile_name="$2"
     include_pvr="$3"
-    include_sdl2_mali="${4:-0}"
+    include_sdl2_powervr="${4:-0}"
     include_retroarch_knulli="${5:-0}"
     root="$work_dir/${profile_name}-root"
     rm -rf "$root"
@@ -897,8 +899,8 @@ build_debian_retroarch_payload() {
     if [ "$include_pvr" -eq 1 ]; then
         install_pvr_probe "$root"
     fi
-    if [ "$include_sdl2_mali" -eq 1 ]; then
-        install_sdl2_mali "$root"
+    if [ "$include_sdl2_powervr" -eq 1 ]; then
+        install_sdl2_powervr "$root"
     fi
     if [ "$include_retroarch_knulli" -eq 1 ]; then
         install_retroarch_knulli "$root"
@@ -922,7 +924,7 @@ mirror=$mirror
 rootfs_profile=$profile_name
 packages=$retroarch_packages
 power_pvr_probe=$include_pvr
-custom_sdl2_mali=$include_sdl2_mali
+custom_sdl2_powervr=$include_sdl2_powervr
 custom_retroarch_knulli=$include_retroarch_knulli
 retroarch_start_mode=$retroarch_start_mode
 retroarch_bin=$([ "$include_retroarch_knulli" -eq 1 ] && printf /usr/local/bin/retroarch-knulli || printf /usr/bin/retroarch)

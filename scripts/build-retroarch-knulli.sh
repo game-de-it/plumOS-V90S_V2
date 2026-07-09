@@ -6,7 +6,7 @@ out_dir="output/retroarch-knulli"
 work_dir="output/build/retroarch-${version}"
 knulli_src=".cache/knulli-linux"
 pvr_dir=".cache/ge8300-drivers"
-sdl2_mali_dir="output/sdl2-mali"
+sdl2_powervr_dir="output/sdl2-powervr"
 local_patch_dir="patches/retroarch"
 docker_image="${PLUMOS_V90S_RETROARCH_DOCKER_IMAGE:-debian:bookworm}"
 apply_patches=0
@@ -22,7 +22,9 @@ Options:
   --work-dir PATH       source/build directory; default output/build/retroarch-TAG
   --knulli-src PATH     KNULLI source checkout; default .cache/knulli-linux
   --pvr-dir PATH        GE8300 driver checkout; default .cache/ge8300-drivers
-  --sdl2-mali-dir PATH  patched SDL2 payload; default output/sdl2-mali
+  --sdl2-powervr-dir PATH
+                        patched SDL2/PowerVR payload; default output/sdl2-powervr
+  --sdl2-mali-dir PATH  deprecated alias for --sdl2-powervr-dir
   --local-patch-dir PATH
                         local RetroArch patches; default patches/retroarch
   --apply-patches       also replay KNULLI package patches before building
@@ -53,8 +55,8 @@ while [ "$#" -gt 0 ]; do
             pvr_dir="$2"
             shift 2
             ;;
-        --sdl2-mali-dir)
-            sdl2_mali_dir="$2"
+        --sdl2-powervr-dir|--sdl2-mali-dir)
+            sdl2_powervr_dir="$2"
             shift 2
             ;;
         --local-patch-dir)
@@ -81,14 +83,14 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-if ! command -v docker >/dev/null 2>&1; then
+if [ "${PLUMOS_V90S_BUILD_IN_CONTAINER:-0}" != "1" ] && ! command -v docker >/dev/null 2>&1; then
     printf 'error: docker is required\n' >&2
     exit 1
 fi
 
 patch_dir="$knulli_src/package/retroarch/retroarch"
 pvr_lib_dir="$pvr_dir/fbdev/glibc/lib64"
-sdl2_lib_dir="$sdl2_mali_dir/usr/local/lib/plumos-sdl2-mali"
+sdl2_lib_dir="$sdl2_powervr_dir/usr/local/lib/plumos-sdl2-powervr"
 
 if [ ! -d "$patch_dir" ]; then
     printf 'error: KNULLI RetroArch package directory not found: %s\n' "$patch_dir" >&2
@@ -100,8 +102,8 @@ if [ ! -f "$pvr_lib_dir/libEGL.so" ] || [ ! -f "$pvr_lib_dir/libGLESv2.so" ]; th
     exit 1
 fi
 if [ ! -f "$sdl2_lib_dir/libSDL2-2.0.so.0" ]; then
-    printf 'error: patched SDL2 mali library not found under: %s\n' "$sdl2_lib_dir" >&2
-    printf 'hint: run ./scripts/run-assembly-tools.sh ./scripts/build-sdl2-mali.sh first\n' >&2
+    printf 'error: patched SDL2/PowerVR library not found under: %s\n' "$sdl2_lib_dir" >&2
+    printf 'hint: run ./scripts/docker-build.sh sdl2-powervr first\n' >&2
     exit 1
 fi
 
@@ -138,27 +140,14 @@ work_abs="$(CDPATH= cd -- "$work_dir" && pwd)"
 pvr_abs="$(CDPATH= cd -- "$pvr_lib_dir" && pwd)"
 sdl2_abs="$(CDPATH= cd -- "$sdl2_lib_dir" && pwd)"
 
-docker run --rm --platform linux/arm64 \
-    -v "$work_abs:/src" \
-    -v "$pvr_abs:/pvr:ro" \
-    -v "$sdl2_abs:/sdl2:ro" \
-    -w /src \
-    "$docker_image" \
-    sh -c '
+if [ "${PLUMOS_V90S_BUILD_IN_CONTAINER:-0}" = "1" ]; then
+    (
+        cd "$work_abs"
         set -eu
-        export DEBIAN_FRONTEND=noninteractive
-        printf "%s\n" "Acquire::Retries \"3\";" > /etc/apt/apt.conf.d/80-plumos-retries
-        rm -rf /var/lib/apt/lists/*
-        apt-get update >/dev/null
-        apt-get install -y --no-install-recommends \
-            build-essential ca-certificates file git make pkg-config \
-            libasound2-dev libegl-dev libfreetype6-dev libgles-dev \
-            libsdl2-dev libudev-dev zlib1g-dev >/dev/null
-
         export CPPFLAGS="-DEGL_API_FB -DLINUX"
         export CFLAGS="-O2 -pipe -fPIC ${CPPFLAGS}"
         export CXXFLAGS="${CFLAGS}"
-        export LDFLAGS="-L/pvr -L/sdl2 -Wl,-rpath-link,/pvr -Wl,-rpath,/usr/lib/powervr -Wl,-rpath,/usr/local/lib/plumos-sdl2-mali"
+        export LDFLAGS="-L$pvr_abs -L$sdl2_abs -Wl,-rpath-link,$pvr_abs -Wl,-rpath,/usr/lib/powervr -Wl,-rpath,/usr/local/lib/plumos-sdl2-powervr"
         export LIBS="-lIMGegl -lsrv_um -lglslcompiler -lusc"
         export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
 
@@ -190,9 +179,66 @@ docker run --rm --platform linux/arm64 \
 
         make -j"$(nproc)"
         rm -rf .stage
-        make DESTDIR=/src/.stage install
+        make DESTDIR="$work_abs/.stage" install
         file .stage/usr/bin/retroarch
-    '
+    )
+else
+    docker run --rm --platform linux/arm64 \
+        -v "$work_abs:/src" \
+        -v "$pvr_abs:/pvr:ro" \
+        -v "$sdl2_abs:/sdl2:ro" \
+        -w /src \
+        "$docker_image" \
+        sh -c '
+            set -eu
+            export DEBIAN_FRONTEND=noninteractive
+            printf "%s\n" "Acquire::Retries \"3\";" > /etc/apt/apt.conf.d/80-plumos-retries
+            rm -rf /var/lib/apt/lists/*
+            apt-get update >/dev/null
+            apt-get install -y --no-install-recommends \
+                build-essential ca-certificates file git make pkg-config \
+                libasound2-dev libegl-dev libfreetype6-dev libgles-dev \
+                libsdl2-dev libudev-dev zlib1g-dev >/dev/null
+
+            export CPPFLAGS="-DEGL_API_FB -DLINUX"
+            export CFLAGS="-O2 -pipe -fPIC ${CPPFLAGS}"
+            export CXXFLAGS="${CFLAGS}"
+            export LDFLAGS="-L/pvr -L/sdl2 -Wl,-rpath-link,/pvr -Wl,-rpath,/usr/lib/powervr -Wl,-rpath,/usr/local/lib/plumos-sdl2-powervr"
+            export LIBS="-lIMGegl -lsrv_um -lglslcompiler -lusc"
+            export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+
+            ./configure \
+                --prefix=/usr \
+                --disable-oss \
+                --enable-zlib \
+                --disable-qt \
+                --enable-threads \
+                --enable-rgui \
+                --enable-sdl2 \
+                --disable-sdl \
+                --disable-videocore \
+                --disable-kms \
+                --disable-x11 \
+                --enable-alsa \
+                --disable-pulse \
+                --enable-opengles \
+                --enable-opengles3 \
+                --enable-opengles3_1 \
+                --enable-egl \
+                --disable-wayland \
+                --disable-vulkan \
+                --enable-freetype \
+                --disable-ffmpeg \
+                --disable-discord \
+                --disable-cdrom \
+                --enable-mali_fbdev
+
+            make -j"$(nproc)"
+            rm -rf .stage
+            make DESTDIR=/src/.stage install
+            file .stage/usr/bin/retroarch
+        '
+fi
 
 mkdir -p "$out_dir/usr/local/bin"
 install -m 0755 "$work_dir/.stage/usr/bin/retroarch" "$out_dir/usr/local/bin/retroarch-knulli"
@@ -211,7 +257,7 @@ patches=$([ "$apply_patches" -eq 1 ] && tr '\n' ' ' < "$applied_patches_file" ||
 local_patch_dir=$local_patch_dir
 local_patches=$([ -s "$applied_local_patches_file" ] && tr '\n' ' ' < "$applied_local_patches_file" || printf none)
 pvr_lib_dir=$pvr_lib_dir
-sdl2_mali_dir=$sdl2_mali_dir
+sdl2_powervr_dir=$sdl2_powervr_dir
 configure=--enable-mali_fbdev --enable-egl --enable-opengles --enable-opengles3 --enable-sdl2 --enable-alsa --disable-x11 --disable-wayland --disable-kms
 output=$out_dir/usr/local/bin/retroarch-knulli
 sha256=$(awk '{print $1}' "$out_dir/retroarch-knulli.sha256")

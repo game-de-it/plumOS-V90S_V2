@@ -581,14 +581,24 @@ fi
 RETROARCH_BIN="$resolved_retroarch"
 log "retroarch-launch: retroarch_bin=$RETROARCH_BIN"
 
-if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
-    export LD_LIBRARY_PATH="/usr/local/lib/plumos-sdl2-mali${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-    log "retroarch-launch: custom SDL2 mali runtime detected"
-    append_cmd "custom-sdl2-mali-files" sh -c 'find /usr/local/lib/plumos-sdl2-mali -maxdepth 1 -print 2>/dev/null || true; find /usr/local/bin -maxdepth 1 -name v90s-sdl2-video-probe -print 2>/dev/null || true; find /etc -maxdepth 1 -name plumos-sdl2-mali-manifest.txt -print 2>/dev/null || true; cat /etc/plumos-sdl2-mali-manifest.txt 2>/dev/null || true'
+sdl2_runtime_dir=""
+sdl2_runtime_label=""
+if [ -d /usr/local/lib/plumos-sdl2-powervr ]; then
+    sdl2_runtime_dir="/usr/local/lib/plumos-sdl2-powervr"
+    sdl2_runtime_label="powervr"
+elif [ -d /usr/local/lib/plumos-sdl2-mali ]; then
+    sdl2_runtime_dir="/usr/local/lib/plumos-sdl2-mali"
+    sdl2_runtime_label="mali-compat"
+fi
+
+if [ -n "$sdl2_runtime_dir" ]; then
+    export LD_LIBRARY_PATH="$sdl2_runtime_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    log "retroarch-launch: custom SDL2 PowerVR runtime detected: $sdl2_runtime_dir ($sdl2_runtime_label)"
+    append_cmd "custom-sdl2-powervr-files" sh -c 'for d in /usr/local/lib/plumos-sdl2-powervr /usr/local/lib/plumos-sdl2-mali; do [ -d "$d" ] && find "$d" -maxdepth 1 -print 2>/dev/null; done; find /usr/local/bin -maxdepth 1 -name v90s-sdl2-video-probe -print 2>/dev/null || true; for f in /etc/plumos-sdl2-powervr-manifest.txt /etc/plumos-sdl2-mali-manifest.txt; do [ -f "$f" ] && echo "--- $f" && cat "$f"; done'
 fi
 if [ -d /usr/lib/powervr ]; then
-    if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
-        export LD_LIBRARY_PATH="/usr/lib/powervr:/usr/local/lib/plumos-sdl2-mali:/usr/lib/aarch64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if [ -n "$sdl2_runtime_dir" ]; then
+        export LD_LIBRARY_PATH="/usr/lib/powervr:$sdl2_runtime_dir:/usr/lib/aarch64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     else
         export LD_LIBRARY_PATH="/usr/lib/powervr:/usr/lib/aarch64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     fi
@@ -646,8 +656,8 @@ export XDG_CACHE_HOME=/tmp/retroarch-cache
 export XDG_RUNTIME_DIR=/run
 mkdir -p /root/.config/retroarch/system /tmp/retroarch-cache /run 2>/dev/null || true
 
-if [ ! -d /usr/local/lib/plumos-sdl2-mali ]; then
-    log "retroarch-launch: required SDL2 mali runtime missing: /usr/local/lib/plumos-sdl2-mali"
+if [ -z "$sdl2_runtime_dir" ]; then
+    log "retroarch-launch: required SDL2 PowerVR runtime missing: /usr/local/lib/plumos-sdl2-powervr"
     mirror_logs
     exit 44
 fi

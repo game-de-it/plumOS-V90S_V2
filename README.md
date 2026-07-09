@@ -1,6 +1,8 @@
 # plumOS-V90S_v2
 
-POWKIDDY V90S 向けに、Armbian 系の userspace/rootfs を使った Linux SD カードイメージを作るための作業リポジトリです。
+POWKIDDY V90S 向けに、StockOS/Batocera 由来の boot/runtime と
+plumOS-built userspace を組み合わせた Linux SD カードイメージを作るため
+の作業リポジトリです。
 
 ## Step 1 goal
 
@@ -10,10 +12,19 @@ Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達�
 
 ## Current strategy
 
-- V90S は KNULLI では `a133-powkiddy-v90s` ターゲットとして扱われています。
-- KNULLI の V90S boot chain は `boot0.img`、`boot_package.fex`、Android boot image 形式の `boot.img`、FAT の boot-resource、SHARE 用 ext4 で構成されています。
-- Step 1 では、V90S で実績のある KNULLI/stock 系 kernel と boot chain を温存し、Armbian 由来の aarch64 rootfs を squashfs として差し替える方針から始めます。
-- mainline kernel / open U-Boot 化は別トラックにします。A133 mainline spike は reboot/black-screen loop で止め、当面は KNULLI の映像/音声 runtime を再現しながら Armbian を rootfs/userspace build framework として使います。
+- V90S は StockOS/Batocera 由来の Linux 4.9.191 kernel、boot image、
+  PowerVR GE8300 runtime、audio stack を vendor runtime baseline とします。
+- KNULLI は有用な参考実装ですが、今後の主契約は実機で動作確認済みの
+  StockOS/Batocera 抽出物に寄せます。
+- Armbian / Buildroot は必須条件ではありません。規模が大きいため、当面は
+  MMF方式の `plumOS-V90S` 専用 Docker toolchain で、RA / libretro cores /
+  PicoArch / standalone / frontend / rootfs / SD image を段階的にビルドします。
+- mainline kernel / open U-Boot 化は別トラックにします。A133 mainline spike は
+  reboot/black-screen loop で止め、当面は StockOS runtime を活用してユーザーが
+  自由に設定変更できる plumOS runtime を作る方向にします。
+
+V90S Docker build 方針は `docs/v90s-docker-build-plan.md` に記録しています。
+入口は MMF と同じように `scripts/docker-build.sh` です。
 
 ## Host status
 

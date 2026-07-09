@@ -28,6 +28,18 @@ scripts/extract-v90s-stockos-runtime.sh root@192.0.2.120 20260710-stockos-runtim
 
 The helper writes into `artifacts/`, which is intentionally not tracked by git.
 
+To prepare this extraction as a build input:
+
+```sh
+./scripts/docker-build.sh stockos-runtime
+```
+
+Default prepared output:
+
+```text
+output/vendor/stockos-runtime
+```
+
 ## Output
 
 The current extraction is:
