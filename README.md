@@ -153,11 +153,13 @@ size: 581M
 
 このイメージでは `plumos-v90s-retroarch.log` もFATへ残る想定です。RetroArchが黒画面で止まる場合でも、`plumos-v90s-retroarch-launch.log` に `attempt=1 timed out after 45s` が出るかを確認します。
 
-最新の実機作業用イメージは、Wi-Fi接続とSSHD起動を追加したものです。RetroArchが黒画面に入る前にネットワーク初期化を実行し、FATへ `plumos-v90s-network-ssh.log` と、IP取得できた場合は `ssh-connect.txt` を出します。
+最新の実機作業用イメージは、USB Wi-Fiドングル前提のWi-Fi接続とSSHD起動を追加したものです。RetroArchが黒画面に入る前にネットワーク初期化を実行し、FATへ `plumos-v90s-network-ssh.log` と、IP取得できた場合は `ssh-connect.txt` を出します。
+
+前回の `-6-wifi-ssh` は、ネットワーク初期化がWi-Fiモジュール一覧を出した後に戻らず、SSHDもRetroArchも起動しませんでした。`-7-usb-wifi-ssh` ではsshdを先に起動し、`lsusb` と `/sys/bus/usb/devices` のVID/PIDをログへ残し、KNULLI A133/V90S overlayにあるUSB Wi-Fi向けRealtekドライバ候補だけをalias一致で読み込みます。
 
 ```text
-output/images/plumos-v90s-armbian-step2-20260709-6-wifi-ssh.img
-sha256: 70cbf6e8edf837ef5d9d3e08a5ed632ba643fce094f08090feeb6276ea874bbc
+output/images/plumos-v90s-armbian-step2-20260709-7-usb-wifi-ssh.img
+sha256: a340674105a9a0ef115833e78c9c84b391b31bc49226ccab943b793997150130
 size: 581M
 ```
 

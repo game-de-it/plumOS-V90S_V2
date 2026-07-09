@@ -152,7 +152,13 @@ First implementation tasks:
 - [x] Confirm Debian RetroArch reaches ROM/core/audio/SDL2-Mali window creation but still does not show useful video.
 - [x] Add Wi-Fi and SSHD bring-up support for live device iteration.
 - [x] Build sixth Step 2 image with Wi-Fi and SSHD: `plumos-v90s-armbian-step2-20260709-6-wifi-ssh.img`.
-- [ ] User flashes sixth Step 2 Wi-Fi/SSHD image and returns FAT logs.
+- [x] User flashes sixth Step 2 Wi-Fi/SSHD image and returns FAT logs.
+- [x] Record user clarification that V90S networking must use a USB Wi-Fi dongle, not an internal Wi-Fi device.
+- [x] Analyze sixth image FAT logs: network init entered, but stopped after Wi-Fi module inventory before sshd or RetroArch could run.
+- [x] Inspect KNULLI A133/V90S Wi-Fi support and confirm USB Realtek module coverage exists.
+- [x] Change network init to start sshd before Wi-Fi probing, log USB VID/PID, and load only matching USB Wi-Fi driver candidates.
+- [x] Build seventh Step 2 image with USB Wi-Fi dongle SSH diagnostics: `plumos-v90s-armbian-step2-20260709-7-usb-wifi-ssh.img`.
+- [ ] User flashes seventh Step 2 USB Wi-Fi/SSHD image with the USB Wi-Fi dongle attached and returns FAT logs if SSH does not work.
 - [ ] Confirm Wi-Fi gets an IP address and SSH login works.
 - [ ] Use SSH to iterate on RetroArch runtime settings on the live V90S.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.

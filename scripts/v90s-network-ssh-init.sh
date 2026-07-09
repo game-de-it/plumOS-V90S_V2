@@ -50,7 +50,87 @@ append_cmd() {
     mirror_log
 }
 
+run_limited_cmd() {
+    label="$1"
+    seconds="$2"
+    shift 2
+
+    {
+        echo ""
+        echo "===== $label ====="
+        if command -v timeout >/dev/null 2>&1; then
+            timeout "$seconds" "$@" 2>&1
+        else
+            "$@" 2>&1
+        fi
+        rc=$?
+        echo "===== $label rc=$rc ====="
+    } >> "$LOG" 2>/dev/null || true
+    mirror_log
+}
+
+load_module_file() {
+    ko="$1"
+    [ -f "$ko" ] || {
+        log "network-ssh: module file missing: $ko"
+        return 0
+    }
+    run_limited_cmd "insmod-$(basename "$ko")" 8 insmod "$ko"
+}
+
+detect_usb_wifi_modules() {
+    tmp=/tmp/plumos-v90s-usb-wifi-modules.txt
+    : > "$tmp" 2>/dev/null || true
+
+    for dev in /sys/bus/usb/devices/*; do
+        [ -r "$dev/idVendor" ] || continue
+        [ -r "$dev/idProduct" ] || continue
+        vendor="$(tr '[:lower:]' '[:upper:]' < "$dev/idVendor" 2>/dev/null || true)"
+        product="$(tr '[:lower:]' '[:upper:]' < "$dev/idProduct" 2>/dev/null || true)"
+        [ -n "$vendor" ] || continue
+        [ -n "$product" ] || continue
+
+        for alias_file in /lib/modules/4.9.191/modules.alias /lib/modules/4.9.191/modules.alias.standard /lib/modules/4.9.191/modules.alias.v90s; do
+            [ -r "$alias_file" ] || continue
+            grep -i "usb:v${vendor}p${product}" "$alias_file" 2>/dev/null | awk '{ print $3 }' >> "$tmp" 2>/dev/null || true
+        done
+    done
+
+    grep -E '^(rtl8192cu|rtl8xxxu|8192eu|8723bu|8812au|8821cu|88x2bu|8188eu)$' "$tmp" 2>/dev/null | sort -u
+}
+
+load_wifi_driver() {
+    driver="$1"
+
+    case "$driver" in
+        rtl8192cu)
+            load_module_file /lib/modules/4.9.191/rtlwifi.ko
+            load_module_file /lib/modules/4.9.191/rtl_usb.ko
+            load_module_file /lib/modules/4.9.191/rtl8192c-common.ko
+            load_module_file /lib/modules/4.9.191/rtl8192cu.ko
+            ;;
+        rtl8xxxu)
+            load_module_file /lib/modules/4.9.191/rtl8xxxu.ko
+            ;;
+        8192eu|8723bu|8812au|8821cu|88x2bu)
+            load_module_file "/lib/modules/4.9.191/extra/${driver}.ko"
+            ;;
+        8188eu)
+            if [ -f /lib/modules/4.9.191/extra/8188eu.ko ]; then
+                load_module_file /lib/modules/4.9.191/extra/8188eu.ko
+            else
+                log "network-ssh: KNULLI service mentions 8188eu, but this V90S overlay only has 8192eu"
+                load_module_file /lib/modules/4.9.191/extra/8192eu.ko
+            fi
+            ;;
+        *)
+            log "network-ssh: unsupported wifi driver candidate: $driver"
+            ;;
+    esac
+}
+
 load_wifi_modules() {
+    append_cmd "usb-devices-before-wifi" sh -c 'command -v lsusb >/dev/null 2>&1 && lsusb 2>&1 || true; cat /proc/bus/usb/devices 2>/dev/null || true; find /sys/bus/usb/devices -maxdepth 2 -type f \( -name idVendor -o -name idProduct -o -name manufacturer -o -name product \) -print -exec cat {} \; 2>/dev/null || true'
     append_cmd "wifi-firmware-files" sh -c 'ls -l /lib/firmware/*xr829* /lib/firmware/*8723* /lib/firmware/rtlwifi/* 2>/dev/null || true'
     append_cmd "wifi-module-files" sh -c 'find /lib/modules/4.9.191 -name "*.ko" 2>/dev/null | grep -E "8723|8192|88|xradio|rtl|wireless|cfg80211|mac80211" || true'
 
@@ -58,23 +138,17 @@ load_wifi_modules() {
         rfkill unblock all >> "$LOG" 2>&1 || true
     fi
 
-    if command -v depmod >/dev/null 2>&1; then
-        depmod -a 4.9.191 >> "$LOG" 2>&1 || true
+    log "network-ssh: loading USB Wi-Fi modules"
+
+    drivers="$(detect_usb_wifi_modules | tr '\n' ' ')"
+    if [ -z "$drivers" ]; then
+        log "network-ssh: no USB Wi-Fi module alias matched; leaving module load disabled for this run"
+        return 0
     fi
 
-    for mod in 8723ds 8723bu 8192eu 8821cu 8812au 88x2bu rtl8192cu rtl8xxxu; do
-        modprobe "$mod" >> "$LOG" 2>&1 || true
-    done
-
-    for ko in \
-        /lib/modules/4.9.191/xradio_mac.ko \
-        /lib/modules/4.9.191/xradio_core.ko \
-        /lib/modules/4.9.191/xradio_wlan.ko \
-        /lib/modules/4.9.191/xradio_mac_tsp.ko \
-        /lib/modules/4.9.191/xradio_core_tsp.ko \
-        /lib/modules/4.9.191/xradio_wlan_tsp.ko
-    do
-        [ -f "$ko" ] && insmod "$ko" >> "$LOG" 2>&1 || true
+    log "network-ssh: usb_wifi_driver_candidates=$drivers"
+    for driver in $drivers; do
+        load_wifi_driver "$driver"
     done
 
     mirror_log
@@ -224,8 +298,8 @@ write_connect_hint() {
 
 log "network-ssh: entered"
 append_cmd "network-release" sh -c 'cat /etc/plumos-network-release 2>/dev/null || true'
-start_wifi || true
 start_sshd || true
+start_wifi || true
 mirror_log
 log "network-ssh: finished"
 exit 0

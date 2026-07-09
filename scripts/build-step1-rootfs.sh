@@ -740,8 +740,10 @@ install_pvr_probe() {
 
     if [ -d "$pvr_standard_module_src" ]; then
         cp -a "$pvr_standard_module_src/." "$root/lib/modules/4.9.191/"
+        [ -f "$pvr_standard_module_src/modules.alias" ] && install -m 0644 "$pvr_standard_module_src/modules.alias" "$root/lib/modules/4.9.191/modules.alias.standard"
     fi
     cp -a "$pvr_module_src/." "$root/lib/modules/4.9.191/"
+    [ -f "$pvr_module_src/modules.alias" ] && install -m 0644 "$pvr_module_src/modules.alias" "$root/lib/modules/4.9.191/modules.alias.v90s"
 
     mkdir -p "$root/etc/ld.so.conf.d"
     printf '/usr/lib/powervr\n' > "$root/etc/ld.so.conf.d/powervr.conf"
@@ -832,7 +834,7 @@ build_debian_retroarch_payload() {
 
     retroarch_packages="retroarch,libretro-nestopia,alsa-utils,input-utils,procps,psmisc,kmod"
     if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
-        retroarch_packages="${retroarch_packages},openssh-server,wpasupplicant,isc-dhcp-client,iproute2,rfkill,iw,wireless-regdb,ca-certificates"
+        retroarch_packages="${retroarch_packages},openssh-server,wpasupplicant,isc-dhcp-client,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates"
     fi
     debootstrap --arch=arm64 --variant=minbase --include="$retroarch_packages" "$suite" "$root" "$mirror"
 
