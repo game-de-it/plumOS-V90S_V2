@@ -195,6 +195,7 @@ First implementation tasks:
 - [x] Build KNULLI RetroArch test image: `plumos-v90s-armbian-step2-20260709-9-knulli-retroarch.img`.
 - [x] Compare the user's modified StockOS RA-running runtime against the current plumOS runtime over SSH.
 - [x] Confirm StockOS uses generated `retroarchcustom.cfg`, QuickNES, `video_refresh_rate=58.917103`, `vrr_runloop_enable=true`, `video_threaded=true`, Pulse/PipeWire audio, `schedutil`, and `irqbalance`.
+- [x] Extract StockOS boot/env partitions, kernel modules, PowerVR/SDL2/RetroArch/PipeWire runtime pieces, and configgen files into ignored `artifacts/20260710-stockos-runtime`.
 - [ ] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
 - [ ] If RA-only timing is insufficient, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
 - [ ] If pacing still differs, test StockOS-like CPU governor and `irqbalance` behavior.
