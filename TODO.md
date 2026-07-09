@@ -6,6 +6,8 @@ Last updated: 2026-07-09
 
 Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux console on the internal display, accepts USB keyboard input, and can run basic commands such as `ls`.
 
+Status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
+
 ## Working Rules
 
 - Keep work in small git commits with clear investigation/build/test boundaries.
@@ -81,6 +83,7 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Fix framebuffer console font initialization and increase text scale.
 - [x] Copy Debian and framebuffer console logs to the FAT boot-resource partition under `plumos-logs/`.
 - [x] Build `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
+- [x] Record device test 15: framebuffer console text was visible, USB keyboard input worked, `df` executed, and FAT logs were readable from macOS.
 
 ## Next: Armbian Rootfs Path
 
@@ -363,16 +366,21 @@ rootfs/plumos-v90s-diag.log
 - [x] Host-verify that Debian init prepares `/boot/plumos-logs` on the FAT boot-resource partition.
 - [x] Host-verify that the framebuffer console writes directly to `/boot/plumos-logs/plumos-v90s-fb-console.log`.
 - [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
-- [ ] User flashes the image to SD and tests on V90S.
-- [ ] Wait at least 60 seconds for framebuffer text to appear.
-- [ ] Attach a USB keyboard and type:
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds for framebuffer text to appear.
+- [x] Result: framebuffer console text appeared on the internal LCD.
+- [x] Result: USB keyboard input worked.
+- [x] Result: `df` was typed and executed.
+- [x] Result: command output was visible on screen.
+- [x] Result: FAT logs were present under `/Volumes/KNULLI/plumos-logs/` and readable without sudo.
+- [x] Attach a USB keyboard and type:
 
 ```text
-ls /
+df
 ```
 
-- [ ] Press Enter and check whether command output appears on screen.
-- [ ] Return the SD card and check FAT logs without sudo:
+- [x] Press Enter and check whether command output appears on screen.
+- [x] Return the SD card and check FAT logs without sudo:
 
 ```text
 /Volumes/KNULLI/plumos-logs/session.txt
@@ -383,7 +391,8 @@ ls /
 
 ## Console Command Check
 
-- [ ] If the framebuffer console accepts keyboard input, run:
+- [x] If the framebuffer console accepts keyboard input, run at least one command and verify output appears on screen.
+- [ ] Optional broader command inventory for the next validation pass:
 
 ```sh
 uname -a
@@ -395,6 +404,7 @@ dmesg | tail -80
 ```
 
 - [ ] Commit the device result under `docs/validation/`.
+- [x] Commit the device result under `docs/validation/`.
 
 ## Branches After Device Test
 
@@ -402,8 +412,8 @@ dmesg | tail -80
 - [x] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
 - [x] If `/dev/fb0` userspace writes work but framebuffer console is unavailable, add a tiny framebuffer terminal or boot-time getty bridge for Step 1.
 - [x] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
-- [ ] If init fails, test a simpler init wrapper before debugging full systemd behavior.
-- [ ] If `/boot_root/boot/knulli` is not found, confirm the real kernel cmdline and which partition the ramdisk mounts.
+- [x] If init fails, test a simpler init wrapper before debugging full systemd behavior.
+- [x] If `/boot_root/boot/knulli` is not found, confirm the real kernel cmdline and which partition the ramdisk mounts.
 
 ## Later
 

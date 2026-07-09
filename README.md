@@ -120,6 +120,8 @@ size: 133M
 
 `-15-fb-text-fat-logs` では font bitmap を起動前に初期化し、文字を少し大きくしました。また Debian 側で FAT boot-resource を `/boot` として rw remount し、ログを `/boot/plumos-logs/` に保存します。macOS では次回から `/Volumes/KNULLI/plumos-logs/` を見るだけで主要ログを確認できます。
 
+`-15-fb-text-fat-logs` の実機確認では、内蔵 LCD に framebuffer console の文字が表示され、USB keyboard から `df` を入力して実行できました。FAT の `/Volumes/KNULLI/plumos-logs/` にもログが保存され、パスワードなしで確認できました。これで Step 1 の「画面表示、USB keyboard 入力、基本コマンド実行」は実機で確認済みです。
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。
