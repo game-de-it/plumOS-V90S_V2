@@ -16,6 +16,8 @@ Step 1 status: achieved on device test 15 with `plumos-v90s-armbian-step1-202607
 - Treat Armbian-derived userspace/rootfs as the main target.
 - Do not commit `artifacts/`; it may contain local ROMs or other test-only binaries.
 - User performs real-device validation; record each device result under `docs/validation/`.
+- Do not add automatic runtime fallback paths. Keep validation routes single and explicit so device results are attributable.
+- Stop live device processes only through recorded PID files plus `/proc/<pid>/comm` or `/proc/<pid>/cmdline` validation; do not use broad process-name kills that could affect SSH.
 
 ## Done
 
@@ -106,7 +108,7 @@ Constraints:
 - [x] Keep `artifacts/` out of git.
 - [x] Keep FAT boot-resource near 33MB.
 - [x] Grow userdata only if RetroArch/core payloads require it.
-- [x] Keep Step 1 console image as a known-good fallback.
+- [x] Keep Step 1 console image as a known-good recovery reference.
 
 First implementation tasks:
 
@@ -123,7 +125,7 @@ First implementation tasks:
 - [x] Add a launcher that writes:
   - `plumos-v90s-retroarch-launch.log`
   - `plumos-v90s-retroarch.log`
-- [x] Confirm V90S built-in controls work through RetroArch's SDL2 fallback mapping.
+- [x] Confirm V90S built-in controls work through RetroArch's SDL2 input mapping.
 - [x] Build first Step 2 RetroArch test image.
 - [x] User flashes first Step 2 image and verifies on real hardware.
 - [x] Analyze FAT logs and record result under `docs/validation/`.
@@ -169,7 +171,11 @@ First implementation tasks:
 - [x] Test V90S speaker PA GPIO polarity over SSH by forcing PH6 low/high during playback.
 - [x] Test RetroArch gameplay audio while switching Headphone, LINEOUT, PA GPIO, DAC Swap, and all mixer controls to maximum values.
 - [x] Confirm `audio_device=default` is not useful on this image; RetroArch reports `failed_to_start_audio_driver`.
-- [x] Disable risky video fallback attempts by default; keep the normal RetroArch route on `sdl2 + mali + software` only.
+- [x] Remove automatic video fallback attempts; keep the normal RetroArch route on `sdl2 + mali + software` only.
+- [x] Add PID-file based RetroArch stop tooling that validates `/proc/<pid>/comm` or `/proc/<pid>/cmdline` and avoids SSH/session-wide kills.
+- [x] Remove broad `killall sshd`/`killall wpa_supplicant` from network bring-up; leave existing daemons alone when PID files show they are running.
+- [x] Live-test the PID-file stop path over SSH; RetroArch stopped and the SSH session continued to respond.
+- [x] Negative-test a bad RetroArch PID file pointing at the SSH shell; the stop tool refused because `/proc/<pid>/comm` was not `retroarch`.
 - [ ] Confirm audible RetroArch output after the DAC mixer setup.
 - [ ] Determine why active PCM/DAC/PA state still produces only a speaker pop and no sustained audible tone.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.

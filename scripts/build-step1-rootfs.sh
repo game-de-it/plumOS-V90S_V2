@@ -842,6 +842,7 @@ build_debian_retroarch_payload() {
     write_debian_init "$root/sbin/init"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"
+    install -D -m 0755 "$script_dir/v90s-retroarch-stop.sh" "$root/usr/local/sbin/v90s-retroarch-stop"
     if [ "$include_pvr" -eq 1 ]; then
         install_pvr_probe "$root"
     fi

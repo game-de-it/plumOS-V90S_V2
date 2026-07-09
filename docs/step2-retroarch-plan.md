@@ -84,7 +84,7 @@ Payload sizing:
 - uncompressed rootfs: 947MB
 - squashfs: 399MB
 
-The launcher tries RetroArch with `fbdev` first, then `sdl2` fallbacks, and writes verbose logs to FAT. If RetroArch exits, Debian init falls back to the known framebuffer console.
+That first launcher tried multiple video routes and wrote verbose logs to FAT. The current launcher policy is different: use one explicit runtime route per image or SSH session so each device result is attributable.
 
 The real-device test of this first image showed that the Debian package route is not enough for display. Boot, payload handoff, ROM discovery, and Nestopia core loading all worked, but Debian RetroArch did not include `fbdev`, and the V90S runtime did not expose a usable KMS/DRM path. The next route is to use KNULLI's A133 graphics stack: PowerVR GE8300 userspace, the A133 kernel modules/firmware, patched SDL2 framebuffer EGL support, and a RetroArch binary built for that stack.
 
@@ -115,7 +115,7 @@ sha256: 8153fb1c692fb665386aeab502ae3b054d3fd512eab17d851de8de2a83dfc108
 
 The launcher now runs the SDL2 probe with `SDL_VIDEODRIVER=mali` before RetroArch and then tries `video_driver=sdl2` with `SDL_VIDEODRIVER=mali` first. If the probe succeeds but Debian RetroArch still fails, the next branch is to build/import KNULLI's RetroArch binary with `--enable-mali_fbdev`.
 
-The real-device test of the fourth image proved the custom SDL2 path: `SDL_VIDEODRIVER=mali`, `current_video_driver=mali`, `SDL_CreateWindow ok`, `SDL_GL_CreateContext ok`, and `joystick[0]=adc_gamepad`. Debian RetroArch then reached attempt 1 with `video_driver=sdl2` and `SDL_VIDEODRIVER=mali`, but did not return to the launcher and did not leave `plumos-v90s-retroarch.log` on FAT. The next build should add a timed RetroArch attempt for better logs and move toward KNULLI's RetroArch build/patches rather than more SDL2/PVR probing.
+The real-device test of the fourth image proved the custom SDL2 path: `SDL_VIDEODRIVER=mali`, `current_video_driver=mali`, `SDL_CreateWindow ok`, `SDL_GL_CreateContext ok`, and `joystick[0]=adc_gamepad`. Debian RetroArch then reached `video_driver=sdl2` and `SDL_VIDEODRIVER=mali`, but did not return to the launcher and did not leave `plumos-v90s-retroarch.log` on FAT. The next build should add timed RetroArch logging for better evidence and move toward KNULLI's RetroArch build/patches rather than more SDL2/PVR probing.
 
 The fifth generated image keeps the proven PVR and SDL2 `mali` stack, but changes the RetroArch launcher into a hang-capturing diagnostic:
 
@@ -124,7 +124,7 @@ output/images/plumos-v90s-armbian-step2-20260709-5-retroarch-timeout-log.img
 sha256: b098ae5474b7517980810245c4227384e04a5d0a621e1e98e23e99acfb57c298
 ```
 
-Each RetroArch attempt now writes and syncs its config before launch, mirrors both launch and runtime logs every 5 seconds, and uses a 45 second timeout by default. If RetroArch hangs in the first `sdl2/mali` attempt again, FAT should still contain `plumos-v90s-retroarch.log` with the last verbose RetroArch lines and `plumos-v90s-retroarch-launch.log` should contain `attempt=1 timed out after 45s`.
+The launcher writes and syncs its single config before launch and mirrors both launch and runtime logs every 5 seconds. If a timeout is explicitly configured, it stops only the recorded RetroArch PID after validating `/proc/<pid>/comm`; otherwise it leaves RetroArch running for live SSH investigation.
 
 KNULLI's local RetroArch package is the next binary route if Debian RetroArch still hangs. `.cache/knulli-linux/package/retroarch/retroarch/retroarch.mk` builds RetroArch `v1.22.2`, enables SDL2/EGL/GLES when the Buildroot target provides them, and adds `--enable-mali_fbdev` when `BR2_PACKAGE_HAS_LIBMALI=y` outside the RK3326/RK3568 exceptions. The A133 board config selects `BR2_PACKAGE_POWERVR_GE8300_DRIVER=y`, and that driver package provides libEGL/libGLES from the GE8300 fbdev/glibc payload.
 
@@ -157,7 +157,7 @@ Audio:
 Input:
 
 - Map V90S built-in controls from `/dev/input/event*`.
-- Keep USB keyboard as a diagnostic fallback only.
+- Keep USB keyboard as a separate diagnostic input path.
 - Confirm in-game Start, D-pad movement, and A/B actions.
 
 Performance:

@@ -11,6 +11,12 @@ RETROARCH_LOG=/tmp/plumos-v90s-retroarch.log
 SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
 RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
+RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
+LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
+RETROARCH_PID_FILE="$RUN_DIR/retroarch.pid"
+RETROARCH_TIMEOUT_FLAG="$RUN_DIR/retroarch.timeout"
+RETROARCH_PID=
+RETROARCH_WATCHDOG_PID=
 LOG_MIRROR_PID=
 
 if [ -d "$FAT_LOG_DIR" ] && [ -w "$FAT_LOG_DIR" ]; then
@@ -42,6 +48,88 @@ log() {
     if [ "$log_count" -lt 30 ] || [ $((log_count % 10)) -eq 0 ]; then
         sync 2>/dev/null || true
     fi
+}
+
+read_pidfile() {
+    pidfile="$1"
+    [ -r "$pidfile" ] || return 1
+    pid="$(sed -n '1p' "$pidfile" 2>/dev/null | tr -d '[:space:]')"
+    case "$pid" in
+        ''|*[!0-9]*)
+            return 1
+            ;;
+    esac
+    printf '%s\n' "$pid"
+}
+
+pidfile_matches_pid() {
+    pidfile="$1"
+    expected="$2"
+    current="$(read_pidfile "$pidfile" 2>/dev/null || true)"
+    [ "$current" = "$expected" ]
+}
+
+remove_pidfile_if_matches() {
+    pidfile="$1"
+    expected="$2"
+    if pidfile_matches_pid "$pidfile" "$expected"; then
+        rm -f "$pidfile" 2>/dev/null || true
+    fi
+}
+
+pid_comm_equals() {
+    pid="$1"
+    expected="$2"
+    [ -r "/proc/$pid/comm" ] || return 1
+    comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+    [ "$comm" = "$expected" ]
+}
+
+wait_pid_exit() {
+    pid="$1"
+    limit="${2:-5}"
+    i=0
+    while [ "$i" -lt "$limit" ]; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+    return 1
+}
+
+terminate_retroarch_pid() {
+    pid="$1"
+    reason="$2"
+
+    case "$pid" in
+        ''|*[!0-9]*)
+            log "retroarch-launch: refusing to stop invalid retroarch pid='$pid'"
+            return 1
+            ;;
+    esac
+
+    if ! kill -0 "$pid" 2>/dev/null; then
+        remove_pidfile_if_matches "$RETROARCH_PID_FILE" "$pid"
+        return 0
+    fi
+
+    if ! pid_comm_equals "$pid" "retroarch"; then
+        comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+        cmdline="$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+        log "retroarch-launch: refusing to stop pid=$pid; comm='$comm' cmdline='$cmdline'"
+        return 1
+    fi
+
+    log "retroarch-launch: stopping RetroArch pid=$pid reason=$reason"
+    kill -TERM "$pid" 2>/dev/null || true
+    if ! wait_pid_exit "$pid" 5; then
+        log "retroarch-launch: RetroArch pid=$pid still alive after TERM; sending KILL"
+        kill -KILL "$pid" 2>/dev/null || true
+        wait_pid_exit "$pid" 2 || true
+    fi
+    remove_pidfile_if_matches "$RETROARCH_PID_FILE" "$pid"
 }
 
 append_cmd() {
@@ -92,29 +180,73 @@ stop_periodic_log_mirror() {
     mirror_logs
 }
 
+cleanup_launcher_pidfile() {
+    remove_pidfile_if_matches "$LAUNCHER_PID_FILE" "$$"
+}
+
+cleanup_retroarch_pidfile() {
+    if [ -n "$RETROARCH_PID" ]; then
+        remove_pidfile_if_matches "$RETROARCH_PID_FILE" "$RETROARCH_PID"
+    fi
+}
+
+on_launcher_exit() {
+    if [ -n "$RETROARCH_WATCHDOG_PID" ]; then
+        kill "$RETROARCH_WATCHDOG_PID" 2>/dev/null || true
+        wait "$RETROARCH_WATCHDOG_PID" 2>/dev/null || true
+        RETROARCH_WATCHDOG_PID=
+    fi
+    stop_periodic_log_mirror
+    cleanup_retroarch_pidfile
+    cleanup_launcher_pidfile
+}
+
+on_launcher_signal() {
+    sig="$1"
+    log "retroarch-launch: caught $sig; stopping managed RetroArch process"
+    if [ -n "$RETROARCH_PID" ]; then
+        terminate_retroarch_pid "$RETROARCH_PID" "launcher-$sig"
+    elif pid="$(read_pidfile "$RETROARCH_PID_FILE" 2>/dev/null || true)"; [ -n "$pid" ]; then
+        terminate_retroarch_pid "$pid" "launcher-$sig"
+    fi
+    exit 128
+}
+
 run_retroarch() {
     cfg="$1"
 
-    if [ "${RETROARCH_TIMEOUT_SECONDS:-0}" = "0" ]; then
-        if command -v stdbuf >/dev/null 2>&1; then
-            stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-        else
-            retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-        fi
-    elif command -v timeout >/dev/null 2>&1; then
-        if command -v stdbuf >/dev/null 2>&1; then
-            timeout -s KILL "$RETROARCH_TIMEOUT_SECONDS" stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-        else
-            timeout -s KILL "$RETROARCH_TIMEOUT_SECONDS" retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-        fi
-    else
-        echo "retroarch-launch: timeout command missing; running RetroArch without enforced timeout" >> "$RETROARCH_LOG" 2>/dev/null || true
-        if command -v stdbuf >/dev/null 2>&1; then
-            stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-        else
-            retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-        fi
+    rm -f "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
+    retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
+    RETROARCH_PID=$!
+    printf '%s\n' "$RETROARCH_PID" > "$RETROARCH_PID_FILE" 2>/dev/null || true
+    log "retroarch-launch: started RetroArch pid=$RETROARCH_PID"
+
+    if [ "${RETROARCH_TIMEOUT_SECONDS:-0}" != "0" ]; then
+        (
+            sleep "$RETROARCH_TIMEOUT_SECONDS"
+            if pidfile_matches_pid "$RETROARCH_PID_FILE" "$RETROARCH_PID" && pid_comm_equals "$RETROARCH_PID" "retroarch"; then
+                : > "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
+                terminate_retroarch_pid "$RETROARCH_PID" "timeout-${RETROARCH_TIMEOUT_SECONDS}s"
+            fi
+        ) &
+        RETROARCH_WATCHDOG_PID=$!
     fi
+
+    wait "$RETROARCH_PID"
+    rc=$?
+
+    if [ -n "$RETROARCH_WATCHDOG_PID" ]; then
+        kill "$RETROARCH_WATCHDOG_PID" 2>/dev/null || true
+        wait "$RETROARCH_WATCHDOG_PID" 2>/dev/null || true
+        RETROARCH_WATCHDOG_PID=
+    fi
+    if [ -f "$RETROARCH_TIMEOUT_FLAG" ]; then
+        rc=124
+        rm -f "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
+    fi
+    cleanup_retroarch_pidfile
+    RETROARCH_PID=
+    return "$rc"
 }
 
 read_file() {
@@ -223,10 +355,22 @@ network_cmd_enable = "false"
 EOF
 }
 
+if ! mkdir -p "$RUN_DIR" 2>/dev/null; then
+    log "retroarch-launch: cannot create run directory: $RUN_DIR"
+    mirror_logs
+    exit 40
+fi
+printf '%s\n' "$$" > "$LAUNCHER_PID_FILE" 2>/dev/null || true
+trap on_launcher_exit EXIT
+trap 'on_launcher_signal TERM' TERM
+trap 'on_launcher_signal INT' INT
+trap 'on_launcher_signal HUP' HUP
+
 log "retroarch-launch: entered"
 log "retroarch-launch: launch_log=$LAUNCH_LOG"
 log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
 log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
+log "retroarch-launch: run_dir=$RUN_DIR"
 log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
 log "retroarch-launch: cmdline=$(read_file /proc/cmdline)"
 
@@ -294,89 +438,44 @@ export XDG_CACHE_HOME=/tmp/retroarch-cache
 export XDG_RUNTIME_DIR=/run
 mkdir -p /root/.config/retroarch/system /tmp/retroarch-cache /run 2>/dev/null || true
 
-attempt=0
-if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
-    if [ "${PLUMOS_V90S_ENABLE_VIDEO_FALLBACKS:-0}" = "1" ]; then
-        set -- \
-            sdl2:sdl2:sdl2:alsa:mali:software \
-            sdl2:sdl2:sdl2:alsa:mali:opengles2 \
-            gl:sdl2:sdl2:alsa:mali:none \
-            fbdev:linuxraw:linuxraw:alsa:none:none \
-            fbdev:udev:udev:alsa:none:none \
-            sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
-    else
-        set -- sdl2:sdl2:sdl2:alsa:mali:software
-    fi
-else
-    if [ "${PLUMOS_V90S_ENABLE_VIDEO_FALLBACKS:-0}" = "1" ]; then
-        set -- \
-            fbdev:linuxraw:linuxraw:alsa:none:none \
-            fbdev:udev:udev:alsa:none:none \
-            gl:udev:udev:alsa:none:none \
-            sdl2:sdl2:sdl2:alsa:mali:opengles2 \
-            sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
-    else
-        set -- fbdev:linuxraw:linuxraw:alsa:none:none
-    fi
+if [ ! -d /usr/local/lib/plumos-sdl2-mali ]; then
+    log "retroarch-launch: required SDL2 mali runtime missing: /usr/local/lib/plumos-sdl2-mali"
+    mirror_logs
+    exit 44
 fi
 
-for spec do
-    attempt=$((attempt + 1))
-    old_ifs="$IFS"
-    IFS=:
-    set -- $spec
-    IFS="$old_ifs"
-    video_driver="$1"
-    input_driver="$2"
-    joypad_driver="$3"
-    audio_driver="$4"
-    sdl_video="$5"
-    sdl_render="${6:-none}"
-    cfg="/tmp/retroarch-v90s-${attempt}.cfg"
+video_driver=sdl2
+input_driver=sdl2
+joypad_driver=sdl2
+audio_driver=alsa
+sdl_video=mali
+sdl_render=software
+cfg=/tmp/retroarch-v90s.cfg
 
-    write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver"
+write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver"
 
-    log "retroarch-launch: attempt=$attempt video=$video_driver input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
-    {
-        echo ""
-        echo "===== attempt $attempt config ====="
-        cat "$cfg"
-        echo "===== attempt $attempt runtime ====="
-    } >> "$RETROARCH_LOG" 2>/dev/null || true
-    mirror_logs
-
-    if [ "$sdl_video" = "none" ]; then
-        unset SDL_VIDEODRIVER
-    else
-        export SDL_VIDEODRIVER="$sdl_video"
-    fi
-    if [ "$sdl_render" = "none" ]; then
-        unset SDL_RENDER_DRIVER
-    else
-        export SDL_RENDER_DRIVER="$sdl_render"
-    fi
-    export SDL_AUDIODRIVER=alsa
-    log "retroarch-launch: attempt=$attempt pre-launch sync complete"
-    mirror_logs
-
-    start_periodic_log_mirror
-    run_retroarch "$cfg"
-    rc=$?
-    stop_periodic_log_mirror
-    log "retroarch-launch: attempt=$attempt exited rc=$rc"
-    if [ "$rc" -eq 124 ]; then
-        log "retroarch-launch: attempt=$attempt timed out after ${RETROARCH_TIMEOUT_SECONDS}s"
-    fi
-    append_cmd "processes-after-attempt-$attempt" sh -c 'ps w 2>/dev/null | grep -E "[r]etroarch|[p]vrsrv|[s]dl" || true'
-    mirror_logs
-
-    if [ "$rc" -eq 0 ]; then
-        log "retroarch-launch: retroarch exited cleanly"
-        mirror_logs
-        exit 0
-    fi
-done
-
-log "retroarch-launch: all attempts failed"
+log "retroarch-launch: route video=$video_driver input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
+{
+    echo ""
+    echo "===== config ====="
+    cat "$cfg"
+    echo "===== runtime ====="
+} >> "$RETROARCH_LOG" 2>/dev/null || true
 mirror_logs
-exit 43
+
+export SDL_VIDEODRIVER="$sdl_video"
+export SDL_RENDER_DRIVER="$sdl_render"
+export SDL_AUDIODRIVER=alsa
+log "retroarch-launch: pre-launch sync complete"
+mirror_logs
+
+start_periodic_log_mirror
+run_retroarch "$cfg"
+rc=$?
+stop_periodic_log_mirror
+log "retroarch-launch: retroarch exited rc=$rc"
+if [ "$rc" -eq 124 ]; then
+    log "retroarch-launch: retroarch timed out after ${RETROARCH_TIMEOUT_SECONDS}s"
+fi
+mirror_logs
+exit "$rc"

@@ -10,6 +10,9 @@ FAT_LOG=
 SHARE_LOG=
 SSHD_LOG=/tmp/plumos-v90s-sshd.log
 WPA_CONF=/etc/wpa_supplicant/wpa_supplicant.conf
+RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
+SSHD_PID_FILE="$RUN_DIR/sshd.pid"
+WPA_PID_FILE="$RUN_DIR/wpa_supplicant.pid"
 
 if [ -d "$FAT_LOG_DIR" ] && [ -w "$FAT_LOG_DIR" ]; then
     FAT_LOG="$FAT_LOG_DIR/plumos-v90s-network-ssh.log"
@@ -36,6 +39,35 @@ log() {
     echo "$*"
     echo "$*" >> "$LOG" 2>/dev/null || true
     mirror_log
+}
+
+read_pidfile() {
+    pidfile="$1"
+    [ -r "$pidfile" ] || return 1
+    pid="$(sed -n '1p' "$pidfile" 2>/dev/null | tr -d '[:space:]')"
+    case "$pid" in
+        ''|*[!0-9]*)
+            return 1
+            ;;
+    esac
+    printf '%s\n' "$pid"
+}
+
+pid_comm_equals() {
+    pid="$1"
+    expected="$2"
+    [ -r "/proc/$pid/comm" ] || return 1
+    comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+    [ "$comm" = "$expected" ]
+}
+
+pidfile_process_running() {
+    pidfile="$1"
+    expected_comm="$2"
+    pid="$(read_pidfile "$pidfile" 2>/dev/null || true)"
+    [ -n "$pid" ] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    pid_comm_equals "$pid" "$expected_comm"
 }
 
 append_cmd() {
@@ -207,8 +239,12 @@ start_wifi() {
     log "network-ssh: wifi_iface=$iface"
     ip link set "$iface" up >> "$LOG" 2>&1 || true
     mkdir -p /run/wpa_supplicant
-    killall wpa_supplicant >> "$LOG" 2>&1 || true
-    wpa_supplicant -B -i "$iface" -c "$WPA_CONF" >> "$LOG" 2>&1 || true
+    mkdir -p "$RUN_DIR" 2>/dev/null || true
+    if pidfile_process_running "$WPA_PID_FILE" "wpa_supplicant"; then
+        log "network-ssh: wpa_supplicant already running from $WPA_PID_FILE"
+    else
+        wpa_supplicant -B -P "$WPA_PID_FILE" -i "$iface" -c "$WPA_CONF" >> "$LOG" 2>&1 || true
+    fi
     mirror_log
 
     i=0
@@ -271,15 +307,19 @@ start_sshd() {
     fi
 
     mkdir -p /run/sshd
+    mkdir -p "$RUN_DIR" 2>/dev/null || true
     prepare_sshd_host_keys
     if [ -z "$SSHD_HOST_ARGS" ]; then
         log "network-ssh: no SSH host keys available"
         return 1
     fi
 
-    killall sshd >> "$LOG" 2>&1 || true
-    # shellcheck disable=SC2086
-    /usr/sbin/sshd $SSHD_HOST_ARGS -E "$SSHD_LOG" >> "$LOG" 2>&1 || true
+    if pidfile_process_running "$SSHD_PID_FILE" "sshd"; then
+        log "network-ssh: sshd already running from $SSHD_PID_FILE"
+    else
+        # shellcheck disable=SC2086
+        /usr/sbin/sshd $SSHD_HOST_ARGS -E "$SSHD_LOG" -o "PidFile=$SSHD_PID_FILE" >> "$LOG" 2>&1 || true
+    fi
     append_cmd "sshd-state" sh -c 'ps w 2>/dev/null | grep -E "[s]shd" || true; cat /tmp/plumos-v90s-sshd.log 2>/dev/null || true'
 }
 

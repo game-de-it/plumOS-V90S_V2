@@ -27,8 +27,8 @@ SDL_RENDER_DRIVER=software
 
 Running the SDL2 video probe immediately before RetroArch, or preferring the SDL2
 `opengles2` renderer, can lead back to a black screen. The launcher now skips
-the SDL2 probe unless `PLUMOS_V90S_RUN_SDL2_PROBE=1` is set and tries the
-software renderer first.
+the SDL2 probe unless `PLUMOS_V90S_RUN_SDL2_PROBE=1` is set and uses only the
+known visible `sdl2 + mali + software` route.
 
 ## Audio Evidence
 
@@ -147,8 +147,8 @@ The known-good audio device remains:
 audio_device = "hw:0,0"
 ```
 
-Trying video fallbacks after failures can push the device into a black screen,
-especially the `opengles2` path. A `pvrsrvctl --start` retry from
+Trying alternate video routes after failures can push the device into a black
+screen, especially the `opengles2` path. A `pvrsrvctl --start` retry from
 `/lib/modules/4.9.191` restored PowerVR status, and a software-only RetroArch
 launch returned video.
 
@@ -191,6 +191,42 @@ software-only route. The audio result after the all-mixer-max test is still
 pending user confirmation, but the kernel/ALSA side shows the maximum values
 were applied.
 
-Launcher policy update: keep the normal route software-only. Run additional
-video fallbacks only when `PLUMOS_V90S_ENABLE_VIDEO_FALLBACKS=1` is set for a
-diagnostic session, because fallbacks can hide the known-good display route.
+Launcher policy update: keep the normal route software-only and do not add
+automatic video fallback paths. Additional video diagnostics must be run as
+separate, explicit SSH commands so they cannot hide the known-good display route.
+
+Process-control policy update: RetroArch stop/restart work must use PID files
+under `/run/plumos-v90s` plus `/proc/<pid>/comm` or `/proc/<pid>/cmdline`
+validation. Do not use broad `pkill -f`, `pgrep -f`, or `killall` patterns that
+could match the SSH command or the live shell used for diagnostics.
+
+## Single-route Launcher and Safe-stop Check
+
+After the policy update, the launcher was copied to the live V90S under `/tmp`
+and started once over SSH. It created separate PID files:
+
+```text
+/run/plumos-v90s/retroarch-launch.pid -> 15292
+/run/plumos-v90s/retroarch.pid        -> 15422
+```
+
+`v90s-retroarch-stop.sh status` validated process identity through `/proc`:
+
+```text
+RetroArch: pid=15422 running comm='retroarch' cmdline='retroarch --verbose --config /tmp/retroarch-v90s.cfg ...'
+launcher: pid=15292 running comm='v90s-retroarch-' cmdline='/bin/sh /tmp/v90s-retroarch-launch.sh'
+```
+
+Then `v90s-retroarch-stop.sh stop` sent `TERM` only to RetroArch PID `15422`.
+The launcher exited cleanly, both PID files were removed, and the same SSH
+session continued to respond immediately afterward. The live device was left
+with no RetroArch process running.
+
+Negative safety test: a deliberately bad `retroarch.pid` pointing at the live
+SSH command shell was refused because `/proc/<pid>/comm` was `bash`, not
+`retroarch`:
+
+```text
+RetroArch: refusing to stop pid=15272; comm='bash' cmdline='bash -c ...'
+alive_after_bad_pid
+```
