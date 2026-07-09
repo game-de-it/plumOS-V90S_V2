@@ -225,10 +225,13 @@ start_wifi() {
     done
 
     if command -v dhclient >/dev/null 2>&1; then
+        lease_file="/run/dhclient-${iface}.leases"
+        pid_file="/run/dhclient-${iface}.pid"
+        : > "$lease_file" 2>/dev/null || true
         if command -v timeout >/dev/null 2>&1; then
-            timeout 35 dhclient -v -1 "$iface" >> "$LOG" 2>&1 || true
+            timeout 35 dhclient -v -1 -lf "$lease_file" -pf "$pid_file" "$iface" >> "$LOG" 2>&1 || true
         else
-            dhclient -v -1 "$iface" >> "$LOG" 2>&1 || true
+            dhclient -v -1 -lf "$lease_file" -pf "$pid_file" "$iface" >> "$LOG" 2>&1 || true
         fi
     fi
 

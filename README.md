@@ -165,6 +165,8 @@ size: 581M
 
 SSHは `root` で鍵認証とパスワード認証を有効にしています。公開鍵はビルド時に `/Users/example/.ssh/id_ed25519.pub` を入れています。Wi-Fi PSKとroot passwordは生成済みイメージ内だけに入れ、git管理ファイルには残しません。
 
+`-7-usb-wifi-ssh` の実機確認では、TP-Link USB Wi-Fiドングルが `rtl8821cu` として認識され、`wlan0` が DHCP で `192.0.2.110` を取得しました。Mac から `ssh root@192.0.2.110` でログインでき、`df` も実行できました。以降、SDカードの焼き直しが不要な作業はSSH越しに進めます。
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。

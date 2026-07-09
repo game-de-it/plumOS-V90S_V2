@@ -158,8 +158,10 @@ First implementation tasks:
 - [x] Inspect KNULLI A133/V90S Wi-Fi support and confirm USB Realtek module coverage exists.
 - [x] Change network init to start sshd before Wi-Fi probing, log USB VID/PID, and load only matching USB Wi-Fi driver candidates.
 - [x] Build seventh Step 2 image with USB Wi-Fi dongle SSH diagnostics: `plumos-v90s-armbian-step2-20260709-7-usb-wifi-ssh.img`.
-- [ ] User flashes seventh Step 2 USB Wi-Fi/SSHD image with the USB Wi-Fi dongle attached and returns FAT logs if SSH does not work.
-- [ ] Confirm Wi-Fi gets an IP address and SSH login works.
+- [x] User flashes seventh Step 2 USB Wi-Fi/SSHD image with the USB Wi-Fi dongle attached.
+- [x] Confirm Wi-Fi gets an IP address and SSH login works.
+- [x] Confirm `df` can be executed over SSH on the live V90S.
+- [x] Switch no-reflash iteration work to SSH as the default path.
 - [ ] Use SSH to iterate on RetroArch runtime settings on the live V90S.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.
 
