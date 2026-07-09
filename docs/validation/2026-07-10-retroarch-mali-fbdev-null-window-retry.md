@@ -354,3 +354,99 @@ RetroArch: pid=3961 running comm='retroarch-knull'
 ```
 
 User confirmation of input recovery is pending.
+
+The user then reported that Start did not work and the key mapping still seemed
+wrong. The problem was that the first SDL2 recovery kept Xbox-like fixed button
+numbers:
+
+```text
+start_btn=9
+select_btn=8
+dpad_btn=13..16
+```
+
+KNULLI's bundled EmulationStation controller database maps the local GPIO
+controller differently:
+
+```text
+.cache/knulli-linux/package/emulationstation/knulli-emulationstation/controllers/es_input.cfg
+GPIO Controller 1:
+  b=0
+  a=1
+  x=2
+  y=3
+  pageup=4
+  pagedown=5
+  select=6
+  start=7
+  hotkey=8
+  left/right=axis 0
+  up/down=axis 1
+```
+
+The live V90S input device is:
+
+```text
+/dev/input/event4
+NAME="adc_gamepad"
+PRODUCT=19/133/1190/0
+PHYS="rocknix-singleadc-joypad/input0"
+```
+
+`configs/retroarch/v90s-knulli-a133-nes.cfg` was changed to keep SDL2 input but
+bind that GPIO mapping explicitly:
+
+```text
+input_autodetect_enable = "false"
+input_player1_analog_dpad_mode = "0"
+input_enable_hotkey_btn = "8"
+input_player1_a_btn = "1"
+input_player1_b_btn = "0"
+input_player1_x_btn = "2"
+input_player1_y_btn = "3"
+input_player1_l_btn = "4"
+input_player1_r_btn = "5"
+input_player1_select_btn = "6"
+input_player1_start_btn = "7"
+input_player1_left_axis = "-0"
+input_player1_right_axis = "+0"
+input_player1_up_axis = "-1"
+input_player1_down_axis = "+1"
+```
+
+This config was transferred and RetroArch was restarted:
+
+```text
+./scripts/live-transfer-retroarch-knulli.sh 192.0.2.118 --config configs/retroarch/v90s-knulli-a133-nes.cfg
+RetroArch: pid=4974 running comm='retroarch-knull'
+input_autodetect_enable = "false"
+input_player1_start_btn = "7"
+input_player1_left_axis = "-0"
+[Input] Found input driver: "sdl2".
+[Input] Found joypad driver: "sdl2".
+[Audio] Started synchronous audio driver.
+```
+
+User confirmation of Start, d-pad, and A/B behavior is pending.
+
+The user then observed that the physical Start button was recognized as Select.
+Only Start/Select were swapped and the test config was transferred again:
+
+```text
+input_player1_select_btn = "7"
+input_player1_start_btn = "6"
+```
+
+Live verification showed the updated config in `/tmp/retroarch-v90s.cfg` and a
+new RetroArch process:
+
+```text
+RetroArch: pid=5431 running comm='retroarch-knull'
+input_player1_select_btn = "7"
+input_player1_start_btn = "6"
+[Input] Found input driver: "sdl2".
+[Input] Found joypad driver: "sdl2".
+```
+
+User confirmation of the physical Start/Select behavior after this swap is
+pending.
