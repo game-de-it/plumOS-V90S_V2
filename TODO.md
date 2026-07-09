@@ -31,6 +31,7 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Record device test 2: same KNULLI boot logo only.
 - [x] Add diagnostic initramfs support that writes `plumos-v90s-diag.log` to SD storage.
 - [x] Build `plumos-v90s-armbian-step1-20260709-3-diag.img`.
+- [x] Record device test 3: no FAT diagnostic log; boot package created `lcd_compatible_index.txt`.
 
 ## Next: Armbian Rootfs Path
 
@@ -108,24 +109,26 @@ plumOS V90S Step1 Debian minbase console
 ## Device Test 3
 
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-3-diag.img`.
-- [ ] User flashes the image to SD and tests on V90S.
-- [ ] Wait at least 60 seconds at the boot logo.
-- [ ] Power off and return the SD card to the host.
-- [ ] Check FAT boot-resource partition for:
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo.
+- [x] Power off and return the SD card to the host.
+- [x] Check FAT boot-resource partition for:
 
 ```text
 plumos-v90s-diag.log
 boot/plumos-v90s-diag.log
 ```
 
+- [x] Result: no FAT diagnostic log was present.
+- [x] Record extra FAT file `lcd_compatible_index.txt`, likely written by the boot package/U-Boot path.
 - [ ] If a Linux host can mount userdata ext4, also check:
 
 ```text
 rootfs/plumos-v90s-diag.log
 ```
 
-- [ ] If a log exists, commit it or a summarized copy under `docs/validation/`.
-- [ ] If no log exists, move to serial UART or bootloader `boot.img` selection investigation.
+- [x] Commit the no-log result and FAT extra-file evidence under `docs/validation/`.
+- [x] If no log exists, move to serial UART or bootloader `boot.img` selection investigation.
 
 ## Console Command Check
 
