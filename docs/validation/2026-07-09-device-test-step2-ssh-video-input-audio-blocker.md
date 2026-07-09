@@ -230,3 +230,54 @@ SSH command shell was refused because `/proc/<pid>/comm` was `bash`, not
 RetroArch: refusing to stop pid=15272; comm='bash' cmdline='bash -c ...'
 alive_after_bad_pid
 ```
+
+## KNULLI Audio Reference
+
+KNULLI's V90S board data confirms the codec path is the A133 internal codec:
+
+```text
+codec@0x05096000
+digital_vol = <0x00>
+lineout_vol = <0x16>
+headphonegain = <0x00>
+pa_level = <0x01>
+gpio-spk = PH6
+```
+
+The V90S `boot/asound.state` uses a different static mixer snapshot:
+
+```text
+DAC Swap: On
+digital volume: 0
+LINEOUT volume: 26
+DAC volume: 0,0
+Headphone Volume: 2
+Soft Volume Master: 190,190
+```
+
+KNULLI's runtime A133 speaker path in `knulli-audio set auto` is narrower:
+
+```text
+HpSpeaker on
+Headphone on
+Headphone 0
+ADC volume 0
+LINEOUT volume 0
+DAC Swap Off
+```
+
+The current plumOS launcher already overlaps the KNULLI runtime speaker path,
+so the next tests should be explicit SSH diagnostics rather than automatic
+fallbacks. Added `scripts/v90s-audio-diagnostic.sh` to run named profiles and
+persist `plumos-v90s-audio-diagnostic.log` to FAT/SHARE when mounted. Profiles
+include `plumos_current`, `knulli_runtime_speaker`, `knulli_dts_loud`,
+`knulli_asound_state`, `headphone_hotplug`, `dmix_softvol`, and `all_max`.
+
+The first live commands to try after returning to the Step 2 image are:
+
+```text
+v90s-retroarch-stop stop
+v90s-audio-diagnostic profile knulli_dts_loud 10
+v90s-audio-diagnostic profile headphone_hotplug 10
+v90s-audio-diagnostic profile dmix_softvol 10
+```

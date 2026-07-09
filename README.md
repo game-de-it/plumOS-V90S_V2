@@ -167,6 +167,23 @@ SSHは `root` で鍵認証とパスワード認証を有効にしています。
 
 `-7-usb-wifi-ssh` の実機確認では、TP-Link USB Wi-Fiドングルが `rtl8821cu` として認識され、`wlan0` が DHCP で `192.0.2.110` を取得しました。Mac から `ssh root@192.0.2.110` でログインでき、`df` も実行できました。以降、SDカードの焼き直しが不要な作業はSSH越しに進めます。
 
+音声調査用の最新イメージは、通常のRetroArch経路を `sdl2 + mali + software` の単一路線に保ったまま、SSHから明示的に呼び出す `v90s-audio-diagnostic` を追加しています。FAT boot-resource は引き続き33MBです。
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-8-audio-diagnostic.img
+sha256: 21dc57e4107669b1ce28be87412d93cc2fa62181b06619e5a64d94458c2fef9e
+size: 581M
+```
+
+最初に試す音声診断コマンド:
+
+```sh
+v90s-retroarch-stop stop
+v90s-audio-diagnostic profile knulli_dts_loud 10
+v90s-audio-diagnostic profile headphone_hotplug 10
+v90s-audio-diagnostic profile dmix_softvol 10
+```
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。

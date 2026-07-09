@@ -139,6 +139,16 @@ sha256: 70cbf6e8edf837ef5d9d3e08a5ed632ba643fce094f08090feeb6276ea874bbc
 
 It installs `openssh-server`, `wpasupplicant`, `isc-dhcp-client`, `iproute2`, `rfkill`, `iw`, and wireless regulatory data. It also copies KNULLI's A133/V90S Wi-Fi firmware and modules into the Debian payload. Runtime logs should include `plumos-v90s-network-ssh.log`, and if DHCP succeeds FAT should contain `ssh-connect.txt` with the detected `ssh root@<ip>` command. Build-time Wi-Fi/SSH secrets are intentionally not recorded in git.
 
+Live SSH testing later proved the normal RetroArch route should stay single and
+explicit: `video_driver=sdl2`, `SDL_VIDEODRIVER=mali`, and
+`SDL_RENDER_DRIVER=software`. Built-in controls work. Audio is still blocked
+below the generic RetroArch/ALSA-open layer: PCM runs, DAC counters advance,
+DAPM output widgets turn on, and PH6 speaker PA toggles, but the user only hears
+a pop. To continue without adding automatic fallbacks, the payload now includes
+`v90s-audio-diagnostic`, an explicit SSH-only tool for testing KNULLI-derived
+mixer profiles and `dmix+softvol` while saving
+`plumos-v90s-audio-diagnostic.log`.
+
 ## Runtime Investigation Targets
 
 Video:
@@ -151,6 +161,8 @@ Audio:
 
 - Inspect `/dev/snd`, ALSA cards, and mixer controls on device.
 - Prefer ALSA output first.
+- Test named mixer profiles with `v90s-audio-diagnostic` before changing the
+  normal RetroArch launcher path.
 - Confirm audible output on real hardware.
 - Keep audio-open success separate from audible sound confirmation.
 
@@ -182,6 +194,7 @@ Step 2 is complete when the user confirms on V90S hardware:
 ```text
 /Volumes/KNULLI/plumos-logs/plumos-v90s-diag.log
 /Volumes/KNULLI/plumos-logs/plumos-v90s-debian-init.log
+/Volumes/KNULLI/plumos-logs/plumos-v90s-audio-diagnostic.log
 /Volumes/KNULLI/plumos-logs/plumos-v90s-retroarch-launch.log
 /Volumes/KNULLI/plumos-logs/plumos-v90s-retroarch.log
 ```

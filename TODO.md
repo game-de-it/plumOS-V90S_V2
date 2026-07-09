@@ -176,6 +176,9 @@ First implementation tasks:
 - [x] Remove broad `killall sshd`/`killall wpa_supplicant` from network bring-up; leave existing daemons alone when PID files show they are running.
 - [x] Live-test the PID-file stop path over SSH; RetroArch stopped and the SSH session continued to respond.
 - [x] Negative-test a bad RetroArch PID file pointing at the SSH shell; the stop tool refused because `/proc/<pid>/comm` was not `retroarch`.
+- [x] Add an explicit SSH audio diagnostic tool that tests KNULLI-derived mixer profiles without changing the normal RetroArch route.
+- [ ] Run `v90s-audio-diagnostic profile knulli_dts_loud`, `headphone_hotplug`, and `dmix_softvol` on the live V90S and record whether any sustained tone is audible.
+- [ ] If all explicit audio profiles are still silent, compare codec register deltas against a real KNULLI boot or patch the boot-package codec defaults.
 - [ ] Confirm audible RetroArch output after the DAC mixer setup.
 - [ ] Determine why active PCM/DAC/PA state still produces only a speaker pop and no sustained audible tone.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.
