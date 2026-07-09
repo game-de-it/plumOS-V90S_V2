@@ -1,4 +1,5 @@
 .cache/
+artifacts/
 output/
 build/
 dist/

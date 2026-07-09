@@ -6,6 +6,8 @@ POWKIDDY V90S 向けに、Armbian 系の userspace/rootfs を使った Linux SD 
 
 まずは V90S 実機で SD カードから起動し、内蔵画面に Linux コンソールが表示され、USB キーボードで入力でき、`ls` などの基本コマンドを実行できる状態を目標にします。
 
+Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達成済みです。現在は Step 2 として、RetroArch で NES ROM を起動し、60fps 映像、音声出力、V90S 本体コントローラー操作を確認する段階です。Step 2 の詳細は `docs/step2-retroarch-plan.md` に記録します。
+
 ## Current strategy
 
 - V90S は KNULLI では `a133-powkiddy-v90s` ターゲットとして扱われています。

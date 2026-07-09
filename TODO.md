@@ -4,9 +4,9 @@ Last updated: 2026-07-09
 
 ## Current Goal
 
-Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux console on the internal display, accepts USB keyboard input, and can run basic commands such as `ls`.
+Step 2: Run RetroArch on V90S real hardware with visible 60fps video, audible audio, and V90S built-in controller input.
 
-Status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
+Step 1 status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
 
 ## Working Rules
 
@@ -14,6 +14,7 @@ Status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-f
 - Keep repeated-test images small. Current assembly defaults are 33MB FAT boot-resource and 64MB userdata.
 - Use KNULLI only as the V90S boot-chain reference unless evidence shows a full KNULLI build is required.
 - Treat Armbian-derived userspace/rootfs as the main target.
+- Do not commit `artifacts/`; it may contain local ROMs or other test-only binaries.
 - User performs real-device validation; record each device result under `docs/validation/`.
 
 ## Done
@@ -84,6 +85,58 @@ Status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-f
 - [x] Copy Debian and framebuffer console logs to the FAT boot-resource partition under `plumos-logs/`.
 - [x] Build `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
 - [x] Record device test 15: framebuffer console text was visible, USB keyboard input worked, `df` executed, and FAT logs were readable from macOS.
+- [x] Define Step 2 as RetroArch bring-up: visible 60fps video, audible audio, and built-in controller input.
+- [x] Add `artifacts/` to `.gitignore`.
+- [x] Record Step 2 RetroArch plan in `docs/step2-retroarch-plan.md`.
+
+## Step 2: RetroArch Bring-up
+
+Target:
+
+- [ ] Boot RetroArch from the generated V90S SD image.
+- [ ] Launch local test ROM `artifacts/nes/Super Mario Bros..nes`.
+- [ ] Show gameplay on the internal LCD.
+- [ ] Reach approximately 60fps with no obvious pacing issue.
+- [ ] Output audible sound.
+- [ ] Use V90S built-in controls for Start, D-pad, A, and B.
+- [ ] Save RetroArch launch/runtime logs to FAT under `/Volumes/KNULLI/plumos-logs/`.
+
+Constraints:
+
+- [x] Keep `artifacts/` out of git.
+- [ ] Keep FAT boot-resource near 33MB.
+- [ ] Grow userdata only if RetroArch/core payloads require it.
+- [ ] Keep Step 1 console image as a known-good fallback.
+
+First implementation tasks:
+
+- [ ] Confirm the local NES test ROM exists before each Step 2 image build.
+- [ ] Inventory RetroArch packaging/build options for Debian arm64 and KNULLI/Buildroot.
+- [ ] Choose first NES libretro core for the fastest proof, likely `fceumm` or another lightweight packaged core.
+- [ ] Add a Step 2 rootfs profile or launch mode.
+- [ ] Add RetroArch config for the V90S runtime path:
+  - video driver
+  - audio driver
+  - input driver
+  - log verbosity
+  - FPS display or logging
+- [ ] Add a launcher that writes:
+  - `plumos-v90s-retroarch-launch.log`
+  - `plumos-v90s-retroarch.log`
+- [ ] Map V90S built-in `/dev/input/event*` controls.
+- [ ] Build first Step 2 RetroArch test image.
+- [ ] User flashes image and verifies on real hardware.
+- [ ] Analyze FAT logs and record result under `docs/validation/`.
+
+Validation buckets:
+
+- [ ] Video visible but FPS unknown.
+- [ ] FPS near 60 confirmed.
+- [ ] Audio device opens but audible output unconfirmed.
+- [ ] Audible output confirmed.
+- [ ] USB keyboard input works only.
+- [ ] Built-in controls work in game.
+- [ ] Built-in controls fail; event mapping needed.
 
 ## Next: Armbian Rootfs Path
 
