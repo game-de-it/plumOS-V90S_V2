@@ -72,11 +72,12 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-1.img \
-  --userdata-size 64M
+  --name plumos-v90s-armbian-step1-20260709-2.img \
+  --userdata-size 64M \
+  --boot-cmdline 'loglevel=8 initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop'
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-1.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-2.img` です。`-1` は実機で KNULLI boot logo までは表示されましたが、その先の console には進まなかったため、`boot.img` cmdline の root device を FAT boot-resource partition の `/dev/mmcblk0p4` に変更した `-2` を次に検証します。
 
 ## Git workflow
 

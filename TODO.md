@@ -25,6 +25,9 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add a reproducible Step 1 rootfs builder with stage1 plus Debian Bookworm arm64 minbase payload.
 - [x] Add userdata payload support to the V90S image assembly script.
 - [x] Build `plumos-v90s-armbian-step1-20260709-1.img` for the first real-device boot attempt.
+- [x] Record device test 1: KNULLI boot logo appears, but no console yet.
+- [x] Add Android `boot.img` cmdline override support.
+- [x] Build `plumos-v90s-armbian-step1-20260709-2.img` with `root=/dev/mmcblk0p4`.
 
 ## Next: Armbian Rootfs Path
 
@@ -59,35 +62,60 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 ## Device Test 1
 
 - [x] Provide the generated image path and sha256 to the user.
-- [ ] User flashes the image to SD and tests on V90S.
-- [ ] Collect this report:
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Collect this report:
 
 ```text
-image:
-sha256:
+image: output/images/plumos-v90s-armbian-step1-20260709-1.img
+sha256: d5ee904e669a5b0d292815cf2700f176f93bcb88b8f11d7946737ae1b94e850b
 SD card:
 
-boot result:
-screen:
-USB keyboard:
+boot result: KNULLI boot logo appears only
+screen: KNULLI boot logo visible
+USB keyboard: not testable yet
 
 commands:
-- uname -a:
-- cat /proc/cmdline:
-- mount:
-- ls /:
-- ls /dev/input:
-- dmesg | tail -80:
+- uname -a: not reached
+- cat /proc/cmdline: not reached
+- mount: not reached
+- ls /: not reached
+- ls /dev/input: not reached
+- dmesg | tail -80: not reached
 
-notes:
+notes: likely stuck before stage1 because boot.img cmdline used root=/dev/mmcblk0p1
 photo/log:
+```
+
+- [x] Commit the device result under `docs/validation/`.
+
+## Device Test 2
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-2.img`.
+- [ ] User flashes the image to SD and tests on V90S.
+- [ ] Check whether the screen advances beyond the KNULLI boot logo.
+- [ ] Look for either stage1 text or the Debian minbase console:
+
+```text
+plumOS V90S stage1: looking for userdata rootfs payload
+plumOS V90S Step1 Debian minbase console
+```
+
+- [ ] If console appears, run:
+
+```sh
+uname -a
+cat /proc/cmdline
+mount
+ls /
+ls /dev/input
+dmesg | tail -80
 ```
 
 - [ ] Commit the device result under `docs/validation/`.
 
 ## Branches After Device Test
 
-- [ ] If there is no visible boot activity, inspect boot offsets, boot package, GPT layout, and bootloader cmdline assumptions.
+- [x] If there is no visible boot activity, inspect boot offsets, boot package, GPT layout, and bootloader cmdline assumptions.
 - [ ] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
 - [ ] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
 - [ ] If init fails, test a simpler init wrapper before debugging full systemd behavior.

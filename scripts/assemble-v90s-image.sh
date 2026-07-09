@@ -9,6 +9,7 @@ keep_work=0
 boot_vfat_size="33M"
 userdata_size="64M"
 userdata_payload=""
+boot_cmdline=""
 
 usage() {
     cat <<'USAGE'
@@ -24,6 +25,8 @@ Options:
   --userdata-size N   userdata partition size, default 64M
   --userdata-payload PATH
                      copy PATH to userdata:/rootfs/step1-rootfs.squashfs
+  --boot-cmdline TEXT
+                     replace Android boot.img kernel cmdline
   --keep-work         keep temporary assembly directory
 USAGE
 }
@@ -56,6 +59,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --userdata-payload)
             userdata_payload="$2"
+            shift 2
+            ;;
+        --boot-cmdline)
+            boot_cmdline="$2"
             shift 2
             ;;
         --keep-work)
@@ -95,6 +102,11 @@ if ! command -v genimage >/dev/null 2>&1; then
     exit 1
 fi
 
+if [ -n "$boot_cmdline" ] && ! command -v abootimg >/dev/null 2>&1; then
+    printf 'error: abootimg is required when --boot-cmdline is used\n' >&2
+    exit 1
+fi
+
 board_dir="$knulli_src/board/allwinner/a133/powkiddy-v90s"
 if [ ! -d "$board_dir" ]; then
     printf 'error: KNULLI V90S board directory not found: %s\n' "$board_dir" >&2
@@ -119,6 +131,10 @@ cp "$board_dir/bootlogo.bmp" "$boot_dir/bootlogo.bmp"
 cp -R "$board_dir/partitions" "$boot_dir/partitions"
 printf 'powkiddy-v90s\n' > "$boot_dir/boot/knulli.board"
 touch "$boot_dir/boot/autoresize"
+
+if [ -n "$boot_cmdline" ]; then
+    abootimg -u "$boot_dir/partitions/boot.img" -c "cmdline=$boot_cmdline" >/dev/null
+fi
 
 if [ -n "$userdata_payload" ]; then
     mkdir -p "$root_dir/userdata/rootfs"
@@ -179,6 +195,9 @@ rm -f "$out_dir/boot.vfat" "$out_dir/userdata.ext4"
 printf 'created: %s/%s\n' "$out_dir" "$image_name"
 printf 'boot.vfat size: %s\n' "$boot_vfat_size"
 printf 'userdata size: %s\n' "$userdata_size"
+if [ -n "$boot_cmdline" ]; then
+    printf 'boot cmdline: %s\n' "$boot_cmdline"
+fi
 
 if [ "$keep_work" -eq 0 ]; then
     rm -rf "$work_dir"
