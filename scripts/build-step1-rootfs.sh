@@ -7,6 +7,7 @@ mirror="http://deb.debian.org/debian"
 out_dir="output/rootfs-step1"
 knulli_ramdisk=".cache/v90s-ramdisk"
 keep_work=0
+rom_path=""
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 usage() {
@@ -15,11 +16,12 @@ Usage:
   build-step1-rootfs.sh [options]
 
 Options:
-  --profile NAME        all, stage1, or debian-minbase; default all
+  --profile NAME        all, stage1, debian-minbase, or debian-retroarch; default all
   --suite NAME          Debian suite for debootstrap, default bookworm
   --mirror URL          Debian mirror, default http://deb.debian.org/debian
   --out-dir PATH        output directory, default output/rootfs-step1
   --knulli-ramdisk PATH extracted KNULLI ramdisk, default .cache/v90s-ramdisk
+  --rom PATH            NES ROM to copy into debian-retroarch payload
   --keep-work           keep temporary build directory
 USAGE
 }
@@ -46,6 +48,10 @@ while [ "$#" -gt 0 ]; do
             knulli_ramdisk="$2"
             shift 2
             ;;
+        --rom)
+            rom_path="$2"
+            shift 2
+            ;;
         --keep-work)
             keep_work=1
             shift
@@ -63,7 +69,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$profile" in
-    all|stage1|debian-minbase)
+    all|stage1|debian-minbase|debian-retroarch)
         ;;
     *)
         printf 'error: unknown profile: %s\n' "$profile" >&2
@@ -76,9 +82,20 @@ if ! command -v mksquashfs >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ]; then
+if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ]; then
     if ! command -v debootstrap >/dev/null 2>&1; then
         printf 'error: debootstrap is required for profile %s\n' "$profile" >&2
+        exit 1
+    fi
+fi
+
+if [ "$profile" = "debian-retroarch" ]; then
+    if [ -z "$rom_path" ]; then
+        printf 'error: --rom is required for profile debian-retroarch\n' >&2
+        exit 2
+    fi
+    if [ ! -f "$rom_path" ]; then
+        printf 'error: ROM not found: %s\n' "$rom_path" >&2
         exit 1
     fi
 fi
@@ -350,6 +367,12 @@ copy_to_fat_logs() {
     if [ -f /mnt/share/plumos-v90s-fb-console.log ]; then
         cp /mnt/share/plumos-v90s-fb-console.log "$FAT_LOG_DIR/plumos-v90s-fb-console.log" 2>/dev/null || true
     fi
+    if [ -f /mnt/share/plumos-v90s-retroarch-launch.log ]; then
+        cp /mnt/share/plumos-v90s-retroarch-launch.log "$FAT_LOG_DIR/plumos-v90s-retroarch-launch.log" 2>/dev/null || true
+    fi
+    if [ -f /mnt/share/plumos-v90s-retroarch.log ]; then
+        cp /mnt/share/plumos-v90s-retroarch.log "$FAT_LOG_DIR/plumos-v90s-retroarch.log" 2>/dev/null || true
+    fi
     sync
 }
 
@@ -478,6 +501,16 @@ persist_debian_log
 fb_probe
 persist_debian_log
 
+if [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
+    log "debian-init: starting RetroArch launcher"
+    persist_debian_log
+    sync
+    /usr/local/sbin/v90s-retroarch-launch
+    rc=$?
+    log "debian-init: RetroArch launcher exited rc=$rc"
+    persist_debian_log
+fi
+
 if [ -x /usr/local/sbin/v90s-fb-console ]; then
     console_log=/tmp/plumos-v90s-fb-console.log
     if [ -d /mnt/share ]; then
@@ -588,10 +621,50 @@ EOF
     printf 'created: %s/debian-%s-minbase-step1.squashfs\n' "$out_dir" "$suite"
 }
 
+build_debian_retroarch() {
+    root="$work_dir/debian-retroarch-root"
+    rm -rf "$root"
+    mkdir -p "$root"
+
+    retroarch_packages="retroarch,libretro-nestopia,alsa-utils,input-utils,procps,psmisc,kmod"
+    debootstrap --arch=arm64 --variant=minbase --include="$retroarch_packages" "$suite" "$root" "$mirror"
+
+    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/root" "$root/roms/nes"
+    write_debian_init "$root/sbin/init"
+    install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
+    install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"
+    install -m 0644 "$rom_path" "$root/roms/nes/Super Mario Bros..nes"
+    printf 'plumos-v90s-step2\n' > "$root/etc/hostname"
+    rom_sha256="$(sha256sum "$rom_path" | awk '{print $1}')"
+    cat > "$root/etc/plumos-step2-release" <<EOF
+name=plumOS V90S Step2 RetroArch Debian payload
+suite=$suite
+mirror=$mirror
+rootfs_profile=debian-retroarch
+packages=$retroarch_packages
+rom_path=/roms/nes/Super Mario Bros..nes
+rom_sha256=$rom_sha256
+EOF
+
+    rm -rf "$root/var/cache/apt/archives/"*.deb "$root/var/lib/apt/lists/"*
+    rm -rf "$root/usr/share/doc" "$root/usr/share/man" "$root/usr/share/info" "$root/usr/share/lintian" "$root/usr/share/locale"
+
+    mksquashfs "$root" "$out_dir/debian-${suite}-retroarch-step2.squashfs" -noappend -comp zstd -b 131072
+    sha256sum "$out_dir/debian-${suite}-retroarch-step2.squashfs" > "$out_dir/debian-${suite}-retroarch-step2.squashfs.sha256"
+    du -sh "$root" > "$out_dir/debian-${suite}-retroarch-root.du.txt"
+    find "$root" -maxdepth 2 -type f | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-retroarch-manifest-depth2.txt"
+    find "$root/usr/lib" "$root/usr/share/libretro" -maxdepth 4 -type f 2>/dev/null | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-retroarch-libretro-files.txt"
+    printf 'created: %s/debian-%s-retroarch-step2.squashfs\n' "$out_dir" "$suite"
+}
+
 if [ "$profile" = "all" ] || [ "$profile" = "stage1" ]; then
     build_stage1
 fi
 
 if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ]; then
     build_debian_minbase
+fi
+
+if [ "$profile" = "debian-retroarch" ]; then
+    build_debian_retroarch
 fi

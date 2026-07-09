@@ -124,6 +124,25 @@ size: 133M
 
 `-15-fb-text-fat-logs` の実機確認では、内蔵 LCD に framebuffer console の文字が表示され、USB keyboard から `df` を入力して実行できました。FAT の `/Volumes/KNULLI/plumos-logs/` にもログが保存され、パスワードなしで確認できました。これで Step 1 の「画面表示、USB keyboard 入力、基本コマンド実行」は実機で確認済みです。
 
+## Step 2 RetroArch image
+
+最初の RetroArch 実機確認用イメージは Debian bookworm arm64 の `retroarch` と `libretro-nestopia` を使います。FAT boot-resource は 33MB のまま、RetroArch payload が大きいため userdata だけ 512MB にしています。
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-1-retroarch-debian.img
+sha256: d31d2913b1792bc4979e55a1437d7d9aedd60c84af11be613b4c0d3387df39a7
+size: 581M
+```
+
+実機確認後、macOS では FAT 側の `/Volumes/KNULLI/plumos-logs/` から以下を確認します。
+
+```text
+plumos-v90s-retroarch-launch.log
+plumos-v90s-retroarch.log
+plumos-v90s-debian-init.log
+plumos-v90s-diag.log
+```
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。

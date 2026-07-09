@@ -104,27 +104,27 @@ Target:
 Constraints:
 
 - [x] Keep `artifacts/` out of git.
-- [ ] Keep FAT boot-resource near 33MB.
-- [ ] Grow userdata only if RetroArch/core payloads require it.
-- [ ] Keep Step 1 console image as a known-good fallback.
+- [x] Keep FAT boot-resource near 33MB.
+- [x] Grow userdata only if RetroArch/core payloads require it.
+- [x] Keep Step 1 console image as a known-good fallback.
 
 First implementation tasks:
 
-- [ ] Confirm the local NES test ROM exists before each Step 2 image build.
-- [ ] Inventory RetroArch packaging/build options for Debian arm64 and KNULLI/Buildroot.
-- [ ] Choose first NES libretro core for the fastest proof, likely `fceumm` or another lightweight packaged core.
-- [ ] Add a Step 2 rootfs profile or launch mode.
-- [ ] Add RetroArch config for the V90S runtime path:
+- [x] Confirm the local NES test ROM exists before each Step 2 image build.
+- [x] Inventory RetroArch packaging/build options for Debian arm64 and KNULLI/Buildroot.
+- [x] Choose first NES libretro core for the fastest proof: Debian bookworm provides `libretro-nestopia`; `libretro-fceumm` was not available in the default repo.
+- [x] Add a Step 2 rootfs profile or launch mode.
+- [x] Add RetroArch config for the V90S runtime path:
   - video driver
   - audio driver
   - input driver
   - log verbosity
   - FPS display or logging
-- [ ] Add a launcher that writes:
+- [x] Add a launcher that writes:
   - `plumos-v90s-retroarch-launch.log`
   - `plumos-v90s-retroarch.log`
 - [ ] Map V90S built-in `/dev/input/event*` controls.
-- [ ] Build first Step 2 RetroArch test image.
+- [x] Build first Step 2 RetroArch test image.
 - [ ] User flashes image and verifies on real hardware.
 - [ ] Analyze FAT logs and record result under `docs/validation/`.
 

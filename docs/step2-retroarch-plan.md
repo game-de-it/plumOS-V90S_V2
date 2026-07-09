@@ -53,6 +53,39 @@ Initial implementation route:
 5. Copy the test ROM from `artifacts/nes/` into the image at build time when present.
 6. Log RetroArch stdout/stderr and launch environment to FAT under `/boot/plumos-logs/`.
 
+## First Implementation Snapshot
+
+The first Step 2 image uses Debian bookworm arm64 packages:
+
+- `retroarch`
+- `libretro-nestopia`
+- `alsa-utils`
+- `input-utils`
+- `procps`
+- `psmisc`
+- `kmod`
+
+Debian bookworm did not provide `libretro-fceumm` from the default package index in the assembly container, so the first NES core is `nestopia_libretro.so`. This is heavier than ideal but keeps the first proof on the Armbian/Debian path.
+
+The first generated image is:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-1-retroarch-debian.img
+sha256: d31d2913b1792bc4979e55a1437d7d9aedd60c84af11be613b4c0d3387df39a7
+```
+
+Partition sizing:
+
+- FAT boot-resource: 33MB
+- userdata: 512MB
+
+Payload sizing:
+
+- uncompressed rootfs: 947MB
+- squashfs: 399MB
+
+The launcher tries RetroArch with `fbdev` first, then `sdl2` fallbacks, and writes verbose logs to FAT. If RetroArch exits, Debian init falls back to the known framebuffer console.
+
 ## Runtime Investigation Targets
 
 Video:
