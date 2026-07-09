@@ -28,6 +28,9 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Record device test 1: KNULLI boot logo appears, but no console yet.
 - [x] Add Android `boot.img` cmdline override support.
 - [x] Build `plumos-v90s-armbian-step1-20260709-2.img` with `root=/dev/mmcblk0p4`.
+- [x] Record device test 2: same KNULLI boot logo only.
+- [x] Add diagnostic initramfs support that writes `plumos-v90s-diag.log` to SD storage.
+- [x] Build `plumos-v90s-armbian-step1-20260709-3-diag.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -91,16 +94,42 @@ photo/log:
 ## Device Test 2
 
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-2.img`.
-- [ ] User flashes the image to SD and tests on V90S.
-- [ ] Check whether the screen advances beyond the KNULLI boot logo.
-- [ ] Look for either stage1 text or the Debian minbase console:
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Check whether the screen advances beyond the KNULLI boot logo.
+- [x] Look for either stage1 text or the Debian minbase console:
 
 ```text
 plumOS V90S stage1: looking for userdata rootfs payload
 plumOS V90S Step1 Debian minbase console
 ```
 
-- [ ] If console appears, run:
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+
+## Device Test 3
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-3-diag.img`.
+- [ ] User flashes the image to SD and tests on V90S.
+- [ ] Wait at least 60 seconds at the boot logo.
+- [ ] Power off and return the SD card to the host.
+- [ ] Check FAT boot-resource partition for:
+
+```text
+plumos-v90s-diag.log
+boot/plumos-v90s-diag.log
+```
+
+- [ ] If a Linux host can mount userdata ext4, also check:
+
+```text
+rootfs/plumos-v90s-diag.log
+```
+
+- [ ] If a log exists, commit it or a summarized copy under `docs/validation/`.
+- [ ] If no log exists, move to serial UART or bootloader `boot.img` selection investigation.
+
+## Console Command Check
+
+- [ ] If console appears in any test, run:
 
 ```sh
 uname -a

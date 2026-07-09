@@ -72,12 +72,15 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-2.img \
+  --name plumos-v90s-armbian-step1-20260709-3-diag.img \
   --userdata-size 64M \
-  --boot-cmdline 'loglevel=8 initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop'
+  --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
+  --diagnostic-init
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-2.img` です。`-1` は実機で KNULLI boot logo までは表示されましたが、その先の console には進まなかったため、`boot.img` cmdline の root device を FAT boot-resource partition の `/dev/mmcblk0p4` に変更した `-2` を次に検証します。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-3-diag.img` です。`-1` と `-2` は実機で KNULLI boot logo までは表示されましたが、その先の console には進みませんでした。`-3-diag` は Android `boot.img` の initramfs `/init` を診断版に差し替え、kernel が initramfs まで到達していれば FAT boot-resource partition に `plumos-v90s-diag.log` を書き出します。
+
+`-3-diag` を実機で 60 秒ほど起動した後、SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` または `boot/plumos-v90s-diag.log` を確認します。ログが存在しない場合は、kernel が initramfs まで到達していないか、別の `boot.img` が使われている可能性が高くなります。
 
 ## Git workflow
 

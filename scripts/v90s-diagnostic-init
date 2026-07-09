@@ -1,0 +1,176 @@
+#!/bin/ash
+
+bb=/bin/busybox
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+LD_LIBRARY_PATH=/usr/lib:/lib
+export PATH LD_LIBRARY_PATH
+
+LOG=/tmp/plumos-v90s-diag.log
+
+$bb mkdir -p /tmp /proc /sys /dev /run /mnt/diag /mnt/candidate /boot_root /new_root
+$bb mount -t proc proc /proc 2>/dev/null || true
+$bb mount -t sysfs sysfs /sys 2>/dev/null || true
+$bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || $bb mount -t tmpfs dev /dev 2>/dev/null || true
+$bb mkdir -p /dev/pts /dev/shm
+$bb mount -t devpts devpts /dev/pts 2>/dev/null || true
+
+if [ -c /dev/console ]; then
+    exec < /dev/console > /dev/console 2>&1
+fi
+
+log() {
+    echo "$*"
+    echo "$*" >> "$LOG"
+    echo "plumos-v90s-diag: $*" > /dev/kmsg 2>/dev/null || true
+}
+
+run_log() {
+    log "## $*"
+    "$@" >> "$LOG" 2>&1 || log "command failed: $*"
+}
+
+partition_list() {
+    $bb awk '$4 ~ /^mmcblk[0-9]+p[0-9]+$/ { print "/dev/" $4 }' /proc/partitions
+}
+
+mount_rw() {
+    dev="$1"
+    mnt="$2"
+
+    $bb umount "$mnt" >/dev/null 2>&1 || true
+    for fs in vfat ext4; do
+        if $bb mount -t "$fs" -o rw "$dev" "$mnt" >/dev/null 2>&1; then
+            echo "$fs"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+mount_ro() {
+    dev="$1"
+    mnt="$2"
+
+    $bb umount "$mnt" >/dev/null 2>&1 || true
+    for fs in vfat ext4 squashfs; do
+        if $bb mount -t "$fs" -o ro "$dev" "$mnt" >/dev/null 2>&1; then
+            echo "$fs"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+persist_logs() {
+    log "persist: scanning writable SD partitions"
+
+    for dev in $(partition_list); do
+        fs="$(mount_rw "$dev" /mnt/diag)" || {
+            log "persist: cannot mount $dev rw as vfat/ext4"
+            continue
+        }
+
+        log "persist: mounted $dev as $fs"
+        {
+            echo "persist_device=$dev"
+            echo "persist_fstype=$fs"
+            echo "persist_path=/plumos-v90s-diag.log"
+            echo
+            cat "$LOG"
+        } > /mnt/diag/plumos-v90s-diag.log
+
+        if [ -d /mnt/diag/boot ]; then
+            cp /mnt/diag/plumos-v90s-diag.log /mnt/diag/boot/plumos-v90s-diag.log 2>/dev/null || true
+        fi
+        if [ -d /mnt/diag/rootfs ]; then
+            cp /mnt/diag/plumos-v90s-diag.log /mnt/diag/rootfs/plumos-v90s-diag.log 2>/dev/null || true
+        fi
+
+        $bb sync
+        $bb umount /mnt/diag >/dev/null 2>&1 || true
+    done
+}
+
+find_boot_root() {
+    BOOT_ROOT_DEV=
+    BOOT_ROOT_FS=
+
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        log "scan: attempt $attempt"
+        run_log cat /proc/partitions
+
+        for dev in $(partition_list); do
+            fs="$(mount_ro "$dev" /mnt/candidate)" || {
+                log "scan: cannot mount $dev ro"
+                continue
+            }
+
+            log "scan: mounted $dev as $fs"
+            run_log ls -la /mnt/candidate
+            if [ -f /mnt/candidate/boot/knulli ]; then
+                BOOT_ROOT_DEV="$dev"
+                BOOT_ROOT_FS="$fs"
+                log "scan: found /boot/knulli on $dev"
+                $bb umount /mnt/candidate >/dev/null 2>&1 || true
+                return 0
+            fi
+
+            $bb umount /mnt/candidate >/dev/null 2>&1 || true
+        done
+
+        $bb sleep 1
+    done
+
+    return 1
+}
+
+log "plumOS V90S diagnostic init started"
+run_log uname -a
+run_log cat /proc/cmdline
+run_log cat /proc/filesystems
+run_log cat /proc/partitions
+run_log ls -la /dev
+run_log dmesg
+
+if find_boot_root; then
+    log "boot: using $BOOT_ROOT_DEV as boot root"
+else
+    log "boot: no partition containing /boot/knulli found"
+    persist_logs
+    log "boot: dropping to diagnostic shell"
+    exec /bin/busybox sh
+fi
+
+fs="$(mount_ro "$BOOT_ROOT_DEV" /boot_root)" || {
+    log "boot: failed to mount $BOOT_ROOT_DEV on /boot_root"
+    persist_logs
+    exec /bin/busybox sh
+}
+log "boot: mounted $BOOT_ROOT_DEV as $fs on /boot_root"
+
+run_log ls -la /boot_root
+run_log ls -la /boot_root/boot
+
+if ! $bb mount -t squashfs -o ro /boot_root/boot/knulli /new_root >/dev/null 2>&1; then
+    log "boot: failed to mount /boot_root/boot/knulli as squashfs"
+    persist_logs
+    exec /bin/busybox sh
+fi
+
+log "boot: mounted /boot_root/boot/knulli as stage1 root"
+run_log ls -la /new_root
+persist_logs
+
+$bb mkdir -p /new_root/proc /new_root/sys /new_root/dev /new_root/boot
+$bb mount --move /proc /new_root/proc 2>/dev/null || true
+$bb mount --move /sys /new_root/sys 2>/dev/null || true
+$bb mount --move /dev /new_root/dev 2>/dev/null || true
+$bb mount --move /boot_root /new_root/boot 2>/dev/null || true
+
+log "boot: switching to stage1 /sbin/init"
+exec $bb switch_root /new_root /sbin/init
+
+log "boot: switch_root failed"
+exec /bin/busybox sh

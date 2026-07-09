@@ -72,3 +72,19 @@ plumOS V90S Step1 Debian minbase console
 ```
 
 If `-2` still shows only the logo, the next likely targets are bootloader cmdline override, `/dev/console` routing, or kernel framebuffer console behavior.
+
+## Device test 2 result
+
+The user tested:
+
+```text
+output/images/plumos-v90s-armbian-step1-20260709-2.img
+sha256: 3e1434f9abf653df7d8bf43dbabcc55134a1e4f9c84ca99f13bdda2ecc3ac490
+```
+
+Observed result:
+
+- Same as `-1`: KNULLI boot logo is visible.
+- No stage1 text or Debian minbase console was observed.
+
+This weakens the simple `root=/dev/mmcblk0p1` hypothesis. The next diagnostic should avoid relying on visible console output and instead write boot/initramfs evidence to SD card storage.

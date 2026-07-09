@@ -10,6 +10,9 @@ boot_vfat_size="33M"
 userdata_size="64M"
 userdata_payload=""
 boot_cmdline=""
+diagnostic_init=0
+diagnostic_init_path="scripts/v90s-diagnostic-init"
+ramdisk_root=".cache/v90s-ramdisk"
 
 usage() {
     cat <<'USAGE'
@@ -27,6 +30,11 @@ Options:
                      copy PATH to userdata:/rootfs/step1-rootfs.squashfs
   --boot-cmdline TEXT
                      replace Android boot.img kernel cmdline
+  --diagnostic-init  replace Android boot.img ramdisk /init with SD logging init
+  --diagnostic-init-path PATH
+                     diagnostic init script, default scripts/v90s-diagnostic-init
+  --ramdisk-root PATH
+                     extracted V90S ramdisk root, default .cache/v90s-ramdisk
   --keep-work         keep temporary assembly directory
 USAGE
 }
@@ -63,6 +71,18 @@ while [ "$#" -gt 0 ]; do
             ;;
         --boot-cmdline)
             boot_cmdline="$2"
+            shift 2
+            ;;
+        --diagnostic-init)
+            diagnostic_init=1
+            shift
+            ;;
+        --diagnostic-init-path)
+            diagnostic_init_path="$2"
+            shift 2
+            ;;
+        --ramdisk-root)
+            ramdisk_root="$2"
             shift 2
             ;;
         --keep-work)
@@ -107,6 +127,23 @@ if [ -n "$boot_cmdline" ] && ! command -v abootimg >/dev/null 2>&1; then
     exit 1
 fi
 
+if [ "$diagnostic_init" -eq 1 ]; then
+    for tool in abootimg cpio gzip; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            printf 'error: %s is required when --diagnostic-init is used\n' "$tool" >&2
+            exit 1
+        fi
+    done
+    if [ ! -d "$ramdisk_root" ]; then
+        printf 'error: ramdisk root not found: %s\n' "$ramdisk_root" >&2
+        exit 1
+    fi
+    if [ ! -f "$diagnostic_init_path" ]; then
+        printf 'error: diagnostic init not found: %s\n' "$diagnostic_init_path" >&2
+        exit 1
+    fi
+fi
+
 board_dir="$knulli_src/board/allwinner/a133/powkiddy-v90s"
 if [ ! -d "$board_dir" ]; then
     printf 'error: KNULLI V90S board directory not found: %s\n' "$board_dir" >&2
@@ -134,6 +171,20 @@ touch "$boot_dir/boot/autoresize"
 
 if [ -n "$boot_cmdline" ]; then
     abootimg -u "$boot_dir/partitions/boot.img" -c "cmdline=$boot_cmdline" >/dev/null
+fi
+
+if [ "$diagnostic_init" -eq 1 ]; then
+    diagnostic_ramdisk_dir="$work_dir/diagnostic-ramdisk"
+    diagnostic_ramdisk_img="$work_dir/diagnostic-ramdisk.gz"
+    mkdir -p "$diagnostic_ramdisk_dir"
+    cp -a "$ramdisk_root/." "$diagnostic_ramdisk_dir/"
+    cp "$diagnostic_init_path" "$diagnostic_ramdisk_dir/init"
+    chmod 0755 "$diagnostic_ramdisk_dir/init"
+    (
+        cd "$diagnostic_ramdisk_dir"
+        find . | cpio -o -H newc 2>"../diagnostic-cpio.log" | gzip -9 > "../diagnostic-ramdisk.gz"
+    )
+    abootimg -u "$boot_dir/partitions/boot.img" -r "$diagnostic_ramdisk_img" >/dev/null
 fi
 
 if [ -n "$userdata_payload" ]; then
@@ -197,6 +248,9 @@ printf 'boot.vfat size: %s\n' "$boot_vfat_size"
 printf 'userdata size: %s\n' "$userdata_size"
 if [ -n "$boot_cmdline" ]; then
     printf 'boot cmdline: %s\n' "$boot_cmdline"
+fi
+if [ "$diagnostic_init" -eq 1 ]; then
+    printf 'diagnostic init: %s\n' "$diagnostic_init_path"
 fi
 
 if [ "$keep_work" -eq 0 ]; then
