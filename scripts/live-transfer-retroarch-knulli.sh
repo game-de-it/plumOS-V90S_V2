@@ -7,6 +7,7 @@ port="${PLUMOS_V90S_SSH_PORT:-22}"
 launch=1
 config_src=""
 refresh_rate=""
+start_mode=""
 
 retroarch_src="${PLUMOS_V90S_RETROARCH_BIN_SRC:-output/retroarch-knulli/usr/local/bin/retroarch-knulli}"
 quicknes_src="${PLUMOS_V90S_QUICKNES_SRC:-output/libretro-quicknes/quicknes_libretro.so}"
@@ -16,7 +17,7 @@ stop_src="${PLUMOS_V90S_STOP_SRC:-scripts/v90s-retroarch-stop.sh}"
 usage() {
     cat <<'USAGE'
 Usage:
-  live-transfer-retroarch-knulli.sh IP [--config PATH] [--refresh-rate RATE] [--transfer-only]
+  live-transfer-retroarch-knulli.sh IP [--config PATH] [--refresh-rate RATE] [--menu|--content] [--transfer-only]
 
 Copies the locally built KNULLI-style RetroArch binary, QuickNES core, and
 V90S launcher/stop scripts to a running device over SSH. By default it safely
@@ -62,6 +63,14 @@ while [ "$#" -gt 0 ]; do
             fi
             refresh_rate="$2"
             shift 2
+            ;;
+        --menu)
+            start_mode="menu"
+            shift
+            ;;
+        --content)
+            start_mode="content"
+            shift
             ;;
         -h|--help)
             usage
@@ -121,6 +130,11 @@ if [ -n "$refresh_rate" ]; then
 else
     ssh $ssh_opts "$remote" "rm -f /tmp/plumos-v90s-live-refresh-rate"
 fi
+if [ -n "$start_mode" ]; then
+    ssh $ssh_opts "$remote" "printf '%s\n' '$start_mode' > /tmp/plumos-v90s-live-start-mode"
+else
+    ssh $ssh_opts "$remote" "rm -f /tmp/plumos-v90s-live-start-mode"
+fi
 
 ssh $ssh_opts "$remote" 'sh -s' <<'REMOTE_SETUP'
 set -eu
@@ -150,6 +164,10 @@ export PLUMOS_V90S_AUDIO_DRIVER=alsa
 export PLUMOS_V90S_SDL_VIDEODRIVER=mali
 export PLUMOS_V90S_SDL_RENDER_DRIVER=software
 ENV
+if [ -s /tmp/plumos-v90s-live-start-mode ]; then
+    live_start_mode="$(sed -n '1p' /tmp/plumos-v90s-live-start-mode)"
+    echo "export PLUMOS_V90S_RETROARCH_START_MODE=$live_start_mode" >> /tmp/plumos-v90s-live-env.sh
+fi
 if [ -s /tmp/plumos-v90s-live-refresh-rate ]; then
     live_refresh="$(sed -n '1p' /tmp/plumos-v90s-live-refresh-rate)"
     echo "export PLUMOS_V90S_VIDEO_REFRESH_RATE=$live_refresh" >> /tmp/plumos-v90s-live-env.sh

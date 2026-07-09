@@ -83,3 +83,16 @@ Does the controller mapping remain usable?
 If the screen is black again, this suggests the BSP LCD timing may not tolerate
 small total changes through `boot_package.fex`, and the next step should return
 to stock timing and look for a runtime pacing fix instead.
+
+## Device Result
+
+User result:
+
+```text
+The screen was black.
+```
+
+Conclusion: `lcd_vt=506` is rejected for now. Both small LCD timing images
+tested after the 59.06 Hz diagnosis produced black screens, so the next
+iteration should restore the stock KNULLI boot package and use RetroArch's
+runtime menu to search for a configuration-level workaround.

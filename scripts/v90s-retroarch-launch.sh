@@ -296,12 +296,25 @@ on_launcher_signal() {
 
 run_retroarch() {
     cfg="$1"
+    start_mode="$2"
 
     rm -f "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
-    "$RETROARCH_BIN" --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
+
+    case "$start_mode" in
+        menu)
+            "$RETROARCH_BIN" --verbose --config "$cfg" --menu >> "$RETROARCH_LOG" 2>&1 &
+            ;;
+        content)
+            "$RETROARCH_BIN" --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
+            ;;
+        *)
+            log "retroarch-launch: unsupported start mode: $start_mode"
+            return 47
+            ;;
+    esac
     RETROARCH_PID=$!
     printf '%s\n' "$RETROARCH_PID" > "$RETROARCH_PID_FILE" 2>/dev/null || true
-    log "retroarch-launch: started RetroArch pid=$RETROARCH_PID"
+    log "retroarch-launch: started RetroArch pid=$RETROARCH_PID mode=$start_mode"
 
     if [ "${RETROARCH_TIMEOUT_SECONDS:-0}" != "0" ]; then
         (
@@ -469,6 +482,13 @@ input_player1_b = "z"
 input_player1_start = "enter"
 input_player1_select = "rshift"
 input_exit_emulator = "escape"
+input_enable_hotkey = "rshift"
+input_hotkey_block_delay = "5"
+input_menu_toggle = "enter"
+input_menu_toggle_gamepad_combo = "4"
+all_users_control_menu = "true"
+menu_pause_libretro = "true"
+rgui_show_start_screen = "false"
 
 pause_nonactive = "false"
 run_ahead_enabled = "false"
@@ -495,6 +515,7 @@ log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
 log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
 log "retroarch-launch: periodic_log_mirror=$PERIODIC_LOG_MIRROR"
 log "retroarch-launch: external_config=${RETROARCH_CONFIG_SRC:-none}"
+log "retroarch-launch: start_mode=${PLUMOS_V90S_RETROARCH_START_MODE:-content}"
 log "retroarch-launch: run_dir=$RUN_DIR"
 log "retroarch-launch: route_config=$ROUTE_CONFIG present=$([ -r "$ROUTE_CONFIG" ] && printf yes || printf no)"
 log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
@@ -550,23 +571,37 @@ append_cmd "dmesg-tail" sh -c 'dmesg 2>/dev/null | tail -120 || true'
 
 core="${PLUMOS_V90S_CORE:-/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so}"
 rom="${PLUMOS_V90S_ROM:-/roms/nes/Super Mario Bros..nes}"
+start_mode="${PLUMOS_V90S_RETROARCH_START_MODE:-content}"
+
+case "$start_mode" in
+    content|menu)
+        ;;
+    *)
+        log "retroarch-launch: unsupported start mode: $start_mode"
+        mirror_logs
+        exit 47
+        ;;
+esac
 
 log "retroarch-launch: selected_core=$core"
 log "retroarch-launch: selected_rom=$rom"
+log "retroarch-launch: selected_start_mode=$start_mode"
 
-if [ ! -f "$core" ]; then
+if [ "$start_mode" = "content" ] && [ ! -f "$core" ]; then
     log "retroarch-launch: RetroArch core missing: $core"
     mirror_logs
     exit 41
 fi
 
-if [ ! -f "$rom" ]; then
+if [ "$start_mode" = "content" ] && [ ! -f "$rom" ]; then
     log "retroarch-launch: ROM missing: $rom"
     mirror_logs
     exit 42
 fi
 
-append_cmd "rom-sha256" sha256sum "$rom"
+if [ "$start_mode" = "content" ]; then
+    append_cmd "rom-sha256" sha256sum "$rom"
+fi
 
 export HOME=/root
 export USER=root
@@ -620,7 +655,7 @@ log "retroarch-launch: pre-launch sync complete"
 mirror_logs
 
 start_periodic_log_mirror
-run_retroarch "$cfg"
+run_retroarch "$cfg" "$start_mode"
 rc=$?
 stop_periodic_log_mirror
 log "retroarch-launch: retroarch exited rc=$rc"

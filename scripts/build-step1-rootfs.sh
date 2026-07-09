@@ -17,6 +17,7 @@ wifi_ssid="${PLUMOS_V90S_WIFI_SSID:-}"
 wifi_psk="${PLUMOS_V90S_WIFI_PSK:-}"
 ssh_authorized_keys="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
 ssh_root_password="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
+retroarch_start_mode="${PLUMOS_V90S_RETROARCH_START_MODE:-content}"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 usage() {
@@ -45,6 +46,8 @@ Options:
                         copy public keys to /root/.ssh/authorized_keys
   --ssh-root-password PASSWORD
                         set root password for SSH password authentication
+  --retroarch-start-mode MODE
+                        content or menu; default content
   --keep-work           keep temporary build directory
 USAGE
 }
@@ -111,6 +114,10 @@ while [ "$#" -gt 0 ]; do
             ssh_root_password="$2"
             shift 2
             ;;
+        --retroarch-start-mode)
+            retroarch_start_mode="$2"
+            shift 2
+            ;;
         --keep-work)
             keep_work=1
             shift
@@ -132,6 +139,15 @@ case "$profile" in
         ;;
     *)
         printf 'error: unknown profile: %s\n' "$profile" >&2
+        exit 2
+        ;;
+esac
+
+case "$retroarch_start_mode" in
+    content|menu)
+        ;;
+    *)
+        printf 'error: unknown RetroArch start mode: %s\n' "$retroarch_start_mode" >&2
         exit 2
         ;;
 esac
@@ -808,8 +824,9 @@ write_retroarch_route() {
     include_retroarch_knulli="$2"
 
     if [ "$include_retroarch_knulli" -eq 1 ]; then
-        cat > "$root/etc/plumos-v90s-retroarch-route" <<'EOF'
+        cat > "$root/etc/plumos-v90s-retroarch-route" <<EOF
 PLUMOS_V90S_RETROARCH_BIN=/usr/local/bin/retroarch
+PLUMOS_V90S_RETROARCH_START_MODE=$retroarch_start_mode
 PLUMOS_V90S_VIDEO_DRIVER=gl
 PLUMOS_V90S_VIDEO_CONTEXT_DRIVER=mali_fbdev
 PLUMOS_V90S_VIDEO_THREADED=false
@@ -820,8 +837,9 @@ PLUMOS_V90S_SDL_VIDEODRIVER=mali
 PLUMOS_V90S_SDL_RENDER_DRIVER=software
 EOF
     else
-        cat > "$root/etc/plumos-v90s-retroarch-route" <<'EOF'
+        cat > "$root/etc/plumos-v90s-retroarch-route" <<EOF
 PLUMOS_V90S_RETROARCH_BIN=/usr/bin/retroarch
+PLUMOS_V90S_RETROARCH_START_MODE=$retroarch_start_mode
 PLUMOS_V90S_VIDEO_DRIVER=sdl2
 PLUMOS_V90S_VIDEO_CONTEXT_DRIVER=
 PLUMOS_V90S_VIDEO_THREADED=true
@@ -952,6 +970,7 @@ packages=$retroarch_packages
 power_pvr_probe=$include_pvr
 custom_sdl2_mali=$include_sdl2_mali
 custom_retroarch_knulli=$include_retroarch_knulli
+retroarch_start_mode=$retroarch_start_mode
 retroarch_bin=$([ "$include_retroarch_knulli" -eq 1 ] && printf /usr/local/bin/retroarch-knulli || printf /usr/bin/retroarch)
 retroarch_knulli_sha256=$retroarch_knulli_sha256
 quicknes_core=/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so
