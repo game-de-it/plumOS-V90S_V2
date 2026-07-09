@@ -296,20 +296,28 @@ mkdir -p /root/.config/retroarch/system /tmp/retroarch-cache /run 2>/dev/null ||
 
 attempt=0
 if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
-    set -- \
-        sdl2:sdl2:sdl2:alsa:mali:software \
-        sdl2:sdl2:sdl2:alsa:mali:opengles2 \
-        gl:sdl2:sdl2:alsa:mali:none \
-        fbdev:linuxraw:linuxraw:alsa:none:none \
-        fbdev:udev:udev:alsa:none:none \
-        sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
+    if [ "${PLUMOS_V90S_ENABLE_VIDEO_FALLBACKS:-0}" = "1" ]; then
+        set -- \
+            sdl2:sdl2:sdl2:alsa:mali:software \
+            sdl2:sdl2:sdl2:alsa:mali:opengles2 \
+            gl:sdl2:sdl2:alsa:mali:none \
+            fbdev:linuxraw:linuxraw:alsa:none:none \
+            fbdev:udev:udev:alsa:none:none \
+            sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
+    else
+        set -- sdl2:sdl2:sdl2:alsa:mali:software
+    fi
 else
-    set -- \
-        fbdev:linuxraw:linuxraw:alsa:none:none \
-        fbdev:udev:udev:alsa:none:none \
-        gl:udev:udev:alsa:none:none \
-        sdl2:sdl2:sdl2:alsa:mali:opengles2 \
-        sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
+    if [ "${PLUMOS_V90S_ENABLE_VIDEO_FALLBACKS:-0}" = "1" ]; then
+        set -- \
+            fbdev:linuxraw:linuxraw:alsa:none:none \
+            fbdev:udev:udev:alsa:none:none \
+            gl:udev:udev:alsa:none:none \
+            sdl2:sdl2:sdl2:alsa:mali:opengles2 \
+            sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
+    else
+        set -- fbdev:linuxraw:linuxraw:alsa:none:none
+    fi
 fi
 
 for spec do

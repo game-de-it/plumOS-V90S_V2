@@ -167,6 +167,9 @@ First implementation tasks:
 - [x] Add V90S audio mixer setup before RetroArch launch.
 - [x] Confirm ALSA playback, DAPM output widgets, DAC FIFO counters, and speaker PA GPIO all become active during `speaker-test`.
 - [x] Test V90S speaker PA GPIO polarity over SSH by forcing PH6 low/high during playback.
+- [x] Test RetroArch gameplay audio while switching Headphone, LINEOUT, PA GPIO, DAC Swap, and all mixer controls to maximum values.
+- [x] Confirm `audio_device=default` is not useful on this image; RetroArch reports `failed_to_start_audio_driver`.
+- [x] Disable risky video fallback attempts by default; keep the normal RetroArch route on `sdl2 + mali + software` only.
 - [ ] Confirm audible RetroArch output after the DAC mixer setup.
 - [ ] Determine why active PCM/DAC/PA state still produces only a speaker pop and no sustained audible tone.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.

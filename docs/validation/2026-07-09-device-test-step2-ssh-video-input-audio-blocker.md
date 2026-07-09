@@ -115,3 +115,82 @@ be changed from userspace.
   and conservative A133 speaker defaults.
 - Keep `v90s-mmio-rmw` as a diagnostic helper only; it writes physical MMIO via
   `/dev/mem` and should not be part of normal runtime behavior.
+
+## Follow-up Live RA Trials
+
+The user started gameplay from the title screen, so the test was no longer only
+an idle title screen.
+
+Runtime audio modes were applied while RetroArch was running:
+
+```text
+knulli_speaker:      digital=63 dac=160 hp=0 line=0  outsel=0
+hp_gain_max:         digital=63 dac=255 hp=7 line=0  outsel=0
+lineout_single_max:  digital=63 dac=255 hp=7 line=31 outsel=0
+lineout_differ_max:  digital=63 dac=255 hp=7 line=31 outsel=1
+pa_forced_low:       PH6 forced low during playback
+pa_forced_high:      PH6 forced high during playback
+dac_swap_on:         DAC Swap enabled during playback
+```
+
+The user reported no sound from these modes.
+
+`audio_device=default` was also tested. It failed in RetroArch with:
+
+```text
+failed_to_start_audio_driver
+```
+
+The known-good audio device remains:
+
+```text
+audio_device = "hw:0,0"
+```
+
+Trying video fallbacks after failures can push the device into a black screen,
+especially the `opengles2` path. A `pvrsrvctl --start` retry from
+`/lib/modules/4.9.191` restored PowerVR status, and a software-only RetroArch
+launch returned video.
+
+All mixer controls were then set to their maximum values while RetroArch was
+running:
+
+```text
+codec hub mode: 1
+DAC Swap: 1
+ADC Swap: 1
+digital volume: 63
+MIC1 gain volume: 31
+MIC2 gain volume: 31
+LINEOUT volume: 31
+DAC volume: 255,255
+ADC volume: 255,255
+Headphone Volume: 7
+LINEOUT Output Select: 1
+ADCL Input MIC1 Boost Switch: on
+ADCR Input MIC2 Boost Switch: on
+Headphone Switch: on
+HpSpeaker Switch: on
+LINEOUT Switch: on
+Soft Volume Master: 255,255
+SPK GPIO PH6: high
+```
+
+At that point the device still reported:
+
+```text
+PCM state: RUNNING
+SPK GPIO: out hi
+SUNXI_DAC_VOL_CTRL: 0x1ffff
+SUNXI_DAC_REG: 0x115f05f
+SUNXI_HEADPHONE_REG: 0x80808fcc
+```
+
+The user confirmed the screen was visible again after switching back to the
+software-only route. The audio result after the all-mixer-max test is still
+pending user confirmation, but the kernel/ALSA side shows the maximum values
+were applied.
+
+Launcher policy update: keep the normal route software-only. Run additional
+video fallbacks only when `PLUMOS_V90S_ENABLE_VIDEO_FALLBACKS=1` is set for a
+diagnostic session, because fallbacks can hide the known-good display route.
