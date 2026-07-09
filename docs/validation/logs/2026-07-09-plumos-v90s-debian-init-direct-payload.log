@@ -1,0 +1,16 @@
+debian-init: init entered before tty setup
+plumOS V90S Step1 Debian minbase console
+debian-init: fb0 probe begin
+debian-init: name=
+debian-init: modes=U:640x480p-60
+debian-init: virtual_size=640,960
+debian-init: bits_per_pixel=32
+debian-init: stride=2560
+1+0 records in
+1+0 records out
+4096 bytes (4.1 kB, 4.0 KiB) copied, 0.000123167 s, 33.3 MB/s
+debian-init: fb0 black probe wrote
+8+0 records in
+8+0 records out
+32768 bytes (33 kB, 32 KiB) copied, 0.000244375 s, 134 MB/s
+debian-init: fb0 white band wrote

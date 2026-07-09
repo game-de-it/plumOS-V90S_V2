@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-11-direct-payload.img \
+  --name plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-11-direct-payload.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img` です。
 
 ```text
-sha256: 6644fb11cb4b8974a9d3bd9dcbe833d2cd1fb307066710fbe0138011cd06b7d7
+sha256: c2345d8daf6bed5644ebd786b11952797139a901b3b7236a29cd824d9064b3e2
 size: 133M
 ```
 
@@ -108,7 +108,9 @@ size: 133M
 
 `-11-direct-payload` では diagnostic initramfs が userdata の Debian payload を直接 `/dev/loop2` で mount し、initramfs から payload `/sbin/init` へ1回だけ `switch_root` します。stage1 は direct payload 準備に失敗した場合の fallback として残します。stage1/Debian init では、移動済みの `/dev` を保持し、sysfs に fb0 があるのに `/dev/fb0` が無い場合は `mknod /dev/fb0 c 29 0` します。
 
-`-11-direct-payload` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` を確認します。
+`-11-direct-payload` の実機ログでは、Debian `/sbin/init` まで到達し、`plumos-v90s-debian-init.log` が userdata に残りました。Debian init は `fb0` を認識し、先頭領域への black/white probe 書き込みも成功しました。ただし実機画面は KNULLI boot logo のままだったため、次の課題は boot ではなく「fb0 書き込みが実表示へ出るか」と「fbcon 無しでどう簡易consoleを描くか」です。
+
+`-12-fb-full-probe` では `virtual_size=640,960` のダブルバッファ疑いに合わせ、fb0全体をblackで塗り、page0/page1の両方へ大きなwhite bandを書きます。`-12-fb-full-probe` を実機で 60 秒ほど起動した後、画面が変わらない場合は SD をホストへ戻して `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
 
 ## Git workflow
 

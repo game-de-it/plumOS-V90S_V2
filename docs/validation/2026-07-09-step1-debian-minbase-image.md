@@ -143,6 +143,18 @@ sha256: dccb0e4b95967b5b93521166befdf4edc50bb3e8c313a4ac34f043bb51ad400c
 compression: zstd
 ```
 
+After device test 11 reached Debian init and proved `/dev/fb0` writes return success, the payloads were rebuilt with a stronger full-virtual-framebuffer probe:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: 4546df08d5a2b56f835096d5f430e035d7c56ac862fe9ba6542373bac8a4da62
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: 2b85f6c827ff067e606a232bfd5b796a6b6dce44f04a7013fb7c4308ef9bc120
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check

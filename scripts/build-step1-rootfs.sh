@@ -142,24 +142,70 @@ fb_probe() {
         return
     fi
 
-    if $bb dd if=/dev/zero of=/dev/fb0 bs=4096 count=1 >> "$LOG" 2>&1; then
-        log "stage1: fb0 black probe wrote"
+    if [ -w /sys/class/graphics/fb0/blank ]; then
+        echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null || true
+        log "stage1: fb0 unblank requested"
+    fi
+
+    virtual_size="$($bb cat /sys/class/graphics/fb0/virtual_size 2>/dev/null || echo 640,480)"
+    fb_width="${virtual_size%,*}"
+    fb_height="${virtual_size#*,}"
+    bpp="$($bb cat /sys/class/graphics/fb0/bits_per_pixel 2>/dev/null || echo 32)"
+    stride="$($bb cat /sys/class/graphics/fb0/stride 2>/dev/null || echo 0)"
+    case "$fb_width:$fb_height:$bpp:$stride" in
+        *[!0-9:]*|*::*)
+            fb_width=640
+            fb_height=480
+            bpp=32
+            stride=2560
+            ;;
+    esac
+    if [ "$stride" -eq 0 ]; then
+        stride=$((fb_width * ((bpp + 7) / 8)))
+    fi
+
+    mode_line="$($bb cat /sys/class/graphics/fb0/modes 2>/dev/null | $bb head -n 1)"
+    mode_height="${mode_line#*x}"
+    mode_height="${mode_height%%[pi-]*}"
+    case "$mode_height" in
+        ''|*[!0-9]*) visible_height="$fb_height" ;;
+    esac
+    if [ -n "${mode_height:-}" ] && [ "$mode_height" -gt 0 ] 2>/dev/null; then
+        visible_height="$mode_height"
+    fi
+
+    fb_bytes=$((stride * fb_height))
+    fb_blocks=$((fb_bytes / 4096))
+    frame_blocks=$(((stride * visible_height) / 4096))
+    [ "$fb_blocks" -lt 1 ] && fb_blocks=1
+    [ "$frame_blocks" -lt 1 ] && frame_blocks=1
+
+    if $bb dd if=/dev/zero of=/dev/fb0 bs=4096 count="$fb_blocks" conv=notrunc >> "$LOG" 2>&1; then
+        log "stage1: fb0 full black wrote blocks=$fb_blocks bytes=$fb_bytes"
     else
-        log "stage1: fb0 black probe failed"
+        log "stage1: fb0 full black failed"
     fi
 
     : > /tmp/fb-white
     i=0
-    while [ "$i" -lt 8192 ]; do
+    while [ "$i" -lt 32768 ]; do
         printf '\377\377\377\377' >> /tmp/fb-white
         i=$((i + 1))
     done
 
-    if $bb dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=8 conv=notrunc >> "$LOG" 2>&1; then
-        log "stage1: fb0 white band wrote"
+    if $bb dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=32 conv=notrunc >> "$LOG" 2>&1; then
+        log "stage1: fb0 white band page0 wrote"
     else
-        log "stage1: fb0 white band failed"
+        log "stage1: fb0 white band page0 failed"
     fi
+    if [ "$fb_height" -gt "$visible_height" ]; then
+        if $bb dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=32 seek="$frame_blocks" conv=notrunc >> "$LOG" 2>&1; then
+            log "stage1: fb0 white band page1 wrote seek_blocks=$frame_blocks"
+        else
+            log "stage1: fb0 white band page1 failed seek_blocks=$frame_blocks"
+        fi
+    fi
+    $bb sync
 }
 
 $bb mount -t proc proc /proc 2>/dev/null || true
@@ -299,24 +345,70 @@ fb_probe() {
         return
     fi
 
-    if dd if=/dev/zero of=/dev/fb0 bs=4096 count=1 >> "$LOG" 2>&1; then
-        log "debian-init: fb0 black probe wrote"
+    if [ -w /sys/class/graphics/fb0/blank ]; then
+        echo 0 > /sys/class/graphics/fb0/blank 2>/dev/null || true
+        log "debian-init: fb0 unblank requested"
+    fi
+
+    virtual_size="$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null || echo 640,480)"
+    fb_width="${virtual_size%,*}"
+    fb_height="${virtual_size#*,}"
+    bpp="$(cat /sys/class/graphics/fb0/bits_per_pixel 2>/dev/null || echo 32)"
+    stride="$(cat /sys/class/graphics/fb0/stride 2>/dev/null || echo 0)"
+    case "$fb_width:$fb_height:$bpp:$stride" in
+        *[!0-9:]*|*::*)
+            fb_width=640
+            fb_height=480
+            bpp=32
+            stride=2560
+            ;;
+    esac
+    if [ "$stride" -eq 0 ]; then
+        stride=$((fb_width * ((bpp + 7) / 8)))
+    fi
+
+    mode_line="$(cat /sys/class/graphics/fb0/modes 2>/dev/null | head -n 1)"
+    mode_height="${mode_line#*x}"
+    mode_height="${mode_height%%[pi-]*}"
+    case "$mode_height" in
+        ''|*[!0-9]*) visible_height="$fb_height" ;;
+    esac
+    if [ -n "${mode_height:-}" ] && [ "$mode_height" -gt 0 ] 2>/dev/null; then
+        visible_height="$mode_height"
+    fi
+
+    fb_bytes=$((stride * fb_height))
+    fb_blocks=$((fb_bytes / 4096))
+    frame_blocks=$(((stride * visible_height) / 4096))
+    [ "$fb_blocks" -lt 1 ] && fb_blocks=1
+    [ "$frame_blocks" -lt 1 ] && frame_blocks=1
+
+    if dd if=/dev/zero of=/dev/fb0 bs=4096 count="$fb_blocks" conv=notrunc >> "$LOG" 2>&1; then
+        log "debian-init: fb0 full black wrote blocks=$fb_blocks bytes=$fb_bytes"
     else
-        log "debian-init: fb0 black probe failed"
+        log "debian-init: fb0 full black failed"
     fi
 
     : > /tmp/fb-white
     i=0
-    while [ "$i" -lt 8192 ]; do
+    while [ "$i" -lt 32768 ]; do
         printf '\377\377\377\377' >> /tmp/fb-white
         i=$((i + 1))
     done
 
-    if dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=8 conv=notrunc >> "$LOG" 2>&1; then
-        log "debian-init: fb0 white band wrote"
+    if dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=32 conv=notrunc >> "$LOG" 2>&1; then
+        log "debian-init: fb0 white band page0 wrote"
     else
-        log "debian-init: fb0 white band failed"
+        log "debian-init: fb0 white band page0 failed"
     fi
+    if [ "$fb_height" -gt "$visible_height" ]; then
+        if dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=32 seek="$frame_blocks" conv=notrunc >> "$LOG" 2>&1; then
+            log "debian-init: fb0 white band page1 wrote seek_blocks=$frame_blocks"
+        else
+            log "debian-init: fb0 white band page1 failed seek_blocks=$frame_blocks"
+        fi
+    fi
+    sync
 }
 
 mount -t proc proc /proc 2>/dev/null || true

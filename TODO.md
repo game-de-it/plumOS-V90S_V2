@@ -68,6 +68,9 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add a diagnostic direct-payload path that mounts userdata payload and switches from initramfs to Debian rootfs in one handoff.
 - [x] Preserve moved `/dev` trees in stage1/Debian init and create `/dev/fb0` with `mknod` when sysfs exposes fb0.
 - [x] Build `plumos-v90s-armbian-step1-20260709-11-direct-payload.img`.
+- [x] Record device test 11: direct payload reached Debian init and Debian wrote to `/dev/fb0`, but the LCD still showed the KNULLI logo.
+- [x] Expand the fb0 probe to clear the full virtual framebuffer and write white bands to both pages.
+- [x] Build `plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -278,10 +281,28 @@ rootfs/plumos-v90s-diag.log
 - [x] Host-verify that diagnostic init mounts userdata payload directly on `/dev/loop2`.
 - [x] Host-verify that diagnostic init switches directly to payload `/sbin/init` before the stage1 fallback.
 - [x] Host-verify that stage1 and Debian init preserve existing `/dev` and can create `/dev/fb0`.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
+- [x] Check whether the screen changes from the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: direct payload route mounted `/dev/mmcblk0p5`, attached payload to `/dev/loop2`, mounted Debian rootfs, and switched to payload `/sbin/init`.
+- [x] Result: `plumos-v90s-debian-init.log` was present.
+- [x] Result: Debian init saw `fb0` as `640x480p-60`, `virtual_size=640,960`, `bits_per_pixel=32`, `stride=2560`.
+- [x] Result: Debian init wrote black and white probes to `/dev/fb0` successfully.
+- [x] Result: no `plumos-v90s-stage1.log` was present, as expected because the direct route did not fall back to stage1.
+
+## Device Test 12
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img`.
+- [x] Host-verify that Debian init writes a full virtual framebuffer black fill and white bands to page 0 and page 1.
+- [x] Host-verify that direct payload route remains present.
+- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Wait at least 60 seconds at the boot logo, changed screen, or console.
 - [ ] Check whether the screen changes from the KNULLI boot logo.
-- [ ] If console appears, continue with the Console Command Check below.
+- [ ] If console appears or the framebuffer probe is visible, record what changed on screen.
 - [ ] If console still does not appear, return the SD card and check FAT/userdata logs for the new failure point:
 
 ```text
@@ -290,8 +311,6 @@ boot/plumos-v90s-diag.log
 rootfs/plumos-v90s-diag.log
 plumos-v90s-debian-init.log
 rootfs/plumos-v90s-debian-init.log
-plumos-v90s-stage1.log
-rootfs/plumos-v90s-stage1.log
 ```
 
 ## Console Command Check
