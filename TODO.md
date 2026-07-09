@@ -190,7 +190,10 @@ First implementation tasks:
 - [x] Run `./scripts/run-armbian-build.sh inventory` successfully in Docker.
 - [x] Confirm Armbian inventory only sees V90S through the local userpatch spike, not an upstream complete target.
 - [x] Record the KNULLI runtime plus Armbian rootfs pivot in `docs/step2-knulli-runtime-armbian-plan.md`.
-- [ ] Build or import KNULLI's RetroArch path with `--enable-mali_fbdev`.
+- [x] Build or import KNULLI's RetroArch path with `--enable-mali_fbdev`.
+- [x] Add a `debian-retroarch-knulli` rootfs profile that keeps the KNULLI kernel/runtime base while packaging the userspace with the existing Armbian-style payload flow.
+- [x] Build KNULLI RetroArch test image: `plumos-v90s-armbian-step2-20260709-9-knulli-retroarch.img`.
+- [ ] User flashes KNULLI RetroArch image and reports LCD/video/audio/input result.
 - [ ] Reproduce KNULLI's video/audio runtime contract before spending more time tuning generic Debian RetroArch.
 - [ ] Bring Armbian build framework into the workflow and use it for rootfs/userspace generation instead of the hand-maintained debootstrap-only path.
 

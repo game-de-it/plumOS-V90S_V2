@@ -122,7 +122,7 @@ boot/runtime contract above.
 
 ## Next Build Target
 
-The next image should be a KNULLI-runtime reproduction image:
+The next image is now a KNULLI-runtime reproduction image:
 
 - small FAT boot-resource
 - userdata/rootfs payload
@@ -132,3 +132,16 @@ The next image should be a KNULLI-runtime reproduction image:
 - KNULLI mixer profile applied before RetroArch
 - no automatic video/core fallback sequence
 - RetroArch built/imported with `--enable-mali_fbdev`
+
+Generated image:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-9-knulli-retroarch.img
+sha256: 68af8bc2d8cfc712718805a26ba0d188ff18f10f0b411eaf8840634d0dc86cd9
+```
+
+The current RetroArch binary is built from RetroArch `v1.22.2` with
+`--enable-mali_fbdev`, `--enable-egl`, `--enable-opengles`, `--enable-sdl2`,
+and `--enable-alsa`. KNULLI's package patches are not replayed yet because
+`000-input_sort_devices.patch` does not apply cleanly to the checked-out tag.
+That patch mismatch is tracked separately from the first video-context test.

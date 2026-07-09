@@ -149,6 +149,24 @@ a pop. To continue without adding automatic fallbacks, the payload now includes
 mixer profiles and `dmix+softvol` while saving
 `plumos-v90s-audio-diagnostic.log`.
 
+After live SSH testing, Debian's stock RetroArch route was no longer the best
+target: QuickNES fixed audio breakup, but the `sdl2 + mali + software` path still
+showed visible pacing issues, and Debian RetroArch's `video_driver=gl` reached
+the GE8300 OpenGL ES stack before crashing. The next image therefore uses a
+locally built RetroArch `v1.22.2` binary with KNULLI's key `--enable-mali_fbdev`
+contract:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-9-knulli-retroarch.img
+sha256: 68af8bc2d8cfc712718805a26ba0d188ff18f10f0b411eaf8840634d0dc86cd9
+```
+
+The new payload keeps SSH and the working KNULLI mixer/QuickNES setup, but its
+single video route is now `video_driver=gl` plus
+`video_context_driver=mali_fbdev`. The KNULLI package patch replay is not yet
+part of the binary because `000-input_sort_devices.patch` does not apply cleanly
+to the checked-out RetroArch tag.
+
 ## Runtime Investigation Targets
 
 Video:

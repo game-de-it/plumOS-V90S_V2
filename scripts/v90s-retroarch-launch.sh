@@ -1,7 +1,7 @@
 #!/bin/sh
 set -u
 
-PATH=/usr/sbin:/usr/bin:/sbin:/bin
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
 FAT_LOG_DIR=/boot/plumos-logs
@@ -12,12 +12,18 @@ SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
 RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
 RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
+ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-/etc/plumos-v90s-retroarch-route}"
 LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
 RETROARCH_PID_FILE="$RUN_DIR/retroarch.pid"
 RETROARCH_TIMEOUT_FLAG="$RUN_DIR/retroarch.timeout"
 RETROARCH_PID=
 RETROARCH_WATCHDOG_PID=
 LOG_MIRROR_PID=
+
+if [ -r "$ROUTE_CONFIG" ]; then
+    . "$ROUTE_CONFIG"
+fi
+RETROARCH_BIN="${PLUMOS_V90S_RETROARCH_BIN:-retroarch}"
 
 if [ -d "$FAT_LOG_DIR" ] && [ -w "$FAT_LOG_DIR" ]; then
     LAUNCH_LOG="$FAT_LOG_DIR/plumos-v90s-retroarch-launch.log"
@@ -85,6 +91,29 @@ pid_comm_equals() {
     [ "$comm" = "$expected" ]
 }
 
+pid_is_retroarch() {
+    pid="$1"
+    [ -r "/proc/$pid/comm" ] || return 1
+    [ -r "/proc/$pid/cmdline" ] || return 1
+    comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+    cmdline="$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+
+    case "$comm" in
+        retroarch|retroarch-knull|retroarch-knulli)
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    case "$cmdline" in
+        *"/tmp/retroarch-v90s.cfg"*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 wait_pid_exit() {
     pid="$1"
     limit="${2:-5}"
@@ -115,7 +144,7 @@ terminate_retroarch_pid() {
         return 0
     fi
 
-    if ! pid_comm_equals "$pid" "retroarch"; then
+    if ! pid_is_retroarch "$pid"; then
         comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
         cmdline="$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
         log "retroarch-launch: refusing to stop pid=$pid; comm='$comm' cmdline='$cmdline'"
@@ -216,7 +245,7 @@ run_retroarch() {
     cfg="$1"
 
     rm -f "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
-    retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
+    "$RETROARCH_BIN" --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
     RETROARCH_PID=$!
     printf '%s\n' "$RETROARCH_PID" > "$RETROARCH_PID_FILE" 2>/dev/null || true
     log "retroarch-launch: started RetroArch pid=$RETROARCH_PID"
@@ -224,7 +253,7 @@ run_retroarch() {
     if [ "${RETROARCH_TIMEOUT_SECONDS:-0}" != "0" ]; then
         (
             sleep "$RETROARCH_TIMEOUT_SECONDS"
-            if pidfile_matches_pid "$RETROARCH_PID_FILE" "$RETROARCH_PID" && pid_comm_equals "$RETROARCH_PID" "retroarch"; then
+            if pidfile_matches_pid "$RETROARCH_PID_FILE" "$RETROARCH_PID" && pid_is_retroarch "$RETROARCH_PID"; then
                 : > "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
                 terminate_retroarch_pid "$RETROARCH_PID" "timeout-${RETROARCH_TIMEOUT_SECONDS}s"
             fi
@@ -331,6 +360,8 @@ write_config() {
     input_driver="$3"
     joypad_driver="$4"
     audio_driver="$5"
+    video_context_driver="$6"
+    video_threaded="$7"
 
     cat > "$cfg" <<EOF
 config_save_on_exit = "false"
@@ -351,11 +382,16 @@ video_font_size = "16.000000"
 
 menu_driver = "rgui"
 video_driver = "$video_driver"
+EOF
+    if [ -n "$video_context_driver" ]; then
+        printf 'video_context_driver = "%s"\n' "$video_context_driver" >> "$cfg"
+    fi
+    cat >> "$cfg" <<EOF
 video_fullscreen = "true"
 video_windowed_fullscreen = "true"
 video_vsync = "true"
 video_refresh_rate = "60.000000"
-video_threaded = "true"
+video_threaded = "$video_threaded"
 video_smooth = "false"
 video_scale_integer = "false"
 video_force_aspect = "true"
@@ -405,6 +441,7 @@ log "retroarch-launch: launch_log=$LAUNCH_LOG"
 log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
 log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
 log "retroarch-launch: run_dir=$RUN_DIR"
+log "retroarch-launch: route_config=$ROUTE_CONFIG present=$([ -r "$ROUTE_CONFIG" ] && printf yes || printf no)"
 log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
 log "retroarch-launch: cmdline=$(read_file /proc/cmdline)"
 
@@ -422,6 +459,16 @@ append_cmd "sound-mixer-before" sh -c 'command -v amixer >/dev/null 2>&1 && amix
 setup_cpu_performance
 setup_audio_mixer
 append_cmd "sound-mixer-after" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
+
+resolved_retroarch="$(command -v "$RETROARCH_BIN" 2>/dev/null || true)"
+if [ -z "$resolved_retroarch" ]; then
+    log "retroarch-launch: RetroArch binary missing: $RETROARCH_BIN"
+    mirror_logs
+    exit 45
+fi
+RETROARCH_BIN="$resolved_retroarch"
+log "retroarch-launch: retroarch_bin=$RETROARCH_BIN"
+
 if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
     export LD_LIBRARY_PATH="/usr/local/lib/plumos-sdl2-mali${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     log "retroarch-launch: custom SDL2 mali runtime detected"
@@ -441,8 +488,8 @@ if [ -x /usr/local/bin/v90s-sdl2-video-probe ] && [ "${PLUMOS_V90S_RUN_SDL2_PROB
 elif [ -x /usr/local/bin/v90s-sdl2-video-probe ]; then
     log "retroarch-launch: skipping SDL2 video probe; set PLUMOS_V90S_RUN_SDL2_PROBE=1 for diagnostics"
 fi
-append_cmd "retroarch-version" retroarch --version
-append_cmd "retroarch-features" retroarch --features
+append_cmd "retroarch-version" "$RETROARCH_BIN" --version
+append_cmd "retroarch-features" "$RETROARCH_BIN" --features
 append_cmd "dmesg-tail" sh -c 'dmesg 2>/dev/null | tail -120 || true'
 
 core="${PLUMOS_V90S_CORE:-/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so}"
@@ -479,17 +526,19 @@ if [ ! -d /usr/local/lib/plumos-sdl2-mali ]; then
     exit 44
 fi
 
-video_driver=sdl2
-input_driver=sdl2
-joypad_driver=sdl2
-audio_driver=alsa
-sdl_video=mali
+video_driver="${PLUMOS_V90S_VIDEO_DRIVER:-sdl2}"
+video_context_driver="${PLUMOS_V90S_VIDEO_CONTEXT_DRIVER:-}"
+video_threaded="${PLUMOS_V90S_VIDEO_THREADED:-true}"
+input_driver="${PLUMOS_V90S_INPUT_DRIVER:-sdl2}"
+joypad_driver="${PLUMOS_V90S_JOYPAD_DRIVER:-sdl2}"
+audio_driver="${PLUMOS_V90S_AUDIO_DRIVER:-alsa}"
+sdl_video="${PLUMOS_V90S_SDL_VIDEODRIVER:-mali}"
 sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
 cfg=/tmp/retroarch-v90s.cfg
 
-write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver"
+write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
 
-log "retroarch-launch: route video=$video_driver input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
+log "retroarch-launch: route video=$video_driver context=$video_context_driver threaded=$video_threaded input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
 {
     echo ""
     echo "===== config ====="

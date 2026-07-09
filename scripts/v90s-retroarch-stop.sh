@@ -1,7 +1,7 @@
 #!/bin/sh
 set -u
 
-PATH=/usr/sbin:/usr/bin:/sbin:/bin
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
 RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
@@ -43,6 +43,23 @@ process_matches() {
     matcher="$2"
 
     case "$matcher" in
+        retroarch-runtime)
+            comm="$(pid_comm "$pid" 2>/dev/null || true)"
+            cmdline="$(pid_cmdline "$pid" 2>/dev/null || true)"
+            case "$comm" in
+                retroarch|retroarch-knull|retroarch-knulli)
+                    ;;
+                *)
+                    return 1
+                    ;;
+            esac
+            case "$cmdline" in
+                *"/tmp/retroarch-v90s.cfg"*)
+                    return 0
+                    ;;
+            esac
+            return 1
+            ;;
         comm:*)
             expected="${matcher#comm:}"
             comm="$(pid_comm "$pid" 2>/dev/null || true)"
@@ -164,11 +181,11 @@ stop_pidfile() {
 
 case "$ACTION" in
     status)
-        status_pidfile "$RETROARCH_PID_FILE" "comm:retroarch" "RetroArch" || true
+        status_pidfile "$RETROARCH_PID_FILE" "retroarch-runtime" "RetroArch" || true
         status_pidfile "$LAUNCHER_PID_FILE" "cmdline:v90s-retroarch-launch" "launcher" || true
         ;;
     stop)
-        stop_pidfile "$RETROARCH_PID_FILE" "comm:retroarch" "RetroArch"
+        stop_pidfile "$RETROARCH_PID_FILE" "retroarch-runtime" "RetroArch"
         stop_pidfile "$LAUNCHER_PID_FILE" "cmdline:v90s-retroarch-launch" "launcher"
         ;;
     *)

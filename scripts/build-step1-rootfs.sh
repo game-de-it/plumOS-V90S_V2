@@ -10,6 +10,7 @@ knulli_a133_overlay=".cache/knulli-linux/board/allwinner/a133/fsoverlay"
 pvr_dir=".cache/ge8300-drivers"
 sdl2_mali_dir="output/sdl2-mali"
 quicknes_dir="output/libretro-quicknes"
+retroarch_knulli_dir="output/retroarch-knulli"
 keep_work=0
 rom_path=""
 wifi_ssid="${PLUMOS_V90S_WIFI_SSID:-}"
@@ -25,7 +26,8 @@ Usage:
 
 Options:
   --profile NAME        all, stage1, debian-minbase, debian-retroarch,
-                        debian-retroarch-pvr-probe, or debian-retroarch-pvr-sdl2; default all
+                        debian-retroarch-pvr-probe, debian-retroarch-pvr-sdl2,
+                        or debian-retroarch-knulli; default all
   --suite NAME          Debian suite for debootstrap, default bookworm
   --mirror URL          Debian mirror, default http://deb.debian.org/debian
   --out-dir PATH        output directory, default output/rootfs-step1
@@ -34,6 +36,8 @@ Options:
   --pvr-dir PATH        GE8300 driver checkout, default .cache/ge8300-drivers
   --sdl2-mali-dir PATH  patched SDL2 payload, default output/sdl2-mali
   --quicknes-dir PATH   QuickNES libretro payload, default output/libretro-quicknes
+  --retroarch-knulli-dir PATH
+                        KNULLI-style RetroArch payload, default output/retroarch-knulli
   --rom PATH            NES ROM to copy into debian-retroarch payload
   --wifi-ssid SSID      configure Wi-Fi SSID in the generated payload
   --wifi-psk PSK        configure Wi-Fi WPA/WPA2 passphrase in the generated payload
@@ -83,6 +87,10 @@ while [ "$#" -gt 0 ]; do
             quicknes_dir="$2"
             shift 2
             ;;
+        --retroarch-knulli-dir)
+            retroarch_knulli_dir="$2"
+            shift 2
+            ;;
         --rom)
             rom_path="$2"
             shift 2
@@ -120,7 +128,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$profile" in
-    all|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe|debian-retroarch-pvr-sdl2)
+    all|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe|debian-retroarch-pvr-sdl2|debian-retroarch-knulli)
         ;;
     *)
         printf 'error: unknown profile: %s\n' "$profile" >&2
@@ -133,14 +141,14 @@ if ! command -v mksquashfs >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
+if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if ! command -v debootstrap >/dev/null 2>&1; then
         printf 'error: debootstrap is required for profile %s\n' "$profile" >&2
         exit 1
     fi
 fi
 
-if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
+if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if [ -z "$rom_path" ]; then
         printf 'error: --rom is required for profile %s\n' "$profile" >&2
         exit 2
@@ -156,7 +164,7 @@ if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-p
     fi
 fi
 
-if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
+if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if [ ! -d "$pvr_dir/fbdev/glibc/lib64" ] || [ ! -x "$pvr_dir/fbdev/glibc/bin/pvrsrvctl" ]; then
         printf 'error: GE8300 fbdev/glibc driver payload not found under: %s\n' "$pvr_dir" >&2
         exit 1
@@ -167,10 +175,18 @@ if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retro
     fi
 fi
 
-if [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
+if [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if [ ! -f "$sdl2_mali_dir/usr/local/lib/plumos-sdl2-mali/libSDL2-2.0.so.0" ] || [ ! -x "$sdl2_mali_dir/usr/local/bin/v90s-sdl2-video-probe" ]; then
         printf 'error: patched SDL2 mali payload not found under: %s\n' "$sdl2_mali_dir" >&2
         printf 'hint: run ./scripts/run-assembly-tools.sh ./scripts/build-sdl2-mali.sh first\n' >&2
+        exit 1
+    fi
+fi
+
+if [ "$profile" = "debian-retroarch-knulli" ]; then
+    if [ ! -x "$retroarch_knulli_dir/usr/local/bin/retroarch-knulli" ]; then
+        printf 'error: KNULLI-style RetroArch payload not found: %s/usr/local/bin/retroarch-knulli\n' "$retroarch_knulli_dir" >&2
+        printf 'hint: run ./scripts/build-retroarch-knulli.sh first\n' >&2
         exit 1
     fi
 fi
@@ -773,6 +789,52 @@ install_sdl2_mali() {
     fi
 }
 
+install_retroarch_knulli() {
+    root="$1"
+
+    mkdir -p "$root/usr/local" "$root/etc"
+    cp -a "$retroarch_knulli_dir/usr/local/." "$root/usr/local/"
+    ln -sf retroarch-knulli "$root/usr/local/bin/retroarch"
+    if [ -f "$retroarch_knulli_dir/manifest.txt" ]; then
+        install -m 0644 "$retroarch_knulli_dir/manifest.txt" "$root/etc/plumos-retroarch-knulli-manifest.txt"
+    fi
+    if [ -f "$retroarch_knulli_dir/retroarch-knulli.sha256" ]; then
+        install -m 0644 "$retroarch_knulli_dir/retroarch-knulli.sha256" "$root/etc/plumos-retroarch-knulli.sha256"
+    fi
+}
+
+write_retroarch_route() {
+    root="$1"
+    include_retroarch_knulli="$2"
+
+    if [ "$include_retroarch_knulli" -eq 1 ]; then
+        cat > "$root/etc/plumos-v90s-retroarch-route" <<'EOF'
+PLUMOS_V90S_RETROARCH_BIN=/usr/local/bin/retroarch
+PLUMOS_V90S_VIDEO_DRIVER=gl
+PLUMOS_V90S_VIDEO_CONTEXT_DRIVER=mali_fbdev
+PLUMOS_V90S_VIDEO_THREADED=false
+PLUMOS_V90S_INPUT_DRIVER=sdl2
+PLUMOS_V90S_JOYPAD_DRIVER=sdl2
+PLUMOS_V90S_AUDIO_DRIVER=alsa
+PLUMOS_V90S_SDL_VIDEODRIVER=mali
+PLUMOS_V90S_SDL_RENDER_DRIVER=software
+EOF
+    else
+        cat > "$root/etc/plumos-v90s-retroarch-route" <<'EOF'
+PLUMOS_V90S_RETROARCH_BIN=/usr/bin/retroarch
+PLUMOS_V90S_VIDEO_DRIVER=sdl2
+PLUMOS_V90S_VIDEO_CONTEXT_DRIVER=
+PLUMOS_V90S_VIDEO_THREADED=true
+PLUMOS_V90S_INPUT_DRIVER=sdl2
+PLUMOS_V90S_JOYPAD_DRIVER=sdl2
+PLUMOS_V90S_AUDIO_DRIVER=alsa
+PLUMOS_V90S_SDL_VIDEODRIVER=mali
+PLUMOS_V90S_SDL_RENDER_DRIVER=software
+EOF
+    fi
+    chmod 0644 "$root/etc/plumos-v90s-retroarch-route"
+}
+
 escape_wpa_value() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
@@ -839,6 +901,7 @@ build_debian_retroarch_payload() {
     profile_name="$2"
     include_pvr="$3"
     include_sdl2_mali="${4:-0}"
+    include_retroarch_knulli="${5:-0}"
     root="$work_dir/${profile_name}-root"
     rm -rf "$root"
     mkdir -p "$root"
@@ -865,6 +928,10 @@ build_debian_retroarch_payload() {
     if [ "$include_sdl2_mali" -eq 1 ]; then
         install_sdl2_mali "$root"
     fi
+    if [ "$include_retroarch_knulli" -eq 1 ]; then
+        install_retroarch_knulli "$root"
+    fi
+    write_retroarch_route "$root" "$include_retroarch_knulli"
     if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
         install_network_ssh "$root"
     fi
@@ -872,6 +939,10 @@ build_debian_retroarch_payload() {
     printf 'plumos-v90s-step2\n' > "$root/etc/hostname"
     rom_sha256="$(sha256sum "$rom_path" | awk '{print $1}')"
     quicknes_sha256="$(sha256sum "$quicknes_dir/quicknes_libretro.so" | awk '{print $1}')"
+    retroarch_knulli_sha256=none
+    if [ "$include_retroarch_knulli" -eq 1 ]; then
+        retroarch_knulli_sha256="$(sha256sum "$retroarch_knulli_dir/usr/local/bin/retroarch-knulli" | awk '{print $1}')"
+    fi
     cat > "$root/etc/plumos-step2-release" <<EOF
 name=plumOS V90S Step2 RetroArch Debian payload
 suite=$suite
@@ -880,6 +951,9 @@ rootfs_profile=$profile_name
 packages=$retroarch_packages
 power_pvr_probe=$include_pvr
 custom_sdl2_mali=$include_sdl2_mali
+custom_retroarch_knulli=$include_retroarch_knulli
+retroarch_bin=$([ "$include_retroarch_knulli" -eq 1 ] && printf /usr/local/bin/retroarch-knulli || printf /usr/bin/retroarch)
+retroarch_knulli_sha256=$retroarch_knulli_sha256
 quicknes_core=/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so
 quicknes_sha256=$quicknes_sha256
 rom_path=/roms/nes/Super Mario Bros..nes
@@ -893,7 +967,7 @@ EOF
     sha256sum "$out_dir/debian-${suite}-${payload_suffix}.squashfs" > "$out_dir/debian-${suite}-${payload_suffix}.squashfs.sha256"
     du -sh "$root" > "$out_dir/debian-${suite}-${payload_suffix}-root.du.txt"
     find "$root" -maxdepth 2 -type f | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-${payload_suffix}-manifest-depth2.txt"
-    find "$root/usr/lib" "$root/usr/share/libretro" -maxdepth 5 -type f 2>/dev/null | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-${payload_suffix}-runtime-files.txt"
+    find "$root/usr/lib" "$root/usr/local" "$root/usr/share/libretro" -maxdepth 5 -type f 2>/dev/null | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-${payload_suffix}-runtime-files.txt"
     printf 'created: %s/debian-%s-%s.squashfs\n' "$out_dir" "$suite" "$payload_suffix"
 }
 
@@ -907,6 +981,10 @@ build_debian_retroarch_pvr_probe() {
 
 build_debian_retroarch_pvr_sdl2() {
     build_debian_retroarch_payload "retroarch-pvr-sdl2-step2" "debian-retroarch-pvr-sdl2" 1 1
+}
+
+build_debian_retroarch_knulli() {
+    build_debian_retroarch_payload "retroarch-knulli-step2" "debian-retroarch-knulli" 1 1 1
 }
 
 if [ "$profile" = "all" ] || [ "$profile" = "stage1" ]; then
@@ -927,4 +1005,8 @@ fi
 
 if [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
     build_debian_retroarch_pvr_sdl2
+fi
+
+if [ "$profile" = "debian-retroarch-knulli" ]; then
+    build_debian_retroarch_knulli
 fi
