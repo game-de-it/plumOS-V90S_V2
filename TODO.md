@@ -145,7 +145,10 @@ First implementation tasks:
 - [x] User flashes fourth Step 2 image and returns FAT logs.
 - [x] Analyze SDL2 probe and RetroArch logs from fourth Step 2 image.
 - [x] Confirm custom SDL2 `mali` probe succeeds on real hardware and sees `adc_gamepad`.
-- [ ] Add timed RetroArch launch diagnostics so `plumos-v90s-retroarch.log` survives when RA does not return.
+- [x] Add timed RetroArch launch diagnostics so `plumos-v90s-retroarch.log` survives when RA does not return.
+- [x] Build fifth Step 2 diagnostic image with timed RetroArch logging: `plumos-v90s-armbian-step2-20260709-5-retroarch-timeout-log.img`.
+- [ ] User flashes fifth Step 2 diagnostic image and returns FAT logs.
+- [ ] Analyze timed RetroArch logs from fifth Step 2 image.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.
 
 Validation buckets:

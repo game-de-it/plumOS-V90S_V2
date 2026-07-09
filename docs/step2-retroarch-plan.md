@@ -117,6 +117,17 @@ The launcher now runs the SDL2 probe with `SDL_VIDEODRIVER=mali` before RetroArc
 
 The real-device test of the fourth image proved the custom SDL2 path: `SDL_VIDEODRIVER=mali`, `current_video_driver=mali`, `SDL_CreateWindow ok`, `SDL_GL_CreateContext ok`, and `joystick[0]=adc_gamepad`. Debian RetroArch then reached attempt 1 with `video_driver=sdl2` and `SDL_VIDEODRIVER=mali`, but did not return to the launcher and did not leave `plumos-v90s-retroarch.log` on FAT. The next build should add a timed RetroArch attempt for better logs and move toward KNULLI's RetroArch build/patches rather than more SDL2/PVR probing.
 
+The fifth generated image keeps the proven PVR and SDL2 `mali` stack, but changes the RetroArch launcher into a hang-capturing diagnostic:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-5-retroarch-timeout-log.img
+sha256: b098ae5474b7517980810245c4227384e04a5d0a621e1e98e23e99acfb57c298
+```
+
+Each RetroArch attempt now writes and syncs its config before launch, mirrors both launch and runtime logs every 5 seconds, and uses a 45 second timeout by default. If RetroArch hangs in the first `sdl2/mali` attempt again, FAT should still contain `plumos-v90s-retroarch.log` with the last verbose RetroArch lines and `plumos-v90s-retroarch-launch.log` should contain `attempt=1 timed out after 45s`.
+
+KNULLI's local RetroArch package is the next binary route if Debian RetroArch still hangs. `.cache/knulli-linux/package/retroarch/retroarch/retroarch.mk` builds RetroArch `v1.22.2`, enables SDL2/EGL/GLES when the Buildroot target provides them, and adds `--enable-mali_fbdev` when `BR2_PACKAGE_HAS_LIBMALI=y` outside the RK3326/RK3568 exceptions. The A133 board config selects `BR2_PACKAGE_POWERVR_GE8300_DRIVER=y`, and that driver package provides libEGL/libGLES from the GE8300 fbdev/glibc payload.
+
 ## Runtime Investigation Targets
 
 Video:

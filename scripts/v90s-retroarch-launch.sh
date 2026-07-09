@@ -10,6 +10,8 @@ LAUNCH_LOG=/tmp/plumos-v90s-retroarch-launch.log
 RETROARCH_LOG=/tmp/plumos-v90s-retroarch.log
 SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
+RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-45}"
+LOG_MIRROR_PID=
 
 if [ -d "$FAT_LOG_DIR" ] && [ -w "$FAT_LOG_DIR" ]; then
     LAUNCH_LOG="$FAT_LOG_DIR/plumos-v90s-retroarch-launch.log"
@@ -25,6 +27,7 @@ fi
 : > "$RETROARCH_LOG" 2>/dev/null || true
 [ -n "$SHARE_LAUNCH_LOG" ] && : > "$SHARE_LAUNCH_LOG" 2>/dev/null || true
 [ -n "$SHARE_RETROARCH_LOG" ] && : > "$SHARE_RETROARCH_LOG" 2>/dev/null || true
+sync 2>/dev/null || true
 
 log_count=0
 
@@ -68,6 +71,44 @@ mirror_logs() {
         cp "$RETROARCH_LOG" "$SHARE_DIR/rootfs/plumos-v90s-retroarch.log" 2>/dev/null || true
     fi
     sync 2>/dev/null || true
+}
+
+start_periodic_log_mirror() {
+    (
+        while :; do
+            sleep 5
+            mirror_logs
+        done
+    ) &
+    LOG_MIRROR_PID=$!
+}
+
+stop_periodic_log_mirror() {
+    if [ -n "$LOG_MIRROR_PID" ]; then
+        kill "$LOG_MIRROR_PID" 2>/dev/null || true
+        wait "$LOG_MIRROR_PID" 2>/dev/null || true
+        LOG_MIRROR_PID=
+    fi
+    mirror_logs
+}
+
+run_retroarch() {
+    cfg="$1"
+
+    if command -v timeout >/dev/null 2>&1; then
+        if command -v stdbuf >/dev/null 2>&1; then
+            timeout "$RETROARCH_TIMEOUT_SECONDS" stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+        else
+            timeout "$RETROARCH_TIMEOUT_SECONDS" retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+        fi
+    else
+        echo "retroarch-launch: timeout command missing; running RetroArch without enforced timeout" >> "$RETROARCH_LOG" 2>/dev/null || true
+        if command -v stdbuf >/dev/null 2>&1; then
+            stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+        else
+            retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+        fi
+    fi
 }
 
 read_file() {
@@ -146,6 +187,7 @@ EOF
 log "retroarch-launch: entered"
 log "retroarch-launch: launch_log=$LAUNCH_LOG"
 log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
+log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
 log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
 log "retroarch-launch: cmdline=$(read_file /proc/cmdline)"
 
@@ -247,6 +289,7 @@ for spec do
         cat "$cfg"
         echo "===== attempt $attempt runtime ====="
     } >> "$RETROARCH_LOG" 2>/dev/null || true
+    mirror_logs
 
     if [ "$sdl_video" = "none" ]; then
         unset SDL_VIDEODRIVER
@@ -254,14 +297,18 @@ for spec do
         export SDL_VIDEODRIVER="$sdl_video"
     fi
     export SDL_AUDIODRIVER=alsa
+    log "retroarch-launch: attempt=$attempt pre-launch sync complete"
+    mirror_logs
 
-    if command -v stdbuf >/dev/null 2>&1; then
-        stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-    else
-        retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
-    fi
+    start_periodic_log_mirror
+    run_retroarch "$cfg"
     rc=$?
+    stop_periodic_log_mirror
     log "retroarch-launch: attempt=$attempt exited rc=$rc"
+    if [ "$rc" -eq 124 ]; then
+        log "retroarch-launch: attempt=$attempt timed out after ${RETROARCH_TIMEOUT_SECONDS}s"
+    fi
+    append_cmd "processes-after-attempt-$attempt" sh -c 'ps w 2>/dev/null | grep -E "[r]etroarch|[p]vrsrv|[s]dl" || true'
     mirror_logs
 
     if [ "$rc" -eq 0 ]; then

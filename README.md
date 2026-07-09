@@ -143,6 +143,16 @@ plumos-v90s-debian-init.log
 plumos-v90s-diag.log
 ```
 
+現在の最新 Step 2 診断イメージは、PowerVR と KNULLI 由来 SDL2 `mali` driver が実機で動作した後の黒画面ハングを調べるため、RetroArch 起動を45秒timeout付きにしています。
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-5-retroarch-timeout-log.img
+sha256: b098ae5474b7517980810245c4227384e04a5d0a621e1e98e23e99acfb57c298
+size: 581M
+```
+
+このイメージでは `plumos-v90s-retroarch.log` もFATへ残る想定です。RetroArchが黒画面で止まる場合でも、`plumos-v90s-retroarch-launch.log` に `attempt=1 timed out after 45s` が出るかを確認します。
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。
