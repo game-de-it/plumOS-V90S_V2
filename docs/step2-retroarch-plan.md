@@ -115,6 +115,8 @@ sha256: 8153fb1c692fb665386aeab502ae3b054d3fd512eab17d851de8de2a83dfc108
 
 The launcher now runs the SDL2 probe with `SDL_VIDEODRIVER=mali` before RetroArch and then tries `video_driver=sdl2` with `SDL_VIDEODRIVER=mali` first. If the probe succeeds but Debian RetroArch still fails, the next branch is to build/import KNULLI's RetroArch binary with `--enable-mali_fbdev`.
 
+The real-device test of the fourth image proved the custom SDL2 path: `SDL_VIDEODRIVER=mali`, `current_video_driver=mali`, `SDL_CreateWindow ok`, `SDL_GL_CreateContext ok`, and `joystick[0]=adc_gamepad`. Debian RetroArch then reached attempt 1 with `video_driver=sdl2` and `SDL_VIDEODRIVER=mali`, but did not return to the launcher and did not leave `plumos-v90s-retroarch.log` on FAT. The next build should add a timed RetroArch attempt for better logs and move toward KNULLI's RetroArch build/patches rather than more SDL2/PVR probing.
+
 ## Runtime Investigation Targets
 
 Video:
