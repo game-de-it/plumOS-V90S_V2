@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img \
+  --name plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` です。
 
 ```text
-sha256: 1b80f2c6067bc22e163f0272d0d5e423cf65fb49c9bde3c8ca068b0228dbbf11
+sha256: f26b6391af990a7b4637054d5558d3794fd50250674fb3b9ec68ed94e1d52f24
 size: 133M
 ```
 
@@ -115,6 +115,10 @@ size: 133M
 `-13-fb-console` では kernel framebuffer console に依存せず、Debian init から `/usr/local/sbin/v90s-fb-console` を実行しました。実機では KNULLI boot logo の後に黒画面になり、console text は出ませんでした。戻した SD のログでは Debian init が `starting framebuffer console` まで到達し、`plumos-v90s-fb-console.log` は 0 bytes でした。一方で dmesg には USB keyboard が `usbhid` input device として認識された記録があり、Caps Lock LED が反応しないことだけでは USB 未認識とは判断しません。
 
 `-14-fb-console-logged` では、console 起動前に `perl -c` を実行し、console の stdout/stderr を userdata の `plumos-v90s-fb-console.log` へリダイレクトします。Perl console 側も起動直後からログを強制 flush/sync し、画面には大きな白い start marker と左上の白枠を描くため、また黒画面で止まっても次の原因を SD 側ログから追えるはずです。
+
+`-14-fb-console-logged` の実機ログでは、console が `uname -a`、`ls /`、`ls /dev/input` を実行し、USB keyboard から入力された `ls` も実行できていました。画面には白い枠線だけが出て文字が見えなかったため、残りの問題は font bitmap が初期化されていないことでした。
+
+`-15-fb-text-fat-logs` では font bitmap を起動前に初期化し、文字を少し大きくしました。また Debian 側で FAT boot-resource を `/boot` として rw remount し、ログを `/boot/plumos-logs/` に保存します。macOS では次回から `/Volumes/KNULLI/plumos-logs/` を見るだけで主要ログを確認できます。
 
 ## Git workflow
 

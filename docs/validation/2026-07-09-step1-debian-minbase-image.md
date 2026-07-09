@@ -179,6 +179,18 @@ sha256: de22009eb734adaeefe206f152c092a51167e1f2dd68b3ac20a004e9fb91432b
 compression: zstd
 ```
 
+After device test 14 showed that keyboard input and command execution worked but text was not visible, the payloads were rebuilt with font initialization fixed and FAT log export enabled:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: d5f3a5a4328a9517fdbe480d5bfbcbdce46dab2b0acc4cb3996fa5bd1da0fabc
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: 827e5929bc1a0ed92527c3aa945bac8c0538ca9a51f55ec3ee7a1aa947512838
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check

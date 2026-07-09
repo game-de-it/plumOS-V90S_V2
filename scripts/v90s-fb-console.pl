@@ -10,7 +10,8 @@ our %FONT;
 my $fb_path = "/dev/fb0";
 my $share_log = "/mnt/share/plumos-v90s-fb-console.log";
 my $share_log_copy = "/mnt/share/rootfs/plumos-v90s-fb-console.log";
-my ($FB, $LOG1, $LOG2);
+my $fat_log = "/boot/plumos-logs/plumos-v90s-fb-console.log";
+my ($FB, $LOG1, $LOG2, $LOG3);
 my $log_count = 0;
 
 open_logs();
@@ -29,13 +30,14 @@ my $bpp = read_int("/sys/class/graphics/fb0/bits_per_pixel", 32, undef);
 my $visible_height = read_visible_height($virtual_height);
 $visible_height = $virtual_height if $visible_height > $virtual_height;
 
-my $scale = 2;
+my $scale = 3;
 my $char_w = 6 * $scale;
 my $char_h = 8 * $scale;
-my $cols = int($width / $char_w);
-my $rows = int($visible_height / $char_h);
-$cols = 40 if $cols < 40;
-$rows = 20 if $rows < 20;
+my $left_margin = 12;
+my $cols = int(($width - $left_margin) / $char_w);
+my $rows = int(($visible_height - 16) / $char_h);
+$cols = 20 if $cols < 20;
+$rows = 8 if $rows < 8;
 
 my $fg = pack("V", 0xffffffff);
 my $dim = pack("V", 0xffb0b0b0);
@@ -115,8 +117,10 @@ sub read_visible_height {
 sub open_logs {
     open($LOG1, ">>", $share_log);
     open($LOG2, ">>", $share_log_copy);
+    open($LOG3, ">>", $fat_log) if -d "/boot/plumos-logs";
     set_autoflush($LOG1) if $LOG1;
     set_autoflush($LOG2) if $LOG2;
+    set_autoflush($LOG3) if $LOG3;
 }
 
 sub set_autoflush {
@@ -133,6 +137,7 @@ sub raw_log {
     $line =~ s/[^ -~]/?/g;
     print $LOG1 "$line\n" if $LOG1;
     print $LOG2 "$line\n" if $LOG2;
+    print $LOG3 "$line\n" if $LOG3;
     $log_count++;
     system("/bin/sync") if -x "/bin/sync" && ($log_count < 20 || ($log_count % 10) == 0);
 }
@@ -276,7 +281,7 @@ sub redraw {
     clear_pages();
     draw_rect(0, 0, $width, 4, $fg);
     draw_rect(0, 0, 4, $visible_height, $fg);
-    my $x = 12;
+    my $x = $left_margin;
     my $y = 8;
     draw_text($x, $y, "plumOS V90S fb console", $dim);
     $y += $char_h;
@@ -357,6 +362,7 @@ sub draw_char {
     }
 }
 
+BEGIN {
 %FONT = (
     " "=>[qw(00000 00000 00000 00000 00000 00000 00000)],
     "!"=>[qw(00100 00100 00100 00100 00100 00000 00100)],
@@ -428,3 +434,4 @@ sub draw_char {
     "}"=>[qw(01000 00100 00100 00010 00100 00100 01000)],
     "~"=>[qw(00000 00000 01000 10101 00010 00000 00000)],
 );
+}

@@ -309,10 +309,48 @@ write_debian_init() {
 #!/bin/sh
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 LOG=/tmp/plumos-v90s-debian-init.log
+FAT_LOG_DIR=
 
 log() {
     echo "$*"
     echo "$*" >> "$LOG"
+}
+
+prepare_fat_logs() {
+    mkdir -p /boot 2>/dev/null || true
+
+    if [ -f /boot/knulli-boot.conf ] || [ -f /boot/boot/knulli ]; then
+        mount -o remount,rw /boot 2>/dev/null || true
+    else
+        for dev in /dev/mmcblk0p4 /dev/mmcblk1p4; do
+            [ -b "$dev" ] || continue
+            mount -t vfat -o rw "$dev" /boot 2>/dev/null && break
+        done
+    fi
+
+    if mkdir -p /boot/plumos-logs 2>/dev/null; then
+        FAT_LOG_DIR=/boot/plumos-logs
+        rm -f "$FAT_LOG_DIR"/plumos-v90s-*.log 2>/dev/null || true
+        {
+            echo "plumOS V90S boot log session"
+            date 2>/dev/null || true
+        } > "$FAT_LOG_DIR/session.txt" 2>/dev/null || true
+        sync
+    fi
+}
+
+copy_to_fat_logs() {
+    [ -n "$FAT_LOG_DIR" ] || return 0
+    [ -d "$FAT_LOG_DIR" ] || return 0
+
+    cp "$LOG" "$FAT_LOG_DIR/plumos-v90s-debian-init.log" 2>/dev/null || true
+    if [ -f /mnt/share/plumos-v90s-diag.log ]; then
+        cp /mnt/share/plumos-v90s-diag.log "$FAT_LOG_DIR/plumos-v90s-diag.log" 2>/dev/null || true
+    fi
+    if [ -f /mnt/share/plumos-v90s-fb-console.log ]; then
+        cp /mnt/share/plumos-v90s-fb-console.log "$FAT_LOG_DIR/plumos-v90s-fb-console.log" 2>/dev/null || true
+    fi
+    sync
 }
 
 persist_debian_log() {
@@ -323,6 +361,7 @@ persist_debian_log() {
         fi
         sync
     fi
+    copy_to_fat_logs
 }
 
 ensure_fb0_node() {
@@ -422,6 +461,7 @@ mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 mount -t devpts devpts /dev/pts 2>/dev/null || true
 chmod 1777 /tmp
+prepare_fat_logs
 
 log "debian-init: init entered before tty setup"
 persist_debian_log
@@ -447,6 +487,9 @@ if [ -x /usr/local/sbin/v90s-fb-console ]; then
             : > /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
         fi
     fi
+    if [ -n "$FAT_LOG_DIR" ]; then
+        : > "$FAT_LOG_DIR/plumos-v90s-fb-console.log" 2>/dev/null || true
+    fi
 
     log "debian-init: checking framebuffer console"
     if command -v perl >/dev/null 2>&1; then
@@ -458,6 +501,7 @@ if [ -x /usr/local/sbin/v90s-fb-console ]; then
     if [ -f "$console_log" ] && [ -d /mnt/share/rootfs ]; then
         cp "$console_log" /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
     fi
+    copy_to_fat_logs
 
     log "debian-init: starting framebuffer console"
     persist_debian_log

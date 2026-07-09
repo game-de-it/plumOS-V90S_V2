@@ -1,0 +1,64 @@
+/usr/local/sbin/v90s-fb-console syntax OK
+fb-console: process entered
+fb-console: fb0 640x960 visible=480 stride=2560 bpp=32
+fb-console: fb opened
+plumOS V90S framebuffer console
+fb0 640x960 visible=480 stride=2560 bpp=32
+Type commands and press Enter. Try: ls /
+$ uname -a
+Linux (none) 4.9.191 #17 SMP PREEMPT Tue May 13 18:14
+:09 UTC 2025 aarch64 GNU/Linux
+$ ls /
+bin
+boot
+dev
+etc
+home
+lib
+media
+mnt
+opt
+proc
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+$ ls /dev/input
+event0
+event1
+event2
+event3
+event4
+event5
+event6
+input opened: /dev/input/event0
+input opened: /dev/input/event1
+input opened: /dev/input/event2
+input opened: /dev/input/event3
+input opened: /dev/input/event4
+input opened: /dev/input/event5
+input opened: /dev/input/event6
+> ls
+$ ls
+bin
+boot
+dev
+etc
+home
+lib
+media
+mnt
+opt
+proc
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var

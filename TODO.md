@@ -77,6 +77,10 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Record device test 13: framebuffer console image reached Debian init, but screen stayed black and console log stayed empty.
 - [x] Add framebuffer console stderr logging, startup marker drawing, and forced log flush/sync.
 - [x] Build `plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img`.
+- [x] Record device test 14: framebuffer console executed commands and read USB keyboard input, but text was not visible because the font table was never initialized.
+- [x] Fix framebuffer console font initialization and increase text scale.
+- [x] Copy Debian and framebuffer console logs to the FAT boot-resource partition under `plumos-logs/`.
+- [x] Build `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -342,8 +346,25 @@ rootfs/plumos-v90s-diag.log
 - [x] Host-verify that the framebuffer console no longer depends on Perl `Fcntl` constants.
 - [x] Host-verify that the framebuffer console writes a large start marker and forced-flushes logs.
 - [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds for framebuffer text or a large white start marker to appear.
+- [x] Result: white frame/start marker appeared on the LCD.
+- [x] Result: text still did not appear.
+- [x] Result: typing `ls` and pressing Enter made the white frame blink.
+- [x] Result: userdata logs confirmed `uname -a`, `ls /`, and `ls /dev/input` ran automatically.
+- [x] Result: userdata logs confirmed USB keyboard input produced `> ls` and the command output.
+- [x] Result: remaining display issue was the framebuffer console font table being assigned after the infinite event loop.
+
+## Device Test 15
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
+- [x] Host-verify that font bitmap initialization runs before the framebuffer console main loop.
+- [x] Host-verify that framebuffer text scale is increased.
+- [x] Host-verify that Debian init prepares `/boot/plumos-logs` on the FAT boot-resource partition.
+- [x] Host-verify that the framebuffer console writes directly to `/boot/plumos-logs/plumos-v90s-fb-console.log`.
+- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
 - [ ] User flashes the image to SD and tests on V90S.
-- [ ] Wait at least 60 seconds for framebuffer text or a large white start marker to appear.
+- [ ] Wait at least 60 seconds for framebuffer text to appear.
 - [ ] Attach a USB keyboard and type:
 
 ```text
@@ -351,13 +372,13 @@ ls /
 ```
 
 - [ ] Press Enter and check whether command output appears on screen.
-- [ ] Return the SD card and check userdata logs even if the screen is black:
+- [ ] Return the SD card and check FAT logs without sudo:
 
 ```text
-plumos-v90s-debian-init.log
-rootfs/plumos-v90s-debian-init.log
-plumos-v90s-fb-console.log
-rootfs/plumos-v90s-fb-console.log
+/Volumes/KNULLI/plumos-logs/session.txt
+/Volumes/KNULLI/plumos-logs/plumos-v90s-diag.log
+/Volumes/KNULLI/plumos-logs/plumos-v90s-debian-init.log
+/Volumes/KNULLI/plumos-logs/plumos-v90s-fb-console.log
 ```
 
 ## Console Command Check
@@ -380,7 +401,7 @@ dmesg | tail -80
 - [x] If there is no visible boot activity, inspect boot offsets, boot package, GPT layout, and bootloader cmdline assumptions.
 - [x] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
 - [x] If `/dev/fb0` userspace writes work but framebuffer console is unavailable, add a tiny framebuffer terminal or boot-time getty bridge for Step 1.
-- [ ] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
+- [x] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
 - [ ] If init fails, test a simpler init wrapper before debugging full systemd behavior.
 - [ ] If `/boot_root/boot/knulli` is not found, confirm the real kernel cmdline and which partition the ramdisk mounts.
 
