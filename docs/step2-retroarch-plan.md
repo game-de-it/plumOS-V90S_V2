@@ -106,6 +106,15 @@ The real-device test of the second image showed that `pvrsrvkm.ko` and `dc_sunxi
 
 The real-device test of the third image confirmed that this corrected sequence works: `pvrsrvctl-start-cwd-moddir rc=0`, `/sys/kernel/debug/pvr/status` reports `Driver Status: OK` and `Firmware Status: OK`, and `gpu00/debug_dump` reports `Services State: OK` plus `Comparison of UM/KM components: MATCHING`. RetroArch still cannot display because the Debian stock SDL2/RetroArch stack lacks KNULLI's fbdev EGL path. The next build should therefore focus on patched SDL2 `mali-fbdev` support and/or a KNULLI-built RetroArch binary.
 
+The fourth generated image keeps Debian RetroArch but adds a KNULLI-derived SDL2 2.30.6 build with the V90S `mali` video driver and a small `v90s-sdl2-video-probe` diagnostic:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-4-pvr-sdl2-mali.img
+sha256: 8153fb1c692fb665386aeab502ae3b054d3fd512eab17d851de8de2a83dfc108
+```
+
+The launcher now runs the SDL2 probe with `SDL_VIDEODRIVER=mali` before RetroArch and then tries `video_driver=sdl2` with `SDL_VIDEODRIVER=mali` first. If the probe succeeds but Debian RetroArch still fails, the next branch is to build/import KNULLI's RetroArch binary with `--enable-mali_fbdev`.
+
 ## Runtime Investigation Targets
 
 Video:

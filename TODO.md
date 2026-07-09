@@ -132,14 +132,18 @@ First implementation tasks:
   - PowerVR GE8300 userspace libraries
   - `pvrsrvkm.ko`, `dc_sunxi.ko`, and `rgx.*` firmware
   - launch diagnostics for `/dev/dri`, `/dev/pvr*`, `pvrsrvctl`, EGL, and SDL video drivers
-- [ ] Add patched SDL2 framebuffer EGL backend or a KNULLI-built RetroArch binary.
+- [x] Add patched SDL2 framebuffer EGL backend as a custom SDL2 `mali` runtime.
 - [x] User flashes PowerVR probe image and returns FAT logs.
 - [x] Analyze `plumos-v90s-pvr-probe.log` and decide whether the next branch is module/firmware repair or patched SDL2/RetroArch build.
 - [x] Fix the PowerVR probe to run `pvrsrvctl --start` from `/lib/modules/4.9.191`, matching KNULLI's a133 init flow.
 - [x] Build a third Step 2 image that verifies corrected `pvrsrvctl --start`.
 - [x] User flashes third PowerVR start-cwd image and returns FAT logs.
 - [x] Confirm `pvrsrvctl-start-cwd-moddir rc=0` and PowerVR debugfs status.
-- [ ] Build patched SDL2 or KNULLI-built RetroArch payload.
+- [x] Build patched SDL2 payload with the KNULLI V90S `mali` video driver.
+- [x] Add `v90s-sdl2-video-probe` to distinguish SDL2 fbdev/EGL failure from RetroArch failure.
+- [x] Build fourth Step 2 image with PowerVR plus patched SDL2: `plumos-v90s-armbian-step2-20260709-4-pvr-sdl2-mali.img`.
+- [ ] User flashes fourth Step 2 image and returns FAT logs.
+- [ ] Analyze SDL2 probe and RetroArch logs from fourth Step 2 image.
 
 Validation buckets:
 

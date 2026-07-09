@@ -8,6 +8,7 @@ out_dir="output/rootfs-step1"
 knulli_ramdisk=".cache/v90s-ramdisk"
 knulli_a133_overlay=".cache/knulli-linux/board/allwinner/a133/fsoverlay"
 pvr_dir=".cache/ge8300-drivers"
+sdl2_mali_dir="output/sdl2-mali"
 keep_work=0
 rom_path=""
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -18,13 +19,15 @@ Usage:
   build-step1-rootfs.sh [options]
 
 Options:
-  --profile NAME        all, stage1, debian-minbase, debian-retroarch, or debian-retroarch-pvr-probe; default all
+  --profile NAME        all, stage1, debian-minbase, debian-retroarch,
+                        debian-retroarch-pvr-probe, or debian-retroarch-pvr-sdl2; default all
   --suite NAME          Debian suite for debootstrap, default bookworm
   --mirror URL          Debian mirror, default http://deb.debian.org/debian
   --out-dir PATH        output directory, default output/rootfs-step1
   --knulli-ramdisk PATH extracted KNULLI ramdisk, default .cache/v90s-ramdisk
   --knulli-a133-overlay PATH KNULLI a133 fsoverlay, default .cache/knulli-linux/board/allwinner/a133/fsoverlay
   --pvr-dir PATH        GE8300 driver checkout, default .cache/ge8300-drivers
+  --sdl2-mali-dir PATH  patched SDL2 payload, default output/sdl2-mali
   --rom PATH            NES ROM to copy into debian-retroarch payload
   --keep-work           keep temporary build directory
 USAGE
@@ -60,6 +63,10 @@ while [ "$#" -gt 0 ]; do
             pvr_dir="$2"
             shift 2
             ;;
+        --sdl2-mali-dir)
+            sdl2_mali_dir="$2"
+            shift 2
+            ;;
         --rom)
             rom_path="$2"
             shift 2
@@ -81,7 +88,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$profile" in
-    all|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe)
+    all|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe|debian-retroarch-pvr-sdl2)
         ;;
     *)
         printf 'error: unknown profile: %s\n' "$profile" >&2
@@ -94,14 +101,14 @@ if ! command -v mksquashfs >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ]; then
+if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
     if ! command -v debootstrap >/dev/null 2>&1; then
         printf 'error: debootstrap is required for profile %s\n' "$profile" >&2
         exit 1
     fi
 fi
 
-if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ]; then
+if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
     if [ -z "$rom_path" ]; then
         printf 'error: --rom is required for profile %s\n' "$profile" >&2
         exit 2
@@ -112,13 +119,21 @@ if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-p
     fi
 fi
 
-if [ "$profile" = "debian-retroarch-pvr-probe" ]; then
+if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
     if [ ! -d "$pvr_dir/fbdev/glibc/lib64" ] || [ ! -x "$pvr_dir/fbdev/glibc/bin/pvrsrvctl" ]; then
         printf 'error: GE8300 fbdev/glibc driver payload not found under: %s\n' "$pvr_dir" >&2
         exit 1
     fi
     if [ ! -f "$knulli_a133_overlay/lib/modules/4.9.191_v90s/pvrsrvkm.ko" ] || [ ! -f "$knulli_a133_overlay/lib/modules/4.9.191_v90s/dc_sunxi.ko" ]; then
         printf 'error: KNULLI a133 PowerVR modules not found under: %s\n' "$knulli_a133_overlay" >&2
+        exit 1
+    fi
+fi
+
+if [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
+    if [ ! -f "$sdl2_mali_dir/usr/local/lib/plumos-sdl2-mali/libSDL2-2.0.so.0" ] || [ ! -x "$sdl2_mali_dir/usr/local/bin/v90s-sdl2-video-probe" ]; then
+        printf 'error: patched SDL2 mali payload not found under: %s\n' "$sdl2_mali_dir" >&2
+        printf 'hint: run ./scripts/run-assembly-tools.sh ./scripts/build-sdl2-mali.sh first\n' >&2
         exit 1
     fi
 fi
@@ -687,10 +702,24 @@ install_pvr_probe() {
     printf '/usr/lib/powervr\n' > "$root/etc/ld.so.conf.d/powervr.conf"
 }
 
+install_sdl2_mali() {
+    root="$1"
+
+    mkdir -p "$root/usr/local" "$root/etc"
+    cp -a "$sdl2_mali_dir/usr/local/." "$root/usr/local/"
+    if [ -f "$sdl2_mali_dir/manifest.txt" ]; then
+        install -m 0644 "$sdl2_mali_dir/manifest.txt" "$root/etc/plumos-sdl2-mali-manifest.txt"
+    fi
+    if [ -f "$sdl2_mali_dir/SHA256SUMS" ]; then
+        install -m 0644 "$sdl2_mali_dir/SHA256SUMS" "$root/etc/plumos-sdl2-mali-SHA256SUMS"
+    fi
+}
+
 build_debian_retroarch_payload() {
     payload_suffix="$1"
     profile_name="$2"
     include_pvr="$3"
+    include_sdl2_mali="${4:-0}"
     root="$work_dir/${profile_name}-root"
     rm -rf "$root"
     mkdir -p "$root"
@@ -705,6 +734,9 @@ build_debian_retroarch_payload() {
     if [ "$include_pvr" -eq 1 ]; then
         install_pvr_probe "$root"
     fi
+    if [ "$include_sdl2_mali" -eq 1 ]; then
+        install_sdl2_mali "$root"
+    fi
     install -m 0644 "$rom_path" "$root/roms/nes/Super Mario Bros..nes"
     printf 'plumos-v90s-step2\n' > "$root/etc/hostname"
     rom_sha256="$(sha256sum "$rom_path" | awk '{print $1}')"
@@ -715,6 +747,7 @@ mirror=$mirror
 rootfs_profile=$profile_name
 packages=$retroarch_packages
 power_pvr_probe=$include_pvr
+custom_sdl2_mali=$include_sdl2_mali
 rom_path=/roms/nes/Super Mario Bros..nes
 rom_sha256=$rom_sha256
 EOF
@@ -731,11 +764,15 @@ EOF
 }
 
 build_debian_retroarch() {
-    build_debian_retroarch_payload "retroarch-step2" "debian-retroarch" 0
+    build_debian_retroarch_payload "retroarch-step2" "debian-retroarch" 0 0
 }
 
 build_debian_retroarch_pvr_probe() {
-    build_debian_retroarch_payload "retroarch-pvr-probe-step2" "debian-retroarch-pvr-probe" 1
+    build_debian_retroarch_payload "retroarch-pvr-probe-step2" "debian-retroarch-pvr-probe" 1 0
+}
+
+build_debian_retroarch_pvr_sdl2() {
+    build_debian_retroarch_payload "retroarch-pvr-sdl2-step2" "debian-retroarch-pvr-sdl2" 1 1
 }
 
 if [ "$profile" = "all" ] || [ "$profile" = "stage1" ]; then
@@ -752,4 +789,8 @@ fi
 
 if [ "$profile" = "debian-retroarch-pvr-probe" ]; then
     build_debian_retroarch_pvr_probe
+fi
+
+if [ "$profile" = "debian-retroarch-pvr-sdl2" ]; then
+    build_debian_retroarch_pvr_sdl2
 fi
