@@ -87,6 +87,7 @@ generated_cfg="$work_dir/genimage.cfg"
 
 rm -rf "$work_dir"
 mkdir -p "$boot_dir/boot" "$root_dir"
+rm -f "$out_dir/knulli.img" "$out_dir/$image_name" "$out_dir/boot.vfat" "$out_dir/userdata.ext4"
 
 cp "$rootfs" "$boot_dir/boot/knulli"
 cp "$board_dir/knulli-boot.conf" "$boot_dir/knulli-boot.conf"
@@ -116,6 +117,8 @@ genimage \
 if [ -f "$out_dir/knulli.img" ]; then
     mv "$out_dir/knulli.img" "$out_dir/$image_name"
 fi
+
+rm -f "$out_dir/boot.vfat" "$out_dir/userdata.ext4"
 
 printf 'created: %s/%s\n' "$out_dir" "$image_name"
 

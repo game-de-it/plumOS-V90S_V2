@@ -49,6 +49,13 @@ Armbian build も取得したい場合:
 
 `genimage` などのホストツールが必要です。
 
+ホストに直接ツールを入れない場合は、アセンブリ用 Docker イメージを使います。
+
+```sh
+docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
+./scripts/run-assembly-tools.sh sh -lc 'genimage --version && mksquashfs -version'
+```
+
 ## Git workflow
 
 作業履歴と判断ログは git に残します。調査・スクリプト・実機結果のまとまりごとに小さく commit します。
