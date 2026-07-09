@@ -107,3 +107,26 @@ Does the controller mapping remain usable?
 
 If SSH is reachable, measure the display interrupt cadence again for 15 to 30
 seconds and compare it to the previous 59.06 Hz measurement.
+
+## Device Result
+
+User result:
+
+```text
+The screen was black.
+```
+
+An SSH check against the previously known address did not connect:
+
+```text
+ssh root@192.0.2.118
+ssh: connect to host 192.0.2.118 port 22: Operation timed out
+```
+
+A quick LAN scan did not find a new obvious V90S SSH target. This does not prove
+the OS failed to boot, but it means this test cannot be treated as "LCD only
+failed while Linux kept running normally".
+
+Conclusion: `lcd_ht=812` is rejected as too risky for the panel/boot path. The
+next candidate should leave the horizontal timing unchanged and only adjust the
+vertical total.
