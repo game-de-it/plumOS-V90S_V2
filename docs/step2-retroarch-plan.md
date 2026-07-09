@@ -86,6 +86,8 @@ Payload sizing:
 
 The launcher tries RetroArch with `fbdev` first, then `sdl2` fallbacks, and writes verbose logs to FAT. If RetroArch exits, Debian init falls back to the known framebuffer console.
 
+The real-device test of this first image showed that the Debian package route is not enough for display. Boot, payload handoff, ROM discovery, and Nestopia core loading all worked, but Debian RetroArch did not include `fbdev`, and the V90S runtime did not expose a usable KMS/DRM path. The next route is to use KNULLI's A133 graphics stack: PowerVR GE8300 userspace, the A133 kernel modules/firmware, patched SDL2 framebuffer EGL support, and a RetroArch binary built for that stack.
+
 ## Runtime Investigation Targets
 
 Video:

@@ -125,8 +125,14 @@ First implementation tasks:
   - `plumos-v90s-retroarch.log`
 - [ ] Map V90S built-in `/dev/input/event*` controls.
 - [x] Build first Step 2 RetroArch test image.
-- [ ] User flashes image and verifies on real hardware.
-- [ ] Analyze FAT logs and record result under `docs/validation/`.
+- [x] User flashes first Step 2 image and verifies on real hardware.
+- [x] Analyze FAT logs and record result under `docs/validation/`.
+- [ ] Build a second Step 2 image using KNULLI's A133/PowerVR graphics path instead of Debian stock RetroArch video drivers.
+- [ ] Add the minimum KNULLI graphics components to the Debian payload:
+  - PowerVR GE8300 userspace libraries
+  - `pvrsrvkm.ko`, `dc_sunxi.ko`, and `rgx.*` firmware
+  - patched SDL2 framebuffer EGL backend or a KNULLI-built RetroArch binary
+  - launch diagnostics for `/dev/dri`, `/dev/pvr*`, `pvrsrvctl`, EGL, and SDL video drivers
 
 Validation buckets:
 
