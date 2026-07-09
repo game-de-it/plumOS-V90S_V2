@@ -93,12 +93,12 @@ Step 1 status: achieved on device test 15 with `plumos-v90s-armbian-step1-202607
 
 Target:
 
-- [ ] Boot RetroArch from the generated V90S SD image.
-- [ ] Launch local test ROM `artifacts/nes/Super Mario Bros..nes`.
-- [ ] Show gameplay on the internal LCD.
+- [x] Boot RetroArch from the generated V90S SD image.
+- [x] Launch local test ROM `artifacts/nes/Super Mario Bros..nes`.
+- [x] Show gameplay on the internal LCD.
 - [ ] Reach approximately 60fps with no obvious pacing issue.
 - [ ] Output audible sound.
-- [ ] Use V90S built-in controls for Start, D-pad, A, and B.
+- [x] Use V90S built-in controls for Start, D-pad, A, and B.
 - [x] Save RetroArch launch/runtime logs to FAT under `/Volumes/KNULLI/plumos-logs/`.
 
 Constraints:
@@ -123,7 +123,7 @@ First implementation tasks:
 - [x] Add a launcher that writes:
   - `plumos-v90s-retroarch-launch.log`
   - `plumos-v90s-retroarch.log`
-- [ ] Map V90S built-in `/dev/input/event*` controls.
+- [x] Confirm V90S built-in controls work through RetroArch's SDL2 fallback mapping.
 - [x] Build first Step 2 RetroArch test image.
 - [x] User flashes first Step 2 image and verifies on real hardware.
 - [x] Analyze FAT logs and record result under `docs/validation/`.
@@ -162,17 +162,23 @@ First implementation tasks:
 - [x] Confirm Wi-Fi gets an IP address and SSH login works.
 - [x] Confirm `df` can be executed over SSH on the live V90S.
 - [x] Switch no-reflash iteration work to SSH as the default path.
-- [ ] Use SSH to iterate on RetroArch runtime settings on the live V90S.
+- [x] Use SSH to iterate on RetroArch runtime settings on the live V90S.
+- [x] Confirm live RetroArch display and built-in control operation with `video_driver=sdl2`, `SDL_VIDEODRIVER=mali`, and `SDL_RENDER_DRIVER=software`.
+- [x] Add V90S audio mixer setup before RetroArch launch.
+- [x] Confirm ALSA playback, DAPM output widgets, DAC FIFO counters, and speaker PA GPIO all become active during `speaker-test`.
+- [x] Test V90S speaker PA GPIO polarity over SSH by forcing PH6 low/high during playback.
+- [ ] Confirm audible RetroArch output after the DAC mixer setup.
+- [ ] Determine why active PCM/DAC/PA state still produces only a speaker pop and no sustained audible tone.
 - [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.
 
 Validation buckets:
 
-- [ ] Video visible but FPS unknown.
+- [x] Video visible but FPS unknown.
 - [ ] FPS near 60 confirmed.
-- [ ] Audio device opens but audible output unconfirmed.
+- [x] Audio device opens but audible output unconfirmed.
 - [ ] Audible output confirmed.
 - [ ] USB keyboard input works only.
-- [ ] Built-in controls work in game.
+- [x] Built-in controls work in game.
 - [ ] Built-in controls fail; event mapping needed.
 
 ## Next: Armbian Rootfs Path

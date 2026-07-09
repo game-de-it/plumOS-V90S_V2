@@ -10,7 +10,7 @@ LAUNCH_LOG=/tmp/plumos-v90s-retroarch-launch.log
 RETROARCH_LOG=/tmp/plumos-v90s-retroarch.log
 SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
-RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-45}"
+RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
 LOG_MIRROR_PID=
 
 if [ -d "$FAT_LOG_DIR" ] && [ -w "$FAT_LOG_DIR" ]; then
@@ -95,11 +95,17 @@ stop_periodic_log_mirror() {
 run_retroarch() {
     cfg="$1"
 
-    if command -v timeout >/dev/null 2>&1; then
+    if [ "${RETROARCH_TIMEOUT_SECONDS:-0}" = "0" ]; then
         if command -v stdbuf >/dev/null 2>&1; then
-            timeout "$RETROARCH_TIMEOUT_SECONDS" stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+            stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
         else
-            timeout "$RETROARCH_TIMEOUT_SECONDS" retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+            retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+        fi
+    elif command -v timeout >/dev/null 2>&1; then
+        if command -v stdbuf >/dev/null 2>&1; then
+            timeout -s KILL "$RETROARCH_TIMEOUT_SECONDS" stdbuf -oL -eL retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
+        else
+            timeout -s KILL "$RETROARCH_TIMEOUT_SECONDS" retroarch --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1
         fi
     else
         echo "retroarch-launch: timeout command missing; running RetroArch without enforced timeout" >> "$RETROARCH_LOG" 2>/dev/null || true
@@ -118,6 +124,39 @@ read_file() {
     else
         printf 'missing'
     fi
+}
+
+amixer_try() {
+    if command -v amixer >/dev/null 2>&1; then
+        amixer -c 0 "$@" >> "$LAUNCH_LOG" 2>&1 || true
+    fi
+}
+
+setup_audio_mixer() {
+    if ! command -v amixer >/dev/null 2>&1; then
+        log "retroarch-launch: amixer missing; skipping audio mixer setup"
+        return
+    fi
+
+    log "retroarch-launch: applying V90S audio mixer setup"
+
+    # A133/V90S KNULLI uses these controls for the internal codec path.
+    adc_volume="${PLUMOS_V90S_ADC_VOLUME:-0}"
+    dac_volume="${PLUMOS_V90S_DAC_VOLUME:-160}"
+    soft_volume="${PLUMOS_V90S_SOFT_VOLUME:-255}"
+
+    amixer_try cset numid=1 1
+    amixer_try cset numid=2 0
+    amixer_try cset numid=4 "${PLUMOS_V90S_DIGITAL_VOLUME:-63}"
+    amixer_try cset numid=7 "${PLUMOS_V90S_LINEOUT_VOLUME:-0}"
+    amixer_try cset numid=8 "$dac_volume,$dac_volume"
+    amixer_try cset numid=9 "$adc_volume,$adc_volume"
+    amixer_try cset numid=10 "${PLUMOS_V90S_HEADPHONE_VOLUME:-0}"
+    amixer_try cset numid=11 "${PLUMOS_V90S_LINEOUT_OUTPUT_SELECT:-0}"
+    amixer_try cset numid=14 on
+    amixer_try cset numid=15 on
+    amixer_try cset numid=16 on
+    amixer_try cset numid=17 "$soft_volume,$soft_volume"
 }
 
 write_config() {
@@ -150,7 +189,7 @@ video_fullscreen = "true"
 video_windowed_fullscreen = "true"
 video_vsync = "true"
 video_refresh_rate = "60.000000"
-video_threaded = "false"
+video_threaded = "true"
 video_smooth = "false"
 video_scale_integer = "false"
 video_force_aspect = "true"
@@ -158,7 +197,7 @@ video_aspect_ratio = "1.333333"
 
 audio_enable = "true"
 audio_driver = "$audio_driver"
-audio_device = "default"
+audio_device = "hw:0,0"
 audio_sync = "true"
 audio_latency = "64"
 
@@ -201,6 +240,9 @@ append_cmd "mount" mount
 append_cmd "framebuffer-devices" sh -c 'ls -l /dev/fb* /dev/dri/* 2>/dev/null || true'
 append_cmd "input-devices" sh -c 'cat /proc/bus/input/devices 2>/dev/null || true; ls -l /dev/input 2>/dev/null || true; command -v lsinput >/dev/null 2>&1 && lsinput 2>&1 || true'
 append_cmd "sound-devices" sh -c 'cat /proc/asound/cards 2>/dev/null || true; cat /proc/asound/devices 2>/dev/null || true; command -v aplay >/dev/null 2>&1 && aplay -l 2>&1 || true; ls -l /dev/snd 2>/dev/null || true'
+append_cmd "sound-mixer-before" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
+setup_audio_mixer
+append_cmd "sound-mixer-after" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
 if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
     export LD_LIBRARY_PATH="/usr/local/lib/plumos-sdl2-mali${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     log "retroarch-launch: custom SDL2 mali runtime detected"
@@ -215,8 +257,10 @@ if [ -d /usr/lib/powervr ]; then
     log "retroarch-launch: LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
     append_cmd "powervr-runtime" sh -c 'ls -l /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /lib/modules/4.9.191/pvrsrvkm.ko /lib/modules/4.9.191/dc_sunxi.ko /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 fi
-if [ -x /usr/local/bin/v90s-sdl2-video-probe ]; then
+if [ -x /usr/local/bin/v90s-sdl2-video-probe ] && [ "${PLUMOS_V90S_RUN_SDL2_PROBE:-0}" = "1" ]; then
     append_cmd "sdl2-video-probe-mali" env SDL_VIDEODRIVER=mali SDL_AUDIODRIVER=alsa /usr/local/bin/v90s-sdl2-video-probe
+elif [ -x /usr/local/bin/v90s-sdl2-video-probe ]; then
+    log "retroarch-launch: skipping SDL2 video probe; set PLUMOS_V90S_RUN_SDL2_PROBE=1 for diagnostics"
 fi
 append_cmd "retroarch-version" retroarch --version
 append_cmd "retroarch-features" retroarch --features
@@ -253,18 +297,19 @@ mkdir -p /root/.config/retroarch/system /tmp/retroarch-cache /run 2>/dev/null ||
 attempt=0
 if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
     set -- \
-        sdl2:sdl2:sdl2:alsa:mali \
-        gl:sdl2:sdl2:alsa:mali \
-        fbdev:linuxraw:linuxraw:alsa:none \
-        fbdev:udev:udev:alsa:none \
-        sdl2:sdl2:sdl2:alsa:kmsdrm
+        sdl2:sdl2:sdl2:alsa:mali:software \
+        sdl2:sdl2:sdl2:alsa:mali:opengles2 \
+        gl:sdl2:sdl2:alsa:mali:none \
+        fbdev:linuxraw:linuxraw:alsa:none:none \
+        fbdev:udev:udev:alsa:none:none \
+        sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
 else
     set -- \
-        fbdev:linuxraw:linuxraw:alsa:none \
-        fbdev:udev:udev:alsa:none \
-        gl:udev:udev:alsa:none \
-        sdl2:sdl2:sdl2:alsa:mali \
-        sdl2:sdl2:sdl2:alsa:kmsdrm
+        fbdev:linuxraw:linuxraw:alsa:none:none \
+        fbdev:udev:udev:alsa:none:none \
+        gl:udev:udev:alsa:none:none \
+        sdl2:sdl2:sdl2:alsa:mali:opengles2 \
+        sdl2:sdl2:sdl2:alsa:kmsdrm:opengles2
 fi
 
 for spec do
@@ -278,11 +323,12 @@ for spec do
     joypad_driver="$3"
     audio_driver="$4"
     sdl_video="$5"
+    sdl_render="${6:-none}"
     cfg="/tmp/retroarch-v90s-${attempt}.cfg"
 
     write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver"
 
-    log "retroarch-launch: attempt=$attempt video=$video_driver input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video"
+    log "retroarch-launch: attempt=$attempt video=$video_driver input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
     {
         echo ""
         echo "===== attempt $attempt config ====="
@@ -295,6 +341,11 @@ for spec do
         unset SDL_VIDEODRIVER
     else
         export SDL_VIDEODRIVER="$sdl_video"
+    fi
+    if [ "$sdl_render" = "none" ]; then
+        unset SDL_RENDER_DRIVER
+    else
+        export SDL_RENDER_DRIVER="$sdl_render"
     fi
     export SDL_AUDIODRIVER=alsa
     log "retroarch-launch: attempt=$attempt pre-launch sync complete"
