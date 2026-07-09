@@ -12,6 +12,7 @@ SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
 RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
 PERIODIC_LOG_MIRROR="${PLUMOS_V90S_PERIODIC_LOG_MIRROR:-0}"
+RETROARCH_CONFIG_SRC="${PLUMOS_V90S_RETROARCH_CONFIG:-}"
 RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
 ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-/etc/plumos-v90s-retroarch-route}"
 LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
@@ -493,6 +494,7 @@ log "retroarch-launch: launch_log=$LAUNCH_LOG"
 log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
 log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
 log "retroarch-launch: periodic_log_mirror=$PERIODIC_LOG_MIRROR"
+log "retroarch-launch: external_config=${RETROARCH_CONFIG_SRC:-none}"
 log "retroarch-launch: run_dir=$RUN_DIR"
 log "retroarch-launch: route_config=$ROUTE_CONFIG present=$([ -r "$ROUTE_CONFIG" ] && printf yes || printf no)"
 log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
@@ -590,7 +592,17 @@ sdl_video="${PLUMOS_V90S_SDL_VIDEODRIVER:-mali}"
 sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
 cfg=/tmp/retroarch-v90s.cfg
 
-write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
+if [ -n "$RETROARCH_CONFIG_SRC" ]; then
+    if [ ! -f "$RETROARCH_CONFIG_SRC" ]; then
+        log "retroarch-launch: external RetroArch config missing: $RETROARCH_CONFIG_SRC"
+        mirror_logs
+        exit 46
+    fi
+    cp "$RETROARCH_CONFIG_SRC" "$cfg"
+    log "retroarch-launch: copied external RetroArch config from $RETROARCH_CONFIG_SRC"
+else
+    write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
+fi
 
 log "retroarch-launch: route video=$video_driver context=$video_context_driver threaded=$video_threaded input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
 {

@@ -236,3 +236,121 @@ retroarch-knull /tmp/retroarch-knulli --verbose --config /tmp/retroarch-v90s.cfg
 `scripts/v90s-retroarch-launch.sh` now disables the periodic log mirror by
 default. Set `PLUMOS_V90S_PERIODIC_LOG_MIRROR=1` only when a hang/crash needs
 continuous FAT log preservation.
+
+## KNULLI-Style RetroArch Config
+
+The user asked whether the RetroArch `.cfg` could be aligned with KNULLI. KNULLI
+does not keep a single V90S-specific static RA config in the source tree; it
+generates one through `knulli-configgen`. The relevant KNULLI sources are:
+
+```text
+package/system/knulli-configgen/configs/configgen-defaults-a133.yml
+package/system/knulli-configgen/configgen/configgen/generators/libretro/libretroConfig.py
+package/system/knulli-configgen/configgen/configgen/generators/libretro/libretroRetroarchCustom.py
+```
+
+The notable A133/libretro differences from our minimal cfg were:
+
+```text
+gfxbackend=gl
+video_threaded=true
+retroarch.audio_driver=alsathread
+input_driver=udev
+input_joypad_driver=udev
+fps_show=false
+audio_latency=64
+```
+
+Added local test config:
+
+```text
+configs/retroarch/v90s-knulli-a133-nes.cfg
+```
+
+It is KNULLI A133/libretro-style with paths adapted to the current Debian
+payload, and with `video_context_driver=mali_fbdev` pinned so the patched GE8300
+fbdev path is used.
+
+`scripts/v90s-retroarch-launch.sh` now supports an explicit external config via
+`PLUMOS_V90S_RETROARCH_CONFIG`. `scripts/live-transfer-retroarch-knulli.sh` can
+transfer and use one with:
+
+```text
+./scripts/live-transfer-retroarch-knulli.sh 192.0.2.118 --config configs/retroarch/v90s-knulli-a133-nes.cfg
+```
+
+Live result:
+
+```text
+external_config=/tmp/v90s-knulli-a133-nes.cfg
+copied external RetroArch config from /tmp/v90s-knulli-a133-nes.cfg
+RetroArch: pid=3492 running comm='retroarch-knull'
+```
+
+The active cfg on the device contains:
+
+```text
+video_driver = "gl"
+video_context_driver = "mali_fbdev"
+video_threaded = "true"
+audio_driver = "alsathread"
+audio_latency = "64"
+input_driver = "udev"
+input_joypad_driver = "udev"
+fps_show = "false"
+```
+
+RetroArch accepted the config and stayed on the native GE8300 route:
+
+```text
+RetroArch 1.22.2 (Git 69a4f0ea1e)
+[Input] Found input driver: "udev".
+[Mali] Native fbdev window rejected; retrying EGL surface with NULL native window.
+[GL] Found GL context: "fbdev_mali".
+[Input] Found joypad driver: "udev".
+[Audio] Set audio input rate to: 44100.00 Hz.
+[Audio] Started synchronous audio driver.
+```
+
+User confirmation of display smoothness, audio continuity, and controls is
+pending.
+
+The first KNULLI-style config used KNULLI configgen's final libretro input
+defaults:
+
+```text
+input_driver = "udev"
+input_joypad_driver = "udev"
+input_autodetect_enable = "false"
+```
+
+The user reported that controls stopped working. This means the current Debian
+payload does not yet carry KNULLI's full udev/autoconfig controller database for
+the V90S `adc_gamepad`, even though RetroArch can open the udev driver.
+
+The live config was adjusted to keep the KNULLI A133 video/audio settings but
+return input to the previously working SDL2 route:
+
+```text
+video_driver = "gl"
+video_context_driver = "mali_fbdev"
+video_threaded = "true"
+audio_driver = "alsathread"
+audio_latency = "64"
+input_driver = "sdl2"
+input_joypad_driver = "sdl2"
+input_autodetect_enable = "true"
+fps_show = "false"
+```
+
+Restart result:
+
+```text
+RetroArch: pid=3961 running comm='retroarch-knull'
+[Input] Found input driver: "sdl2".
+[GL] Found GL context: "fbdev_mali".
+[Input] Found joypad driver: "sdl2".
+[Audio] Started synchronous audio driver.
+```
+
+User confirmation of input recovery is pending.
