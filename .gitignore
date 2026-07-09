@@ -1,0 +1,11 @@
+.cache/
+output/
+build/
+dist/
+dl/
+*.img
+*.img.gz
+*.squashfs
+*.tar.gz
+*.log
+.DS_Store
