@@ -9,6 +9,7 @@ keep_work=0
 boot_vfat_size="33M"
 userdata_size="64M"
 userdata_payload=""
+boot_package_override=""
 boot_cmdline=""
 diagnostic_init=0
 diagnostic_init_path="scripts/v90s-diagnostic-init"
@@ -28,6 +29,8 @@ Options:
   --userdata-size N   userdata partition size, default 64M
   --userdata-payload PATH
                      copy PATH to userdata:/rootfs/step1-rootfs.squashfs
+  --boot-package PATH
+                     replace KNULLI partitions/boot_package.fex
   --boot-cmdline TEXT
                      replace Android boot.img kernel cmdline
   --diagnostic-init  replace Android boot.img ramdisk /init with SD logging init
@@ -67,6 +70,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --userdata-payload)
             userdata_payload="$2"
+            shift 2
+            ;;
+        --boot-package)
+            boot_package_override="$2"
             shift 2
             ;;
         --boot-cmdline)
@@ -114,6 +121,11 @@ fi
 
 if [ -n "$userdata_payload" ] && [ ! -f "$userdata_payload" ]; then
     printf 'error: userdata payload not found: %s\n' "$userdata_payload" >&2
+    exit 1
+fi
+
+if [ -n "$boot_package_override" ] && [ ! -f "$boot_package_override" ]; then
+    printf 'error: boot package override not found: %s\n' "$boot_package_override" >&2
     exit 1
 fi
 
@@ -166,6 +178,9 @@ cp "$rootfs" "$boot_dir/boot/knulli"
 cp "$board_dir/knulli-boot.conf" "$boot_dir/knulli-boot.conf"
 cp "$board_dir/bootlogo.bmp" "$boot_dir/bootlogo.bmp"
 cp -R "$board_dir/partitions" "$boot_dir/partitions"
+if [ -n "$boot_package_override" ]; then
+    cp "$boot_package_override" "$boot_dir/partitions/boot_package.fex"
+fi
 printf 'powkiddy-v90s\n' > "$boot_dir/boot/knulli.board"
 touch "$boot_dir/boot/autoresize"
 
@@ -248,6 +263,9 @@ printf 'boot.vfat size: %s\n' "$boot_vfat_size"
 printf 'userdata size: %s\n' "$userdata_size"
 if [ -n "$boot_cmdline" ]; then
     printf 'boot cmdline: %s\n' "$boot_cmdline"
+fi
+if [ -n "$boot_package_override" ]; then
+    printf 'boot package: %s\n' "$boot_package_override"
 fi
 if [ "$diagnostic_init" -eq 1 ]; then
     printf 'diagnostic init: %s\n' "$diagnostic_init_path"
