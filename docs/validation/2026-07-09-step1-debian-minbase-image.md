@@ -61,7 +61,7 @@ b435bbffebf43fe383cc57028f69bd2180c101d9bd14b8c4ad4fc4bb1b284840  output/rootfs-
 d5ee904e669a5b0d292815cf2700f176f93bcb88b8f11d7946737ae1b94e850b  output/images/plumos-v90s-armbian-step1-20260709-1.img
 ```
 
-## Later payload compression update
+## Later payload compression updates
 
 After device test 4, the Debian minbase payload was rebuilt with gzip squashfs compression for closer compatibility with the V90S/KNULLI 4.9 kernel path:
 
@@ -69,6 +69,18 @@ After device test 4, the Debian minbase payload was rebuilt with gzip squashfs c
 output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 45M
 sha256: d94c08bd3b331eee0503c0cba9da04f26e5a030d9c9f4cd0471536f57eab411b
 compression: gzip
+```
+
+Device test 5 showed that the gzip stage1 squashfs was readable and loop-attached, but squashfs mount still failed with `Invalid argument`. The payloads were then rebuilt with zstd compression to match KNULLI's a133 board setting:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: ee7730474e43f8e9fcda5486c73888a707c5b9c1b47b802166c3201bdd6bb799
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: c1ecd25e75b9b0da6cdb2b0a53fde33140b0885598f4b50e02e7cd479e2013b1
+compression: zstd
 ```
 
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.

@@ -225,7 +225,7 @@ build_stage1() {
 
     write_stage1_init "$root/sbin/init"
 
-    mksquashfs "$root" "$out_dir/stage1-userdata-loader.squashfs" -noappend -comp gzip >/dev/null
+    mksquashfs "$root" "$out_dir/stage1-userdata-loader.squashfs" -noappend -comp zstd -b 131072 >/dev/null
     sha256sum "$out_dir/stage1-userdata-loader.squashfs" > "$out_dir/stage1-userdata-loader.squashfs.sha256"
     du -sh "$root" > "$out_dir/stage1-root.du.txt"
     printf 'created: %s/stage1-userdata-loader.squashfs\n' "$out_dir"
@@ -250,7 +250,7 @@ EOF
 
     rm -rf "$root/var/cache/apt/archives/"*.deb "$root/var/lib/apt/lists/"*
 
-    mksquashfs "$root" "$out_dir/debian-${suite}-minbase-step1.squashfs" -noappend -comp gzip -b 131072
+    mksquashfs "$root" "$out_dir/debian-${suite}-minbase-step1.squashfs" -noappend -comp zstd -b 131072
     sha256sum "$out_dir/debian-${suite}-minbase-step1.squashfs" > "$out_dir/debian-${suite}-minbase-step1.squashfs.sha256"
     du -sh "$root" > "$out_dir/debian-${suite}-minbase-root.du.txt"
     find "$root" -maxdepth 2 -type f | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-minbase-manifest-depth2.txt"

@@ -40,6 +40,10 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add KNULLI-style file mount probe path before explicit loop mount fallback.
 - [x] Rebuild Debian minbase payload as gzip squashfs for kernel compatibility.
 - [x] Build `plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img`.
+- [x] Record device test 5: gzip stage1 squashfs is readable and loop-attached, but all squashfs mount attempts fail with `Invalid argument`.
+- [x] Switch Step 1 squashfs payload generation to zstd to match KNULLI a133 rootfs settings.
+- [x] Fix diagnostic dmesg tail command to BusyBox-compatible `tail -n 120`.
+- [x] Build `plumos-v90s-armbian-step1-20260709-6-diag-zstd.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -156,6 +160,19 @@ rootfs/plumos-v90s-diag.log
 
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img`.
 - [x] Host-verify that diagnostic initramfs tries KNULLI-style file mount first and records loop/mount diagnostics.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo or console.
+- [x] Check whether the screen advances beyond the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: `/boot/knulli` was readable and loop-attached, but all squashfs mount attempts failed with `Invalid argument`.
+
+## Device Test 6
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-6-diag-zstd.img`.
+- [x] Host-verify that stage1 and Debian payload squashfs files use zstd compression.
+- [x] Host-verify that diagnostic initramfs uses BusyBox-compatible `tail -n 120` for post-failure dmesg capture.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Wait at least 60 seconds at the boot logo or console.
 - [ ] Check whether the screen advances beyond the KNULLI boot logo.

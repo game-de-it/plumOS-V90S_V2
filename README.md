@@ -72,16 +72,16 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img \
+  --name plumos-v90s-armbian-step1-20260709-6-diag-zstd.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-6-diag-zstd.img` です。
 
 ```text
-sha256: c4c600696276c550d3be36b0fa83b039221a462e796ad1ccb72ca1e6120e2089
+sha256: 21ebb95f828bd4fd293ac53ba213480628f7c2761871937037c558f7acb623ea
 size: 133M
 ```
 
@@ -89,9 +89,11 @@ size: 133M
 
 `-3-diag` のログでは `/dev/mmcblk0p4` の FAT boot-resource から `/boot/knulli` を見つけたあと、squashfs ファイルを直接 mount しようとして失敗していました。`-4-diag-loop` は `/boot/knulli` を `/dev/loop0` に割り当ててから squashfs として mount しましたが、実機では `/dev/loop0` の squashfs mount に失敗しました。
 
-`-5-diag-mount-probe` は KNULLI 元 initramfs と同じ直接 file mount を先に試し、失敗時は `-o loop`、明示 `losetup`、loop device mount を順に試して詳細ログを残します。Debian minbase payload も gzip squashfs に作り直してあります。
+`-5-diag-mount-probe` は KNULLI 元 initramfs と同じ直接 file mount を先に試し、失敗時は `-o loop`、明示 `losetup`、loop device mount を順に試しました。実機ログでは `/boot/knulli` の読み取りと loop attach は成功していましたが、gzip squashfs の mount がすべて `Invalid argument` で失敗しました。
 
-`-5-diag-mount-probe` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` を確認します。
+`-6-diag-zstd` は KNULLI a133 の `BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y` に合わせ、stage1 と Debian minbase payload を zstd squashfs にしています。また、失敗時の kernel squashfs エラーを取れるように `dmesg | tail -n 120` へ修正しています。
+
+`-6-diag-zstd` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` を確認します。
 
 ## Git workflow
 

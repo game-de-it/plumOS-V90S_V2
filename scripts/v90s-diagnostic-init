@@ -129,7 +129,7 @@ find_boot_root() {
 log_mount_context() {
     run_log ls -la /boot_root/boot
     run_log $bb sh -c 'dd if=/boot_root/boot/knulli bs=96 count=1 2>/dev/null | hexdump -C'
-    run_log $bb sh -c 'dmesg | tail -120'
+    run_log $bb sh -c 'dmesg | tail -n 120'
 }
 
 mount_stage1_root() {
