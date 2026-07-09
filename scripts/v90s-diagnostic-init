@@ -93,6 +93,44 @@ persist_logs() {
     done
 }
 
+persist_logs_to_stage1_share() {
+    if [ -d /new_root/mnt/share ]; then
+        {
+            echo "persist_device=stage1-share"
+            echo "persist_path=/plumos-v90s-diag.log"
+            echo
+            cat "$LOG"
+        } > /new_root/mnt/share/plumos-v90s-diag.log 2>/dev/null || true
+
+        if [ -d /new_root/mnt/share/rootfs ]; then
+            cp /new_root/mnt/share/plumos-v90s-diag.log /new_root/mnt/share/rootfs/plumos-v90s-diag.log 2>/dev/null || true
+        fi
+        $bb sync
+    fi
+}
+
+prepare_stage1_share() {
+    log "stage1-share: scanning writable SD partitions"
+    $bb mkdir -p /new_root/mnt/share
+
+    for dev in $(partition_list); do
+        $bb umount /new_root/mnt/share >/dev/null 2>&1 || true
+        for fs in ext4 vfat; do
+            if $bb mount -t "$fs" -o rw "$dev" /new_root/mnt/share >/dev/null 2>&1; then
+                if [ -f /new_root/mnt/share/rootfs/step1-rootfs.squashfs ]; then
+                    log "stage1-share: mounted $dev as $fs on /new_root/mnt/share"
+                    return 0
+                fi
+                $bb umount /new_root/mnt/share >/dev/null 2>&1 || true
+            fi
+        done
+        log "stage1-share: cannot use $dev"
+    done
+
+    log "stage1-share: no writable payload partition prepared"
+    return 1
+}
+
 find_boot_root() {
     BOOT_ROOT_DEV=
     BOOT_ROOT_FS=
@@ -221,12 +259,16 @@ fi
 
 log "boot: mounted /boot_root/boot/knulli as stage1 root"
 run_log ls -la /new_root
+run_log ls -la /new_root/bin
+run_log ls -la /new_root/sbin
 persist_logs
 
 $bb mkdir -p /new_root/proc /new_root/sys /new_root/dev /new_root/boot
 
 log "boot: preparing to switch to stage1 /sbin/init"
 persist_logs
+prepare_stage1_share || true
+persist_logs_to_stage1_share
 
 $bb mount --move /proc /new_root/proc 2>/dev/null || true
 $bb mount --move /sys /new_root/sys 2>/dev/null || true
@@ -234,9 +276,11 @@ $bb mount --move /dev /new_root/dev 2>/dev/null || true
 $bb mount --move /boot_root /new_root/boot 2>/dev/null || true
 
 log "boot: switching to stage1 /sbin/init"
+persist_logs_to_stage1_share
 exec $bb switch_root /new_root /sbin/init
 
 log "boot: switch_root failed"
+persist_logs_to_stage1_share
 $bb mount -t proc proc /proc 2>/dev/null || true
 $bb mount -t sysfs sysfs /sys 2>/dev/null || true
 $bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true

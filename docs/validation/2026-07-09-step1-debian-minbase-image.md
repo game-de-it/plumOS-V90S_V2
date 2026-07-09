@@ -107,6 +107,18 @@ sha256: 58704d22bd72960f2bf2d4224453366bf0257db810edddf158194c2b3adeef9e
 compression: zstd
 ```
 
+After device test 8 still showed no stage1 log, the stage1 payload was rebuilt to use a pre-mounted `/mnt/share` handoff from diagnostic init:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: b4eac7d084bc1a66a411a353737c1b9211f75f2127619265ef84228a9a7030a9
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: 58704d22bd72960f2bf2d4224453366bf0257db810edddf158194c2b3adeef9e
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check

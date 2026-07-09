@@ -171,7 +171,16 @@ done
 log "plumOS V90S stage1: looking for userdata rootfs payload"
 
 payload=""
+if [ -f /mnt/share/rootfs/step1-rootfs.squashfs ]; then
+    payload="/mnt/share/rootfs/step1-rootfs.squashfs"
+    log "stage1: using pre-mounted payload on /mnt/share"
+    persist_stage1_log
+    fb_probe
+    persist_stage1_log
+fi
+
 for dev in /dev/mmcblk0p5 /dev/mmcblk1p5 /dev/mmcblk2p5 /dev/mmcblk0p4 /dev/mmcblk1p4 /dev/mmcblk2p4; do
+    [ -z "$payload" ] || break
     [ -b "$dev" ] || continue
     $bb umount /mnt/share 2>/dev/null || true
     if $bb mount -t ext4 -o rw "$dev" /mnt/share 2>> "$LOG" || $bb mount -t ext4 -o ro "$dev" /mnt/share 2>> "$LOG"; then

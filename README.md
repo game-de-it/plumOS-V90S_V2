@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img \
+  --name plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img` です。
 
 ```text
-sha256: f52ba13d4faacb41e4eb2a08715659a3a682350722cb89d27ffc53153605402f
+sha256: 049f684e0ba2b4a845282c79b16e79bef284c0c4e7f23122b8473bb941b58617
 size: 133M
 ```
 
@@ -100,7 +100,9 @@ size: 133M
 
 `-7-stage1-fb-probe` の実機ログでは、diagnostic initramfs が stage1 root までは mount しましたが、stage1/Debian のログは出ませんでした。host inspection で stage1 `/sbin/init` が `#!/bin/sh` なのに stage1 rootfs に `/bin/sh` がないことが分かったため、`-8-stage1-sh-prepersist` では `/bin/sh -> busybox` を追加し、framebuffer probe より前に stage1 到達ログを保存するようにしています。
 
-`-8-stage1-sh-prepersist` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
+`-8-stage1-sh-prepersist` の実機ログでは、diagnostic initramfs が `boot: preparing to switch to stage1 /sbin/init` まで到達しましたが、stage1/Debian のログはまだ出ませんでした。`-9-stage1-share-handoff` では diagnostic initramfs が userdata を `/new_root/mnt/share` に mount してから `switch_root` し、stage1 がそのまま `/mnt/share` として使えるようにしています。これで stage1 が実行された場合、block device scan の前に `plumos-v90s-stage1.log` が残るはずです。
+
+`-9-stage1-share-handoff` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
 
 ## Git workflow
 

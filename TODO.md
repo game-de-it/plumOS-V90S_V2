@@ -55,6 +55,11 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Persist a diagnostic marker immediately before `switch_root`.
 - [x] Persist stage1/Debian logs before framebuffer writes.
 - [x] Build `plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img`.
+- [x] Record device test 8: diagnostic reached pre-`switch_root` marker, but no stage1/Debian logs were present.
+- [x] Add diagnostic userdata handoff mount at `/new_root/mnt/share`.
+- [x] Teach stage1 to use a pre-mounted `/mnt/share` payload before scanning block devices.
+- [x] Persist diagnostic logs through the handoff mount before `switch_root` and on the `switch_root` failure path.
+- [x] Build `plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -214,6 +219,21 @@ rootfs/plumos-v90s-diag.log
 - [x] Host-verify that stage1 contains `/bin/sh -> busybox`.
 - [x] Host-verify that diagnostic init persists a pre-`switch_root` marker.
 - [x] Host-verify that stage1 persists logs before framebuffer probing.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
+- [x] Check whether the screen changes from the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: diagnostic log included `boot: preparing to switch to stage1 /sbin/init`.
+- [x] Result: no `plumos-v90s-stage1.log` or `plumos-v90s-debian-init.log` was present.
+
+## Device Test 9
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img`.
+- [x] Host-verify that diagnostic init mounts userdata at `/new_root/mnt/share` for stage1 handoff.
+- [x] Host-verify that stage1 uses pre-mounted `/mnt/share` before scanning block devices.
+- [x] Host-verify that diagnostic init persists through the handoff mount before `switch_root` and on `switch_root` failure.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Wait at least 60 seconds at the boot logo, changed screen, or console.
 - [ ] Check whether the screen changes from the KNULLI boot logo.
