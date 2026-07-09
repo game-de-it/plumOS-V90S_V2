@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-13-fb-console.img \
+  --name plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-13-fb-console.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img` です。
 
 ```text
-sha256: e81b77a18d3530ab094be55896c69e48ba9647bc61c59efac7caa2a24d7d18b6
+sha256: 1b80f2c6067bc22e163f0272d0d5e423cf65fb49c9bde3c8ca068b0228dbbf11
 size: 133M
 ```
 
@@ -112,7 +112,9 @@ size: 133M
 
 `-12-fb-full-probe` では `virtual_size=640,960` のダブルバッファ疑いに合わせ、fb0全体をblackで塗り、page0/page1の両方へ大きなwhite bandを書きました。実機では KNULLI boot logo が消え、黒画面に白帯が表示されたため、Debian userspace からの `/dev/fb0` 描画が V90S LCD に出ることを確認できました。
 
-`-13-fb-console` では kernel framebuffer console に依存せず、Debian init から `/usr/local/sbin/v90s-fb-console` を実行します。この小さい userspace console は `/dev/fb0` に直接テキストを描き、`/dev/input/event*` から USB keyboard 入力を読み、入力されたコマンドを `/bin/sh` 経由で実行します。起動時に `uname -a`、`ls /`、`ls /dev/input` を自動実行し、ログを `plumos-v90s-fb-console.log` に残します。
+`-13-fb-console` では kernel framebuffer console に依存せず、Debian init から `/usr/local/sbin/v90s-fb-console` を実行しました。実機では KNULLI boot logo の後に黒画面になり、console text は出ませんでした。戻した SD のログでは Debian init が `starting framebuffer console` まで到達し、`plumos-v90s-fb-console.log` は 0 bytes でした。一方で dmesg には USB keyboard が `usbhid` input device として認識された記録があり、Caps Lock LED が反応しないことだけでは USB 未認識とは判断しません。
+
+`-14-fb-console-logged` では、console 起動前に `perl -c` を実行し、console の stdout/stderr を userdata の `plumos-v90s-fb-console.log` へリダイレクトします。Perl console 側も起動直後からログを強制 flush/sync し、画面には大きな白い start marker と左上の白枠を描くため、また黒画面で止まっても次の原因を SD 側ログから追えるはずです。
 
 ## Git workflow
 

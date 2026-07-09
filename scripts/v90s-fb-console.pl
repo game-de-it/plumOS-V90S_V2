@@ -1,13 +1,26 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Fcntl qw(:DEFAULT O_NONBLOCK);
+use constant O_RDONLY_FLAG => 0;
+use constant O_RDWR_FLAG => 2;
+use constant O_NONBLOCK_FLAG => 04000;
 
 our %FONT;
 
 my $fb_path = "/dev/fb0";
 my $share_log = "/mnt/share/plumos-v90s-fb-console.log";
 my $share_log_copy = "/mnt/share/rootfs/plumos-v90s-fb-console.log";
+my ($FB, $LOG1, $LOG2);
+my $log_count = 0;
+
+open_logs();
+$SIG{__DIE__} = sub {
+    my $msg = join("", @_);
+    $msg =~ s/\s+$//;
+    raw_log("fb-console: fatal: $msg");
+    system("/bin/sync") if -x "/bin/sync";
+    exit 111;
+};
 
 my $width = read_int("/sys/class/graphics/fb0/virtual_size", 640, 0);
 my $virtual_height = read_int("/sys/class/graphics/fb0/virtual_size", 480, 1);
@@ -30,13 +43,14 @@ my $black = "\0\0\0\0";
 my @page_offsets = (0);
 push @page_offsets, $stride * $visible_height if $virtual_height > $visible_height;
 
-sysopen(my $FB, $fb_path, O_RDWR) or die "open $fb_path: $!";
-binmode($FB);
+raw_log("fb-console: process entered");
+raw_log("fb-console: fb0 ${width}x${virtual_height} visible=${visible_height} stride=${stride} bpp=${bpp}");
 
-open(my $LOG1, ">>", $share_log);
-open(my $LOG2, ">>", $share_log_copy);
-select((select($LOG1), $| = 1)[0]) if $LOG1;
-select((select($LOG2), $| = 1)[0]) if $LOG2;
+sysopen($FB, $fb_path, O_RDWR_FLAG) or die "open $fb_path: $!";
+binmode($FB);
+raw_log("fb-console: fb opened");
+draw_start_marker();
+sleep 1;
 
 my @screen;
 my $cmd = "";
@@ -98,10 +112,34 @@ sub read_visible_height {
     return $fallback;
 }
 
-sub log_line {
+sub open_logs {
+    open($LOG1, ">>", $share_log);
+    open($LOG2, ">>", $share_log_copy);
+    set_autoflush($LOG1) if $LOG1;
+    set_autoflush($LOG2) if $LOG2;
+}
+
+sub set_autoflush {
+    my ($fh) = @_;
+    my $old = select($fh);
+    $| = 1;
+    select($old);
+}
+
+sub raw_log {
     my ($line) = @_;
+    $line = "" unless defined $line;
+    $line =~ s/[\r\t]/ /g;
+    $line =~ s/[^ -~]/?/g;
     print $LOG1 "$line\n" if $LOG1;
     print $LOG2 "$line\n" if $LOG2;
+    $log_count++;
+    system("/bin/sync") if -x "/bin/sync" && ($log_count < 20 || ($log_count % 10) == 0);
+}
+
+sub log_line {
+    my ($line) = @_;
+    raw_log($line);
 }
 
 sub push_line {
@@ -168,7 +206,7 @@ sub rescan_inputs {
     my @paths = sort glob("/dev/input/event*");
     for my $path (@paths) {
         next if exists $inputs{$path};
-        if (sysopen(my $fh, $path, O_RDONLY | O_NONBLOCK)) {
+        if (sysopen(my $fh, $path, O_RDONLY_FLAG | O_NONBLOCK_FLAG)) {
             binmode($fh);
             $inputs{$path} = $fh;
             push_line("input opened: $path");
@@ -236,17 +274,26 @@ sub key_char {
 
 sub redraw {
     clear_pages();
-    my $y = 0;
-    draw_text(0, $y, "plumOS V90S fb console", $dim);
+    draw_rect(0, 0, $width, 4, $fg);
+    draw_rect(0, 0, 4, $visible_height, $fg);
+    my $x = 12;
+    my $y = 8;
+    draw_text($x, $y, "plumOS V90S fb console", $dim);
     $y += $char_h;
     for my $line (@screen) {
         last if $y >= ($visible_height - $char_h);
-        draw_text(0, $y, $line, $fg);
+        draw_text($x, $y, $line, $fg);
         $y += $char_h;
     }
     my $prompt = "> $cmd";
     $prompt = substr($prompt, -$cols) if length($prompt) > $cols;
-    draw_text(0, $visible_height - $char_h, $prompt, $fg);
+    draw_text($x, $visible_height - $char_h, $prompt, $fg);
+}
+
+sub draw_start_marker {
+    clear_pages();
+    draw_rect(0, 0, $width, 48, $fg);
+    draw_rect(0, 56, $width, 8, $dim);
 }
 
 sub clear_pages {
@@ -270,6 +317,21 @@ sub draw_text {
         last if $cx + $char_w > $width;
         draw_char($cx, $y, $ch, $color);
         $cx += $char_w;
+    }
+}
+
+sub draw_rect {
+    my ($x, $y, $w, $h, $color) = @_;
+    $w = $width - $x if $x + $w > $width;
+    $h = $visible_height - $y if $y + $h > $visible_height;
+    return if $w <= 0 || $h <= 0;
+    my $run = $color x $w;
+    for my $row (0 .. $h - 1) {
+        my $py = $y + $row;
+        for my $base (@page_offsets) {
+            sysseek($FB, $base + ($py * $stride) + ($x * 4), 0);
+            syswrite($FB, $run);
+        }
     }
 }
 

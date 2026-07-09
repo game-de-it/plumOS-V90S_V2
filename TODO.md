@@ -74,6 +74,9 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Record device test 12: boot logo disappeared and the full framebuffer probe became visible on the LCD.
 - [x] Add a small userspace framebuffer console that draws text to `/dev/fb0`, reads `/dev/input/event*`, and runs commands through `/bin/sh`.
 - [x] Build `plumos-v90s-armbian-step1-20260709-13-fb-console.img`.
+- [x] Record device test 13: framebuffer console image reached Debian init, but screen stayed black and console log stayed empty.
+- [x] Add framebuffer console stderr logging, startup marker drawing, and forced log flush/sync.
+- [x] Build `plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -320,9 +323,27 @@ rootfs/plumos-v90s-diag.log
 - [x] Host-verify that Debian payload contains `/usr/local/sbin/v90s-fb-console`.
 - [x] Host-verify that Debian init executes `v90s-fb-console` after the fb0 probe.
 - [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds for framebuffer text to appear.
+- [x] Check whether startup text appears instead of the white-band probe.
+- [x] Result: KNULLI boot logo disappeared, then the screen stayed black.
+- [x] Result: USB keyboard key presses did not visibly affect the screen.
+- [x] Result: Caps Lock LED did not toggle, but this is not conclusive because the userspace console does not drive keyboard LEDs.
+- [x] Result: FAT stage1 hash matched the `-13` image.
+- [x] Result: userdata ext4 logs were recovered and analyzed.
+- [x] Result: Debian init reached `debian-init: starting framebuffer console`.
+- [x] Result: `plumos-v90s-fb-console.log` and `rootfs/plumos-v90s-fb-console.log` were present but 0 bytes.
+- [x] Result: dmesg showed the USB keyboard as `ELECOM ELECOM TK-FCP096`, `input3/input4`, `hidraw0/hidraw1`, and `usbhid`.
+
+## Device Test 14
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img`.
+- [x] Host-verify that Debian init captures framebuffer console stdout/stderr to userdata.
+- [x] Host-verify that the framebuffer console no longer depends on Perl `Fcntl` constants.
+- [x] Host-verify that the framebuffer console writes a large start marker and forced-flushes logs.
+- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
 - [ ] User flashes the image to SD and tests on V90S.
-- [ ] Wait at least 60 seconds for framebuffer text to appear.
-- [ ] Check whether startup text appears instead of the white-band probe.
+- [ ] Wait at least 60 seconds for framebuffer text or a large white start marker to appear.
 - [ ] Attach a USB keyboard and type:
 
 ```text
@@ -330,7 +351,7 @@ ls /
 ```
 
 - [ ] Press Enter and check whether command output appears on screen.
-- [ ] Return the SD card and check userdata logs if text or keyboard input fails:
+- [ ] Return the SD card and check userdata logs even if the screen is black:
 
 ```text
 plumos-v90s-debian-init.log

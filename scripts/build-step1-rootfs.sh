@@ -439,9 +439,36 @@ fb_probe
 persist_debian_log
 
 if [ -x /usr/local/sbin/v90s-fb-console ]; then
+    console_log=/tmp/plumos-v90s-fb-console.log
+    if [ -d /mnt/share ]; then
+        console_log=/mnt/share/plumos-v90s-fb-console.log
+        : > "$console_log" 2>/dev/null || true
+        if [ -d /mnt/share/rootfs ]; then
+            : > /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
+        fi
+    fi
+
+    log "debian-init: checking framebuffer console"
+    if command -v perl >/dev/null 2>&1; then
+        /usr/bin/perl -c /usr/local/sbin/v90s-fb-console >> "$console_log" 2>&1
+        log "debian-init: framebuffer console perl-check rc=$?"
+    else
+        log "debian-init: perl not found"
+    fi
+    if [ -f "$console_log" ] && [ -d /mnt/share/rootfs ]; then
+        cp "$console_log" /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
+    fi
+
     log "debian-init: starting framebuffer console"
     persist_debian_log
-    exec /usr/local/sbin/v90s-fb-console
+    sync
+    /usr/local/sbin/v90s-fb-console >> "$console_log" 2>&1
+    rc=$?
+    log "debian-init: framebuffer console exited rc=$rc"
+    if [ -f "$console_log" ] && [ -d /mnt/share/rootfs ]; then
+        cp "$console_log" /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
+    fi
+    persist_debian_log
 fi
 
 cat <<MSG

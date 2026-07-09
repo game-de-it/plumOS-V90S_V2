@@ -167,6 +167,18 @@ sha256: 56cc7e4a3700b60977b3fcde1a3b7301ed48ae4b0ddfd42731d0329d0638a721
 compression: zstd
 ```
 
+After device test 13 showed a black screen and an empty framebuffer console log, the payloads were rebuilt to capture console stdout/stderr, force-flush startup logs, and draw a large visible start marker:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: b9c7a4a5ee16e64b94ff8081cbc7c3c9d7bb6e42a564050bb95df18cff9ea9ed
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: de22009eb734adaeefe206f152c092a51167e1f2dd68b3ac20a004e9fb91432b
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check
