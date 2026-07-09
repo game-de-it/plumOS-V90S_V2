@@ -153,8 +153,16 @@ log "boot: mounted $BOOT_ROOT_DEV as $fs on /boot_root"
 run_log ls -la /boot_root
 run_log ls -la /boot_root/boot
 
-if ! $bb mount -t squashfs -o ro /boot_root/boot/knulli /new_root >/dev/null 2>&1; then
-    log "boot: failed to mount /boot_root/boot/knulli as squashfs"
+[ -b /dev/loop0 ] || $bb mknod /dev/loop0 b 7 0
+$bb losetup -d /dev/loop0 >/dev/null 2>&1 || true
+if ! $bb losetup /dev/loop0 /boot_root/boot/knulli >/dev/null 2>&1; then
+    log "boot: failed to attach /boot_root/boot/knulli to /dev/loop0"
+    persist_logs
+    exec /bin/busybox sh
+fi
+
+if ! $bb mount -t squashfs -o ro /dev/loop0 /new_root >/dev/null 2>&1; then
+    log "boot: failed to mount /dev/loop0 as squashfs"
     persist_logs
     exec /bin/busybox sh
 fi

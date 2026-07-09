@@ -32,6 +32,10 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add diagnostic initramfs support that writes `plumos-v90s-diag.log` to SD storage.
 - [x] Build `plumos-v90s-armbian-step1-20260709-3-diag.img`.
 - [x] Record device test 3: no FAT diagnostic log; boot package created `lcd_compatible_index.txt`.
+- [x] Inspect userdata ext4 from device test 3 and recover `plumos-v90s-diag.log`.
+- [x] Confirm the V90S booted Linux 4.9.191, reached diagnostic initramfs `/init`, found `/boot/knulli` on `/dev/mmcblk0p4`, and persisted logs to userdata `/dev/mmcblk0p5`.
+- [x] Fix diagnostic initramfs to loop-mount the `/boot/knulli` squashfs file before switching to stage1.
+- [x] Build `plumos-v90s-armbian-step1-20260709-4-diag-loop.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -121,14 +125,32 @@ boot/plumos-v90s-diag.log
 
 - [x] Result: no FAT diagnostic log was present.
 - [x] Record extra FAT file `lcd_compatible_index.txt`, likely written by the boot package/U-Boot path.
-- [ ] If a Linux host can mount userdata ext4, also check:
+- [x] Check userdata ext4 for:
 
 ```text
 rootfs/plumos-v90s-diag.log
 ```
 
+- [x] Result: userdata contained both `/plumos-v90s-diag.log` and `/rootfs/plumos-v90s-diag.log`.
+- [x] Result: diagnostic init mounted `/dev/mmcblk0p4`, found `/boot/knulli`, then failed because the squashfs image file was mounted directly instead of through a loop device.
 - [x] Commit the no-log result and FAT extra-file evidence under `docs/validation/`.
-- [x] If no log exists, move to serial UART or bootloader `boot.img` selection investigation.
+- [x] Defer serial UART for now because SD userdata logging proved the patched `boot.img` and initramfs path are active.
+
+## Device Test 4
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-4-diag-loop.img`.
+- [x] Host-verify that diagnostic initramfs contains the `/dev/loop0` squashfs mount path.
+- [ ] User flashes the image to SD and tests on V90S.
+- [ ] Wait at least 60 seconds at the boot logo or console.
+- [ ] Check whether the screen advances beyond the KNULLI boot logo.
+- [ ] If console appears, continue with the Console Command Check below.
+- [ ] If console still does not appear, return the SD card and check FAT/userdata logs for the new failure point:
+
+```text
+plumos-v90s-diag.log
+boot/plumos-v90s-diag.log
+rootfs/plumos-v90s-diag.log
+```
 
 ## Console Command Check
 

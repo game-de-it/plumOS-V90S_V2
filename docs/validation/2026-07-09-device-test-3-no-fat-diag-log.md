@@ -68,19 +68,55 @@ This strongly suggests the A133 boot package/U-Boot code is running and can writ
 
 No FAT diagnostic log means the diagnostic initramfs did not successfully persist logs to the FAT partition.
 
-Current possibilities:
+A later userdata ext4 inspection showed this was not a bootloader or initramfs selection failure. The diagnostic initramfs did run and persisted logs to userdata `/dev/mmcblk0p5`.
 
-- kernel did not reach initramfs `/init`
-- bootloader is not loading the patched Android `boot.img`
-- kernel/initramfs started but could not enumerate or mount the SD partitions
-- diagnostic init failed before `persist_logs`
+Because the boot package can write `lcd_compatible_index.txt` and userdata logs prove `/init` ran, the observed failure is inside the Linux initramfs path after the boot-resource partition is found.
 
-Because the boot package can write `lcd_compatible_index.txt`, the problem is probably after early boot/display setup but before, or very early inside, the Linux initramfs path.
+## Follow-up userdata inspection
 
-## Not yet inspected
+After sudo access was granted, the userdata partition was read from the SD card and inspected offline.
 
-The userdata ext4 partition was not inspected on macOS during this pass because reading `/dev/rdisk4s5` requires an interactive `sudo` Terminal command. The diagnostic init writes FAT first when possible, so the lack of FAT log is already a strong negative signal, but ext4 inspection remains a possible follow-up.
+Source partition:
+
+```text
+/dev/rdisk4s5
+```
+
+Extracted image:
+
+```text
+output/device-logs/v90s-disk4s5-userdata-after-diag.img
+sha256: 748e343f8d322dcb2a6ed333422693327e0b3a305b997327fccd31a3d13edb3a
+```
+
+Recovered diagnostic logs:
+
+```text
+/plumos-v90s-diag.log
+/rootfs/plumos-v90s-diag.log
+sha256: 769480194ab2a0fc122c76cd11c3d2958509c0a0943f9b1a3c9ad798706f95c4
+```
+
+The log copy stored for this repository is:
+
+```text
+docs/validation/logs/2026-07-09-plumos-v90s-diag-userdata.log
+```
+
+Key evidence from the recovered log:
+
+- Linux kernel booted: `Linux version 4.9.191`
+- diagnostic init started: `plumOS V90S diagnostic init started`
+- real kernel cmdline included the generated image override: `root=/dev/mmcblk0p4`
+- SD partitions were visible as `/dev/mmcblk0p1` through `/dev/mmcblk0p5`
+- `/dev/mmcblk0p4` mounted as vfat and contained `/boot/knulli`
+- `/dev/mmcblk0p5` mounted as ext4 for log persistence
+- the failure point was `boot: failed to mount /boot_root/boot/knulli as squashfs`
+
+The failure is consistent with trying to mount a squashfs image file directly from BusyBox initramfs without first attaching it to a loop device.
 
 ## Next direction
 
-The next most useful evidence is serial UART boot logging. If staying SD-only, the next image should test whether the bootloader is actually loading the patched `boot.img`, for example by changing only one boot source at a time or by creating a deliberately obvious boot-image failure/probe.
+Serial UART is no longer the immediate next step because SD logging proved that the patched Android `boot.img` is active and initramfs is executing.
+
+The next image should attach `/boot/knulli` to `/dev/loop0`, mount `/dev/loop0` as squashfs, and then switch to stage1.
