@@ -13,6 +13,8 @@ SHARE_RETROARCH_LOG=
 RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
 PERIODIC_LOG_MIRROR="${PLUMOS_V90S_PERIODIC_LOG_MIRROR:-0}"
 RETROARCH_CONFIG_SRC="${PLUMOS_V90S_RETROARCH_CONFIG:-}"
+RETROARCH_CONFIG_DIR="${PLUMOS_V90S_RETROARCH_CONFIG_DIR:-/mnt/share/retroarch}"
+RETROARCH_CONFIG_PATH="${PLUMOS_V90S_RETROARCH_CONFIG_PATH:-}"
 RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
 ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-/etc/plumos-v90s-retroarch-route}"
 LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
@@ -109,7 +111,7 @@ pid_is_retroarch() {
     esac
 
     case "$cmdline" in
-        *"/tmp/retroarch-v90s.cfg"*)
+        *"retroarch-v90s.cfg"*)
             return 0
             ;;
     esac
@@ -430,7 +432,7 @@ write_config() {
     video_threaded="$7"
 
     cat > "$cfg" <<EOF
-config_save_on_exit = "false"
+config_save_on_exit = "true"
 libretro_directory = "/usr/lib/aarch64-linux-gnu/libretro"
 libretro_info_path = "/usr/share/libretro/info"
 assets_directory = "/usr/share/libretro/assets"
@@ -496,6 +498,39 @@ rewind_enable = "false"
 cheevos_enable = "false"
 network_cmd_enable = "false"
 EOF
+}
+
+prepare_config_path() {
+    if [ -n "$RETROARCH_CONFIG_PATH" ]; then
+        cfg="$RETROARCH_CONFIG_PATH"
+        cfg_dir="$(dirname "$cfg")"
+        mkdir -p "$cfg_dir" 2>/dev/null || true
+        if [ -d "$cfg_dir" ] && [ -w "$cfg_dir" ]; then
+            printf '%s\n' "$cfg"
+            return 0
+        fi
+        log "retroarch-launch: configured persistent config dir is not writable: $cfg_dir"
+    fi
+
+    if [ -d "$RETROARCH_CONFIG_DIR" ] || mkdir -p "$RETROARCH_CONFIG_DIR" 2>/dev/null; then
+        if [ -w "$RETROARCH_CONFIG_DIR" ]; then
+            printf '%s/retroarch-v90s.cfg\n' "$RETROARCH_CONFIG_DIR"
+            return 0
+        fi
+    fi
+
+    log "retroarch-launch: persistent config unavailable; using volatile /tmp config"
+    printf '/tmp/retroarch-v90s.cfg\n'
+}
+
+ensure_config_save_enabled() {
+    cfg="$1"
+
+    if grep -q '^config_save_on_exit[[:space:]]*=' "$cfg" 2>/dev/null; then
+        sed -i 's/^config_save_on_exit[[:space:]]*=.*/config_save_on_exit = "true"/' "$cfg" 2>/dev/null || true
+    else
+        printf '\nconfig_save_on_exit = "true"\n' >> "$cfg" 2>/dev/null || true
+    fi
 }
 
 if ! mkdir -p "$RUN_DIR" 2>/dev/null; then
@@ -625,7 +660,9 @@ joypad_driver="${PLUMOS_V90S_JOYPAD_DRIVER:-sdl2}"
 audio_driver="${PLUMOS_V90S_AUDIO_DRIVER:-alsa}"
 sdl_video="${PLUMOS_V90S_SDL_VIDEODRIVER:-mali}"
 sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
-cfg=/tmp/retroarch-v90s.cfg
+cfg="$(prepare_config_path)"
+cfg_dir="$(dirname "$cfg")"
+mkdir -p "$cfg_dir" 2>/dev/null || true
 
 if [ -n "$RETROARCH_CONFIG_SRC" ]; then
     if [ ! -f "$RETROARCH_CONFIG_SRC" ]; then
@@ -633,11 +670,22 @@ if [ -n "$RETROARCH_CONFIG_SRC" ]; then
         mirror_logs
         exit 46
     fi
-    cp "$RETROARCH_CONFIG_SRC" "$cfg"
-    log "retroarch-launch: copied external RetroArch config from $RETROARCH_CONFIG_SRC"
+    if [ "$RETROARCH_CONFIG_SRC" != "$cfg" ]; then
+        cp "$RETROARCH_CONFIG_SRC" "$cfg"
+        log "retroarch-launch: copied external RetroArch config from $RETROARCH_CONFIG_SRC to $cfg"
+    else
+        log "retroarch-launch: using external RetroArch config in place: $cfg"
+    fi
 else
-    write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
+    if [ -f "$cfg" ]; then
+        log "retroarch-launch: reusing persistent RetroArch config: $cfg"
+    else
+        write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
+        log "retroarch-launch: created RetroArch config: $cfg"
+    fi
 fi
+ensure_config_save_enabled "$cfg"
+log "retroarch-launch: config_path=$cfg"
 
 log "retroarch-launch: route video=$video_driver context=$video_context_driver threaded=$video_threaded input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
 {

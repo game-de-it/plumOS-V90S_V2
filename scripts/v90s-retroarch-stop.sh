@@ -54,7 +54,7 @@ process_matches() {
                     ;;
             esac
             case "$cmdline" in
-                *"/tmp/retroarch-v90s.cfg"*)
+                *"retroarch-v90s.cfg"*)
                     return 0
                     ;;
             esac
