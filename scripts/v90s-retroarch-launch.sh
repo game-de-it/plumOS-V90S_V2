@@ -159,6 +159,11 @@ append_cmd "mount" mount
 append_cmd "framebuffer-devices" sh -c 'ls -l /dev/fb* /dev/dri/* 2>/dev/null || true'
 append_cmd "input-devices" sh -c 'cat /proc/bus/input/devices 2>/dev/null || true; ls -l /dev/input 2>/dev/null || true; command -v lsinput >/dev/null 2>&1 && lsinput 2>&1 || true'
 append_cmd "sound-devices" sh -c 'cat /proc/asound/cards 2>/dev/null || true; cat /proc/asound/devices 2>/dev/null || true; command -v aplay >/dev/null 2>&1 && aplay -l 2>&1 || true; ls -l /dev/snd 2>/dev/null || true'
+if [ -d /usr/lib/powervr ]; then
+    export LD_LIBRARY_PATH="/usr/lib/powervr:/usr/lib/aarch64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    log "retroarch-launch: LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+    append_cmd "powervr-runtime" sh -c 'ls -l /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /lib/modules/4.9.191/pvrsrvkm.ko /lib/modules/4.9.191/dc_sunxi.ko /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
+fi
 append_cmd "retroarch-version" retroarch --version
 append_cmd "retroarch-features" retroarch --features
 append_cmd "dmesg-tail" sh -c 'dmesg 2>/dev/null | tail -120 || true'
@@ -195,6 +200,8 @@ attempt=0
 for spec in \
     fbdev:linuxraw:linuxraw:alsa:none \
     fbdev:udev:udev:alsa:none \
+    gl:udev:udev:alsa:none \
+    sdl2:sdl2:sdl2:alsa:mali \
     sdl2:sdl2:sdl2:alsa:kmsdrm \
     sdl2:sdl2:sdl2:sdl2:dummy
 do

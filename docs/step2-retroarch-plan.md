@@ -88,6 +88,20 @@ The launcher tries RetroArch with `fbdev` first, then `sdl2` fallbacks, and writ
 
 The real-device test of this first image showed that the Debian package route is not enough for display. Boot, payload handoff, ROM discovery, and Nestopia core loading all worked, but Debian RetroArch did not include `fbdev`, and the V90S runtime did not expose a usable KMS/DRM path. The next route is to use KNULLI's A133 graphics stack: PowerVR GE8300 userspace, the A133 kernel modules/firmware, patched SDL2 framebuffer EGL support, and a RetroArch binary built for that stack.
 
+The second generated image is a PowerVR initialization probe:
+
+```text
+output/images/plumos-v90s-armbian-step2-20260709-2-pvr-probe.img
+sha256: eb5de70bc4d9c289a0add25fedb2316cb9939b72847c328cf3291f567af40953
+```
+
+Partition sizing remains small:
+
+- FAT boot-resource: 33MB
+- userdata: 512MB
+
+This image adds the KNULLI A133 PowerVR GE8300 userspace libraries, `pvrsrvkm.ko`, `dc_sunxi.ko`, `rgx.*` firmware, and `/usr/local/sbin/v90s-pvr-probe`. It writes `plumos-v90s-pvr-probe.log` to FAT before launching RetroArch. If PowerVR initializes, the next build should add KNULLI's patched SDL2 framebuffer EGL route or a KNULLI-built RetroArch binary. If it does not, fix module/firmware/userspace initialization first.
+
 ## Runtime Investigation Targets
 
 Video:

@@ -99,7 +99,7 @@ Target:
 - [ ] Reach approximately 60fps with no obvious pacing issue.
 - [ ] Output audible sound.
 - [ ] Use V90S built-in controls for Start, D-pad, A, and B.
-- [ ] Save RetroArch launch/runtime logs to FAT under `/Volumes/KNULLI/plumos-logs/`.
+- [x] Save RetroArch launch/runtime logs to FAT under `/Volumes/KNULLI/plumos-logs/`.
 
 Constraints:
 
@@ -127,12 +127,14 @@ First implementation tasks:
 - [x] Build first Step 2 RetroArch test image.
 - [x] User flashes first Step 2 image and verifies on real hardware.
 - [x] Analyze FAT logs and record result under `docs/validation/`.
-- [ ] Build a second Step 2 image using KNULLI's A133/PowerVR graphics path instead of Debian stock RetroArch video drivers.
-- [ ] Add the minimum KNULLI graphics components to the Debian payload:
+- [x] Build a second Step 2 image using KNULLI's A133/PowerVR graphics path instead of Debian stock RetroArch video drivers.
+- [x] Add the minimum KNULLI graphics components to the Debian payload:
   - PowerVR GE8300 userspace libraries
   - `pvrsrvkm.ko`, `dc_sunxi.ko`, and `rgx.*` firmware
-  - patched SDL2 framebuffer EGL backend or a KNULLI-built RetroArch binary
   - launch diagnostics for `/dev/dri`, `/dev/pvr*`, `pvrsrvctl`, EGL, and SDL video drivers
+- [ ] Add patched SDL2 framebuffer EGL backend or a KNULLI-built RetroArch binary.
+- [ ] User flashes PowerVR probe image and returns FAT logs.
+- [ ] Analyze `plumos-v90s-pvr-probe.log` and decide whether the next branch is module/firmware repair or patched SDL2/RetroArch build.
 
 Validation buckets:
 

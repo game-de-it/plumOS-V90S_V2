@@ -6,6 +6,8 @@ suite="bookworm"
 mirror="http://deb.debian.org/debian"
 out_dir="output/rootfs-step1"
 knulli_ramdisk=".cache/v90s-ramdisk"
+knulli_a133_overlay=".cache/knulli-linux/board/allwinner/a133/fsoverlay"
+pvr_dir=".cache/ge8300-drivers"
 keep_work=0
 rom_path=""
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -16,11 +18,13 @@ Usage:
   build-step1-rootfs.sh [options]
 
 Options:
-  --profile NAME        all, stage1, debian-minbase, or debian-retroarch; default all
+  --profile NAME        all, stage1, debian-minbase, debian-retroarch, or debian-retroarch-pvr-probe; default all
   --suite NAME          Debian suite for debootstrap, default bookworm
   --mirror URL          Debian mirror, default http://deb.debian.org/debian
   --out-dir PATH        output directory, default output/rootfs-step1
   --knulli-ramdisk PATH extracted KNULLI ramdisk, default .cache/v90s-ramdisk
+  --knulli-a133-overlay PATH KNULLI a133 fsoverlay, default .cache/knulli-linux/board/allwinner/a133/fsoverlay
+  --pvr-dir PATH        GE8300 driver checkout, default .cache/ge8300-drivers
   --rom PATH            NES ROM to copy into debian-retroarch payload
   --keep-work           keep temporary build directory
 USAGE
@@ -48,6 +52,14 @@ while [ "$#" -gt 0 ]; do
             knulli_ramdisk="$2"
             shift 2
             ;;
+        --knulli-a133-overlay)
+            knulli_a133_overlay="$2"
+            shift 2
+            ;;
+        --pvr-dir)
+            pvr_dir="$2"
+            shift 2
+            ;;
         --rom)
             rom_path="$2"
             shift 2
@@ -69,7 +81,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$profile" in
-    all|stage1|debian-minbase|debian-retroarch)
+    all|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe)
         ;;
     *)
         printf 'error: unknown profile: %s\n' "$profile" >&2
@@ -82,20 +94,31 @@ if ! command -v mksquashfs >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ]; then
+if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ]; then
     if ! command -v debootstrap >/dev/null 2>&1; then
         printf 'error: debootstrap is required for profile %s\n' "$profile" >&2
         exit 1
     fi
 fi
 
-if [ "$profile" = "debian-retroarch" ]; then
+if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ]; then
     if [ -z "$rom_path" ]; then
-        printf 'error: --rom is required for profile debian-retroarch\n' >&2
+        printf 'error: --rom is required for profile %s\n' "$profile" >&2
         exit 2
     fi
     if [ ! -f "$rom_path" ]; then
         printf 'error: ROM not found: %s\n' "$rom_path" >&2
+        exit 1
+    fi
+fi
+
+if [ "$profile" = "debian-retroarch-pvr-probe" ]; then
+    if [ ! -d "$pvr_dir/fbdev/glibc/lib64" ] || [ ! -x "$pvr_dir/fbdev/glibc/bin/pvrsrvctl" ]; then
+        printf 'error: GE8300 fbdev/glibc driver payload not found under: %s\n' "$pvr_dir" >&2
+        exit 1
+    fi
+    if [ ! -f "$knulli_a133_overlay/lib/modules/4.9.191_v90s/pvrsrvkm.ko" ] || [ ! -f "$knulli_a133_overlay/lib/modules/4.9.191_v90s/dc_sunxi.ko" ]; then
+        printf 'error: KNULLI a133 PowerVR modules not found under: %s\n' "$knulli_a133_overlay" >&2
         exit 1
     fi
 fi
@@ -373,6 +396,9 @@ copy_to_fat_logs() {
     if [ -f /mnt/share/plumos-v90s-retroarch.log ]; then
         cp /mnt/share/plumos-v90s-retroarch.log "$FAT_LOG_DIR/plumos-v90s-retroarch.log" 2>/dev/null || true
     fi
+    if [ -f /mnt/share/plumos-v90s-pvr-probe.log ]; then
+        cp /mnt/share/plumos-v90s-pvr-probe.log "$FAT_LOG_DIR/plumos-v90s-pvr-probe.log" 2>/dev/null || true
+    fi
     sync
 }
 
@@ -501,6 +527,16 @@ persist_debian_log
 fb_probe
 persist_debian_log
 
+if [ -x /usr/local/sbin/v90s-pvr-probe ]; then
+    log "debian-init: starting PowerVR probe"
+    persist_debian_log
+    sync
+    /usr/local/sbin/v90s-pvr-probe
+    rc=$?
+    log "debian-init: PowerVR probe exited rc=$rc"
+    persist_debian_log
+fi
+
 if [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
     log "debian-init: starting RetroArch launcher"
     persist_debian_log
@@ -621,8 +657,41 @@ EOF
     printf 'created: %s/debian-%s-minbase-step1.squashfs\n' "$out_dir" "$suite"
 }
 
-build_debian_retroarch() {
-    root="$work_dir/debian-retroarch-root"
+install_pvr_probe() {
+    root="$1"
+    pvr_module_src="$knulli_a133_overlay/lib/modules/4.9.191_v90s"
+
+    install -D -m 0755 "$script_dir/v90s-pvr-probe.sh" "$root/usr/local/sbin/v90s-pvr-probe"
+
+    mkdir -p "$root/usr/bin" "$root/usr/lib/powervr" "$root/lib/firmware" "$root/lib/modules/4.9.191"
+    cp -a "$pvr_dir/fbdev/glibc/lib64/." "$root/usr/lib/powervr/"
+    install -m 0755 "$pvr_dir/fbdev/glibc/bin/pvrsrvctl" "$root/usr/bin/pvrsrvctl"
+    if [ -x "$pvr_dir/fbdev/glibc/bin/ocl_unit_test" ]; then
+        install -m 0755 "$pvr_dir/fbdev/glibc/bin/ocl_unit_test" "$root/usr/bin/ocl_unit_test"
+    fi
+
+    cp -a "$pvr_dir/fbdev/glibc/lib64/firmware/." "$root/lib/firmware/" 2>/dev/null || true
+    cp -a "$knulli_a133_overlay/lib/firmware/rgx.fw.22.102.54.38" "$root/lib/firmware/" 2>/dev/null || true
+    cp -a "$knulli_a133_overlay/lib/firmware/rgx.sh.22.102.54.38" "$root/lib/firmware/" 2>/dev/null || true
+
+    install -m 0644 "$pvr_module_src/pvrsrvkm.ko" "$root/lib/modules/4.9.191/pvrsrvkm.ko"
+    install -m 0644 "$pvr_module_src/dc_sunxi.ko" "$root/lib/modules/4.9.191/dc_sunxi.ko"
+    if [ -f "$pvr_module_src/sunxi-backlight.ko" ]; then
+        install -m 0644 "$pvr_module_src/sunxi-backlight.ko" "$root/lib/modules/4.9.191/sunxi-backlight.ko"
+    fi
+    for meta in modules.alias modules.builtin modules.dep modules.devname modules.order modules.softdep modules.symbols; do
+        [ -f "$pvr_module_src/$meta" ] && install -m 0644 "$pvr_module_src/$meta" "$root/lib/modules/4.9.191/$meta"
+    done
+
+    mkdir -p "$root/etc/ld.so.conf.d"
+    printf '/usr/lib/powervr\n' > "$root/etc/ld.so.conf.d/powervr.conf"
+}
+
+build_debian_retroarch_payload() {
+    payload_suffix="$1"
+    profile_name="$2"
+    include_pvr="$3"
+    root="$work_dir/${profile_name}-root"
     rm -rf "$root"
     mkdir -p "$root"
 
@@ -633,6 +702,9 @@ build_debian_retroarch() {
     write_debian_init "$root/sbin/init"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"
+    if [ "$include_pvr" -eq 1 ]; then
+        install_pvr_probe "$root"
+    fi
     install -m 0644 "$rom_path" "$root/roms/nes/Super Mario Bros..nes"
     printf 'plumos-v90s-step2\n' > "$root/etc/hostname"
     rom_sha256="$(sha256sum "$rom_path" | awk '{print $1}')"
@@ -640,8 +712,9 @@ build_debian_retroarch() {
 name=plumOS V90S Step2 RetroArch Debian payload
 suite=$suite
 mirror=$mirror
-rootfs_profile=debian-retroarch
+rootfs_profile=$profile_name
 packages=$retroarch_packages
+power_pvr_probe=$include_pvr
 rom_path=/roms/nes/Super Mario Bros..nes
 rom_sha256=$rom_sha256
 EOF
@@ -649,12 +722,20 @@ EOF
     rm -rf "$root/var/cache/apt/archives/"*.deb "$root/var/lib/apt/lists/"*
     rm -rf "$root/usr/share/doc" "$root/usr/share/man" "$root/usr/share/info" "$root/usr/share/lintian" "$root/usr/share/locale"
 
-    mksquashfs "$root" "$out_dir/debian-${suite}-retroarch-step2.squashfs" -noappend -comp zstd -b 131072
-    sha256sum "$out_dir/debian-${suite}-retroarch-step2.squashfs" > "$out_dir/debian-${suite}-retroarch-step2.squashfs.sha256"
-    du -sh "$root" > "$out_dir/debian-${suite}-retroarch-root.du.txt"
-    find "$root" -maxdepth 2 -type f | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-retroarch-manifest-depth2.txt"
-    find "$root/usr/lib" "$root/usr/share/libretro" -maxdepth 4 -type f 2>/dev/null | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-retroarch-libretro-files.txt"
-    printf 'created: %s/debian-%s-retroarch-step2.squashfs\n' "$out_dir" "$suite"
+    mksquashfs "$root" "$out_dir/debian-${suite}-${payload_suffix}.squashfs" -noappend -comp zstd -b 131072
+    sha256sum "$out_dir/debian-${suite}-${payload_suffix}.squashfs" > "$out_dir/debian-${suite}-${payload_suffix}.squashfs.sha256"
+    du -sh "$root" > "$out_dir/debian-${suite}-${payload_suffix}-root.du.txt"
+    find "$root" -maxdepth 2 -type f | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-${payload_suffix}-manifest-depth2.txt"
+    find "$root/usr/lib" "$root/usr/share/libretro" -maxdepth 5 -type f 2>/dev/null | sed "s#^$root/##" | sort > "$out_dir/debian-${suite}-${payload_suffix}-runtime-files.txt"
+    printf 'created: %s/debian-%s-%s.squashfs\n' "$out_dir" "$suite" "$payload_suffix"
+}
+
+build_debian_retroarch() {
+    build_debian_retroarch_payload "retroarch-step2" "debian-retroarch" 0
+}
+
+build_debian_retroarch_pvr_probe() {
+    build_debian_retroarch_payload "retroarch-pvr-probe-step2" "debian-retroarch-pvr-probe" 1
 }
 
 if [ "$profile" = "all" ] || [ "$profile" = "stage1" ]; then
@@ -667,4 +748,8 @@ fi
 
 if [ "$profile" = "debian-retroarch" ]; then
     build_debian_retroarch
+fi
+
+if [ "$profile" = "debian-retroarch-pvr-probe" ]; then
+    build_debian_retroarch_pvr_probe
 fi
