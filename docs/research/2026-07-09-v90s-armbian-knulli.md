@@ -39,6 +39,8 @@ These are enough for Step 1 planning, but the real boot contract must still be c
 
 KNULLI recommends Docker builds and documents a large build footprint. The public build guide says Linux + Docker is expected and that more than 180GB of free disk space is needed.
 
+For this project, KNULLI is a boot-chain reference and source of V90S-specific prebuilt boot assets. Do not spend time on a full KNULLI build unless later evidence shows that a regenerated V90S boot package or kernel/module set is required. The main build target is Armbian-derived userspace/rootfs.
+
 Relevant source files in the KNULLI snapshot:
 
 - `configs/knulli-a133.board`
@@ -157,10 +159,11 @@ The Armbian docs also currently say there are no detailed instructions for addin
    - include V90S kernel modules from KNULLI/stock if later USB/input/display proof requires them
 
 4. Assemble SD image:
-   - create FAT32 boot-resource partition labelled `KNULLI`
+   - create a small FAT32 boot-resource partition labelled `KNULLI`
    - include `/boot/boot/knulli`
    - include `knulli.board` with `powkiddy-v90s`
    - retain raw boot offsets from KNULLI
+   - keep repeated-test images small; current practical default is 33MB for boot-resource FAT and 64MB for userdata
 
 5. User performs real-device test:
    - boot screen visible?

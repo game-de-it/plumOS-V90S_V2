@@ -6,6 +6,8 @@ knulli_src=".cache/knulli-linux"
 out_dir="output/images"
 image_name="plumos-v90s-armbian-step1.img"
 keep_work=0
+boot_vfat_size="33M"
+userdata_size="64M"
 
 usage() {
     cat <<'USAGE'
@@ -17,6 +19,8 @@ Options:
   --knulli-src PATH   KNULLI source checkout, default .cache/knulli-linux
   --out-dir PATH      output directory, default output/images
   --name NAME         output image name, default plumos-v90s-armbian-step1.img
+  --boot-vfat-size N  FAT boot-resource size, default 33M
+  --userdata-size N   userdata partition size, default 64M
   --keep-work         keep temporary assembly directory
 USAGE
 }
@@ -37,6 +41,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         --name)
             image_name="$2"
+            shift 2
+            ;;
+        --boot-vfat-size)
+            boot_vfat_size="$2"
+            shift 2
+            ;;
+        --userdata-size)
+            userdata_size="$2"
             shift 2
             ;;
         --keep-work)
@@ -107,6 +119,33 @@ tmp_cfg="$generated_cfg.tmp"
 sed 's#../../a133-boot-packages/powkiddy-v90s_boot_package.fex#partitions/boot_package.fex#' "$generated_cfg" > "$tmp_cfg"
 mv "$tmp_cfg" "$generated_cfg"
 
+tmp_cfg="$generated_cfg.tmp"
+awk -v boot_vfat_size="$boot_vfat_size" -v userdata_size="$userdata_size" '
+    /^image boot\.vfat[[:space:]]*\{/ {
+        section = "boot"
+    }
+    /^image userdata\.ext4[[:space:]]*\{/ {
+        section = "userdata"
+    }
+    /^image [^[:space:]]+[[:space:]]*\{/ &&
+        $2 != "boot.vfat" &&
+        $2 != "userdata.ext4" {
+        section = ""
+    }
+    section == "boot" && /^[[:space:]]*size[[:space:]]*=/ {
+        print "        size = \"" boot_vfat_size "\""
+        next
+    }
+    section == "userdata" && /^[[:space:]]*size[[:space:]]*=/ {
+        print "        size = \"" userdata_size "\""
+        next
+    }
+    {
+        print
+    }
+' "$generated_cfg" > "$tmp_cfg"
+mv "$tmp_cfg" "$generated_cfg"
+
 genimage \
     --rootpath="$root_dir" \
     --inputpath="$boot_dir" \
@@ -121,6 +160,8 @@ fi
 rm -f "$out_dir/boot.vfat" "$out_dir/userdata.ext4"
 
 printf 'created: %s/%s\n' "$out_dir" "$image_name"
+printf 'boot.vfat size: %s\n' "$boot_vfat_size"
+printf 'userdata size: %s\n' "$userdata_size"
 
 if [ "$keep_work" -eq 0 ]; then
     rm -rf "$work_dir"

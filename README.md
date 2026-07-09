@@ -44,10 +44,14 @@ Armbian build も取得したい場合:
 ./scripts/assemble-v90s-image.sh \
   --rootfs output/rootfs/armbian-v90s-step1.squashfs \
   --knulli-src .cache/knulli-linux \
-  --out-dir output/images
+  --out-dir output/images \
+  --boot-vfat-size 33M \
+  --userdata-size 64M
 ```
 
 `genimage` などのホストツールが必要です。
+
+KNULLI の元設定は boot-resource FAT を数GB確保しますが、このプロジェクトの反復テストでは不要なので、組み立てスクリプトのデフォルトは `--boot-vfat-size 33M`、`--userdata-size 64M` にしています。30MB/32MB は KNULLI 元設定の FAT32 指定では `mtools` がディレクトリを作れず失敗したため、実測で通る最小値の 33MB を使います。Armbian rootfs が 33MB に収まらない段階では、FAT を大きくするよりも rootfs を別 partition に置く方向で調整します。
 
 ホストに直接ツールを入れない場合は、アセンブリ用 Docker イメージを使います。
 

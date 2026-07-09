@@ -40,6 +40,8 @@ Output:
 
 This track proves that our assembly mechanism matches the V90S boot contract before Armbian complexity is added.
 
+Keep the iteration image small. The KNULLI source config reserves a multi-GB FAT boot-resource partition, but Step 1 only needs enough room for boot assets and the test rootfs. The current assembly default is a 33MB FAT boot-resource partition plus a 64MB userdata partition; 30MB/32MB failed with the FAT32 tooling used by the KNULLI config, while 33MB assembled successfully.
+
 ### Track B: minimal Armbian rootfs
 
 Generate an aarch64 Armbian-derived console rootfs and pack it as squashfs.
