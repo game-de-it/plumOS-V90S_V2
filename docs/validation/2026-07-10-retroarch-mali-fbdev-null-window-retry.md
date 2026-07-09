@@ -450,3 +450,69 @@ input_player1_start_btn = "6"
 
 User confirmation of the physical Start/Select behavior after this swap is
 pending.
+
+The user then reported that the d-pad no longer worked and audio had stopped.
+The conclusion is that the KNULLI-style full config was still overriding too
+many known-good runtime settings:
+
+```text
+audio_driver = "alsathread"
+input_autodetect_enable = "false"
+input_player1_*_btn / input_player1_*_axis fixed binds
+```
+
+The device was restarted without any external RetroArch config so the launcher
+could regenerate the original minimal config and enable only the required live
+route values:
+
+```text
+./scripts/live-transfer-retroarch-knulli.sh 192.0.2.118
+```
+
+Live verification:
+
+```text
+RetroArch: pid=5920 running comm='retroarch-knull'
+PLUMOS_V90S_VIDEO_DRIVER=gl
+PLUMOS_V90S_VIDEO_CONTEXT_DRIVER=mali_fbdev
+PLUMOS_V90S_VIDEO_THREADED=false
+PLUMOS_V90S_INPUT_DRIVER=sdl2
+PLUMOS_V90S_JOYPAD_DRIVER=sdl2
+PLUMOS_V90S_AUDIO_DRIVER=alsa
+```
+
+The active `/tmp/retroarch-v90s.cfg` returned to the previously working input
+style:
+
+```text
+audio_driver = "alsa"
+audio_device = "hw:0,0"
+input_driver = "sdl2"
+input_joypad_driver = "sdl2"
+input_autodetect_enable = "true"
+input_player1_up = "up"
+input_player1_down = "down"
+input_player1_left = "left"
+input_player1_right = "right"
+input_player1_a = "x"
+input_player1_b = "z"
+input_player1_start = "enter"
+input_player1_select = "rshift"
+```
+
+RetroArch stayed on the patched GE8300 path and ALSA initialized against the
+explicit hardware device:
+
+```text
+[Input] Found input driver: "sdl2".
+[Mali] Native fbdev window rejected; retrying EGL surface with NULL native window.
+[GL] Found GL context: "fbdev_mali".
+[Input] Found joypad driver: "sdl2".
+[ALSA] Using S16_LE sample format for PLAYBACK device "hw:0,0".
+[ALSA] Initialized PLAYBACK device "hw:0,0".
+[Audio] Started synchronous audio driver.
+```
+
+`configs/retroarch/v90s-knulli-a133-nes.cfg` was also reduced to this same
+minimal shape so future external-config tests do not reintroduce the broad
+KNULLI overrides. User confirmation of d-pad and audio recovery is pending.
