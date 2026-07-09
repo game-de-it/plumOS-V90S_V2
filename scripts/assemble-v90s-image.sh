@@ -86,7 +86,7 @@ genimage_tmp="$work_dir/genimage.tmp"
 generated_cfg="$work_dir/genimage.cfg"
 
 rm -rf "$work_dir"
-mkdir -p "$boot_dir/boot" "$root_dir"
+mkdir -p "$boot_dir/boot" "$root_dir/userdata"
 rm -f "$out_dir/knulli.img" "$out_dir/$image_name" "$out_dir/boot.vfat" "$out_dir/userdata.ext4"
 
 cp "$rootfs" "$boot_dir/boot/knulli"
