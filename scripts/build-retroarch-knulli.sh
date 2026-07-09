@@ -7,6 +7,7 @@ work_dir="output/build/retroarch-${version}"
 knulli_src=".cache/knulli-linux"
 pvr_dir=".cache/ge8300-drivers"
 sdl2_mali_dir="output/sdl2-mali"
+local_patch_dir="patches/retroarch"
 docker_image="${PLUMOS_V90S_RETROARCH_DOCKER_IMAGE:-debian:bookworm}"
 apply_patches=0
 
@@ -22,6 +23,8 @@ Options:
   --knulli-src PATH     KNULLI source checkout; default .cache/knulli-linux
   --pvr-dir PATH        GE8300 driver checkout; default .cache/ge8300-drivers
   --sdl2-mali-dir PATH  patched SDL2 payload; default output/sdl2-mali
+  --local-patch-dir PATH
+                        local RetroArch patches; default patches/retroarch
   --apply-patches       also replay KNULLI package patches before building
   --skip-patches        accepted for compatibility; this is the default
 USAGE
@@ -52,6 +55,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --sdl2-mali-dir)
             sdl2_mali_dir="$2"
+            shift 2
+            ;;
+        --local-patch-dir)
+            local_patch_dir="$2"
             shift 2
             ;;
         --skip-patches)
@@ -109,7 +116,9 @@ git -C "$work_dir" reset --hard --quiet "$version"
 git -C "$work_dir" clean -fdx --quiet
 
 applied_patches_file="$work_dir/.plumos-applied-patches.txt"
+applied_local_patches_file="$work_dir/.plumos-applied-local-patches.txt"
 : > "$applied_patches_file"
+: > "$applied_local_patches_file"
 if [ "$apply_patches" -eq 1 ]; then
     for patch in "$patch_dir"/[0-9][0-9][0-9]-*.patch "$patch_dir"/[0-9][0-9]-*.patch; do
         [ -f "$patch" ] || continue
@@ -118,6 +127,12 @@ if [ "$apply_patches" -eq 1 ]; then
         printf '%s\n' "$(basename -- "$patch")" >> "$applied_patches_file"
     done
 fi
+for patch in "$local_patch_dir"/*.patch; do
+    [ -f "$patch" ] || continue
+    printf 'applying local patch: %s\n' "$patch"
+    git -C "$work_dir" apply --whitespace=nowarn "$(CDPATH= cd -- "$(dirname -- "$patch")" && pwd)/$(basename -- "$patch")"
+    printf '%s\n' "$(basename -- "$patch")" >> "$applied_local_patches_file"
+done
 
 work_abs="$(CDPATH= cd -- "$work_dir" && pwd)"
 pvr_abs="$(CDPATH= cd -- "$pvr_lib_dir" && pwd)"
@@ -193,6 +208,8 @@ source=https://github.com/libretro/RetroArch.git
 version=$version
 knulli_patch_dir=$patch_dir
 patches=$([ "$apply_patches" -eq 1 ] && tr '\n' ' ' < "$applied_patches_file" || printf none)
+local_patch_dir=$local_patch_dir
+local_patches=$([ -s "$applied_local_patches_file" ] && tr '\n' ' ' < "$applied_local_patches_file" || printf none)
 pvr_lib_dir=$pvr_lib_dir
 sdl2_mali_dir=$sdl2_mali_dir
 configure=--enable-mali_fbdev --enable-egl --enable-opengles --enable-opengles3 --enable-sdl2 --enable-alsa --disable-x11 --disable-wayland --disable-kms

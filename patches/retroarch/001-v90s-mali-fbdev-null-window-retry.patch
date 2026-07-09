@@ -1,0 +1,22 @@
+diff --git a/gfx/drivers_context/mali_fbdev_ctx.c b/gfx/drivers_context/mali_fbdev_ctx.c
+--- a/gfx/drivers_context/mali_fbdev_ctx.c
++++ b/gfx/drivers_context/mali_fbdev_ctx.c
+@@ -260,9 +260,16 @@ static void *gfx_ctx_mali_fbdev_init(void *video_driver)
+ #ifdef HAVE_EGL
+    frontend_driver_install_signal_handler();
+    mali->egl.use_hw_ctx = true;
+    if (!egl_init_context(&mali->egl, EGL_NONE, EGL_DEFAULT_DISPLAY,
+             &major, &minor, &n, attribs_init, NULL) ||
+-   !egl_create_context(&mali->egl, attribs_create) ||
+-   !egl_create_surface(&mali->egl, &mali->native_window))
++   !egl_create_context(&mali->egl, attribs_create))
+       goto error;
++
++   if (!egl_create_surface(&mali->egl, &mali->native_window))
++   {
++      RARCH_WARN("[Mali] Native fbdev window rejected; retrying EGL surface with NULL native window.\n");
++      egl_report_error();
++      if (!egl_create_surface(&mali->egl, NULL))
++         goto error;
++   }
+ #endif

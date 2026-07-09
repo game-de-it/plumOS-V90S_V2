@@ -167,6 +167,23 @@ single video route is now `video_driver=gl` plus
 part of the binary because `000-input_sort_devices.patch` does not apply cleanly
 to the checked-out RetroArch tag.
 
+The first live transfer of that binary reached the GE8300 GLES stack but logged
+`EGL_BAD_NATIVE_WINDOW`, then RetroArch continued through its internal `gl_sdl`
+context path. Since KNULLI's V90S SDL2 Mali patch retries
+`eglCreateWindowSurface` with a NULL native window after the fbdev window is
+rejected, the local RetroArch build now applies
+`patches/retroarch/001-v90s-mali-fbdev-null-window-retry.patch`. The rebuilt
+binary hash is:
+
+```text
+output/retroarch-knulli/usr/local/bin/retroarch-knulli
+sha256: d377e9ed983290d3829dc17e551561558e75b16ebf55bad49d0b0449178f1664
+```
+
+If SSH is reachable, `scripts/live-transfer-retroarch-knulli.sh <V90S_IP>` can
+transfer the rebuilt RA binary, QuickNES core, launcher, and safe stop script
+without rebuilding the SD image.
+
 ## Runtime Investigation Targets
 
 Video:
