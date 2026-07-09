@@ -196,9 +196,7 @@ mount_payload_root() {
     fi
 
     log "payload-root: mounted Debian payload rootfs"
-    run_log ls -la /payload_root
-    run_log ls -la /payload_root/sbin
-    run_log ls -la /payload_root/usr/sbin
+    log "payload-root: directory listing disabled"
     persist_logs_to_share /payload_share payload-share
     return 0
 }
@@ -228,7 +226,6 @@ find_boot_root() {
             }
 
             log "scan: mounted $dev as $fs"
-            run_log ls -la /mnt/candidate
             if [ -f /mnt/candidate/boot/knulli ]; then
                 BOOT_ROOT_DEV="$dev"
                 BOOT_ROOT_FS="$fs"
@@ -247,7 +244,6 @@ find_boot_root() {
 }
 
 log_mount_context() {
-    run_log ls -la /boot_root/boot
     run_log $bb sh -c 'dd if=/boot_root/boot/knulli bs=96 count=1 2>/dev/null | hexdump -C'
     run_log $bb sh -c 'dmesg | tail -n 120'
 }
@@ -311,7 +307,6 @@ run_log cat /proc/version
 run_log cat /proc/cmdline
 run_log cat /proc/filesystems
 run_log cat /proc/partitions
-run_log ls -la /dev
 run_log dmesg
 
 if find_boot_root; then
@@ -329,9 +324,6 @@ fs="$(mount_ro "$BOOT_ROOT_DEV" /boot_root)" || {
     exec /bin/busybox sh
 }
 log "boot: mounted $BOOT_ROOT_DEV as $fs on /boot_root"
-
-run_log ls -la /boot_root
-run_log ls -la /boot_root/boot
 
 if mount_payload_root; then
     $bb mkdir -p /payload_root/proc /payload_root/sys /payload_root/dev /payload_root/boot /payload_root/mnt/share
@@ -363,9 +355,7 @@ if ! mount_stage1_root; then
 fi
 
 log "boot: mounted /boot_root/boot/knulli as stage1 root"
-run_log ls -la /new_root
-run_log ls -la /new_root/bin
-run_log ls -la /new_root/sbin
+log "boot: stage1 directory listing disabled"
 persist_logs
 
 $bb mkdir -p /new_root/proc /new_root/sys /new_root/dev /new_root/boot

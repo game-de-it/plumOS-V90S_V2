@@ -529,9 +529,9 @@ for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/clas
 done
 
 append_cmd "mount" mount
-append_cmd "framebuffer-devices" sh -c 'ls -l /dev/fb* /dev/dri/* 2>/dev/null || true'
-append_cmd "input-devices" sh -c 'cat /proc/bus/input/devices 2>/dev/null || true; ls -l /dev/input 2>/dev/null || true; command -v lsinput >/dev/null 2>&1 && lsinput 2>&1 || true'
-append_cmd "sound-devices" sh -c 'cat /proc/asound/cards 2>/dev/null || true; cat /proc/asound/devices 2>/dev/null || true; command -v aplay >/dev/null 2>&1 && aplay -l 2>&1 || true; ls -l /dev/snd 2>/dev/null || true'
+append_cmd "framebuffer-devices" sh -c 'find /dev -maxdepth 1 -name "fb*" -print 2>/dev/null; find /dev/dri -maxdepth 1 -print 2>/dev/null || true'
+append_cmd "input-devices" sh -c 'cat /proc/bus/input/devices 2>/dev/null || true; find /dev/input -maxdepth 1 -print 2>/dev/null || true; command -v lsinput >/dev/null 2>&1 && lsinput 2>&1 || true'
+append_cmd "sound-devices" sh -c 'cat /proc/asound/cards 2>/dev/null || true; cat /proc/asound/devices 2>/dev/null || true; command -v aplay >/dev/null 2>&1 && aplay -l 2>&1 || true; find /dev/snd -maxdepth 1 -print 2>/dev/null || true'
 append_cmd "sound-mixer-before" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
 setup_cpu_performance
 setup_audio_mixer
@@ -549,7 +549,7 @@ log "retroarch-launch: retroarch_bin=$RETROARCH_BIN"
 if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
     export LD_LIBRARY_PATH="/usr/local/lib/plumos-sdl2-mali${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     log "retroarch-launch: custom SDL2 mali runtime detected"
-    append_cmd "custom-sdl2-mali-files" sh -c 'ls -l /usr/local/lib/plumos-sdl2-mali /usr/local/bin/v90s-sdl2-video-probe /etc/plumos-sdl2-mali-manifest.txt 2>/dev/null || true; cat /etc/plumos-sdl2-mali-manifest.txt 2>/dev/null || true'
+    append_cmd "custom-sdl2-mali-files" sh -c 'find /usr/local/lib/plumos-sdl2-mali -maxdepth 1 -print 2>/dev/null || true; find /usr/local/bin -maxdepth 1 -name v90s-sdl2-video-probe -print 2>/dev/null || true; find /etc -maxdepth 1 -name plumos-sdl2-mali-manifest.txt -print 2>/dev/null || true; cat /etc/plumos-sdl2-mali-manifest.txt 2>/dev/null || true'
 fi
 if [ -d /usr/lib/powervr ]; then
     if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
@@ -558,7 +558,7 @@ if [ -d /usr/lib/powervr ]; then
         export LD_LIBRARY_PATH="/usr/lib/powervr:/usr/lib/aarch64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     fi
     log "retroarch-launch: LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-    append_cmd "powervr-runtime" sh -c 'ls -l /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /lib/modules/4.9.191/pvrsrvkm.ko /lib/modules/4.9.191/dc_sunxi.ko /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
+    append_cmd "powervr-runtime" sh -c 'for p in /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /lib/modules/4.9.191/pvrsrvkm.ko /lib/modules/4.9.191/dc_sunxi.ko /dev/pvr* /dev/pvrsrvkm /dev/dri/*; do [ -e "$p" ] && printf "%s\n" "$p"; done; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 fi
 if [ -x /usr/local/bin/v90s-sdl2-video-probe ] && [ "${PLUMOS_V90S_RUN_SDL2_PROBE:-0}" = "1" ]; then
     append_cmd "sdl2-video-probe-mali" env SDL_VIDEODRIVER=mali SDL_AUDIODRIVER=alsa /usr/local/bin/v90s-sdl2-video-probe

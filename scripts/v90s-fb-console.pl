@@ -62,10 +62,7 @@ my $last_scan = 0;
 
 push_line("plumOS V90S framebuffer console");
 push_line("fb0 ${width}x${virtual_height} visible=${visible_height} stride=${stride} bpp=${bpp}");
-push_line("Type commands and press Enter. Try: ls /");
-run_command("uname -a");
-run_command("ls /");
-run_command("ls /dev/input");
+push_line("Type commands and press Enter.");
 redraw();
 
 while (1) {

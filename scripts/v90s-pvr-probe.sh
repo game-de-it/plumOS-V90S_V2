@@ -112,11 +112,11 @@ fi
 
 append_cmd "cmdline" cat /proc/cmdline
 append_cmd "mount" mount
-append_cmd "fb-devices" sh -c 'ls -l /dev/fb* /sys/class/graphics/fb0/* 2>/dev/null || true'
-append_cmd "pvr-files" sh -c 'ls -l /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /usr/lib/powervr/firmware/* /lib/firmware/rgx.* /lib/modules/4.9.191/*.ko 2>/dev/null || true'
+append_cmd "fb-devices" sh -c 'find /dev -maxdepth 1 -name "fb*" -print 2>/dev/null || true; find /sys/class/graphics/fb0 -maxdepth 1 -print 2>/dev/null || true'
+append_cmd "pvr-files" sh -c 'for p in /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /usr/lib/powervr/firmware/* /lib/firmware/rgx.* /lib/modules/4.9.191/*.ko; do [ -e "$p" ] && printf "%s\n" "$p"; done'
 append_cmd "pvr-strings" sh -c 'command -v strings >/dev/null 2>&1 && strings /usr/bin/pvrsrvctl 2>/dev/null | grep -E "pvrsrv|/proc/pvr|/sys/kernel/debug/pvr|DriverMode|RGXBVNC" || true'
 append_cmd "debugfs-mount" sh -c 'mkdir -p /sys/kernel/debug; mountpoint -q /sys/kernel/debug 2>/dev/null || mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true; mount | grep debug || true'
-append_cmd "devices-before" sh -c 'ls -l /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
+append_cmd "devices-before" sh -c 'for p in /dev/pvr* /dev/pvrsrvkm /dev/dri/*; do [ -e "$p" ] && printf "%s\n" "$p"; done; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 append_cmd "dmesg-before" sh -c 'dmesg 2>/dev/null | tail -160 || true'
 
 if [ -x /usr/bin/pvrsrvctl ]; then
@@ -133,14 +133,14 @@ if ! module_loaded pvrsrvkm || ! module_loaded dc_sunxi; then
     fi
 fi
 
-append_cmd "devices-after-insmod" sh -c 'ls -l /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
+append_cmd "devices-after-insmod" sh -c 'for p in /dev/pvr* /dev/pvrsrvkm /dev/dri/*; do [ -e "$p" ] && printf "%s\n" "$p"; done; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 append_cmd "dmesg-after-insmod" sh -c 'dmesg 2>/dev/null | tail -220 || true'
 
 if [ -x /usr/bin/pvrsrvctl ]; then
     run_timeout "pvrsrvctl-help" 8 /usr/bin/pvrsrvctl --help
 fi
 
-append_cmd "devices-after-pvrsrvctl" sh -c 'ls -l /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
+append_cmd "devices-after-pvrsrvctl" sh -c 'for p in /dev/pvr* /dev/pvrsrvkm /dev/dri/*; do [ -e "$p" ] && printf "%s\n" "$p"; done; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 dump_tree /proc/pvr
 dump_tree /sys/kernel/debug/pvr
 append_cmd "dmesg-final" sh -c 'dmesg 2>/dev/null | tail -260 || true'

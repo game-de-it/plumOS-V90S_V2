@@ -654,59 +654,13 @@ if [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
     persist_debian_log
 fi
 
-if [ -x /usr/local/sbin/v90s-fb-console ]; then
-    console_log=/tmp/plumos-v90s-fb-console.log
-    if [ -d /mnt/share ]; then
-        console_log=/mnt/share/plumos-v90s-fb-console.log
-        : > "$console_log" 2>/dev/null || true
-        if [ -d /mnt/share/rootfs ]; then
-            : > /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
-        fi
-    fi
-    if [ -n "$FAT_LOG_DIR" ]; then
-        : > "$FAT_LOG_DIR/plumos-v90s-fb-console.log" 2>/dev/null || true
-    fi
+log "debian-init: entering idle loop; framebuffer console fallback disabled"
+persist_debian_log
+sync
 
-    log "debian-init: checking framebuffer console"
-    if command -v perl >/dev/null 2>&1; then
-        /usr/bin/perl -c /usr/local/sbin/v90s-fb-console >> "$console_log" 2>&1
-        log "debian-init: framebuffer console perl-check rc=$?"
-    else
-        log "debian-init: perl not found"
-    fi
-    if [ -f "$console_log" ] && [ -d /mnt/share/rootfs ]; then
-        cp "$console_log" /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
-    fi
-    copy_to_fat_logs
-
-    log "debian-init: starting framebuffer console"
-    persist_debian_log
-    sync
-    /usr/local/sbin/v90s-fb-console >> "$console_log" 2>&1
-    rc=$?
-    log "debian-init: framebuffer console exited rc=$rc"
-    if [ -f "$console_log" ] && [ -d /mnt/share/rootfs ]; then
-        cp "$console_log" /mnt/share/rootfs/plumos-v90s-fb-console.log 2>/dev/null || true
-    fi
-    persist_debian_log
-fi
-
-cat <<MSG
-plumOS V90S Step1 Debian minbase console
-Try:
-  uname -a
-  cat /proc/cmdline
-  mount
-  ls /
-  ls /dev/input
-  dmesg | tail -80
-MSG
-
-if command -v setsid >/dev/null 2>&1; then
-    exec setsid /bin/sh
-fi
-
-exec /bin/sh
+while :; do
+    sleep 3600
+done
 EOF
     chmod 0755 "$init_path"
 }

@@ -163,7 +163,7 @@ load_wifi_driver() {
 
 load_wifi_modules() {
     append_cmd "usb-devices-before-wifi" sh -c 'command -v lsusb >/dev/null 2>&1 && lsusb 2>&1 || true; cat /proc/bus/usb/devices 2>/dev/null || true; find /sys/bus/usb/devices -maxdepth 2 -type f \( -name idVendor -o -name idProduct -o -name manufacturer -o -name product \) -print -exec cat {} \; 2>/dev/null || true'
-    append_cmd "wifi-firmware-files" sh -c 'ls -l /lib/firmware/*xr829* /lib/firmware/*8723* /lib/firmware/rtlwifi/* 2>/dev/null || true'
+    append_cmd "wifi-firmware-files" sh -c 'find /lib/firmware -maxdepth 1 \( -name "*xr829*" -o -name "*8723*" \) -print 2>/dev/null || true; find /lib/firmware/rtlwifi -maxdepth 1 -print 2>/dev/null || true'
     append_cmd "wifi-module-files" sh -c 'find /lib/modules/4.9.191 -name "*.ko" 2>/dev/null | grep -E "8723|8192|88|xradio|rtl|wireless|cfg80211|mac80211" || true'
 
     if command -v rfkill >/dev/null 2>&1; then
