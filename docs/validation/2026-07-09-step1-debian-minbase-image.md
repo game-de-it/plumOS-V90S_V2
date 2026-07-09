@@ -61,6 +61,18 @@ b435bbffebf43fe383cc57028f69bd2180c101d9bd14b8c4ad4fc4bb1b284840  output/rootfs-
 d5ee904e669a5b0d292815cf2700f176f93bcb88b8f11d7946737ae1b94e850b  output/images/plumos-v90s-armbian-step1-20260709-1.img
 ```
 
+## Later payload compression update
+
+After device test 4, the Debian minbase payload was rebuilt with gzip squashfs compression for closer compatibility with the V90S/KNULLI 4.9 kernel path:
+
+```text
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 45M
+sha256: d94c08bd3b331eee0503c0cba9da04f26e5a030d9c9f4cd0471536f57eab411b
+compression: gzip
+```
+
+The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
+
 ## Layout check
 
 `gpt -r show output/images/plumos-v90s-armbian-step1-20260709-1.img`:

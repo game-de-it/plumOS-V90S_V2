@@ -72,24 +72,26 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-4-diag-loop.img \
+  --name plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-4-diag-loop.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img` です。
 
 ```text
-sha256: 6f6490c19f173fa538fa9e8e781cb94bb5b39bde38f16f0f9e98c2b78eba057c
+sha256: c4c600696276c550d3be36b0fa83b039221a462e796ad1ccb72ca1e6120e2089
 size: 133M
 ```
 
 `-1` と `-2` は実機で KNULLI boot logo までは表示されましたが、その先の console には進みませんでした。`-3-diag` では FAT にログは出ませんでしたが、userdata ext4 に `plumos-v90s-diag.log` が残り、kernel が Linux 4.9.191 として起動して診断 initramfs `/init` まで到達していることを確認できました。
 
-`-3-diag` のログでは `/dev/mmcblk0p4` の FAT boot-resource から `/boot/knulli` を見つけたあと、squashfs ファイルを直接 mount しようとして失敗していました。`-4-diag-loop` はこの点を修正し、`/boot/knulli` を `/dev/loop0` に割り当ててから squashfs として mount します。
+`-3-diag` のログでは `/dev/mmcblk0p4` の FAT boot-resource から `/boot/knulli` を見つけたあと、squashfs ファイルを直接 mount しようとして失敗していました。`-4-diag-loop` は `/boot/knulli` を `/dev/loop0` に割り当ててから squashfs として mount しましたが、実機では `/dev/loop0` の squashfs mount に失敗しました。
 
-`-4-diag-loop` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` を確認します。
+`-5-diag-mount-probe` は KNULLI 元 initramfs と同じ直接 file mount を先に試し、失敗時は `-o loop`、明示 `losetup`、loop device mount を順に試して詳細ログを残します。Debian minbase payload も gzip squashfs に作り直してあります。
+
+`-5-diag-mount-probe` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` を確認します。
 
 ## Git workflow
 

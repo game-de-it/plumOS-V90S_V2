@@ -126,8 +126,68 @@ find_boot_root() {
     return 1
 }
 
+log_mount_context() {
+    run_log ls -la /boot_root/boot
+    run_log $bb sh -c 'dd if=/boot_root/boot/knulli bs=96 count=1 2>/dev/null | hexdump -C'
+    run_log $bb sh -c 'dmesg | tail -120'
+}
+
+mount_stage1_root() {
+    $bb umount /new_root >/dev/null 2>&1 || true
+
+    log "boot: trying KNULLI-style file mount"
+    if mount /boot_root/boot/knulli /new_root >> "$LOG" 2>&1; then
+        log "boot: mounted /boot_root/boot/knulli with KNULLI-style file mount"
+        return 0
+    fi
+
+    log "boot: KNULLI-style file mount failed"
+    $bb umount /new_root >/dev/null 2>&1 || true
+
+    log "boot: trying file mount with loop option"
+    if mount -o loop,ro /boot_root/boot/knulli /new_root >> "$LOG" 2>&1; then
+        log "boot: mounted /boot_root/boot/knulli with loop mount option"
+        return 0
+    fi
+
+    log "boot: file mount with loop option failed"
+    $bb umount /new_root >/dev/null 2>&1 || true
+
+    [ -b /dev/loop0 ] || $bb mknod /dev/loop0 b 7 0
+    $bb losetup -d /dev/loop0 >/dev/null 2>&1 || true
+    log "boot: trying explicit losetup on /dev/loop0"
+    if ! $bb losetup /dev/loop0 /boot_root/boot/knulli >> "$LOG" 2>&1; then
+        log "boot: failed to attach /boot_root/boot/knulli to /dev/loop0"
+        log_mount_context
+        return 1
+    fi
+
+    run_log $bb losetup /dev/loop0
+    run_log cat /sys/block/loop0/size
+    run_log $bb sh -c 'dd if=/dev/loop0 bs=96 count=1 2>/dev/null | hexdump -C'
+
+    log "boot: trying loop device mount with autodetect"
+    if mount -o ro /dev/loop0 /new_root >> "$LOG" 2>&1; then
+        log "boot: mounted /dev/loop0 with autodetect"
+        return 0
+    fi
+
+    log "boot: loop device autodetect mount failed"
+    $bb umount /new_root >/dev/null 2>&1 || true
+
+    log "boot: trying loop device mount as squashfs"
+    if mount -t squashfs -o ro /dev/loop0 /new_root >> "$LOG" 2>&1; then
+        log "boot: mounted /dev/loop0 as squashfs"
+        return 0
+    fi
+
+    log "boot: loop device squashfs mount failed"
+    log_mount_context
+    return 1
+}
+
 log "plumOS V90S diagnostic init started"
-run_log uname -a
+run_log cat /proc/version
 run_log cat /proc/cmdline
 run_log cat /proc/filesystems
 run_log cat /proc/partitions
@@ -153,16 +213,8 @@ log "boot: mounted $BOOT_ROOT_DEV as $fs on /boot_root"
 run_log ls -la /boot_root
 run_log ls -la /boot_root/boot
 
-[ -b /dev/loop0 ] || $bb mknod /dev/loop0 b 7 0
-$bb losetup -d /dev/loop0 >/dev/null 2>&1 || true
-if ! $bb losetup /dev/loop0 /boot_root/boot/knulli >/dev/null 2>&1; then
-    log "boot: failed to attach /boot_root/boot/knulli to /dev/loop0"
-    persist_logs
-    exec /bin/busybox sh
-fi
-
-if ! $bb mount -t squashfs -o ro /dev/loop0 /new_root >/dev/null 2>&1; then
-    log "boot: failed to mount /dev/loop0 as squashfs"
+if ! mount_stage1_root; then
+    log "boot: failed to mount /boot_root/boot/knulli as stage1 root"
     persist_logs
     exec /bin/busybox sh
 fi

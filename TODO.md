@@ -36,6 +36,10 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Confirm the V90S booted Linux 4.9.191, reached diagnostic initramfs `/init`, found `/boot/knulli` on `/dev/mmcblk0p4`, and persisted logs to userdata `/dev/mmcblk0p5`.
 - [x] Fix diagnostic initramfs to loop-mount the `/boot/knulli` squashfs file before switching to stage1.
 - [x] Build `plumos-v90s-armbian-step1-20260709-4-diag-loop.img`.
+- [x] Record device test 4: diagnostic init still runs, but `/dev/loop0` squashfs mount fails.
+- [x] Add KNULLI-style file mount probe path before explicit loop mount fallback.
+- [x] Rebuild Debian minbase payload as gzip squashfs for kernel compatibility.
+- [x] Build `plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -140,6 +144,18 @@ rootfs/plumos-v90s-diag.log
 
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-4-diag-loop.img`.
 - [x] Host-verify that diagnostic initramfs contains the `/dev/loop0` squashfs mount path.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo or console.
+- [x] Check whether the screen advances beyond the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: `/boot/knulli` was found, explicit `losetup` did not report failure, but mounting `/dev/loop0` as squashfs failed.
+
+## Device Test 5
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img`.
+- [x] Host-verify that diagnostic initramfs tries KNULLI-style file mount first and records loop/mount diagnostics.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Wait at least 60 seconds at the boot logo or console.
 - [ ] Check whether the screen advances beyond the KNULLI boot logo.
