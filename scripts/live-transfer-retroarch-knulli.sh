@@ -70,6 +70,17 @@ printf 'transfer target: %s\n' "$remote"
 printf 'retroarch: %s\n' "$(sha256sum "$retroarch_src" | awk '{print $1}')"
 printf 'quicknes:   %s\n' "$(sha256sum "$quicknes_src" | awk '{print $1}')"
 
+ssh $ssh_opts "$remote" 'sh -s' <<'REMOTE_PRESTOP'
+set -eu
+if [ -x /tmp/v90s-retroarch-stop.sh ]; then
+    /tmp/v90s-retroarch-stop.sh stop || true
+elif command -v v90s-retroarch-stop >/dev/null 2>&1; then
+    v90s-retroarch-stop stop || true
+else
+    echo "no existing v90s-retroarch-stop found; continuing transfer"
+fi
+REMOTE_PRESTOP
+
 scp $scp_opts \
     "$retroarch_src" "$quicknes_src" "$launcher_src" "$stop_src" \
     "$remote:/tmp/"

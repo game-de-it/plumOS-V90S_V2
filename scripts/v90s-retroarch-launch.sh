@@ -11,6 +11,7 @@ RETROARCH_LOG=/tmp/plumos-v90s-retroarch.log
 SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
 RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
+PERIODIC_LOG_MIRROR="${PLUMOS_V90S_PERIODIC_LOG_MIRROR:-0}"
 RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
 ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-/etc/plumos-v90s-retroarch-route}"
 LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
@@ -161,6 +162,52 @@ terminate_retroarch_pid() {
     remove_pidfile_if_matches "$RETROARCH_PID_FILE" "$pid"
 }
 
+stop_fb_console() {
+    if [ "${PLUMOS_V90S_STOP_FB_CONSOLE:-1}" != "1" ]; then
+        log "retroarch-launch: fb console stop disabled"
+        return
+    fi
+
+    for proc in /proc/[0-9]*; do
+        [ -d "$proc" ] || continue
+        pid="${proc#/proc/}"
+        case "$pid" in
+            ''|*[!0-9]*)
+                continue
+                ;;
+        esac
+
+        [ "$pid" != "$$" ] || continue
+        [ -r "$proc/cmdline" ] || continue
+        cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+        case "$cmdline" in
+            *"/usr/local/sbin/v90s-fb-console"*)
+                ;;
+            *)
+                continue
+                ;;
+        esac
+
+        comm="$(cat "$proc/comm" 2>/dev/null || true)"
+        case "$comm" in
+            v90s-fb-console)
+                ;;
+            *)
+                log "retroarch-launch: refusing to stop fb console candidate pid=$pid comm='$comm' cmdline='$cmdline'"
+                continue
+                ;;
+        esac
+
+        log "retroarch-launch: stopping fb console pid=$pid before RetroArch"
+        kill -TERM "$pid" 2>/dev/null || true
+        if ! wait_pid_exit "$pid" 3; then
+            log "retroarch-launch: fb console pid=$pid still alive after TERM; sending KILL"
+            kill -KILL "$pid" 2>/dev/null || true
+            wait_pid_exit "$pid" 1 || true
+        fi
+    done
+}
+
 append_cmd() {
     label="$1"
     shift
@@ -191,6 +238,11 @@ mirror_logs() {
 }
 
 start_periodic_log_mirror() {
+    if [ "$PERIODIC_LOG_MIRROR" != "1" ]; then
+        log "retroarch-launch: periodic log mirror disabled"
+        return
+    fi
+
     (
         while :; do
             sleep 5
@@ -440,10 +492,12 @@ log "retroarch-launch: entered"
 log "retroarch-launch: launch_log=$LAUNCH_LOG"
 log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
 log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
+log "retroarch-launch: periodic_log_mirror=$PERIODIC_LOG_MIRROR"
 log "retroarch-launch: run_dir=$RUN_DIR"
 log "retroarch-launch: route_config=$ROUTE_CONFIG present=$([ -r "$ROUTE_CONFIG" ] && printf yes || printf no)"
 log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
 log "retroarch-launch: cmdline=$(read_file /proc/cmdline)"
+stop_fb_console
 
 for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
     if [ -r "$info" ]; then
