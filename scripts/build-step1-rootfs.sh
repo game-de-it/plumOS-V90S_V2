@@ -104,6 +104,55 @@ write_stage1_init() {
 bb=/bin/busybox
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
+LOG=/tmp/plumos-v90s-stage1.log
+
+log() {
+    echo "$*"
+    echo "$*" >> "$LOG"
+}
+
+persist_stage1_log() {
+    if [ -d /mnt/share ]; then
+        $bb cp "$LOG" /mnt/share/plumos-v90s-stage1.log 2>/dev/null || true
+        if [ -d /mnt/share/rootfs ]; then
+            $bb cp "$LOG" /mnt/share/rootfs/plumos-v90s-stage1.log 2>/dev/null || true
+        fi
+        $bb sync
+    fi
+}
+
+fb_probe() {
+    log "stage1: fb0 probe begin"
+    for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
+        if [ -r "$info" ]; then
+            log "stage1: $($bb basename "$info")=$($bb cat "$info" 2>/dev/null)"
+        fi
+    done
+
+    if [ ! -c /dev/fb0 ]; then
+        log "stage1: /dev/fb0 not present"
+        return
+    fi
+
+    if $bb dd if=/dev/zero of=/dev/fb0 bs=1024 count=1200 >> "$LOG" 2>&1; then
+        log "stage1: fb0 cleared"
+    else
+        log "stage1: fb0 clear failed"
+    fi
+
+    : > /tmp/fb-white
+    i=0
+    while [ "$i" -lt 8192 ]; do
+        printf '\377\377\377\377' >> /tmp/fb-white
+        i=$((i + 1))
+    done
+
+    if $bb dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=8 conv=notrunc >> "$LOG" 2>&1; then
+        log "stage1: fb0 white band wrote"
+    else
+        log "stage1: fb0 white band failed"
+    fi
+}
 
 $bb mount -t proc proc /proc 2>/dev/null || true
 $bb mount -t sysfs sysfs /sys 2>/dev/null || true
@@ -119,16 +168,18 @@ for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do
     fi
 done
 
-echo "plumOS V90S stage1: looking for userdata rootfs payload"
+log "plumOS V90S stage1: looking for userdata rootfs payload"
+fb_probe
 
 payload=""
 for dev in /dev/mmcblk0p5 /dev/mmcblk1p5 /dev/mmcblk2p5 /dev/mmcblk0p4 /dev/mmcblk1p4 /dev/mmcblk2p4; do
     [ -b "$dev" ] || continue
     $bb umount /mnt/share 2>/dev/null || true
-    if $bb mount -t ext4 -o ro "$dev" /mnt/share 2>/dev/null; then
+    if $bb mount -t ext4 -o rw "$dev" /mnt/share 2>> "$LOG" || $bb mount -t ext4 -o ro "$dev" /mnt/share 2>> "$LOG"; then
         if [ -f /mnt/share/rootfs/step1-rootfs.squashfs ]; then
             payload="/mnt/share/rootfs/step1-rootfs.squashfs"
-            echo "stage1: found payload on $dev"
+            log "stage1: found payload on $dev"
+            persist_stage1_log
             break
         fi
         $bb umount /mnt/share 2>/dev/null || true
@@ -136,20 +187,27 @@ for dev in /dev/mmcblk0p5 /dev/mmcblk1p5 /dev/mmcblk2p5 /dev/mmcblk0p4 /dev/mmcb
 done
 
 if [ -z "$payload" ]; then
-    echo "stage1: payload not found; dropping to shell"
+    log "stage1: payload not found; dropping to shell"
+    persist_stage1_log
     exec /bin/busybox sh
 fi
 
-[ -b /dev/loop0 ] || $bb mknod /dev/loop0 b 7 0
-$bb losetup /dev/loop0 "$payload" || {
-    echo "stage1: losetup failed"
+payload_loop=/dev/loop1
+[ -b "$payload_loop" ] || $bb mknod "$payload_loop" b 7 1
+$bb losetup -d "$payload_loop" >/dev/null 2>&1 || true
+$bb losetup "$payload_loop" "$payload" >> "$LOG" 2>&1 || {
+    log "stage1: losetup failed on $payload_loop"
+    persist_stage1_log
     exec /bin/busybox sh
 }
+log "stage1: attached payload to $payload_loop"
 
-$bb mount -t squashfs -o ro /dev/loop0 /new_root || {
-    echo "stage1: rootfs squashfs mount failed"
+$bb mount -t squashfs -o ro "$payload_loop" /new_root >> "$LOG" 2>&1 || {
+    log "stage1: rootfs squashfs mount failed"
+    persist_stage1_log
     exec /bin/busybox sh
 }
+log "stage1: mounted payload rootfs"
 
 $bb mount --move /proc /new_root/proc 2>/dev/null || true
 $bb mount --move /sys /new_root/sys 2>/dev/null || true
@@ -158,9 +216,16 @@ $bb mount --move /boot /new_root/boot 2>/dev/null || true
 $bb mkdir -p /new_root/mnt/share
 $bb mount --move /mnt/share /new_root/mnt/share 2>/dev/null || true
 
-echo "stage1: switching to payload rootfs"
+log "stage1: switching to payload rootfs"
+if [ -d /new_root/mnt/share ]; then
+    $bb cp "$LOG" /new_root/mnt/share/plumos-v90s-stage1.log 2>/dev/null || true
+    if [ -d /new_root/mnt/share/rootfs ]; then
+        $bb cp "$LOG" /new_root/mnt/share/rootfs/plumos-v90s-stage1.log 2>/dev/null || true
+    fi
+    $bb sync
+fi
 exec $bb switch_root /new_root /sbin/init
-echo "stage1: switch_root failed"
+log "stage1: switch_root failed"
 exec /bin/busybox sh
 EOF
     chmod 0755 "$init_path"
@@ -171,6 +236,55 @@ write_debian_init() {
     cat > "$init_path" <<'EOF'
 #!/bin/sh
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LOG=/tmp/plumos-v90s-debian-init.log
+
+log() {
+    echo "$*"
+    echo "$*" >> "$LOG"
+}
+
+persist_debian_log() {
+    if [ -d /mnt/share ]; then
+        cp "$LOG" /mnt/share/plumos-v90s-debian-init.log 2>/dev/null || true
+        if [ -d /mnt/share/rootfs ]; then
+            cp "$LOG" /mnt/share/rootfs/plumos-v90s-debian-init.log 2>/dev/null || true
+        fi
+        sync
+    fi
+}
+
+fb_probe() {
+    log "debian-init: fb0 probe begin"
+    for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
+        if [ -r "$info" ]; then
+            log "debian-init: $(basename "$info")=$(cat "$info" 2>/dev/null)"
+        fi
+    done
+
+    if [ ! -c /dev/fb0 ]; then
+        log "debian-init: /dev/fb0 not present"
+        return
+    fi
+
+    if dd if=/dev/zero of=/dev/fb0 bs=1024 count=1200 >> "$LOG" 2>&1; then
+        log "debian-init: fb0 cleared"
+    else
+        log "debian-init: fb0 clear failed"
+    fi
+
+    : > /tmp/fb-white
+    i=0
+    while [ "$i" -lt 8192 ]; do
+        printf '\377\377\377\377' >> /tmp/fb-white
+        i=$((i + 1))
+    done
+
+    if dd if=/tmp/fb-white of=/dev/fb0 bs=4096 count=8 conv=notrunc >> "$LOG" 2>&1; then
+        log "debian-init: fb0 white band wrote"
+    else
+        log "debian-init: fb0 white band failed"
+    fi
+}
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
@@ -185,6 +299,10 @@ for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do
         break
     fi
 done
+
+log "plumOS V90S Step1 Debian minbase console"
+fb_probe
+persist_debian_log
 
 cat <<MSG
 plumOS V90S Step1 Debian minbase console

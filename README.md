@@ -72,16 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-6-diag-zstd.img \
+  --name plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
-  --diagnostic-init
+  --diagnostic-init \
+  --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-6-diag-zstd.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img` です。
 
 ```text
-sha256: 21ebb95f828bd4fd293ac53ba213480628f7c2761871937037c558f7acb623ea
+sha256: 4f0b42cd1fbd74670af1f4780629eb3554fe34606f505be23f16bd0dd07a885c
 size: 133M
 ```
 
@@ -91,9 +92,13 @@ size: 133M
 
 `-5-diag-mount-probe` は KNULLI 元 initramfs と同じ直接 file mount を先に試し、失敗時は `-o loop`、明示 `losetup`、loop device mount を順に試しました。実機ログでは `/boot/knulli` の読み取りと loop attach は成功していましたが、gzip squashfs の mount がすべて `Invalid argument` で失敗しました。
 
-`-6-diag-zstd` は KNULLI a133 の `BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y` に合わせ、stage1 と Debian minbase payload を zstd squashfs にしています。また、失敗時の kernel squashfs エラーを取れるように `dmesg | tail -n 120` へ修正しています。
+`-6-diag-zstd` は KNULLI a133 の `BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y` に合わせ、stage1 と Debian minbase payload を zstd squashfs にしました。実機ログでは `/boot/knulli` が KNULLI-style file mount で stage1 root として mount できました。これにより、前段の squashfs mount 問題は zstd で突破できたことを確認しています。
 
-`-6-diag-zstd` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` を確認します。
+一方で画面は KNULLI boot logo のままでした。参照した V90S/KNULLI kernel config では `CONFIG_VT_CONSOLE=y` ですが `# CONFIG_FRAMEBUFFER_CONSOLE is not set` なので、`console=tty0` だけでは内蔵 LCD に Linux text console が出ない可能性が高いです。
+
+`-7-stage1-fb-probe` は、stage1 と Debian init のログを userdata に残し、`/dev/fb0` へ直接 white band を書く probe を追加しています。また、diagnostic initramfs が `/dev/loop0` を使って stage1 を mount するため、stage1 側の Debian payload は `/dev/loop1` で mount します。
+
+`-7-stage1-fb-probe` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
 
 ## Git workflow
 

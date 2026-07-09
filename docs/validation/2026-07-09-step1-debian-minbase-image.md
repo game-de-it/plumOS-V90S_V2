@@ -83,6 +83,18 @@ sha256: c1ecd25e75b9b0da6cdb2b0a53fde33140b0885598f4b50e02e7cd479e2013b1
 compression: zstd
 ```
 
+After device test 6 confirmed the zstd stage1 mount path, the payloads were rebuilt again with userdata-persisted stage1/Debian logs and direct `/dev/fb0` write probes:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: d3a8ac80776bfaac8a36f9e1e51d95a3f7214eed461b16731e45b47908f46a78
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: 36a6e1c3156cbc6e6761f92c5d7bad76f5807527f35cdd1c134e64b73f27cb20
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check

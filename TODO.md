@@ -44,6 +44,12 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Switch Step 1 squashfs payload generation to zstd to match KNULLI a133 rootfs settings.
 - [x] Fix diagnostic dmesg tail command to BusyBox-compatible `tail -n 120`.
 - [x] Build `plumos-v90s-armbian-step1-20260709-6-diag-zstd.img`.
+- [x] Record device test 6: zstd `/boot/knulli` mounted successfully as the stage1 root, but the LCD still showed the KNULLI logo.
+- [x] Confirm the V90S/KNULLI kernel config has `CONFIG_VT_CONSOLE=y` but `# CONFIG_FRAMEBUFFER_CONSOLE is not set`.
+- [x] Add stage1 and Debian init logs that persist to userdata.
+- [x] Add a direct `/dev/fb0` write probe in stage1 and Debian init.
+- [x] Move the Debian payload loop mount from `/dev/loop0` to `/dev/loop1`.
+- [x] Build `plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -173,9 +179,23 @@ rootfs/plumos-v90s-diag.log
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-6-diag-zstd.img`.
 - [x] Host-verify that stage1 and Debian payload squashfs files use zstd compression.
 - [x] Host-verify that diagnostic initramfs uses BusyBox-compatible `tail -n 120` for post-failure dmesg capture.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo or console.
+- [x] Check whether the screen advances beyond the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: zstd `/boot/knulli` mounted with the KNULLI-style file mount and listed a valid stage1 root.
+- [x] Result: likely no visible text console because the closed V90S/KNULLI kernel has no framebuffer console.
+
+## Device Test 7
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img`.
+- [x] Host-verify that stage1 logs to userdata and uses `/dev/loop1` for the Debian payload.
+- [x] Host-verify that stage1 and Debian init include `/dev/fb0` white-band probes.
 - [ ] User flashes the image to SD and tests on V90S.
-- [ ] Wait at least 60 seconds at the boot logo or console.
-- [ ] Check whether the screen advances beyond the KNULLI boot logo.
+- [ ] Wait at least 60 seconds at the boot logo, changed screen, or console.
+- [ ] Check whether the screen changes from the KNULLI boot logo.
 - [ ] If console appears, continue with the Console Command Check below.
 - [ ] If console still does not appear, return the SD card and check FAT/userdata logs for the new failure point:
 
@@ -183,6 +203,10 @@ rootfs/plumos-v90s-diag.log
 plumos-v90s-diag.log
 boot/plumos-v90s-diag.log
 rootfs/plumos-v90s-diag.log
+plumos-v90s-stage1.log
+rootfs/plumos-v90s-stage1.log
+plumos-v90s-debian-init.log
+rootfs/plumos-v90s-debian-init.log
 ```
 
 ## Console Command Check
@@ -203,7 +227,8 @@ dmesg | tail -80
 ## Branches After Device Test
 
 - [x] If there is no visible boot activity, inspect boot offsets, boot package, GPT layout, and bootloader cmdline assumptions.
-- [ ] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
+- [x] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
+- [ ] If `/dev/fb0` userspace writes work but framebuffer console is unavailable, add a tiny framebuffer terminal or boot-time getty bridge for Step 1.
 - [ ] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
 - [ ] If init fails, test a simpler init wrapper before debugging full systemd behavior.
 - [ ] If `/boot_root/boot/knulli` is not found, confirm the real kernel cmdline and which partition the ramdisk mounts.
