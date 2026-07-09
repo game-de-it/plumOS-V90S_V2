@@ -41,6 +41,7 @@ scripts/v90s-retroarch-tune.sh root@192.0.2.119 --profile dts-exact-fat
 scripts/v90s-retroarch-tune.sh root@192.0.2.119 --profile panel
 scripts/v90s-retroarch-tune.sh root@192.0.2.119 --profile hybrid-5925
 scripts/v90s-retroarch-tune.sh root@192.0.2.119 --profile hybrid-5950
+scripts/v90s-retroarch-tune.sh root@192.0.2.119 --profile stockos-generated
 scripts/v90s-retroarch-tune.sh root@192.0.2.119 --profile sixty
 ```
 
@@ -76,6 +77,7 @@ Then test Exact-on only with a thicker audio buffer:
 dts-exact-fat    58.95531 Hz, Exact on, latency 192
 panel-exact-fat  59.06063 Hz, Exact on, latency 192
 stockos-exact    59.04900 Hz, Exact on, latency 128
+stockos-generated 58.917103 Hz, Exact on, latency 64, video_threaded on
 ```
 
 If every profile with normal pitch still produces pacing noise or scroll judder,
@@ -110,3 +112,28 @@ RetroArch accepted the second `hybrid-5925` run and logged:
 That is less slowed down than the previous measured-panel test at `43409.56 Hz`,
 but it is still below the core's `44100 Hz` audio rate. User confirmation of
 pitch, popping, and scroll smoothness is pending.
+
+## StockOS Generated Profile
+
+The user's modified StockOS image was later used as a comparison target while
+RetroArch was running through EmulationStation. StockOS generated:
+
+```text
+video_refresh_rate = "58.917103"
+vrr_runloop_enable = true
+video_threaded = true
+audio_driver = "pulse"
+audio_latency = 64
+```
+
+Its measured RA-running cadence was:
+
+```text
+display_hz=59.02293
+pvr_hz=118.04586
+```
+
+The new `stockos-generated` profile intentionally copies only the RA timing
+portion of that generated config. It does not import StockOS's Pulse/PipeWire,
+CPU governor, irqbalance, shader, or evmapy behavior. Those layers should be
+tested separately if the RA-only profile is not enough.

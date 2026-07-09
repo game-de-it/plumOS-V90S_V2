@@ -15,6 +15,7 @@ Profiles:
   hybrid-5925       59.25000 Hz, Exact off, latency 128
   hybrid-5950       59.50000 Hz, Exact off, latency 128
   stockos-exact     59.04900 Hz, Exact on,  latency 128
+  stockos-generated 58.917103 Hz, Exact on, latency 64, video_threaded on
   sixty             60.00000 Hz, Exact off, latency 128
   knulli-threaded   60.00000 Hz, Exact off, latency 64, video_threaded on
 
@@ -140,6 +141,12 @@ case "$profile" in
         exact="true"
         latency="128"
         threaded="false"
+        ;;
+    stockos-generated)
+        refresh="58.917103"
+        exact="true"
+        latency="64"
+        threaded="true"
         ;;
     sixty)
         refresh="60.00000"

@@ -193,8 +193,12 @@ First implementation tasks:
 - [x] Build or import KNULLI's RetroArch path with `--enable-mali_fbdev`.
 - [x] Add a `debian-retroarch-knulli` rootfs profile that keeps the KNULLI kernel/runtime base while packaging the userspace with the existing Armbian-style payload flow.
 - [x] Build KNULLI RetroArch test image: `plumos-v90s-armbian-step2-20260709-9-knulli-retroarch.img`.
-- [ ] User flashes KNULLI RetroArch image and reports LCD/video/audio/input result.
-- [ ] Reproduce KNULLI's video/audio runtime contract before spending more time tuning generic Debian RetroArch.
+- [x] Compare the user's modified StockOS RA-running runtime against the current plumOS runtime over SSH.
+- [x] Confirm StockOS uses generated `retroarchcustom.cfg`, QuickNES, `video_refresh_rate=58.917103`, `vrr_runloop_enable=true`, `video_threaded=true`, Pulse/PipeWire audio, `schedutil`, and `irqbalance`.
+- [ ] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
+- [ ] If RA-only timing is insufficient, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
+- [ ] If pacing still differs, test StockOS-like CPU governor and `irqbalance` behavior.
+- [ ] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
 - [ ] Bring Armbian build framework into the workflow and use it for rootfs/userspace generation instead of the hand-maintained debootstrap-only path.
 
 Validation buckets:

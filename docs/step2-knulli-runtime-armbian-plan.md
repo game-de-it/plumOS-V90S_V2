@@ -27,6 +27,10 @@ in controlled steps.
   V90S LCD.
 - KNULLI-derived `asound.state` values make the internal speaker path audible.
 - KNULLI-pinned QuickNES stops the audio breakup seen with Nestopia.
+- The user's modified StockOS image runs RetroArch through Batocera's generated
+  config with QuickNES, `video_refresh_rate=58.917103`,
+  `vrr_runloop_enable=true`, `video_threaded=true`, Pulse/PipeWire audio, and a
+  measured LCD cadence around 59.02 Hz while RA is running.
 
 ## Current Failure Boundary
 
@@ -40,6 +44,13 @@ segfaults.
 
 This points at RetroArch's video context/windowing path rather than the kernel,
 PowerVR module, SDL2 `mali` driver, input path, or ALSA path.
+
+The StockOS comparison refined this boundary further. The visible `59 fps`
+behavior matches the panel cadence instead of proving an emulator-core CPU
+problem. The remaining work is to reproduce the runtime contract in layers:
+first the generated RetroArch timing profile, then the Pulse/PipeWire audio
+buffering path, then StockOS-like CPU governor and interrupt-balancing behavior
+if the RA-only settings are not enough.
 
 ## KNULLI Runtime Contract To Reproduce
 
