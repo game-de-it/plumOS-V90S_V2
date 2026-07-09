@@ -6,14 +6,14 @@ POWKIDDY V90S 向けに、Armbian 系の userspace/rootfs を使った Linux SD 
 
 まずは V90S 実機で SD カードから起動し、内蔵画面に Linux コンソールが表示され、USB キーボードで入力でき、`ls` などの基本コマンドを実行できる状態を目標にします。
 
-Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達成済みです。現在は Step 2 として、RetroArch で NES ROM を起動し、60fps 映像、音声出力、V90S 本体コントローラー操作を確認する段階です。Step 2 の詳細は `docs/step2-retroarch-plan.md` に記録します。
+Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達成済みです。現在は Step 2 として、RetroArch で NES ROM を起動し、60fps 映像、音声出力、V90S 本体コントローラー操作を確認する段階です。Step 2 の詳細は `docs/step2-retroarch-plan.md` と `docs/step2-knulli-runtime-armbian-plan.md` に記録します。
 
 ## Current strategy
 
 - V90S は KNULLI では `a133-powkiddy-v90s` ターゲットとして扱われています。
 - KNULLI の V90S boot chain は `boot0.img`、`boot_package.fex`、Android boot image 形式の `boot.img`、FAT の boot-resource、SHARE 用 ext4 で構成されています。
 - Step 1 では、V90S で実績のある KNULLI/stock 系 kernel と boot chain を温存し、Armbian 由来の aarch64 rootfs を squashfs として差し替える方針から始めます。
-- mainline kernel / open U-Boot 化は、Step 1 の起動確認後の別トラックにします。
+- mainline kernel / open U-Boot 化は別トラックにします。A133 mainline spike は reboot/black-screen loop で止め、当面は KNULLI の映像/音声 runtime を再現しながら Armbian を rootfs/userspace build framework として使います。
 
 ## Host status
 
@@ -36,6 +36,13 @@ Armbian build も取得したい場合:
 
 ```sh
 ./scripts/fetch-reference-sources.sh --with-armbian
+```
+
+Armbian build framework は macOS 上で直接ではなく、Ubuntu コンテナ内で動かします。まずは inventory 系コマンドでターゲット/ユーザーランド情報を確認します。
+
+```sh
+./scripts/run-armbian-build.sh inventory
+./scripts/run-armbian-build.sh inventory-boards
 ```
 
 ## Image assembly prototype
@@ -182,6 +189,14 @@ v90s-retroarch-stop stop
 v90s-audio-diagnostic profile knulli_dts_loud 10
 v90s-audio-diagnostic profile headphone_hotplug 10
 v90s-audio-diagnostic profile dmix_softvol 10
+```
+
+最新の実機調査では、KNULLI-derived mixer state でゲーム音が出ること、KNULLI-pinned QuickNES で音切れが止まることを確認しました。一方で Debian generic RetroArch は、QuickNESでもスクロールのガタつきが残り、`video_threaded=false` では約50fpsまで落ちます。次は generic Debian RetroArch の調整ではなく、KNULLIのRetroArch build contractである `--enable-mali_fbdev` を再現する方向に進めます。
+
+QuickNES core は以下で生成し、RetroArch payload へ必須ファイルとして組み込みます。
+
+```sh
+./scripts/build-libretro-quicknes.sh
 ```
 
 ## Git workflow

@@ -177,18 +177,30 @@ First implementation tasks:
 - [x] Live-test the PID-file stop path over SSH; RetroArch stopped and the SSH session continued to respond.
 - [x] Negative-test a bad RetroArch PID file pointing at the SSH shell; the stop tool refused because `/proc/<pid>/comm` was not `retroarch`.
 - [x] Add an explicit SSH audio diagnostic tool that tests KNULLI-derived mixer profiles without changing the normal RetroArch route.
-- [ ] Run `v90s-audio-diagnostic profile knulli_dts_loud`, `headphone_hotplug`, and `dmix_softvol` on the live V90S and record whether any sustained tone is audible.
-- [ ] If all explicit audio profiles are still silent, compare codec register deltas against a real KNULLI boot or patch the boot-package codec defaults.
-- [ ] Confirm audible RetroArch output after the DAC mixer setup.
-- [ ] Determine why active PCM/DAC/PA state still produces only a speaker pop and no sustained audible tone.
-- [ ] Build or import KNULLI's RetroArch path with SDL GL context workaround / `--enable-mali_fbdev`.
+- [x] Run `v90s-audio-diagnostic` on the live V90S and confirm `knulli_asound_state` produces a sustained audible tone.
+- [x] Patch the RetroArch launcher audio mixer setup to use the working KNULLI asound-state values.
+- [x] Confirm audible RetroArch game output after launching with the working KNULLI asound-state mixer setup.
+- [x] Build and live-test KNULLI-pinned QuickNES as a small diagnostic core; audio breakup stopped, but scrolling still showed pacing issues.
+- [x] Confirm `SDL_RENDER_DRIVER=opengles2` lowers CPU but makes the LCD image too dark on the current Debian RetroArch route.
+- [x] Confirm Debian RetroArch `video_driver=gl` reaches the GE8300 OpenGL ES stack, then crashes; generic Debian RetroArch is not the final video route.
+- [x] Make QuickNES the explicit default core path for the launcher.
+- [x] Add a reproducible QuickNES build helper pinned to KNULLI's commit.
+- [x] Require QuickNES when generating RetroArch payloads instead of silently selecting Nestopia/FCEUmm.
+- [x] Add Armbian Docker wrapper script for `inventory`, `inventory-boards`, `targets`, and later rootfs commands.
+- [x] Run `./scripts/run-armbian-build.sh inventory` successfully in Docker.
+- [x] Confirm Armbian inventory only sees V90S through the local userpatch spike, not an upstream complete target.
+- [x] Record the KNULLI runtime plus Armbian rootfs pivot in `docs/step2-knulli-runtime-armbian-plan.md`.
+- [ ] Build or import KNULLI's RetroArch path with `--enable-mali_fbdev`.
+- [ ] Reproduce KNULLI's video/audio runtime contract before spending more time tuning generic Debian RetroArch.
+- [ ] Bring Armbian build framework into the workflow and use it for rootfs/userspace generation instead of the hand-maintained debootstrap-only path.
 
 Validation buckets:
 
 - [x] Video visible but FPS unknown.
-- [ ] FPS near 60 confirmed.
-- [x] Audio device opens but audible output unconfirmed.
-- [ ] Audible output confirmed.
+- [x] FPS near 60 observed, but slightly below 60 and not yet tuned.
+- [x] Audio diagnostic tone is audible with `knulli_asound_state`.
+- [x] Audible RetroArch game output confirmed.
+- [ ] Smooth KNULLI-equivalent vsync/frame pacing confirmed.
 - [ ] USB keyboard input works only.
 - [x] Built-in controls work in game.
 - [ ] Built-in controls fail; event mapping needed.
@@ -199,7 +211,7 @@ Validation buckets:
 - [x] Decide the first rootfs source:
   - Option A: Armbian build framework rootfs output.
   - Option B: temporary Armbian-like Debian/Ubuntu aarch64 console rootfs via `debootstrap`, used only to prove the V90S boot path.
-- [ ] Later, fetch/update Armbian build framework with `./scripts/fetch-reference-sources.sh --with-armbian` when moving beyond the first boot proof.
+- [x] Fetch/update Armbian build framework with `./scripts/fetch-reference-sources.sh --with-armbian`.
 - [x] Create a reproducible script for the first minimal aarch64 console rootfs.
 - [x] Ensure the rootfs has:
   - `/sbin/init`

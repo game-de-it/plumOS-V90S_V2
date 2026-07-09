@@ -264,31 +264,65 @@ amixer_try() {
     fi
 }
 
+setup_cpu_performance() {
+    if [ "${PLUMOS_V90S_CPU_PERFORMANCE:-0}" != "1" ]; then
+        log "retroarch-launch: CPU performance setup disabled"
+        return
+    fi
+
+    log "retroarch-launch: applying CPU performance governor"
+    for cpufreq in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        [ -d "$cpufreq" ] || continue
+
+        if [ -w "$cpufreq/scaling_governor" ] &&
+            grep -qw performance "$cpufreq/scaling_available_governors" 2>/dev/null; then
+            echo performance > "$cpufreq/scaling_governor" 2>/dev/null || true
+        fi
+
+        if [ -r "$cpufreq/scaling_max_freq" ] && [ -w "$cpufreq/scaling_min_freq" ]; then
+            cat "$cpufreq/scaling_max_freq" > "$cpufreq/scaling_min_freq" 2>/dev/null || true
+        fi
+    done
+
+    append_cmd "cpufreq-after-setup" sh -c 'for d in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do [ -d "$d" ] || continue; echo "${d%/cpufreq}: governor=$(cat "$d/scaling_governor" 2>/dev/null) cur=$(cat "$d/scaling_cur_freq" 2>/dev/null) min=$(cat "$d/scaling_min_freq" 2>/dev/null) max=$(cat "$d/scaling_max_freq" 2>/dev/null)"; done'
+}
+
 setup_audio_mixer() {
     if ! command -v amixer >/dev/null 2>&1; then
         log "retroarch-launch: amixer missing; skipping audio mixer setup"
         return
     fi
 
-    log "retroarch-launch: applying V90S audio mixer setup"
+    log "retroarch-launch: applying V90S KNULLI asound-state mixer setup"
 
-    # A133/V90S KNULLI uses these controls for the internal codec path.
-    adc_volume="${PLUMOS_V90S_ADC_VOLUME:-0}"
+    # These defaults match the live RetroArch run that produced game audio
+    # after the KNULLI asound-state diagnostic proved the speaker path.
+    adc_swap="${PLUMOS_V90S_ADC_SWAP:-0}"
+    dac_swap="${PLUMOS_V90S_DAC_SWAP:-1}"
+    adc_volume="${PLUMOS_V90S_ADC_VOLUME:-160}"
     dac_volume="${PLUMOS_V90S_DAC_VOLUME:-160}"
-    soft_volume="${PLUMOS_V90S_SOFT_VOLUME:-255}"
+    digital_volume="${PLUMOS_V90S_DIGITAL_VOLUME:-0}"
+    headphone_volume="${PLUMOS_V90S_HEADPHONE_VOLUME:-2}"
+    lineout_volume="${PLUMOS_V90S_LINEOUT_VOLUME:-26}"
+    lineout_select="${PLUMOS_V90S_LINEOUT_OUTPUT_SELECT:-0}"
+    mic_boost="${PLUMOS_V90S_MIC_BOOST:-on}"
 
     amixer_try cset numid=1 1
-    amixer_try cset numid=2 0
-    amixer_try cset numid=4 "${PLUMOS_V90S_DIGITAL_VOLUME:-63}"
-    amixer_try cset numid=7 "${PLUMOS_V90S_LINEOUT_VOLUME:-0}"
+    amixer_try cset numid=2 "$dac_swap"
+    amixer_try cset numid=3 "$adc_swap"
+    amixer_try cset numid=4 "$digital_volume"
+    amixer_try cset numid=5 31
+    amixer_try cset numid=6 31
+    amixer_try cset numid=7 "$lineout_volume"
     amixer_try cset numid=8 "$dac_volume,$dac_volume"
     amixer_try cset numid=9 "$adc_volume,$adc_volume"
-    amixer_try cset numid=10 "${PLUMOS_V90S_HEADPHONE_VOLUME:-0}"
-    amixer_try cset numid=11 "${PLUMOS_V90S_LINEOUT_OUTPUT_SELECT:-0}"
+    amixer_try cset numid=10 "$headphone_volume"
+    amixer_try cset numid=11 "$lineout_select"
+    amixer_try cset numid=12 "$mic_boost"
+    amixer_try cset numid=13 "$mic_boost"
     amixer_try cset numid=14 on
     amixer_try cset numid=15 on
     amixer_try cset numid=16 on
-    amixer_try cset numid=17 "$soft_volume,$soft_volume"
 }
 
 write_config() {
@@ -331,7 +365,7 @@ audio_enable = "true"
 audio_driver = "$audio_driver"
 audio_device = "hw:0,0"
 audio_sync = "true"
-audio_latency = "64"
+audio_latency = "${PLUMOS_V90S_AUDIO_LATENCY:-64}"
 
 input_driver = "$input_driver"
 input_joypad_driver = "$joypad_driver"
@@ -385,6 +419,7 @@ append_cmd "framebuffer-devices" sh -c 'ls -l /dev/fb* /dev/dri/* 2>/dev/null ||
 append_cmd "input-devices" sh -c 'cat /proc/bus/input/devices 2>/dev/null || true; ls -l /dev/input 2>/dev/null || true; command -v lsinput >/dev/null 2>&1 && lsinput 2>&1 || true'
 append_cmd "sound-devices" sh -c 'cat /proc/asound/cards 2>/dev/null || true; cat /proc/asound/devices 2>/dev/null || true; command -v aplay >/dev/null 2>&1 && aplay -l 2>&1 || true; ls -l /dev/snd 2>/dev/null || true'
 append_cmd "sound-mixer-before" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
+setup_cpu_performance
 setup_audio_mixer
 append_cmd "sound-mixer-after" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
 if [ -d /usr/local/lib/plumos-sdl2-mali ]; then
@@ -410,14 +445,14 @@ append_cmd "retroarch-version" retroarch --version
 append_cmd "retroarch-features" retroarch --features
 append_cmd "dmesg-tail" sh -c 'dmesg 2>/dev/null | tail -120 || true'
 
-core="$(find /usr/lib /usr/local/lib -type f \( -name '*nestopia*_libretro.so' -o -name '*nestopia*.so' -o -name '*fceumm*_libretro.so' -o -name '*fceumm*.so' \) 2>/dev/null | sort | head -n 1)"
+core="${PLUMOS_V90S_CORE:-/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so}"
 rom="${PLUMOS_V90S_ROM:-/roms/nes/Super Mario Bros..nes}"
 
-log "retroarch-launch: selected_core=${core:-missing}"
+log "retroarch-launch: selected_core=$core"
 log "retroarch-launch: selected_rom=$rom"
 
-if [ -z "$core" ]; then
-    log "retroarch-launch: no NES libretro core found"
+if [ ! -f "$core" ]; then
+    log "retroarch-launch: RetroArch core missing: $core"
     mirror_logs
     exit 41
 fi
@@ -449,7 +484,7 @@ input_driver=sdl2
 joypad_driver=sdl2
 audio_driver=alsa
 sdl_video=mali
-sdl_render=software
+sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
 cfg=/tmp/retroarch-v90s.cfg
 
 write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver"

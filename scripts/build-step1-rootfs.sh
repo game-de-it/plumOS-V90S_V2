@@ -9,6 +9,7 @@ knulli_ramdisk=".cache/v90s-ramdisk"
 knulli_a133_overlay=".cache/knulli-linux/board/allwinner/a133/fsoverlay"
 pvr_dir=".cache/ge8300-drivers"
 sdl2_mali_dir="output/sdl2-mali"
+quicknes_dir="output/libretro-quicknes"
 keep_work=0
 rom_path=""
 wifi_ssid="${PLUMOS_V90S_WIFI_SSID:-}"
@@ -32,6 +33,7 @@ Options:
   --knulli-a133-overlay PATH KNULLI a133 fsoverlay, default .cache/knulli-linux/board/allwinner/a133/fsoverlay
   --pvr-dir PATH        GE8300 driver checkout, default .cache/ge8300-drivers
   --sdl2-mali-dir PATH  patched SDL2 payload, default output/sdl2-mali
+  --quicknes-dir PATH   QuickNES libretro payload, default output/libretro-quicknes
   --rom PATH            NES ROM to copy into debian-retroarch payload
   --wifi-ssid SSID      configure Wi-Fi SSID in the generated payload
   --wifi-psk PSK        configure Wi-Fi WPA/WPA2 passphrase in the generated payload
@@ -75,6 +77,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --sdl2-mali-dir)
             sdl2_mali_dir="$2"
+            shift 2
+            ;;
+        --quicknes-dir)
+            quicknes_dir="$2"
             shift 2
             ;;
         --rom)
@@ -141,6 +147,11 @@ if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-p
     fi
     if [ ! -f "$rom_path" ]; then
         printf 'error: ROM not found: %s\n' "$rom_path" >&2
+        exit 1
+    fi
+    if [ ! -f "$quicknes_dir/quicknes_libretro.so" ]; then
+        printf 'error: QuickNES libretro core not found: %s/quicknes_libretro.so\n' "$quicknes_dir" >&2
+        printf 'hint: run ./scripts/build-libretro-quicknes.sh first\n' >&2
         exit 1
     fi
 fi
@@ -832,7 +843,7 @@ build_debian_retroarch_payload() {
     rm -rf "$root"
     mkdir -p "$root"
 
-    retroarch_packages="retroarch,libretro-nestopia,alsa-utils,input-utils,procps,psmisc,kmod"
+    retroarch_packages="retroarch,alsa-utils,input-utils,procps,psmisc,kmod"
     if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
         retroarch_packages="${retroarch_packages},openssh-server,wpasupplicant,isc-dhcp-client,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates"
     fi
@@ -844,6 +855,10 @@ build_debian_retroarch_payload() {
     install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"
     install -D -m 0755 "$script_dir/v90s-retroarch-stop.sh" "$root/usr/local/sbin/v90s-retroarch-stop"
     install -D -m 0755 "$script_dir/v90s-audio-diagnostic.sh" "$root/usr/local/sbin/v90s-audio-diagnostic"
+    install -D -m 0644 "$quicknes_dir/quicknes_libretro.so" "$root/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so"
+    if [ -f "$quicknes_dir/quicknes-manifest.txt" ]; then
+        install -D -m 0644 "$quicknes_dir/quicknes-manifest.txt" "$root/etc/plumos-libretro-quicknes-manifest.txt"
+    fi
     if [ "$include_pvr" -eq 1 ]; then
         install_pvr_probe "$root"
     fi
@@ -856,6 +871,7 @@ build_debian_retroarch_payload() {
     install -m 0644 "$rom_path" "$root/roms/nes/Super Mario Bros..nes"
     printf 'plumos-v90s-step2\n' > "$root/etc/hostname"
     rom_sha256="$(sha256sum "$rom_path" | awk '{print $1}')"
+    quicknes_sha256="$(sha256sum "$quicknes_dir/quicknes_libretro.so" | awk '{print $1}')"
     cat > "$root/etc/plumos-step2-release" <<EOF
 name=plumOS V90S Step2 RetroArch Debian payload
 suite=$suite
@@ -864,6 +880,8 @@ rootfs_profile=$profile_name
 packages=$retroarch_packages
 power_pvr_probe=$include_pvr
 custom_sdl2_mali=$include_sdl2_mali
+quicknes_core=/usr/lib/aarch64-linux-gnu/libretro/quicknes_libretro.so
+quicknes_sha256=$quicknes_sha256
 rom_path=/roms/nes/Super Mario Bros..nes
 rom_sha256=$rom_sha256
 EOF
