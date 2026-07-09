@@ -133,8 +133,12 @@ First implementation tasks:
   - `pvrsrvkm.ko`, `dc_sunxi.ko`, and `rgx.*` firmware
   - launch diagnostics for `/dev/dri`, `/dev/pvr*`, `pvrsrvctl`, EGL, and SDL video drivers
 - [ ] Add patched SDL2 framebuffer EGL backend or a KNULLI-built RetroArch binary.
-- [ ] User flashes PowerVR probe image and returns FAT logs.
-- [ ] Analyze `plumos-v90s-pvr-probe.log` and decide whether the next branch is module/firmware repair or patched SDL2/RetroArch build.
+- [x] User flashes PowerVR probe image and returns FAT logs.
+- [x] Analyze `plumos-v90s-pvr-probe.log` and decide whether the next branch is module/firmware repair or patched SDL2/RetroArch build.
+- [x] Fix the PowerVR probe to run `pvrsrvctl --start` from `/lib/modules/4.9.191`, matching KNULLI's a133 init flow.
+- [x] Build a third Step 2 image that verifies corrected `pvrsrvctl --start`.
+- [ ] User flashes third PowerVR start-cwd image and returns FAT logs.
+- [ ] If `pvrsrvctl-start-cwd-moddir rc=0`, build patched SDL2 or KNULLI-built RetroArch payload.
 
 Validation buckets:
 

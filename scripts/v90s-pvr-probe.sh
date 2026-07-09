@@ -68,6 +68,11 @@ run_timeout() {
     fi
 }
 
+start_pvrsrvctl() {
+    label="$1"
+    run_timeout "$label" 8 sh -c 'cd /lib/modules/4.9.191 && /usr/bin/pvrsrvctl --start'
+}
+
 module_loaded() {
     name="$1"
     grep -qw "^$name" /proc/modules 2>/dev/null
@@ -110,21 +115,29 @@ append_cmd "mount" mount
 append_cmd "fb-devices" sh -c 'ls -l /dev/fb* /sys/class/graphics/fb0/* 2>/dev/null || true'
 append_cmd "pvr-files" sh -c 'ls -l /usr/bin/pvrsrvctl /usr/lib/powervr/libEGL.so /usr/lib/powervr/libGLESv2.so /usr/lib/powervr/firmware/* /lib/firmware/rgx.* /lib/modules/4.9.191/*.ko 2>/dev/null || true'
 append_cmd "pvr-strings" sh -c 'command -v strings >/dev/null 2>&1 && strings /usr/bin/pvrsrvctl 2>/dev/null | grep -E "pvrsrv|/proc/pvr|/sys/kernel/debug/pvr|DriverMode|RGXBVNC" || true'
+append_cmd "debugfs-mount" sh -c 'mkdir -p /sys/kernel/debug; mountpoint -q /sys/kernel/debug 2>/dev/null || mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true; mount | grep debug || true'
 append_cmd "devices-before" sh -c 'ls -l /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 append_cmd "dmesg-before" sh -c 'dmesg 2>/dev/null | tail -160 || true'
 
-try_insmod /lib/modules/4.9.191/pvrsrvkm.ko
-try_insmod /lib/modules/4.9.191/dc_sunxi.ko
+if [ -x /usr/bin/pvrsrvctl ]; then
+    start_pvrsrvctl "pvrsrvctl-start-cwd-moddir"
+else
+    log "pvr-probe: /usr/bin/pvrsrvctl is missing or not executable"
+fi
+
+if ! module_loaded pvrsrvkm || ! module_loaded dc_sunxi; then
+    try_insmod /lib/modules/4.9.191/pvrsrvkm.ko
+    try_insmod /lib/modules/4.9.191/dc_sunxi.ko
+    if [ -x /usr/bin/pvrsrvctl ]; then
+        start_pvrsrvctl "pvrsrvctl-start-after-insmod-cwd-moddir"
+    fi
+fi
 
 append_cmd "devices-after-insmod" sh -c 'ls -l /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'
 append_cmd "dmesg-after-insmod" sh -c 'dmesg 2>/dev/null | tail -220 || true'
 
 if [ -x /usr/bin/pvrsrvctl ]; then
-    run_timeout "pvrsrvctl-start" 8 /usr/bin/pvrsrvctl --start
-    run_timeout "pvrsrvctl-start-no-module" 8 /usr/bin/pvrsrvctl --start --no-module
     run_timeout "pvrsrvctl-help" 8 /usr/bin/pvrsrvctl --help
-else
-    log "pvr-probe: /usr/bin/pvrsrvctl is missing or not executable"
 fi
 
 append_cmd "devices-after-pvrsrvctl" sh -c 'ls -l /dev/pvr* /dev/pvrsrvkm /dev/dri/* 2>/dev/null || true; cat /proc/devices 2>/dev/null | grep -E "pvr|drm|fb" || true; cat /proc/modules 2>/dev/null | grep -E "pvr|dc_sunxi|sunxi" || true'

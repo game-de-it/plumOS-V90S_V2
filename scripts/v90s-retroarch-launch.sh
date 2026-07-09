@@ -202,8 +202,7 @@ for spec in \
     fbdev:udev:udev:alsa:none \
     gl:udev:udev:alsa:none \
     sdl2:sdl2:sdl2:alsa:mali \
-    sdl2:sdl2:sdl2:alsa:kmsdrm \
-    sdl2:sdl2:sdl2:sdl2:dummy
+    sdl2:sdl2:sdl2:alsa:kmsdrm
 do
     attempt=$((attempt + 1))
     old_ifs="$IFS"

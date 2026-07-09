@@ -102,6 +102,8 @@ Partition sizing remains small:
 
 This image adds the KNULLI A133 PowerVR GE8300 userspace libraries, `pvrsrvkm.ko`, `dc_sunxi.ko`, `rgx.*` firmware, and `/usr/local/sbin/v90s-pvr-probe`. It writes `plumos-v90s-pvr-probe.log` to FAT before launching RetroArch. If PowerVR initializes, the next build should add KNULLI's patched SDL2 framebuffer EGL route or a KNULLI-built RetroArch binary. If it does not, fix module/firmware/userspace initialization first.
 
+The real-device test of the second image showed that `pvrsrvkm.ko` and `dc_sunxi.ko` can load, `/dev/dri/*` appears, and dmesg reports `RGX Device registered` plus `Found usable fbdev device`. The remaining PowerVR init issue was that the probe ran `pvrsrvctl --start` outside `/lib/modules/4.9.191`, while KNULLI's a133 `rcS` does `cd /lib/modules/4.9.191` first so `pvrsrvctl` can find `pvrsrvkm.ko` and `dc_sunxi.ko` by relative filename.
+
 ## Runtime Investigation Targets
 
 Video:
