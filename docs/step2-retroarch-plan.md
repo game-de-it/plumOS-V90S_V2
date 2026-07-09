@@ -104,6 +104,8 @@ This image adds the KNULLI A133 PowerVR GE8300 userspace libraries, `pvrsrvkm.ko
 
 The real-device test of the second image showed that `pvrsrvkm.ko` and `dc_sunxi.ko` can load, `/dev/dri/*` appears, and dmesg reports `RGX Device registered` plus `Found usable fbdev device`. The remaining PowerVR init issue was that the probe ran `pvrsrvctl --start` outside `/lib/modules/4.9.191`, while KNULLI's a133 `rcS` does `cd /lib/modules/4.9.191` first so `pvrsrvctl` can find `pvrsrvkm.ko` and `dc_sunxi.ko` by relative filename.
 
+The real-device test of the third image confirmed that this corrected sequence works: `pvrsrvctl-start-cwd-moddir rc=0`, `/sys/kernel/debug/pvr/status` reports `Driver Status: OK` and `Firmware Status: OK`, and `gpu00/debug_dump` reports `Services State: OK` plus `Comparison of UM/KM components: MATCHING`. RetroArch still cannot display because the Debian stock SDL2/RetroArch stack lacks KNULLI's fbdev EGL path. The next build should therefore focus on patched SDL2 `mali-fbdev` support and/or a KNULLI-built RetroArch binary.
+
 ## Runtime Investigation Targets
 
 Video:
