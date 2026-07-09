@@ -134,10 +134,10 @@ fb_probe() {
         return
     fi
 
-    if $bb dd if=/dev/zero of=/dev/fb0 bs=1024 count=1200 >> "$LOG" 2>&1; then
-        log "stage1: fb0 cleared"
+    if $bb dd if=/dev/zero of=/dev/fb0 bs=4096 count=1 >> "$LOG" 2>&1; then
+        log "stage1: fb0 black probe wrote"
     else
-        log "stage1: fb0 clear failed"
+        log "stage1: fb0 black probe failed"
     fi
 
     : > /tmp/fb-white
@@ -169,7 +169,6 @@ for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do
 done
 
 log "plumOS V90S stage1: looking for userdata rootfs payload"
-fb_probe
 
 payload=""
 for dev in /dev/mmcblk0p5 /dev/mmcblk1p5 /dev/mmcblk2p5 /dev/mmcblk0p4 /dev/mmcblk1p4 /dev/mmcblk2p4; do
@@ -179,6 +178,8 @@ for dev in /dev/mmcblk0p5 /dev/mmcblk1p5 /dev/mmcblk2p5 /dev/mmcblk0p4 /dev/mmcb
         if [ -f /mnt/share/rootfs/step1-rootfs.squashfs ]; then
             payload="/mnt/share/rootfs/step1-rootfs.squashfs"
             log "stage1: found payload on $dev"
+            persist_stage1_log
+            fb_probe
             persist_stage1_log
             break
         fi
@@ -266,10 +267,10 @@ fb_probe() {
         return
     fi
 
-    if dd if=/dev/zero of=/dev/fb0 bs=1024 count=1200 >> "$LOG" 2>&1; then
-        log "debian-init: fb0 cleared"
+    if dd if=/dev/zero of=/dev/fb0 bs=4096 count=1 >> "$LOG" 2>&1; then
+        log "debian-init: fb0 black probe wrote"
     else
-        log "debian-init: fb0 clear failed"
+        log "debian-init: fb0 black probe failed"
     fi
 
     : > /tmp/fb-white
@@ -301,6 +302,7 @@ for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do
 done
 
 log "plumOS V90S Step1 Debian minbase console"
+persist_debian_log
 fb_probe
 persist_debian_log
 
@@ -336,6 +338,7 @@ build_stage1() {
     mkdir -p "$root/bin" "$root/sbin" "$root/lib" "$root/usr/lib" "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/new_root"
 
     cp -a "$knulli_ramdisk/bin/busybox" "$root/bin/busybox"
+    ln -sf busybox "$root/bin/sh"
     cp -a "$knulli_ramdisk/lib/." "$root/lib/"
     if [ -d "$knulli_ramdisk/usr/lib" ]; then
         cp -a "$knulli_ramdisk/usr/lib/." "$root/usr/lib/"

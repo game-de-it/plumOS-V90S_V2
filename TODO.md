@@ -50,6 +50,11 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Add a direct `/dev/fb0` write probe in stage1 and Debian init.
 - [x] Move the Debian payload loop mount from `/dev/loop0` to `/dev/loop1`.
 - [x] Build `plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img`.
+- [x] Record device test 7: diagnostic still reached stage1 root, but no stage1/Debian logs were present.
+- [x] Fix stage1 `/sbin/init` execution by adding `/bin/sh -> busybox`.
+- [x] Persist a diagnostic marker immediately before `switch_root`.
+- [x] Persist stage1/Debian logs before framebuffer writes.
+- [x] Build `plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -193,6 +198,22 @@ rootfs/plumos-v90s-diag.log
 - [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img`.
 - [x] Host-verify that stage1 logs to userdata and uses `/dev/loop1` for the Debian payload.
 - [x] Host-verify that stage1 and Debian init include `/dev/fb0` white-band probes.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
+- [x] Check whether the screen changes from the KNULLI boot logo.
+- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
+- [x] FAT diagnostic logs were not present.
+- [x] Userdata ext4 logs were recovered and analyzed.
+- [x] Result: diagnostic still mounted zstd `/boot/knulli` as stage1 root.
+- [x] Result: no `plumos-v90s-stage1.log` or `plumos-v90s-debian-init.log` was present.
+- [x] Result: host inspection found stage1 `/sbin/init` uses `#!/bin/sh`, but stage1 lacked `/bin/sh`.
+
+## Device Test 8
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img`.
+- [x] Host-verify that stage1 contains `/bin/sh -> busybox`.
+- [x] Host-verify that diagnostic init persists a pre-`switch_root` marker.
+- [x] Host-verify that stage1 persists logs before framebuffer probing.
 - [ ] User flashes the image to SD and tests on V90S.
 - [ ] Wait at least 60 seconds at the boot logo, changed screen, or console.
 - [ ] Check whether the screen changes from the KNULLI boot logo.

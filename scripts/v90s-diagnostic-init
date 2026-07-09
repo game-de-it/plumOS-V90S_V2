@@ -224,6 +224,10 @@ run_log ls -la /new_root
 persist_logs
 
 $bb mkdir -p /new_root/proc /new_root/sys /new_root/dev /new_root/boot
+
+log "boot: preparing to switch to stage1 /sbin/init"
+persist_logs
+
 $bb mount --move /proc /new_root/proc 2>/dev/null || true
 $bb mount --move /sys /new_root/sys 2>/dev/null || true
 $bb mount --move /dev /new_root/dev 2>/dev/null || true
@@ -233,4 +237,8 @@ log "boot: switching to stage1 /sbin/init"
 exec $bb switch_root /new_root /sbin/init
 
 log "boot: switch_root failed"
+$bb mount -t proc proc /proc 2>/dev/null || true
+$bb mount -t sysfs sysfs /sys 2>/dev/null || true
+$bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+persist_logs
 exec /bin/busybox sh

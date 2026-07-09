@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img \
+  --name plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img` です。
 
 ```text
-sha256: 4f0b42cd1fbd74670af1f4780629eb3554fe34606f505be23f16bd0dd07a885c
+sha256: f52ba13d4faacb41e4eb2a08715659a3a682350722cb89d27ffc53153605402f
 size: 133M
 ```
 
@@ -98,7 +98,9 @@ size: 133M
 
 `-7-stage1-fb-probe` は、stage1 と Debian init のログを userdata に残し、`/dev/fb0` へ直接 white band を書く probe を追加しています。また、diagnostic initramfs が `/dev/loop0` を使って stage1 を mount するため、stage1 側の Debian payload は `/dev/loop1` で mount します。
 
-`-7-stage1-fb-probe` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
+`-7-stage1-fb-probe` の実機ログでは、diagnostic initramfs が stage1 root までは mount しましたが、stage1/Debian のログは出ませんでした。host inspection で stage1 `/sbin/init` が `#!/bin/sh` なのに stage1 rootfs に `/bin/sh` がないことが分かったため、`-8-stage1-sh-prepersist` では `/bin/sh -> busybox` を追加し、framebuffer probe より前に stage1 到達ログを保存するようにしています。
+
+`-8-stage1-sh-prepersist` を実機で 60 秒ほど起動した後、console が出ない場合は SD をホストへ戻して FAT partition の `plumos-v90s-diag.log` / `boot/plumos-v90s-diag.log`、または userdata ext4 の `rootfs/plumos-v90s-diag.log` / `plumos-v90s-stage1.log` / `rootfs/plumos-v90s-stage1.log` / `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
 
 ## Git workflow
 

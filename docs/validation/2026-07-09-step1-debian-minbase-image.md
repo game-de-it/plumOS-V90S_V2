@@ -95,6 +95,18 @@ sha256: 36a6e1c3156cbc6e6761f92c5d7bad76f5807527f35cdd1c134e64b73f27cb20
 compression: zstd
 ```
 
+After device test 7 showed no stage1 log, the payloads were rebuilt with `/bin/sh -> busybox` in stage1 and with log persistence before framebuffer writes:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: 82e5c48e7d0876cf8b96aa28323199bc1723adf3cba1048d31ab2e3179eef818
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: 58704d22bd72960f2bf2d4224453366bf0257db810edddf158194c2b3adeef9e
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check
