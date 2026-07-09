@@ -72,17 +72,17 @@ docker build -f docker/assembly-tools/Dockerfile -t plumos-v90s-assembly-tools .
   --rootfs output/rootfs-step1/stage1-userdata-loader.squashfs \
   --userdata-payload output/rootfs-step1/debian-bookworm-minbase-step1.squashfs \
   --out-dir output/images \
-  --name plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img \
+  --name plumos-v90s-armbian-step1-20260709-13-fb-console.img \
   --userdata-size 64M \
   --boot-cmdline 'loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop' \
   --diagnostic-init \
   --keep-work
 ```
 
-実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img` です。
+実機確認用の現在の成果物は `output/images/plumos-v90s-armbian-step1-20260709-13-fb-console.img` です。
 
 ```text
-sha256: c2345d8daf6bed5644ebd786b11952797139a901b3b7236a29cd824d9064b3e2
+sha256: e81b77a18d3530ab094be55896c69e48ba9647bc61c59efac7caa2a24d7d18b6
 size: 133M
 ```
 
@@ -110,7 +110,9 @@ size: 133M
 
 `-11-direct-payload` の実機ログでは、Debian `/sbin/init` まで到達し、`plumos-v90s-debian-init.log` が userdata に残りました。Debian init は `fb0` を認識し、先頭領域への black/white probe 書き込みも成功しました。ただし実機画面は KNULLI boot logo のままだったため、次の課題は boot ではなく「fb0 書き込みが実表示へ出るか」と「fbcon 無しでどう簡易consoleを描くか」です。
 
-`-12-fb-full-probe` では `virtual_size=640,960` のダブルバッファ疑いに合わせ、fb0全体をblackで塗り、page0/page1の両方へ大きなwhite bandを書きます。`-12-fb-full-probe` を実機で 60 秒ほど起動した後、画面が変わらない場合は SD をホストへ戻して `plumos-v90s-debian-init.log` / `rootfs/plumos-v90s-debian-init.log` を確認します。
+`-12-fb-full-probe` では `virtual_size=640,960` のダブルバッファ疑いに合わせ、fb0全体をblackで塗り、page0/page1の両方へ大きなwhite bandを書きました。実機では KNULLI boot logo が消え、黒画面に白帯が表示されたため、Debian userspace からの `/dev/fb0` 描画が V90S LCD に出ることを確認できました。
+
+`-13-fb-console` では kernel framebuffer console に依存せず、Debian init から `/usr/local/sbin/v90s-fb-console` を実行します。この小さい userspace console は `/dev/fb0` に直接テキストを描き、`/dev/input/event*` から USB keyboard 入力を読み、入力されたコマンドを `/bin/sh` 経由で実行します。起動時に `uname -a`、`ls /`、`ls /dev/input` を自動実行し、ログを `plumos-v90s-fb-console.log` に残します。
 
 ## Git workflow
 

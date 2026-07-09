@@ -155,6 +155,18 @@ sha256: 2b85f6c827ff067e606a232bfd5b796a6b6dce44f04a7013fb7c4308ef9bc120
 compression: zstd
 ```
 
+After device test 12 proved that `/dev/fb0` userspace writes are visible on the LCD, the payloads were rebuilt with a small userspace framebuffer console:
+
+```text
+output/rootfs-step1/stage1-userdata-loader.squashfs        2.7M
+sha256: 6e74bc431acc26e7ea1eb96ac533cf13f83a00f9a3d9f8bce6298b8095bbaa81
+compression: zstd
+
+output/rootfs-step1/debian-bookworm-minbase-step1.squashfs 42M
+sha256: 56cc7e4a3700b60977b3fcde1a3b7301ed48ae4b0ddfd42731d0329d0638a721
+compression: zstd
+```
+
 The original `-1` image hash above still refers to the first generated image. Later test images record their own image hashes separately.
 
 ## Layout check
@@ -207,10 +219,13 @@ plumOS V90S stage1: looking for userdata rootfs payload
 
 Then it searches likely V90S userdata partitions, mounts the ext4 partition read-only, loop-mounts `/rootfs/step1-rootfs.squashfs`, and switches into the Debian minbase rootfs.
 
-The Debian rootfs uses a small `/sbin/init` shell wrapper, not systemd. Expected final console text:
+The Debian rootfs uses a small `/sbin/init` shell wrapper, not systemd. The current test image starts a userspace framebuffer console because the V90S/KNULLI kernel does not expose a kernel framebuffer console. Expected final console text:
 
 ```text
-plumOS V90S Step1 Debian minbase console
+plumOS V90S framebuffer console
+$ uname -a
+$ ls /
+$ ls /dev/input
 ```
 
-If stage1 appears but the final console does not, the next target is userdata device enumeration or squashfs loop mounting. If even stage1 does not appear, the next target remains the KNULLI ramdisk boot-root selection and real kernel cmdline.
+If framebuffer text appears but USB keyboard input does not, the next target is `/dev/input/event*` enumeration and HID event decoding. If framebuffer text does not appear, inspect `plumos-v90s-debian-init.log` and `plumos-v90s-fb-console.log` from userdata.

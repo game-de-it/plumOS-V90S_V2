@@ -71,6 +71,9 @@ Step 1: V90S real hardware boots from a generated SD-card image, shows a Linux c
 - [x] Record device test 11: direct payload reached Debian init and Debian wrote to `/dev/fb0`, but the LCD still showed the KNULLI logo.
 - [x] Expand the fb0 probe to clear the full virtual framebuffer and write white bands to both pages.
 - [x] Build `plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img`.
+- [x] Record device test 12: boot logo disappeared and the full framebuffer probe became visible on the LCD.
+- [x] Add a small userspace framebuffer console that draws text to `/dev/fb0`, reads `/dev/input/event*`, and runs commands through `/bin/sh`.
+- [x] Build `plumos-v90s-armbian-step1-20260709-13-fb-console.img`.
 
 ## Next: Armbian Rootfs Path
 
@@ -299,23 +302,46 @@ rootfs/plumos-v90s-diag.log
 - [x] Host-verify that Debian init writes a full virtual framebuffer black fill and white bands to page 0 and page 1.
 - [x] Host-verify that direct payload route remains present.
 - [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
+- [x] User flashes the image to SD and tests on V90S.
+- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
+- [x] Check whether the screen changes from the KNULLI boot logo.
+- [x] Result: KNULLI boot logo disappeared.
+- [x] Result: screen changed to the expected black framebuffer with a white band near the top.
+- [x] Result: FAT diagnostic logs were not present.
+- [x] Result: userdata ext4 logs were recovered and analyzed.
+- [x] Result: direct payload route still reached Debian `/sbin/init`.
+- [x] Result: Debian init saw `fb0` as `640x480p-60`, `virtual_size=640,960`, `bits_per_pixel=32`, `stride=2560`.
+- [x] Result: Debian init wrote the full black fill and white bands to page 0 and page 1.
+- [x] Result: `/dev/fb0` userspace writes are visible on the V90S LCD.
+
+## Device Test 13
+
+- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-13-fb-console.img`.
+- [x] Host-verify that Debian payload contains `/usr/local/sbin/v90s-fb-console`.
+- [x] Host-verify that Debian init executes `v90s-fb-console` after the fb0 probe.
+- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
 - [ ] User flashes the image to SD and tests on V90S.
-- [ ] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [ ] Check whether the screen changes from the KNULLI boot logo.
-- [ ] If console appears or the framebuffer probe is visible, record what changed on screen.
-- [ ] If console still does not appear, return the SD card and check FAT/userdata logs for the new failure point:
+- [ ] Wait at least 60 seconds for framebuffer text to appear.
+- [ ] Check whether startup text appears instead of the white-band probe.
+- [ ] Attach a USB keyboard and type:
 
 ```text
-plumos-v90s-diag.log
-boot/plumos-v90s-diag.log
-rootfs/plumos-v90s-diag.log
+ls /
+```
+
+- [ ] Press Enter and check whether command output appears on screen.
+- [ ] Return the SD card and check userdata logs if text or keyboard input fails:
+
+```text
 plumos-v90s-debian-init.log
 rootfs/plumos-v90s-debian-init.log
+plumos-v90s-fb-console.log
+rootfs/plumos-v90s-fb-console.log
 ```
 
 ## Console Command Check
 
-- [ ] If console appears in any test, run:
+- [ ] If the framebuffer console accepts keyboard input, run:
 
 ```sh
 uname -a
@@ -332,7 +358,7 @@ dmesg | tail -80
 
 - [x] If there is no visible boot activity, inspect boot offsets, boot package, GPT layout, and bootloader cmdline assumptions.
 - [x] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
-- [ ] If `/dev/fb0` userspace writes work but framebuffer console is unavailable, add a tiny framebuffer terminal or boot-time getty bridge for Step 1.
+- [x] If `/dev/fb0` userspace writes work but framebuffer console is unavailable, add a tiny framebuffer terminal or boot-time getty bridge for Step 1.
 - [ ] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
 - [ ] If init fails, test a simpler init wrapper before debugging full systemd behavior.
 - [ ] If `/boot_root/boot/knulli` is not found, confirm the real kernel cmdline and which partition the ramdisk mounts.

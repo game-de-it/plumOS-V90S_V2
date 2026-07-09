@@ -7,6 +7,7 @@ mirror="http://deb.debian.org/debian"
 out_dir="output/rootfs-step1"
 knulli_ramdisk=".cache/v90s-ramdisk"
 keep_work=0
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 usage() {
     cat <<'USAGE'
@@ -437,6 +438,12 @@ persist_debian_log
 fb_probe
 persist_debian_log
 
+if [ -x /usr/local/sbin/v90s-fb-console ]; then
+    log "debian-init: starting framebuffer console"
+    persist_debian_log
+    exec /usr/local/sbin/v90s-fb-console
+fi
+
 cat <<MSG
 plumOS V90S Step1 Debian minbase console
 Try:
@@ -492,6 +499,7 @@ build_debian_minbase() {
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/root"
     write_debian_init "$root/sbin/init"
+    install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     printf 'plumos-v90s-step1\n' > "$root/etc/hostname"
     cat > "$root/etc/plumos-step1-release" <<EOF
 name=plumOS V90S Step1 Debian minbase

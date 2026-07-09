@@ -1,0 +1,698 @@
+persist_device=payload-share
+persist_path=/plumos-v90s-diag.log
+
+plumOS V90S diagnostic init started
+## cat /proc/version
+Linux version 4.9.191 (nas@nas) (gcc version 6.4.1 (OpenWrt/Linaro GCC 6.4-2017.11 2017-11) ) #17 SMP PREEMPT Tue May 13 18:14:09 UTC 2025
+## cat /proc/cmdline
+console=ttyS0,115200 root=/dev/mmcblk0p4 rootwait init=/sbin/init loglevel=4 earlyprintk=sunxi-uart,0x05000000 initcall_debug=0 loglevel=4 partitions=boot@mmcblk0p1:env@mmcblk0p2:env-redund@mmcblk0p3:boot-resource@mmcblk0p4:userdata@mmcblk0p5 cma=32M gpt=1 androidboot.mode=normal androidboot.serialno=3c000c66274606f1e1d androidboot.hardware=sun50iw10p1 boot_type=1 androidboot.boot_type=1 androidboot.secure_os_exist=0 gpt=1 uboot_message=2018.05-00041-gcab9917(04/22/2025-11:15:25) disp_reserve=1228800,0x7bf9b900 bootreason=button loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop
+## cat /proc/filesystems
+nodev	sysfs
+nodev	rootfs
+nodev	ramfs
+nodev	bdev
+nodev	proc
+nodev	cgroup
+nodev	cgroup2
+nodev	tmpfs
+nodev	devtmpfs
+nodev	configfs
+nodev	debugfs
+nodev	tracefs
+nodev	sockfs
+nodev	pipefs
+nodev	rpc_pipefs
+nodev	devpts
+	ext3
+	ext2
+	ext4
+	squashfs
+	vfat
+	msdos
+	exfat
+nodev	nfsd
+	ntfs3
+nodev	overlay
+nodev	pstore
+## cat /proc/partitions
+major minor  #blocks  name
+
+## ls -la /dev
+crw-------    1  254,   0 gpiochip0
+crw-------    1  254,   1 gpiochip1
+crw-------    1   10,  63 ion
+crw-------    1   10,  62 rfkill
+crw-------    1    1,   1 mem
+crw-------    1    1,   2 kmem
+crw-rw-rw-    1    1,   3 null
+crw-rw-rw-    1    1,   5 zero
+crw-rw-rw-    1    1,   7 full
+crw-rw-rw-    1    1,   8 random
+crw-rw-rw-    1    1,   9 urandom
+crw-r--r--    1    1,  11 kmsg
+crw-rw-rw-    1    5,   0 tty
+crw-------    1    5,   1 console
+crw-------    1  251,   0 sunxi_pwm0
+crw-------    1  250,   0 disp
+crw-------    1   29,   0 fb0
+crw-------    1   10,  61 sid_efuse
+crw-------    1    2,   0 ptyp0
+crw-------    1    2,   1 ptyp1
+crw-------    1    2,   2 ptyp2
+crw-------    1    2,   3 ptyp3
+crw-------    1    2,   4 ptyp4
+crw-------    1    2,   5 ptyp5
+crw-------    1    2,   6 ptyp6
+crw-------    1    2,   7 ptyp7
+crw-------    1    2,   8 ptyp8
+crw-------    1    2,   9 ptyp9
+crw-------    1    2,  10 ptypa
+crw-------    1    2,  11 ptypb
+crw-------    1    2,  12 ptypc
+crw-------    1    2,  13 ptypd
+crw-------    1    2,  14 ptype
+crw-------    1    2,  15 ptypf
+crw-------    1    3,   0 ttyp0
+crw-------    1    3,   1 ttyp1
+crw-------    1    3,   2 ttyp2
+crw-------    1    3,   3 ttyp3
+crw-------    1    3,   4 ttyp4
+crw-------    1    3,   5 ttyp5
+crw-------    1    3,   6 ttyp6
+crw-------    1    3,   7 ttyp7
+crw-------    1    3,   8 ttyp8
+crw-------    1    3,   9 ttyp9
+crw-------    1    3,  10 ttypa
+crw-------    1    3,  11 ttypb
+crw-------    1    3,  12 ttypc
+crw-------    1    3,  13 ttypd
+crw-------    1    3,  14 ttype
+crw-------    1    3,  15 ttypf
+crw-rw-rw-    1    5,   2 ptmx
+crw-------    1  249,   0 ttyS0
+crw-------    1   10,  60 sunxi_soc_info
+crw-------    1   10,  59 sunxi-reg
+crw-------    1   10, 237 loop-control
+brw-------    1    7,   0 loop0
+brw-------    1    7,   1 loop1
+brw-------    1    7,   2 loop2
+brw-------    1    7,   3 loop3
+brw-------    1    7,   4 loop4
+brw-------    1    7,   5 loop5
+brw-------    1    7,   6 loop6
+brw-------    1    7,   7 loop7
+drwxr-xr-x    3        60 bus
+drwxr-xr-x    2       140 input
+crw-------    1   10, 223 uinput
+crw-------    1  253,   0 rtc0
+crw-------    1   89,   6 i2c-6
+crw-------    1   89,   1 i2c-1
+drwxr-xr-x    2        60 mapper
+drwxr-xr-x    2       140 snd
+crw-------    1   10,  58 cpu_dma_latency
+crw-------    1   10,  57 network_latency
+crw-------    1   10,  56 network_throughput
+crw-------    1   10,  55 memory_bandwidth
+drwxr-xr-x    2         0 pts
+drwxr-xr-x    2        40 shm
+drwxrwxr-x   17         0 ..
+drwxr-xr-x    8      1580 .
+## dmesg
+<6>[    0.000000] Booting Linux on physical CPU 0x0
+<5>[    0.000000] random: get_random_bytes called from start_kernel+0x30/0x38c with crng_init=0
+<5>[    0.000000] Linux version 4.9.191 (nas@nas) (gcc version 6.4.1 (OpenWrt/Linaro GCC 6.4-2017.11 2017-11) ) #17 SMP PREEMPT Tue May 13 18:14:09 UTC 2025
+<6>[    0.000000] Boot CPU: AArch64 Processor [410fd034]
+<6>[    0.000000] bootconsole [earlycon0] enabled
+<6>[    0.000000] disp reserve base 0x7bf9b900 ,size 0x12c000
+<6>[    0.000000] debug: ignoring loglevel setting.
+<6>[    0.000000] cma: Reserved 32 MiB at 0x000000007e000000
+<7>[    0.000000] On node 0 totalpages: 262144
+<7>[    0.000000]   DMA zone: 4096 pages used for memmap
+<7>[    0.000000]   DMA zone: 0 pages reserved
+<7>[    0.000000]   DMA zone: 262144 pages, LIFO batch:31
+<6>[    0.000000] psci: probing for conduit method from DT.
+<6>[    0.000000] psci: PSCIv1.0 detected in firmware.
+<6>[    0.000000] psci: Using standard PSCI v0.2 function IDs
+<6>[    0.000000] psci: Trusted OS migration not required
+<6>[    0.000000] psci: SMC Calling Convention v1.0
+<6>[    0.000000] percpu: Embedded 22 pages/cpu s50712 r8192 d31208 u90112
+<7>[    0.000000] pcpu-alloc: s50712 r8192 d31208 u90112 alloc=22*4096
+<7>[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 
+<6>[    0.000000] Detected VIPT I-cache on CPU0
+<6>[    0.000000] CPU features: enabling workaround for ARM erratum 845719
+<6>[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 258048
+<5>[    0.000000] Kernel command line: console=ttyS0,115200 root=/dev/mmcblk0p4 rootwait init=/sbin/init loglevel=4 earlyprintk=sunxi-uart,0x05000000 initcall_debug=0 loglevel=4 partitions=boot@mmcblk0p1:env@mmcblk0p2:env-redund@mmcblk0p3:boot-resource@mmcblk0p4:userdata@mmcblk0p5 cma=32M gpt=1 androidboot.mode=normal androidboot.serialno=3c000c66274606f1e1d androidboot.hardware=sun50iw10p1 boot_type=1 androidboot.boot_type=1 androidboot.secure_os_exist=0 gpt=1 uboot_message=2018.05-00041-gcab9917(04/22/2025-11:15:25) disp_reserve=1228800,0x7bf9b900 bootreason=button loglevel=8 ignore_loglevel initcall_debug=0 console=tty0 console=ttyS0,115200 rootwait root=/dev/mmcblk0p4 init=/sbin/init elevator=noop
+<6>[    0.000000] log_buf_len individual max cpu contribution: 4096 bytes
+<6>[    0.000000] log_buf_len total cpu_extra contributions: 12288 bytes
+<6>[    0.000000] log_buf_len min size: 16384 bytes
+<6>[    0.000000] log_buf_len: 32768 bytes
+<6>[    0.000000] early log buf free: 14016(85%)
+<6>[    0.000000] PID hash table entries: 4096 (order: 3, 32768 bytes)
+<6>[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes)
+<6>[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes)
+<6>[    0.000000] Memory: 962780K/1048576K available (7870K kernel code, 1652K rwdata, 2388K rodata, 832K init, 295K bss, 53028K reserved, 32768K cma-reserved)
+<5>[    0.000000] Virtual kernel memory layout:
+<5>[    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
+<5>[    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
+<5>[    0.000000]       .text : 0xffff000008080000 - 0xffff000008830000   (  7872 KB)
+<5>[    0.000000]     .rodata : 0xffff000008830000 - 0xffff000008a90000   (  2432 KB)
+<5>[    0.000000]       .init : 0xffff000008a90000 - 0xffff000008b60000   (   832 KB)
+<5>[    0.000000]       .data : 0xffff000008b60000 - 0xffff000008cfd008   (  1653 KB)
+<5>[    0.000000]        .bss : 0xffff000008cfd008 - 0xffff000008d46d64   (   296 KB)
+<5>[    0.000000]     fixed   : 0xffff7dfffe7fb000 - 0xffff7dfffec00000   (  4116 KB)
+<5>[    0.000000]     PCI I/O : 0xffff7dfffee00000 - 0xffff7dffffe00000   (    16 MB)
+<5>[    0.000000]     vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
+<5>[    0.000000]               0xffff7e0000000000 - 0xffff7e0001000000   (    16 MB actual)
+<5>[    0.000000]     memory  : 0xffff800000000000 - 0xffff800040000000   (  1024 MB)
+<6>[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+<6>[    0.000000] Preemptible hierarchical RCU implementation.
+<6>[    0.000000] 	Build-time adjustment of leaf fanout to 64.
+<6>[    0.000000] NR_IRQS:64 nr_irqs:64 0
+<6>[    0.000000] clocksource: timer: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 79635851949 ns
+<6>[    0.000000] arm_arch_timer: Architected cp15 timer(s) running at 24.00MHz (virt).
+<6>[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x588fe9dc0, max_idle_ns: 440795202592 ns
+<6>[    0.000005] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 4398046511097ns
+<6>[    0.008165] Calibrating delay loop (skipped), value calculated using timer frequency.. 48.00 BogoMIPS (lpj=96000)
+<6>[    0.018198] pid_max: default: 32768 minimum: 301
+<6>[    0.023372] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes)
+<6>[    0.029480] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes)
+<6>[    0.039085] ftrace: allocating 30016 entries in 118 pages
+<4>[    0.095846] sched-energy: CPU device node has no sched-energy-costs
+<4>[    0.096486] Invalid sched_group_energy for CPU0
+<6>[    0.101022] CPU0: update cpu_capacity 1024
+<6>[    0.117154] ASID allocator initialised with 32768 entries
+<6>[    0.173491] Detected VIPT I-cache on CPU1
+<4>[    0.173551] Invalid sched_group_energy for CPU1
+<6>[    0.173555] CPU1: update cpu_capacity 1024
+<6>[    0.173558] CPU1: Booted secondary processor [410fd034]
+<6>[    0.201545] Detected VIPT I-cache on CPU2
+<4>[    0.201588] Invalid sched_group_energy for CPU2
+<6>[    0.201591] CPU2: update cpu_capacity 1024
+<6>[    0.201594] CPU2: Booted secondary processor [410fd034]
+<6>[    0.229606] Detected VIPT I-cache on CPU3
+<4>[    0.229643] Invalid sched_group_energy for CPU3
+<6>[    0.229646] CPU3: update cpu_capacity 1024
+<6>[    0.229649] CPU3: Booted secondary processor [410fd034]
+<6>[    0.229729] Brought up 4 CPUs
+<6>[    0.244829] SMP: Total of 4 processors activated.
+<6>[    0.249521] CPU features: detected feature: 32-bit EL0 Support
+<6>[    0.255326] CPU features: detected feature: Kernel page table isolation (KPTI)
+<6>[    0.265836] CPU: All CPU(s) started at EL1
+<6>[    0.266607] alternatives: patching kernel code
+<4>[    0.271517] Invalid sched_group_energy for CPU3
+<4>[    0.275523] Invalid sched_group_energy for Cluster3
+<4>[    0.280372] Invalid sched_group_energy for CPU2
+<4>[    0.284879] Invalid sched_group_energy for Cluster2
+<4>[    0.289731] Invalid sched_group_energy for CPU1
+<4>[    0.294238] Invalid sched_group_energy for Cluster1
+<4>[    0.299090] Invalid sched_group_energy for CPU0
+<4>[    0.303598] Invalid sched_group_energy for Cluster0
+<6>[    0.309669] devtmpfs: initialized
+<6>[    0.629608] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+<6>[    0.633733] futex hash table entries: 1024 (order: 5, 131072 bytes)
+<6>[    0.641564] atomic64_test: passed
+<6>[    0.643243] pinctrl core: initialized pinctrl subsystem
+<6>[    0.653970] NET: Registered protocol family 16
+<6>[    0.657682] dump_class_init,857, success
+<6>[    0.672593] cpuidle: using governor menu
+<6>[    0.675224] sunxi iommu: irq = 8
+<6>[    0.676269] vdso: 2 pages (1 code @ ffff000008836000, 1 data @ ffff000008b64000)
+<6>[    0.682808] DMA: preallocated 256 KiB pool for atomic allocations
+<6>[    0.700557] sun50iw10p1-r-pinctrl r_pio: initialized sunXi PIO driver
+<6>[    0.782821] sun50iw10p1-pinctrl pio: initialized sunXi PIO driver
+<6>[    0.795748] iommu: Adding device 1c0e000.ve to group 0
+<6>[    0.813547] iommu: Adding device soc@03000000:disp1@1 to group 0
+<6>[    0.816010] iommu: Adding device 6000000.disp to group 0
+<6>[    0.820610] iommu: Adding device 6400000.eink to group 0
+<6>[    0.828417] iommu: Adding device 6480000.g2d to group 0
+<6>[    0.932750] pwm module init!
+<6>[    0.944957] sunxi-pm debug v3.10
+<5>[    0.950568] SCSI subsystem initialized
+<6>[    0.951350] usbcore: registered new interface driver usbfs
+<6>[    0.954503] usbcore: registered new interface driver hub
+<6>[    0.959705] usbcore: registered new device driver usb
+<4>[    0.965104] sunxi_i2c_adap_init()2672 - init
+<4>[    0.969890] sunxi_i2c_probe()2395 - [i2c6] twi_drv_used = 0
+<4>[    0.974268] sunxi_i2c_probe()2402 - [i2c6] twi_pkt_interval = 0
+<4>[    0.980167] twi6 supply twi not found, using dummy regulator
+<4>[    0.986038] twi_request_gpio()458 - [i2c6] init name: (null)
+<6>[    0.993619] axp20x-i2c 6-0034: AXP20x variant AXP2202 found
+<3>[    1.014756] axp2101-regulator axp2101-regulator.0: Setting DCDC frequency for unsupported AXP variant
+<3>[    1.018353] axp2101-regulator axp2101-regulator.0: Error setting dcdc frequency: -22
+<5>[    1.051004] random: fast init done
+<6>[    1.099456] axp20x-i2c 6-0034: AXP20X driver loaded
+<4>[    1.100824] sunxi_i2c_probe()2395 - [i2c1] twi_drv_used = 0
+<4>[    1.104271] sunxi_i2c_probe()2402 - [i2c1] twi_pkt_interval = 0
+<4>[    1.110196] twi1 supply twi not found, using dummy regulator
+<4>[    1.116086] twi_request_gpio()458 - [i2c1] init name: (null)
+<6>[    1.123651] media: Linux media interface: v0.10
+<6>[    1.126186] Linux video capture interface: v2.00
+<6>[    1.132664] ion_parse_dt_heap_common: id 0 type 0 name sys_user align 1000
+<6>[    1.138021] ion_parse_dt_heap_common: id 4 type 4 name cma align 1000
+<6>[    1.144415] ion_parse_dt_heap_common: id 6 type 6 name secure align 1000
+<3>[    1.151476] ion_heap_create: Invalid heap type 6
+<6>[    1.155927] Advanced Linux Sound Architecture Driver Initialized.
+<6>[    1.164522] Bluetooth: Core ver 2.22
+<6>[    1.164774] NET: Registered protocol family 31
+<6>[    1.169089] Bluetooth: HCI device and connection manager initialized
+<6>[    1.175447] Bluetooth: HCI socket layer initialized
+<6>[    1.180297] Bluetooth: L2CAP socket layer initialized
+<6>[    1.185422] Bluetooth: SCO socket layer initialized
+<6>[    1.194872] input: sunxi-keyboard as /devices/virtual/input/input0
+<6>[    1.197222] clocksource: Switched to clocksource arch_sys_counter
+<7>[    1.358130] udc_init,0
+<6>[    1.362345] NET: Registered protocol family 2
+<6>[    1.377713] TCP established hash table entries: 16 (order: -5, 128 bytes)
+<6>[    1.378875] TCP bind hash table entries: 16 (order: -4, 256 bytes)
+<6>[    1.385044] TCP: Hash tables configured (established 16 bind 16)
+<6>[    1.391153] UDP hash table entries: 256 (order: 1, 8192 bytes)
+<6>[    1.396830] UDP-Lite hash table entries: 256 (order: 1, 8192 bytes)
+<6>[    1.403814] NET: Registered protocol family 1
+<6>[    1.408845] RPC: Registered named UNIX socket transport module.
+<6>[    1.413288] RPC: Registered udp transport module.
+<6>[    1.417959] RPC: Registered tcp transport module.
+<6>[    1.422638] RPC: Registered tcp NFSv4.1 backchannel transport module.
+<6>[    1.429833] Unpacking initramfs...
+<6>[    1.596438] Freeing initrd memory: 3064K
+<6>[    1.610031] workingset: timestamp_bits=61 max_order=18 bucket_order=0
+<6>[    1.718368] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+<6>[    1.720475] exFAT: file-system version 5.8-2arter97
+<6>[    1.725365] Installing knfsd (copyright (C) 1996 okir@monad.swb.de).
+<6>[    1.731290] ntfs3: Max link count 4000
+<5>[    1.733489] ntfs3: Warning: Activated 64 bits per cluster. Windows does not support this
+<6>[    1.748391] NET: Registered protocol family 38
+<6>[    1.748537] io scheduler noop registered (default)
+<6>[    1.751984] io scheduler deadline registered
+<6>[    1.758200] io scheduler cfq registered
+<6>[    1.768246] [DISP]disp_module_init
+<3>[    1.770144] disp soc@03000000:disp1@1: unable to map de registers
+<4>[    1.772123] disp: probe of soc@03000000:disp1@1 failed with error -22
+<4>[    1.779879] [DISP] disp_init,line:2227:
+<4>[    1.782166] smooth display screen:0 type:1 mode:4
+<7>[    1.820360] display_fb_request,fb_id:0
+<4>[    1.835527] [DISP] lcd_clk_config,line:772:
+<4>[    1.835574] disp 0, clk: pll(150000000),clk(150000000),dclk(25000000) dsi_rate(25000000)
+<4>[    1.835574]      clk real:pll(288000000),clk(288000000),dclk(72000000) dsi_rate(150000000)
+<6>[    1.851490] [DISP]disp_module_init finish
+<6>[    1.869476] Freeing logo buffer memory: 1196K
+<3>[    1.891585] uart uart0: get regulator failed
+<3>[    1.892496] uart uart0: uart0 error to get fifo size property
+<6>[    1.896160] uart0: ttyS0 at MMIO 0x5000000 (irq = 348, base_baud = 1500000) is a SUNXI
+<4>[    1.903887] sw_console_setup()2040 - console setup baud 115200 parity n bits 8, flow n
+<6>[    1.911789] console [ttyS0] enabled
+<6>[    1.915749] bootconsole [earlycon0] disabled
+<6>[    1.926824] misc dump reg init
+<6>[    1.932609] [drm] Initialized
+<4>[    1.936856] Unable to detect cache hierarchy for CPU 0
+<6>[    1.976429] loop: module loaded
+<6>[    2.003439] rgp_version_init,148, success
+<7>[    2.008440] gpio_0, gpio=129  mul-sel=0  pull=-1  drv_level=-1  data=-1
+<7>[    2.015995] gpio_1, gpio=130  mul-sel=0  pull=-1  drv_level=-1  data=-1
+<7>[    2.023493] gpio_2, gpio=131  mul-sel=0  pull=-1  drv_level=-1  data=-1
+<7>[    2.030989] gpio_3, gpio=132  mul-sel=0  pull=-1  drv_level=-1  data=-1
+<6>[    2.040815] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+<7>[    2.048579] get ehci0-controller, regulator_io is no nocare
+<7>[    2.054862] get ehci0-controller wakeup-source is fail.
+<7>[    2.061147] sunxi ehci0-controller don't init wakeup source
+<7>[    2.067431] [sunxi-ehci0]: probe, pdev->name: 5101000.ehci0-controller, sunxi_ehci: 0xffff000008d32650, 0x:ffff000008fba000, irq_no:160
+<7>[    2.081135] [sunxi-ehci0]: Not init ehci0
+<7>[    2.085878] get ehci1-controller, regulator_io is no nocare
+<7>[    2.092159] get ehci1-controller wakeup-source is fail.
+<7>[    2.098230] sunxi ehci1-controller don't init wakeup source
+<7>[    2.104512] [sunxi-ehci1]: probe, pdev->name: 5200000.ehci1-controller, sunxi_ehci: 0xffff000008d32d70, 0x:ffff000008fc2000, irq_no:162
+<6>[    2.119804] sunxi-ehci 5200000.ehci1-controller: SW USB2.0 'Enhanced' Host Controller (EHCI) Driver
+<6>[    2.130085] sunxi-ehci 5200000.ehci1-controller: new USB bus registered, assigned bus number 1
+<6>[    2.140591] sunxi-ehci 5200000.ehci1-controller: irq 354, io mem 0xffff80003ad74e90
+<6>[    2.165259] sunxi-ehci 5200000.ehci1-controller: USB 0.0 started, EHCI 1.00
+<6>[    2.176968] hub 1-0:1.0: USB hub found
+<6>[    2.181314] hub 1-0:1.0: 1 port detected
+<6>[    2.188466] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+<7>[    2.195978] get ohci0-controller, regulator_io is no nocare
+<7>[    2.202264] get ohci0-controller wakeup-source is fail.
+<7>[    2.208546] sunxi ohci0-controller don't init wakeup source
+<7>[    2.214909] ohci0-controller get usb clk_hosc failed.
+<7>[    2.220623] ohci0-controller get usb clk_losc clk failed.
+<7>[    2.226709] [sunxi-ohci0]: probe, pdev->name: 5101000.ohci0-controller, sunxi_ohci: 0xffff000008d329e0
+<7>[    2.237187] [sunxi-ohci0]: Not init ohci0
+<7>[    2.241940] get ohci1-controller, regulator_io is no nocare
+<7>[    2.248220] get ohci1-controller wakeup-source is fail.
+<7>[    2.254325] sunxi ohci1-controller don't init wakeup source
+<7>[    2.260768] [sunxi-ohci1]: probe, pdev->name: 5200000.ohci1-controller, sunxi_ohci: 0xffff000008d33100
+<6>[    2.271610] sunxi-ohci 5200000.ohci1-controller: SW USB2.0 'Open' Host Controller (OHCI) Driver
+<6>[    2.281477] sunxi-ohci 5200000.ohci1-controller: new USB bus registered, assigned bus number 2
+<6>[    2.292537] sunxi-ohci 5200000.ohci1-controller: irq 355, io mem 0xffff0000088d3000
+<6>[    2.368963] hub 2-0:1.0: USB hub found
+<6>[    2.373302] hub 2-0:1.0: 1 port detected
+<6>[    2.380553] usbcore: registered new interface driver uas
+<6>[    2.386944] usbcore: registered new interface driver usb-storage
+<6>[    2.393887] usbcore: registered new interface driver ums-alauda
+<6>[    2.400723] usbcore: registered new interface driver ums-cypress
+<6>[    2.407670] usbcore: registered new interface driver ums-datafab
+<6>[    2.414612] usbcore: registered new interface driver ums_eneub6250
+<6>[    2.421745] usbcore: registered new interface driver ums-freecom
+<6>[    2.428677] usbcore: registered new interface driver ums-isd200
+<6>[    2.435511] usbcore: registered new interface driver ums-jumpshot
+<6>[    2.442560] usbcore: registered new interface driver ums-karma
+<6>[    2.449315] usbcore: registered new interface driver ums-onetouch
+<6>[    2.456485] usbcore: registered new interface driver ums-realtek
+<6>[    2.463434] usbcore: registered new interface driver ums-sddr09
+<6>[    2.470281] usbcore: registered new interface driver ums-sddr55
+<6>[    2.477122] usbcore: registered new interface driver ums-usbat
+<6>[    2.484019] usb_serial_number:20080411
+<6>[    2.489980] usbcore: registered new interface driver xpad
+<6>[    2.508012] input: axp2202-pek as /devices/platform/soc/twi6/i2c-6/6-0034/axp2101-pek.0/input/input1
+<6>[    2.520178] sunxi_gpadc_init,1889, success
+<3>[    2.525610] sunxi_key_init: get key count failed
+<3>[    2.530649] sunxi_gpadc_setup: get channel scan data failed
+<6>[    2.538292] input: sunxi-gpadc0 as /devices/virtual/input/input2
+<6>[    2.548432] sunxi-rtc rtc: rtc core: registered sunxi-rtc as rtc0
+<6>[    2.555575] sunxi-rtc rtc: RTC enabled
+<6>[    2.560358] i2c /dev entries driver
+<7>[    2.595771] zzz bat_power->pmu_PC16_LED3.gpio:135
+<7>[    2.601141] : pmu_PC16_LED3 gpio_request ok
+<6>[    2.625823] device-mapper: ioctl: 4.35.0-ioctl (2016-06-23) initialised: dm-devel@redhat.com
+<6>[    2.635312] Bluetooth: HCI UART driver ver 2.2.74e8f89.20201026-111523
+<6>[    2.642684] Bluetooth: HCI UART protocol (null) registered
+<6>[    2.648864] Bluetooth: HCI H4 protocol initialized
+<6>[    2.654261] Bluetooth: HCI UART protocol (null) registered
+<6>[    2.660447] Bluetooth: HCI Realtek H5 protocol initialized
+<6>[    2.666629] Bluetooth: Generic Bluetooth SDIO driver ver 0.1
+<4>[    2.682749] sun50iw10p1-pinctrl pio: expect_func as:uart0_jtag, but muxsel(3) is func:jtag0
+<4>[    2.692178] sun50iw10p1-pinctrl pio: expect_func as:uart0_jtag, but muxsel(3) is func:jtag0
+<4>[    2.701591] sun50iw10p1-pinctrl pio: expect_func as:uart0_jtag, but muxsel(3) is func:uart0
+<4>[    2.711004] sun50iw10p1-pinctrl pio: expect_func as:uart0_jtag, but muxsel(3) is func:jtag0
+<4>[    2.720416] sun50iw10p1-pinctrl pio: expect_func as:uart0_jtag, but muxsel(3) is func:uart0
+<4>[    2.729828] sun50iw10p1-pinctrl pio: expect_func as:uart0_jtag, but muxsel(3) is func:jtag0
+<6>[    2.740015] sunxi-mmc sdc0: SD/MMC/SDIO Host Controller Driver(v3.48 2020-9-15 16:01)
+<6>[    2.749039] sunxi-mmc sdc0: ***ctl-spec-caps*** 8
+<6>[    2.757351] sunxi-mmc sdc0: No vqmmc regulator found
+<6>[    2.762951] sunxi-mmc sdc0: No vdmmc regulator found
+<6>[    2.769607] sunxi-mmc sdc0: set host busy
+<6>[    2.774231] sunxi-mmc sdc0: Got CD GPIO
+<6>[    2.779482] sunxi-mmc sdc0: sdc set ios:clk 0Hz bm PP pm UP vdd 23 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.789796] sunxi-mmc sdc0: no vqmmc,Check if there is regulator
+<6>[    2.813311] sunxi-mmc sdc0: sdc set ios:clk 400000Hz bm PP pm ON vdd 23 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.841839] sunxi-mmc sdc0: detmode:gpio irq
+<6>[    2.841870] sunxi-mmc sdc0: sdc set ios:clk 400000Hz bm PP pm ON vdd 23 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.848809] sunxi-mmc sdc0: sdc set ios:clk 400000Hz bm PP pm ON vdd 23 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.871829] sunxi-mmc sdc0: sdc set ios:clk 400000Hz bm PP pm ON vdd 23 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.883462] sunxi-mmc sdc1: SD/MMC/SDIO Host Controller Driver(v3.48 2020-9-15 16:01)
+<6>[    2.883611] sunxi-mmc sdc1: ***ctl-spec-caps*** 8
+<6>[    2.883776] sunxi-mmc sdc1: No vmmc regulator found
+<6>[    2.883781] sunxi-mmc sdc1: No vqmmc regulator found
+<6>[    2.883786] sunxi-mmc sdc1: No vdmmc regulator found
+<6>[    2.883791] sunxi-mmc sdc1: No vd33sw regulator found
+<6>[    2.883795] sunxi-mmc sdc1: No vd18sw regulator found
+<6>[    2.883800] sunxi-mmc sdc1: No vq33sw regulator found
+<6>[    2.883805] sunxi-mmc sdc1: No vq18sw regulator found
+<6>[    2.884801] sunxi-mmc sdc1: set host busy
+<6>[    2.884898] sunxi-mmc sdc1: Got CD GPIO
+<6>[    2.885824] sunxi-mmc sdc1: sdc set ios:clk 0Hz bm PP pm UP vdd 21 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.885850] sunxi-mmc sdc1: no vqmmc,Check if there is regulator
+<6>[    2.901255] sunxi-mmc sdc1: sdc set ios:clk 400000Hz bm PP pm ON vdd 21 width 1 timing LEGACY(SDR12) dt B
+<6>[    2.921849] sunxi-mmc sdc1: detmode:gpio irq
+<6>[    2.923288] hidraw: raw HID events driver (C) Jiri Kosina
+<6>[    2.923933] usbcore: registered new interface driver usbhid
+<6>[    2.923936] usbhid: USB HID core driver
+<6>[    2.928244] usbcore: registered new interface driver snd-usb-audio
+<4>[    2.935314] sunxi-internal-codec codec: dac digital volume get failed
+<4>[    2.935460] sunxi-internal-codec codec: [sunxi_internal_codec_probe] codec probe finished.
+<4>[    2.937659] [sunxi_card_init] card init finished.
+<6>[    2.940881] sunxi-codec-machine sndcodec: sun50iw10codec <-> 5096000.cpudai-controller mapping ok
+<6>[    2.946167] input: audiocodec sunxi Audio Jack as /devices/platform/soc/sndcodec/sound/card0/input3
+<3>[    2.947381] [audio] hp_detect_case: 1
+<4>[    2.947896] sunxi-codec-machine sndcodec: [sunxi_card_dev_probe] register card finished.
+<6>[    2.948539] u32 classifier
+<6>[    2.948542]     Actions configured
+<6>[    2.948549] Netfilter messages via NETLINK v0.30.
+<6>[    2.949765] nf_conntrack version 0.5.0 (8192 buckets, 32768 max)
+<6>[    2.951086] ctnetlink v0.93: registering with nfnetlink.
+<6>[    2.991744] ip_tables: (C) 2000-2006 Netfilter Core Team
+<6>[    2.995961] Initializing XFRM netlink socket
+<6>[    3.002211] NET: Registered protocol family 10
+<6>[    3.008835] NET: Registered protocol family 17
+<6>[    3.010199] Bluetooth: RFCOMM TTY layer initialized
+<6>[    3.010259] Bluetooth: RFCOMM socket layer initialized
+<6>[    3.010346] Bluetooth: RFCOMM ver 1.11
+<6>[    3.010386] 8021q: 802.1Q VLAN Support v1.8
+<4>[    3.056850] sid_rd_ver_reg()471 - ver >= 4, soc ver:6
+<5>[    3.056868] sun50i_cpufreq_nvmem: using table: c0
+<4>[    3.063215] core: _opp_supported_by_regulators: OPP minuV: 0 maxuV: 0, not supported by regulator
+<4>[    3.063228] cpu cpu0: _opp_add: OPP not supported by regulators (1320000000)
+<4>[    3.064068] core: _opp_supported_by_regulators: OPP minuV: 0 maxuV: 0, not supported by regulator
+<4>[    3.064075] cpu cpu0: _opp_add: OPP not supported by regulators (1464000000)
+<4>[    3.064509] core: _opp_supported_by_regulators: OPP minuV: 0 maxuV: 0, not supported by regulator
+<4>[    3.064515] cpu cpu0: _opp_add: OPP not supported by regulators (1512000000)
+<4>[    3.065373] core: _opp_supported_by_regulators: OPP minuV: 0 maxuV: 0, not supported by regulator
+<4>[    3.065379] cpu cpu0: _opp_add: OPP not supported by regulators (1704000000)
+<3>[    3.065941] cpu cpu1: opp_list_debug_create_link: Failed to create link
+<3>[    3.065948] cpu cpu1: _add_opp_dev: Failed to register opp debugfs (-12)
+<3>[    3.066018] cpu cpu2: opp_list_debug_create_link: Failed to create link
+<3>[    3.066024] cpu cpu2: _add_opp_dev: Failed to register opp debugfs (-12)
+<3>[    3.066085] cpu cpu3: opp_list_debug_create_link: Failed to create link
+<3>[    3.066090] cpu cpu3: _add_opp_dev: Failed to register opp debugfs (-12)
+<7>[    3.068560] get usb_detect_mode is fail, 22
+<7>[    3.068568] get id is fail, 84
+<6>[    3.070378] rocknix-singleadc-joypad adc_joystick: joypad_dt_parse : invert-absx = 1, inveret-absy = 1, invert-absrx = 0, invert-absry = 0
+<7>[    3.070845] ====value: -1, linux_code:16 
+<7>[    3.070845] 
+<7>[    3.070873] ====value: 1, linux_code:16 
+<7>[    3.070873] 
+<7>[    3.070899] ====value: -1, linux_code:17 
+<7>[    3.070899] 
+<7>[    3.070925] ====value: 1, linux_code:17 
+<7>[    3.070925] 
+<6>[    3.071106] rocknix-singleadc-joypad adc_joystick: joypad_dt_parse : adc key cnt = 4, gpio key cnt = 15
+<6>[    3.071110] rocknix-singleadc-joypad adc_joystick: joypad_dt_parse : has rumble
+<6>[    3.071195] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : SCALE = 2, ABS min = -1800, max = 1800, fuzz = 32, flat = 32, deadzone = 64
+<6>[    3.071199] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : adc tuning_p = 200, adc_tuning_n = 200
+<6>[    3.071199] 
+<6>[    3.071203] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : SCALE = 2, ABS min = -1800, max = 1800, fuzz = 32, flat = 32, deadzone = 64
+<6>[    3.071207] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : adc tuning_p = 200, adc_tuning_n = 200
+<6>[    3.071207] 
+<6>[    3.071212] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : SCALE = 2, ABS min = -1800, max = 1800, fuzz = 32, flat = 32, deadzone = 64
+<6>[    3.071216] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : adc tuning_p = 200, adc_tuning_n = 200
+<6>[    3.071216] 
+<6>[    3.071220] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : SCALE = 2, ABS min = -1800, max = 1800, fuzz = 32, flat = 32, deadzone = 64
+<6>[    3.071224] rocknix-singleadc-joypad adc_joystick: joypad_input_setup : adc tuning_p = 200, adc_tuning_n = 200
+<6>[    3.071224] 
+<6>[    3.071229] rocknix-singleadc-joypad adc_joystick: Boost = 0, 0
+<6>[    3.071234] rocknix-singleadc-joypad adc_joystick: pwmid = 2, period:200000
+<6>[    3.071997] input: adc_gamepad as /devices/platform/adc_joystick/input/input4
+<6>[    3.072580] rocknix-singleadc-joypad adc_joystick: rumble setup success!
+<6>[    3.072584] rocknix-singleadc-joypad adc_joystick: joypad_probe : probe success
+<6>[    3.077025] sunxi-rtc rtc: setting system clock to 2026-06-07 02:36:33 UTC (1780799793)
+<6>[    3.078160] axp2202-dcdc4: disabling
+<6>[    3.080090] axp2202-cldo4: disabling
+<6>[    3.081020] ALSA device list:
+<6>[    3.081023]   #0: audiocodec
+<6>[    3.125242] sunxi-mmc sdc1: sdc set ios:clk 0Hz bm PP pm OFF vdd 0 width 1 timing LEGACY(SDR12) dt B
+<6>[    3.498915] Freeing unused kernel memory: 832K
+<6>[    3.504972] sunxi-mmc sdc0: sdc set ios:clk 400000Hz bm PP pm ON vdd 23 width 1 timing LEGACY(SDR12) dt B
+<15>[    3.519453] plumos-v90s-diag: plumOS V90S diagnostic init started
+<15>[    3.528961] plumos-v90s-diag: ## cat /proc/version
+<15>[    3.536876] plumos-v90s-diag: ## cat /proc/cmdline
+<15>[    3.546189] plumos-v90s-diag: ## cat /proc/filesystems
+<15>[    3.556236] plumos-v90s-diag: ## cat /proc/partitions
+<15>[    3.565992] plumos-v90s-diag: ## ls -la /dev
+<6>[    3.572909] sunxi-mmc sdc0: sdc set ios:clk 0Hz bm PP pm ON vdd 23 width 1 timing LEGACY(SDR12) dt B
+<6>[    3.583190] sunxi-mmc sdc0: no vqmmc,Check if there is regulator
+<15>[    3.590808] plumos-v90s-diag: ## dmesg
+scan: attempt 1
+## cat /proc/partitions
+major minor  #blocks  name
+
+scan: attempt 2
+## cat /proc/partitions
+major minor  #blocks  name
+
+ 179        0  120829952 mmcblk0
+ 179        1      15872 mmcblk0p1
+ 179        2        128 mmcblk0p2
+ 179        3        128 mmcblk0p3
+ 179        4      33792 mmcblk0p4
+ 179        5      65536 mmcblk0p5
+scan: cannot mount /dev/mmcblk0p1 ro
+scan: cannot mount /dev/mmcblk0p2 ro
+scan: cannot mount /dev/mmcblk0p3 ro
+scan: mounted /dev/mmcblk0p4 as vfat
+## ls -la /mnt/candidate
+-rwxr-xr-x    1        16 lcd_compatible_index.txt
+drwxr-xr-x    2       512 .fseventsd
+drwxr-xr-x    2       512 partitions
+-rwxr-xr-x    1      2643 knulli-boot.conf
+-rwxr-xr-x    1   1228938 bootlogo.bmp
+drwxr-xr-x    2       512 boot
+drwxr-xr-x    4         0 ..
+drwxr-xr-x    5       512 .
+scan: found /boot/knulli on /dev/mmcblk0p4
+boot: using /dev/mmcblk0p4 as boot root
+boot: mounted /dev/mmcblk0p4 as vfat on /boot_root
+## ls -la /boot_root
+-rwxr-xr-x    1        16 lcd_compatible_index.txt
+drwxr-xr-x    2       512 .fseventsd
+drwxr-xr-x    2       512 partitions
+-rwxr-xr-x    1      2643 knulli-boot.conf
+-rwxr-xr-x    1   1228938 bootlogo.bmp
+drwxr-xr-x    2       512 boot
+drwxrwxr-x   17         0 ..
+drwxr-xr-x    5       512 .
+## ls -la /boot_root/boot
+-rwxr-xr-x    1        14 knulli.board
+-rwxr-xr-x    1   2875392 knulli
+-rwxr-xr-x    1         0 autoresize
+drwxr-xr-x    5       512 ..
+drwxr-xr-x    2       512 .
+payload-share: scanning writable SD partitions
+payload-share: cannot use /dev/mmcblk0p1
+payload-share: cannot use /dev/mmcblk0p2
+payload-share: cannot use /dev/mmcblk0p3
+payload-share: cannot use /dev/mmcblk0p4
+payload-share: mounted /dev/mmcblk0p5 as ext4 on /payload_share
+payload-root: attached payload to /dev/loop2
+payload-root: mounted Debian payload rootfs
+## ls -la /payload_root
+drwxr-xr-x   11       160 var
+drwxr-xr-x   11       153 usr
+drwxrwxrwt    2         3 tmp
+drwxr-xr-x    2         3 sys
+drwxr-xr-x    2         3 srv
+lrwxrwxrwx    1         8 sbin -> usr/sbin
+drwxr-xr-x    4        40 run
+drwx------    2        46 root
+drwxr-xr-x    2         3 proc
+drwxr-xr-x    2         3 opt
+drwxr-xr-x    3        28 mnt
+drwxr-xr-x    2         3 media
+lrwxrwxrwx    1         7 lib -> usr/lib
+drwxr-xr-x    2         3 home
+drwxr-xr-x   29      1104 etc
+drwxr-xr-x    4       191 dev
+drwxr-xr-x    2         3 boot
+lrwxrwxrwx    1         7 bin -> usr/bin
+drwxrwxr-x   17         0 ..
+drwxr-xr-x   17       244 .
+## ls -la /payload_root/sbin
+lrwxrwxrwx    1         8 /payload_root/sbin -> usr/sbin
+## ls -la /payload_root/usr/sbin
+-rwxr-xr-x    1    133384 zramctl
+-rwxr-xr-x    1     68080 zic
+-rwxr-xr-x    1     67752 wipefs
+-rwxr-xr-x    1     74008 vipw
+lrwxrwxrwx    1         4 vigr -> vipw
+-rwxr-xr-x    1    142568 usermod
+-rwxr-xr-x    1    141856 userdel
+-rwxr-xr-x    1    208280 useradd
+-rwxr-xr-x    1      3984 update-shells
+-rwxr-xr-x    1     17742 update-rc.d
+-rwxr-xr-x    1     67920 update-passwd
+-rwxr-xr-x    1     67680 unix_update
+-rwxr-sr-x    1     67680 unix_chkpwd
+-rwxr-xr-x    1    133456 tune2fs
+-rwxr-xr-x    1       936 tarcat
+-rwxr-xr-x    1     67784 switch_root
+-rwxr-xr-x    1     67744 swapon
+-rwxr-xr-x    1     67744 swapoff
+-rwxr-xr-x    1     67744 swaplabel
+-rwxr-xr-x    1     67752 sulogin
+-rwxr-xr-x    1     68888 start-stop-daemon
+-rwxr-xr-x    1      2273 shadowconfig
+-rwxr-xr-x    1      9107 service
+-rwxr-xr-x    1    133312 runuser
+-rwxr-xr-x    1     67752 rtcwake
+-rwxr-xr-x    1     68464 rmt-tar
+lrwxrwxrwx    1        21 rmt -> /etc/alternatives/rmt
+-rwxr-xr-x    1     67672 resize2fs
+-rwxr-xr-x    1      1111 remove-shell
+-rwxr-xr-x    1     67784 readprofile
+-rwxr-xr-x    1     71528 pwunconv
+-rwxr-xr-x    1     67680 pwhistory_helper
+-rwxr-xr-x    1     71536 pwconv
+-rwxr-xr-x    1     71664 pwck
+-rwxr-xr-x    1     67744 pivot_root
+-rwxr-xr-x    1     67680 pam_timestamp_check
+-rwxr-xr-x    1       467 pam_namespace_helper
+-rwxr-xr-x    1      2890 pam_getenv
+-rwxr-xr-x    1     21288 pam-auth-update
+-rwxr-xr-x    1     67664 nologin
+-rwxr-xr-x    1    141816 newusers
+-rwxr-xr-x    1    133288 mkswap
+-rwxr-xr-x    1     67672 mklost+found
+-rwxr-xr-x    1     75888 mkhomedir_helper
+-rwxr-xr-x    1    133296 mkfs.minix
+lrwxrwxrwx    1         6 mkfs.ext4 -> mke2fs
+lrwxrwxrwx    1         6 mkfs.ext3 -> mke2fs
+lrwxrwxrwx    1         6 mkfs.ext2 -> mke2fs
+-rwxr-xr-x    1     67680 mkfs.cramfs
+-rwxr-xr-x    1     67752 mkfs.bfs
+-rwxr-xr-x    1     67744 mkfs
+-rwxr-xr-x    1    199048 mke2fs
+-rwxr-xr-x    1    133384 losetup
+-rwxr-xr-x    1     67520 logsave
+-rwxr-xr-x    1    863088 ldconfig
+-rwxr-xr-x    1     67752 ldattach
+-rwxr-xr-x    1     67800 killall5
+-rwxr-xr-x    1     67752 isosize
+-rwxr-xr-x    1     16517 invoke-rc.d
+-rwxr-xr-x    1      2659 installkernel
+-rwxr-xr-x    1      4404 init
+-rwxr-xr-x    1     68128 iconvconfig
+-rwxr-xr-x    1    133352 hwclock
+-rwxr-xr-x    1     71544 grpunconv
+-rwxr-xr-x    1     71544 grpconv
+-rwxr-xr-x    1     71688 grpck
+-rwxr-xr-x    1    141904 groupmod
+-rwxr-xr-x    1     71720 groupmems
+-rwxr-xr-x    1    141760 groupdel
+-rwxr-xr-x    1    141936 groupadd
+lrwxrwxrwx    1         6 getty -> agetty
+-rwxr-xr-x    1    133288 fstrim
+-rwxr-xr-x    1     67672 fstab-decode
+-rwxr-xr-x    1     67744 fsfreeze
+-rwxr-xr-x    1    198848 fsck.minix
+lrwxrwxrwx    1         6 fsck.ext4 -> e2fsck
+lrwxrwxrwx    1         6 fsck.ext3 -> e2fsck
+lrwxrwxrwx    1         6 fsck.ext2 -> e2fsck
+-rwxr-xr-x    1     67808 fsck.cramfs
+-rwxr-xr-x    1     67784 fsck
+-rwxr-xr-x    1     67744 findfs
+-rwxr-xr-x    1     67696 filefrag
+-rwxr-xr-x    1     67680 faillock
+-rwxr-xr-x    1     67672 e4defrag
+-rwxr-xr-x    1     67744 e4crypt
+-rwxr-xr-x    1     67672 e2undo
+-rwxr-xr-x    1      5394 e2scrub_all
+-rwxr-xr-x    1      7294 e2scrub
+lrwxrwxrwx    1         8 e2mmpstatus -> dumpe2fs
+lrwxrwxrwx    1         7 e2label -> tune2fs
+-rwxr-xr-x    1     67872 e2image
+-rwxr-xr-x    1    348192 e2fsck
+-rwxr-xr-x    1     67672 e2freefrag
+-rwxr-xr-x    1     67680 dumpe2fs
+-rwxr-xr-x    1      4485 dpkg-reconfigure
+-rwxr-xr-x    1      3925 dpkg-preconfigure
+-rwxr-xr-x    1     17401 dpkg-fsys-usrunmess
+-rwxr-xr-x    1     16727 deluser
+lrwxrwxrwx    1         7 delgroup -> deluser
+-rwxr-xr-x    1    271976 debugfs
+-rwxr-xr-x    1     67744 ctrlaltdel
+-rwxr-xr-x    1     73776 cppw
+lrwxrwxrwx    1         4 cpgr -> cppw
+-rwxr-xr-x    1     68560 chroot
+-rwxr-xr-x    1     71752 chpasswd
+-rwxr-xr-x    1    133288 chmem
+-rwxr-xr-x    1     71696 chgpasswd
+-rwxr-xr-x    1     67744 chcpu
+-rwxr-xr-x    1    133288 blockdev
+-rwxr-xr-x    1    133288 blkzone
+-rwxr-xr-x    1    198856 blkid
+-rwxr-xr-x    1     67752 blkdiscard
+-rwxr-xr-x    1     67688 badblocks
+-rwxr-xr-x    1    134480 agetty
+-rwxr-xr-x    1     48382 adduser
+lrwxrwxrwx    1         7 addgroup -> adduser
+-rwxr-xr-x    1      1053 add-shell
+drwxr-xr-x   11       153 ..
+drwxr-xr-x    2      1955 .
+boot: preparing to switch directly to payload /sbin/init
+boot: switching directly to payload /sbin/init
