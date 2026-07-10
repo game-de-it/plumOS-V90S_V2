@@ -8413,7 +8413,7 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line2, line2_size, "Use Connect Wi-Fi to start a new connection.");
     } else if (strcmp(id, "network_ssh_enabled") == 0) {
       copy_string(line1, line1_size, "SSH remote shell service.");
-      copy_string(line2, line2_size, "Port 2222; SFTP depends on this service.");
+      copy_string(line2, line2_size, "Port 22; SFTP depends on this service.");
     } else if (strcmp(id, "network_ftp_enabled") == 0) {
       copy_string(line1, line1_size, "FTP file transfer service.");
       copy_string(line2, line2_size, "Home is /mnt/plumos; ON/OFF persists after reboot.");

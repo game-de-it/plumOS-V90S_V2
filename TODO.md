@@ -111,7 +111,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Implement `cores` as the normal libretro-core build target.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
-- [x] Implement `network-services` for FTP/SFTP/Samba app-layer payloads.
+- [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba app-layer payloads.
 - [ ] Implement `picoarch`.
 - [ ] Implement `standalone`.
 - [x] Implement `frontend`.
@@ -196,7 +196,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy supported libretro cores into the app layer.
 - [x] Copy frontend into the app layer.
 - [x] Copy BusyBox and command-line userland into the app layer.
-- [x] Copy SSH/FTP/SFTP/Samba network service payloads into the app layer.
+- [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba network service payloads into the app layer.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.
@@ -220,6 +220,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Use p5 as the plumOS system squashfs.
 - [ ] Choose whether p6 or p7 becomes the FAT32 app/update/data partition.
 - [ ] Validate the chosen p6/p7 FAT32 layout on real hardware.
+- [ ] Increase the validated FAT32 app-layer capacity or split optional
+  userland/network payloads so the generated app-layer can be deployed without
+  exceeding the current 55MB live p7.
 - [ ] Keep an explicit development compatibility mode for the current p6/p7
   shape until the FAT32 app-layer partition is validated.
 - [ ] Do not treat ext4 `SHARE` as the final release app-layer design.

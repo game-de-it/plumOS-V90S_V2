@@ -23,7 +23,7 @@ usage() {
 Usage:
   build-network-services.sh
 
-Builds the plumOS V90S FTP/SFTP/Samba service package into:
+Builds the plumOS V90S Wi-Fi/FTP/SFTP/Samba service package into:
   output/network-services/v90s/
 
 Environment:
@@ -178,6 +178,7 @@ assemble_base() {
   mkdir -p "$BIN_DIR" "$LIB_DIR" "$SSH_LIBEXEC_DIR" "$SAMBA_SBIN_DIR" "$DOC_DIR"
   cp -a "${PACKAGE_DIR}/." "$PLUMOS_DIR/"
   chmod 0755 "${BIN_DIR}/plumos-network-services"
+  chmod 0755 "${BIN_DIR}/plumos-network-control"
   chmod 0755 "${PLUMOS_DIR}/ssh/start-ssh.sh" "${PLUMOS_DIR}/ssh/stop-ssh.sh"
   : > "$MANIFEST"
   {
@@ -326,6 +327,11 @@ Default share/home directory:
   /mnt/plumos
 
 Services:
+  Wi-Fi:
+    /mnt/plumos/bin/plumos-network-control scans SSIDs and controls the USB
+    Wi-Fi runtime used by the frontend. V90S has no internal Wi-Fi; when no USB
+    dongle or supported interface is present, scan/connect return with a
+    bounded failure stage instead of waiting forever.
   FTP:
     BusyBox tcpsvd + ftpd, port 21, max 20 concurrent connections.
     Use FileZilla's Force UTF-8 charset setting for Japanese ROM filenames.
@@ -347,6 +353,10 @@ Persistent service state:
   /mnt/plumos/config/network/services.conf
 
 Runtime control:
+  /mnt/plumos/bin/plumos-network-control --wifi status
+  /mnt/plumos/bin/plumos-network-control --scan
+  /mnt/plumos/bin/plumos-network-control --wifi on
+  /mnt/plumos/bin/plumos-network-control --wifi off
   /mnt/plumos/bin/plumos-network-services status ftp
   /mnt/plumos/bin/plumos-network-services status ssh
   /mnt/plumos/bin/plumos-network-services start ssh

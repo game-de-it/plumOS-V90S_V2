@@ -121,7 +121,10 @@ set -eu
 action="${1:-stop}"
 
 frontend_pids() {
-  pidof plumos-controller-ui-fbdev 2>/dev/null || true
+  {
+    pidof plumos-controller-ui-fbdev 2>/dev/null || true
+    pidof plumos-controller-ui-v90s 2>/dev/null || true
+  } | tr ' ' '\n' | awk 'NF && !seen[$1]++ { print $1 }'
 }
 
 print_status() {

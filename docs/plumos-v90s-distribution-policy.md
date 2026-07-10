@@ -305,6 +305,13 @@ Until the boot chain proves that p6/p7 can be simplified, image assembly may
 keep the existing partition count and assign the plumOS app layer to the safest
 validated partition.
 
+The chosen FAT32 app-layer partition must be sized from the generated payload,
+not from the early boot-test image. The July 11 live V90S p7 was only about
+55MB, which is enough for a targeted FE/RA/Wi-Fi update but too small for the
+current full app-layer output that includes userland and network-service
+payloads. Either increase the final FAT32 app-layer capacity or split optional
+payloads before treating full app-layer metadata as deployable to that partition.
+
 FAT32 limitations must be treated as part of the ABI:
 
 - no per-file Unix ownership or executable bits
@@ -353,7 +360,7 @@ The build system should be shaped like the MMF workflow:
 - Docker-based cross-build and packaging environment
 - explicit targets for vendor runtime preparation
 - explicit targets for command-line userland tools
-- explicit targets for FTP/SFTP/Samba transfer service payloads
+- explicit targets for Wi-Fi/FTP/SFTP/Samba network service payloads
 - explicit targets for RetroArch
 - explicit targets for libretro cores
 - explicit targets for standalone emulators
@@ -385,7 +392,7 @@ image              build the Docker toolchain image
 shell              open an interactive toolchain shell
 vendor-runtime     prepare v90s-stockos-r1 from artifacts/
 userland           build BusyBox and command-line tools for the app layer
-network-services   build FTP/SFTP/Samba payloads for the app layer
+network-services   build Wi-Fi/FTP/SFTP/Samba payloads for the app layer
 sdl2-powervr       build the patched SDL2 PowerVR compatibility payload
 retroarch          build RetroArch for the V90S PowerVR fbdev route
 cores              build supported libretro cores
@@ -477,7 +484,7 @@ test ROM or temporary payload only when the profile name makes that explicit.
 `app-layer` must assemble the FAT32-visible plumOS tree. It should collect:
 
 - BusyBox and command-line userland tools
-- FTP/SFTP/Samba transfer service payloads
+- Wi-Fi/FTP/SFTP/Samba network service payloads
 - RetroArch
 - libretro cores
 - PicoArch/PICO payloads
@@ -490,10 +497,13 @@ test ROM or temporary payload only when the profile name makes that explicit.
 - license notices for bundled app-layer components
 - update metadata
 
-The app-layer network service controller owns the user-facing SSH service state
-alongside FTP, SFTP, and Samba so the frontend, logs, and troubleshooting view
-all agree. On V90S the app-layer controller may start or adopt the OpenSSH
-daemon supplied by the system rootfs, but the visible control command is still:
+The app-layer network service controller owns the user-facing Wi-Fi and SSH
+service state alongside FTP, SFTP, and Samba so the frontend, logs, and
+troubleshooting view all agree. On V90S the Wi-Fi path must assume an external
+USB dongle rather than internal Wi-Fi, and scan/connect actions must return a
+bounded failure when no dongle or no supported interface is present. The
+app-layer controller may start or adopt the OpenSSH daemon supplied by the
+system rootfs, but the visible SSH control command is still:
 
 ```text
 /mnt/plumos/bin/plumos-network-services start|stop|status ssh
