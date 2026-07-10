@@ -112,7 +112,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Implement `standalone`.
 - [ ] Implement `frontend`.
 - [x] Implement `app-layer`.
-- [ ] Implement `release`.
+- [x] Implement `release`.
 - [ ] Implement `all` as the normal release build chain.
 - [ ] Emit manifest and sha256 metadata for every reusable build output.
 
@@ -228,12 +228,12 @@ Build plumOS V90S as a V90S-specific distribution:
 
 - [ ] Generate a full SD-root style package:
   `dist/plumos-v90s-sdroot-VERSION/`.
-- [ ] Generate an update-only package:
+- [x] Generate an update-only package:
   `dist/plumos-v90s-update-VERSION/`.
-- [ ] Ensure update-only packages can be copied over the FAT32 app layer from
+- [x] Ensure update-only packages can be copied over the FAT32 app layer from
   Windows or macOS.
-- [ ] Generate release `manifest.json`.
-- [ ] Generate release `checksums.sha256`.
+- [x] Generate release `manifest.json`.
+- [x] Generate release `checksums.sha256`.
 - [ ] Include license and notice files for:
   - plumOS-owned files
   - POWKIDDY StockOS/Batocera-derived runtime files
@@ -241,7 +241,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - libretro cores
   - bundled standalone emulators
   - bundled frontend dependencies
-- [ ] Ensure release archives do not contain private ROMs or credentials.
+- [x] Ensure release archives do not contain private ROMs or credentials.
 - [ ] Document the copy-over update workflow for Windows and macOS users.
 
 ## Milestone 8: Validation

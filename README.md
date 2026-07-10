@@ -69,6 +69,7 @@ Docker build flow です。
 ./scripts/docker-build.sh cores
 ./scripts/docker-build.sh retroarch
 ./scripts/docker-build.sh app-layer --strict
+./scripts/docker-build.sh release
 ./scripts/docker-build.sh system-rootfs \
   --profile debian-retroarch-powervr \
   --out-dir output/rootfs-step2 \
@@ -88,6 +89,11 @@ Docker build flow です。
 SDL2 PowerVR private libs、既知良好RetroArch設定テンプレート、metadata、
 checksumを含みます。symlinkは使わず、FAT32上で成立する実体ファイルとして
 配置します。
+
+`release` は `output/app-layer/v90s/` から update-only package を
+`dist/plumos-v90s-update-VERSION/`、`.tar.gz`、`.zip` として生成します。
+現時点では full SD-root package ではなく、FAT32 app layer へ上書きコピーする
+ための更新パッケージです。
 
 `sd-image` は StockOS 実機スナップショットで確認したパーティション契約を
 再現します。

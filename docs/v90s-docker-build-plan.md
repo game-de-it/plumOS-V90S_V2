@@ -112,13 +112,23 @@ directories, RetroArch, QuickNES, SDL2 PowerVR private libraries, and the curren
 known-good RetroArch defaults template. Files are copied without symlinks so the
 tree can be placed on FAT32.
 
+Implemented update-only release target:
+
+```sh
+./scripts/docker-build.sh release
+```
+
+This packages `output/app-layer/v90s/` into
+`dist/plumos-v90s-update-VERSION/`, `.tar.gz`, and `.zip`, plus archive
+SHA256SUMS. This is intentionally update-only until the final p6/p7 FAT32 app
+layer partition is validated.
+
 Reserved next targets:
 
 ```sh
 ./scripts/docker-build.sh picoarch
 ./scripts/docker-build.sh standalone
 ./scripts/docker-build.sh frontend
-./scripts/docker-build.sh release
 ./scripts/docker-build.sh all
 ```
 
