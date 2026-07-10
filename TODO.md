@@ -242,7 +242,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - bundled standalone emulators
   - bundled frontend dependencies
 - [x] Ensure release archives do not contain private ROMs or credentials.
-- [ ] Document the copy-over update workflow for Windows and macOS users.
+- [x] Document the copy-over update workflow for Windows and macOS users.
 
 ## Milestone 8: Validation
 
