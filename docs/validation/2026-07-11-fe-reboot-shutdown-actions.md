@@ -295,3 +295,67 @@ cmd: reboot -f
 
 Boot-time validation after this reboot is recorded in
 `docs/validation/2026-07-11-boot-speed-retest.md`.
+
+## Follow-up: poweroff command hang and p7 read-only remount
+
+The user later reported that both Reboot and Shutdown stopped working again and
+asked whether simply running `reboot` / `poweroff` would be enough.
+
+The live log showed that Shutdown reached the forced BusyBox command and then
+stopped there:
+
+```text
+start action=shutdown poweroff=1 dry_run=0 power_backend=auto sleep_backend=mem
+sd2: stopping content mounts
+sync: begin
+sync: done
+poweroff: requested backend=auto
+cmd: poweroff -f
+```
+
+This proves that plain command-based reboot/poweroff is not reliable on the
+current V90S runtime. The default FE path now avoids `reboot`, `poweroff`,
+`halt`, and BusyBox terminal commands. After SD2 stop and `sync`, Reboot and
+Shutdown go directly to the kernel sysrq trigger:
+
+```text
+reboot:   echo b >/proc/sysrq-trigger
+poweroff: echo o >/proc/sysrq-trigger
+```
+
+Explicit non-default backends remain available for diagnostics, but `auto`
+means sysrq-first/direct for normal FE operation.
+
+During the same check, p7 was found remounted read-only:
+
+```text
+/dev/mmcblk0p7 /mnt/plumos vfat ro,...,errors=remount-ro 0 0
+```
+
+The kernel reported FAT corruption at boot:
+
+```text
+FAT-fs (mmcblk0p7): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+FAT-fs (mmcblk0p7): error, fat_free_clusters: deleting FAT entry beyond EOF
+FAT-fs (mmcblk0p7): Filesystem has been set read-only
+```
+
+This is consistent with the user having to press the hardware reset button
+after the previous hung power action: p7 was not cleanly unmounted, then the
+next boot remounted it read-only after detecting FAT damage.
+
+This read-only remount also explains why RetroArch config saves can appear to
+revert: `/mnt/plumos/config/retroarch/retroarch-v90s.cfg` cannot be updated
+while p7 is read-only.
+
+The sysrq-direct helper was rebuilt locally:
+
+```text
+1c34c9670e782bd2f586402bbe97a4c1ba167e13c1d72f980d35b178da09adf4  output/app-layer/v90s/bin/plumos-safe-shutdown
+51a0cf0ba3ac69bf89609944dfde6b768219e562f3e516d3bfc9eea5f04c427e  output/app-layer/v90s/manifest.json
+b5d53ab4ee246b46fbae96d06064af34abb090bf1476acb145884e5382950797  output/app-layer/v90s/checksums.sha256
+```
+
+Live deployment could not be completed because `/mnt/plumos` was already
+read-only. The next step is to repair p7 with FAT fsck from macOS or from an
+offline maintenance path, then deploy the updated helper.

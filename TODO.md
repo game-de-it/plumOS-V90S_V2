@@ -241,6 +241,10 @@ Build plumOS V90S as a V90S-specific distribution:
   filesystem sync performed before reboot or poweroff.
 - [x] Add a final-action watchdog so a hung `reboot -f` or `poweroff -f` cannot
   block the already-synced FE Reboot/Shutdown path before reaching sysrq.
+- [x] Change the normal FE Reboot/Shutdown path to direct sysrq after SD2 stop
+  and sync, because BusyBox `reboot` / `poweroff` can return or hang on V90S.
+- [ ] Repair and revalidate the p7 FAT32 app layer after the kernel remounted
+  `/mnt/plumos` read-only due to FAT corruption.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout

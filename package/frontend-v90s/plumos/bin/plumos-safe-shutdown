@@ -28,7 +28,7 @@ Options:
   --sleep                Sync and enter sleep when supported.
   --poweroff             Power off after shutdown sync.
   --no-poweroff          Do not power off. Default.
-  --power-backend NAME   Power backend: auto, poweroff, halt, busybox, sysrq, none.
+  --power-backend NAME   Power backend: auto, sysrq, poweroff, halt, busybox, none.
   --sleep-backend NAME   Sleep backend: mem, standby, freeze, none.
   --wakeup-sec N         Set RTC wakealarm before sleep when available.
   --hold-resume          Accepted for compatibility; no-op.
@@ -302,9 +302,7 @@ reboot_action() {
     echo "result=dry_run_reboot"
     return 0
   fi
-  run_final_command_with_watchdog b reboot reboot -f ||
-    run_final_command_with_watchdog b busybox-reboot busybox reboot -f ||
-    trigger_sysrq b reboot ||
+  trigger_sysrq b reboot ||
     {
       log "reboot: failed_all_backends"
       echo "result=reboot_failed"
@@ -326,10 +324,7 @@ shutdown_action() {
     return 0
   fi
   if [ "$POWER_BACKEND" = auto ]; then
-    try_poweroff poweroff ||
-      try_poweroff busybox ||
-      try_poweroff halt ||
-      try_poweroff sysrq ||
+    try_poweroff sysrq ||
       {
         log "poweroff: failed_all_backends"
         echo "result=poweroff_failed"
