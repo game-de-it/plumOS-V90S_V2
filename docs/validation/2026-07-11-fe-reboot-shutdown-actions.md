@@ -217,3 +217,55 @@ result=dry_run_poweroff
 
 Actual reboot and poweroff still need user-side real-device validation because
 running either action intentionally drops SSH.
+
+## Follow-up: hung final reboot command
+
+The user tested START menu Reboot again. The device appeared to hang and needed
+the hardware reset button.
+
+The live log showed that the helper reached the forced final command and then
+stopped there:
+
+```text
+start action=reboot poweroff=0 dry_run=0 power_backend=auto sleep_backend=mem
+sd2: stopping content mounts
+sync: begin
+sync: done
+reboot: requested
+cmd: reboot -f
+```
+
+There was no `cmd_returned` line after `cmd: reboot -f`, so the previous
+fallback chain could still stall before reaching `busybox reboot -f` or sysrq.
+
+The helper now wraps only the terminal `reboot -f` / `poweroff -f` commands in a
+short final-action watchdog. After `sync` has completed, the watchdog waits
+three seconds by default and then triggers sysrq if the terminal command has not
+returned:
+
+```text
+reboot -f watchdog -> sysrq b
+poweroff -f watchdog -> sysrq o
+```
+
+This keeps the normal frontend/SSH process model unchanged and only affects the
+last irreversible power action after the user explicitly chooses Reboot or
+Shutdown.
+
+Updated output hashes:
+
+```text
+318691a8ab798e771bc65f0e4a72d7931f3e1796931f6dd77ae74806a83deb05  output/app-layer/v90s/bin/plumos-safe-shutdown
+51eb6c15912ce15d72e998e56cf361aea2132d7a7cdee8b412518e4c20881877  output/app-layer/v90s/manifest.json
+58187e49f20b64f91bfaca8f025f82d27ce679eb7b20503194f59ff52c7d8f55  output/app-layer/v90s/checksums.sha256
+```
+
+Live deployment:
+
+```text
+318691a8ab798e771bc65f0e4a72d7931f3e1796931f6dd77ae74806a83deb05  /mnt/plumos/bin/plumos-safe-shutdown
+bin/plumos-safe-shutdown: OK
+```
+
+The actual FE Reboot action needs one more user-side validation pass after this
+watchdog deployment.

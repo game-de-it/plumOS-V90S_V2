@@ -16,6 +16,7 @@ POWER_BACKEND="${PLUMOS_POWER_ACTION_POWER_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_POWER
 SLEEP_BACKEND="${PLUMOS_POWER_ACTION_SLEEP_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_SLEEP_BACKEND:-mem}}"
 WAKEUP_SEC="${PLUMOS_POWER_ACTION_SLEEP_WAKEUP_SEC:-${PLUMOS_SAFE_SLEEP_WAKEUP_SEC:-0}}"
 WAIT_SEC="${PLUMOS_POWER_ACTION_WAIT_SEC:-${PLUMOS_SAFE_SHUTDOWN_WAIT_SEC:-1}}"
+FINAL_WATCHDOG_SEC="${PLUMOS_POWER_ACTION_FINAL_WATCHDOG_SEC:-${PLUMOS_SAFE_SHUTDOWN_FINAL_WATCHDOG_SEC:-3}}"
 
 usage() {
   cat <<'USAGE'
@@ -165,6 +166,38 @@ run_final_command() {
   return 1
 }
 
+run_final_command_with_watchdog() {
+  key="$1"
+  name="$2"
+  shift 2
+
+  marker=""
+  watchdog_pid=""
+  if [ "$FINAL_WATCHDOG_SEC" -gt 0 ] 2>/dev/null && [ -w /proc/sysrq-trigger ]; then
+    marker="/tmp/plumos-final-action.$$.$name"
+    if : > "$marker" 2>/dev/null; then
+      (
+        sleep "$FINAL_WATCHDOG_SEC" 2>/dev/null || true
+        [ -e "$marker" ] || exit 0
+        log "watchdog: trigger action=$name key=$key after=${FINAL_WATCHDOG_SEC}s"
+        echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
+        echo "$key" >/proc/sysrq-trigger 2>/dev/null || true
+      ) &
+      watchdog_pid=$!
+    else
+      marker=""
+    fi
+  fi
+
+  log "cmd: $*"
+  "$@"
+  rc=$?
+  [ -z "$marker" ] || rm -f "$marker" 2>/dev/null || true
+  [ -z "$watchdog_pid" ] || kill "$watchdog_pid" 2>/dev/null || true
+  log "cmd_returned rc=$rc cmd=$*"
+  return 1
+}
+
 trigger_sysrq() {
   key="$1"
   name="$2"
@@ -243,13 +276,13 @@ try_poweroff() {
   backend="$1"
   case "$backend" in
     poweroff)
-      run_final_command poweroff -f
+      run_final_command_with_watchdog o poweroff poweroff -f
       ;;
     halt)
-      run_final_command halt -f
+      run_final_command_with_watchdog o halt halt -f
       ;;
     busybox)
-      run_final_command busybox poweroff -f
+      run_final_command_with_watchdog o busybox-poweroff busybox poweroff -f
       ;;
     sysrq)
       trigger_sysrq o poweroff
@@ -269,8 +302,8 @@ reboot_action() {
     echo "result=dry_run_reboot"
     return 0
   fi
-  run_final_command reboot -f ||
-    run_final_command busybox reboot -f ||
+  run_final_command_with_watchdog b reboot reboot -f ||
+    run_final_command_with_watchdog b busybox-reboot busybox reboot -f ||
     trigger_sysrq b reboot ||
     {
       log "reboot: failed_all_backends"

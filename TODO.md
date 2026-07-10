@@ -239,6 +239,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Expose FE reboot and shutdown actions through
   `/mnt/plumos/bin/plumos-safe-shutdown`, with SD2 content mounts stopped and
   filesystem sync performed before reboot or poweroff.
+- [x] Add a final-action watchdog so a hung `reboot -f` or `poweroff -f` cannot
+  block the already-synced FE Reboot/Shutdown path before reaching sysrq.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout
