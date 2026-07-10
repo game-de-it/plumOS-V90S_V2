@@ -192,7 +192,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Add boot/frontend startup checks for app-layer metadata in the
   development init path.
 - [x] Validate frontend boot on real V90S hardware.
-- [ ] Live-validate the formal V90S fbdev frontend design after SSH reconnect,
+- [x] Live-validate the formal V90S fbdev frontend design after SSH reconnect,
   including a `/dev/fb0` capture and single-frontend-process check.
 
 ## Milestone 5: SD Image Layout

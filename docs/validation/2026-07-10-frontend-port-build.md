@@ -526,3 +526,84 @@ The next live validation step is to reconnect V90S SSH, copy
 `output/app-layer/v90s` to `/mnt/plumos` without deleting ROMs/Saves, restart
 only the validated frontend PID from `/run/plumos-v90s/frontend.pid`, and capture
 `/dev/fb0` for visual proof.
+
+## Formal fbdev Frontend Live Validation
+
+SSH returned at:
+
+```text
+root@192.0.2.120
+```
+
+The running image had p7 `SHARE` present but not mounted. It was empty except for
+`lost+found`, so p7 was mounted live as:
+
+```text
+/dev/mmcblk0p7 -> /mnt/plumos
+```
+
+The rebuilt app layer was copied to `/mnt/plumos`. AppleDouble `._*` files from
+the macOS tar stream were removed afterward. The app-layer checksum passed on
+device:
+
+```text
+cd /mnt/plumos
+sha256sum -c checksums.sha256: OK
+```
+
+The NES test ROM was copied to:
+
+```text
+/mnt/plumos/Roms/nes/Super Mario Bros..nes
+```
+
+The scanner detected it:
+
+```text
+system nes                roms=1 thumbnails=0
+wrote: /mnt/plumos/state/frontend/systems/nes.json
+```
+
+The frontend was started from SSH:
+
+```text
+PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+  nohup /mnt/plumos/bin/plumos-frontend-launch \
+  >/mnt/plumos/Logs/frontend-ssh-start.log 2>&1 &
+```
+
+Runtime proof:
+
+```text
+frontend pid=1061 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+frontend_count=1
+retroarch_count=0
+pidfile=1061
+pidfile_alive=yes
+```
+
+Framebuffer metadata:
+
+```text
+virtual_size=640,960
+bpp=32
+stride=2560
+```
+
+The formal frontend was captured from fb page 0:
+
+```text
+output/validation/frontend-formal-live/fb0-page0.png
+d94eb51c27653d1b6a4d658abf7a9da035360ebde1841a9f0831d9519610f86b
+```
+
+The second framebuffer page still contained a stale RetroArch menu image from a
+previous run:
+
+```text
+output/validation/frontend-formal-live/fb0-page1.png
+fecac0e4af0707015fe0ee02b1b78d0f7d1f64388ca7bc027a3b8e2c42409509
+```
+
+That stale page was not a live RetroArch process; `/proc` showed
+`retroarch_count=0`.
