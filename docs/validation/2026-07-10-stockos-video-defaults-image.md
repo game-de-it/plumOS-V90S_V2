@@ -24,13 +24,22 @@ threaded_data_runloop_enable = "true"
 
 ## Live Device Status
 
-The V90S initially answered at `192.0.2.120` and was running
-`plumOS V90S Step2 RetroArch Debian payload`. Before the live config could be
-changed, SSH stopped responding. Subsequent scans only found unrelated SSH hosts
-at `192.0.2.1` and `192.0.2.6`.
+The V90S answered at `192.0.2.120` and was running
+`plumOS V90S Step2 RetroArch Debian payload`. The live device was updated over
+SSH with the same launcher, route, and RetroArch config values documented here,
+then RetroArch was restarted.
 
-The source tree and replacement image were updated so the next boot can test the
-same settings even without live SSH access.
+User-observed result after the live update:
+
+```text
+fps, scrolling, and audio pitch are perfect.
+```
+
+The full live success snapshot is recorded in:
+
+```text
+docs/validation/2026-07-10-step2-stockos-video-perfect-runtime.md
+```
 
 ## Build
 
@@ -76,6 +85,5 @@ setting is not assumed to be portable to the current runtime.
 
 ## Next Test
 
-If SSH returns on the current boot, apply the same values live to
-`/mnt/share/retroarch/retroarch-v90s.cfg` and restart RetroArch. Otherwise flash
-`plumos-v90s-stockos-ra-20260710-2-stockos-video.img`.
+Clean-boot `plumos-v90s-stockos-ra-20260710-2-stockos-video.img` from SD and
+confirm it reproduces the live-patched success without SSH-side edits.

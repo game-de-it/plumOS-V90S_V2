@@ -4,7 +4,7 @@ Last updated: 2026-07-10
 
 ## Current Goal
 
-Step 2: Run RetroArch on V90S real hardware with visible 60fps video, audible audio, and V90S built-in controller input.
+Step 2 status: achieved on the live StockOS-layout image after applying StockOS-derived RetroArch video timing defaults.
 
 Step 1 status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
 
@@ -98,10 +98,10 @@ Target:
 - [x] Boot RetroArch from the generated V90S SD image.
 - [x] Launch local test ROM `artifacts/nes/Super Mario Bros..nes`.
 - [x] Show gameplay on the internal LCD.
-- [ ] Reach approximately 60fps with no obvious pacing issue.
-- [ ] Output audible sound.
+- [x] Reach approximately 60fps with no obvious pacing issue.
+- [x] Output audible sound.
 - [x] Use V90S built-in controls for Start, D-pad, A, and B.
-- [x] Save RetroArch launch/runtime logs to FAT under `/Volumes/KNULLI/plumos-logs/`.
+- [x] Save RetroArch launch/runtime logs for analysis; current StockOS-layout runtime writes them under `/mnt/share/` on the live overlay.
 
 Constraints:
 
@@ -203,15 +203,16 @@ First implementation tasks:
 - [x] Add a StockOS/Batocera-layout SD image assembler using vendor runtime raw env/boot partitions.
 - [x] Build `plumos-v90s-stockos-smoke-20260710-1.img` with p1 Volumn, p2/p3 env, p4 boot, p5 batocera squashfs, p6 BATOCERA, and p7 SHARE.
 - [x] Extend StockOS extraction to capture raw `boot0` and `boot_package` areas for future fallback removal.
-- [ ] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
-- [ ] If RA-only timing is insufficient, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
-- [ ] If pacing still differs, test StockOS-like CPU governor and `irqbalance` behavior.
-- [ ] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
+- [x] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
+- [x] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
+- [ ] If future cores still show timing/audio issues, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
+- [ ] If future cores still show pacing issues, test StockOS-like CPU governor and `irqbalance` behavior.
 - [x] Move the SD image assembly path to StockOS/Batocera vendor-runtime inputs instead of KNULLI/Armbian-named inputs.
 - [x] Build a StockOS-layout RA image by placing the current RetroArch-capable rootfs on p5 instead of the smoke stage1 rootfs.
 - [ ] Boot-test the StockOS-layout smoke image on V90S and compare logs/display behavior with the existing KNULLI-layout Step 1 image.
 - [ ] Boot-test `plumos-v90s-stockos-ra-20260710-1.img` on V90S and compare RetroArch display/input/audio behavior.
 - [x] Apply StockOS-derived RetroArch video defaults in the V90S launcher path: `video_threaded=true`, `video_refresh_rate=58.917103`, and `vrr_runloop_enable=true`.
+- [x] Live-apply StockOS-derived RetroArch video defaults to `192.0.2.120`; user confirmed fps, scrolling, and audio pitch are perfect.
 - [ ] Boot-test `plumos-v90s-stockos-ra-20260710-2-stockos-video.img` and compare pacing/audio against `-1`.
 - [ ] Add V90S Docker targets for PicoArch, standalone emulators, and the plumOS frontend.
 
@@ -221,7 +222,8 @@ Validation buckets:
 - [x] FPS near 60 observed, but slightly below 60 and not yet tuned.
 - [x] Audio diagnostic tone is audible with `knulli_asound_state`.
 - [x] Audible RetroArch game output confirmed.
-- [ ] Smooth KNULLI-equivalent vsync/frame pacing confirmed.
+- [x] StockOS timing defaults produce user-confirmed perfect FPS/scrolling/audio pitch on the live V90S.
+- [x] Smooth StockOS/KNULLI-equivalent frame pacing confirmed with StockOS timing defaults.
 - [ ] USB keyboard input works only.
 - [x] Built-in controls work in game.
 - [ ] Built-in controls fail; event mapping needed.

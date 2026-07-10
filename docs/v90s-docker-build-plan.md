@@ -125,7 +125,9 @@ p5:
 ```
 
 The StockOS-video-defaults variant keeps the same layout and applies the
-observed StockOS RetroArch timing defaults:
+observed StockOS RetroArch timing defaults. The same values were live-applied
+to `plumos-v90s-stockos-ra-20260710-1.img`, where the user confirmed FPS,
+scrolling, and audio pitch were perfect:
 
 ```sh
 ./scripts/docker-build.sh stockos-image \
@@ -165,17 +167,23 @@ Batocera's restrictive configuration behavior. The goal is:
 - keep diagnostics explicit instead of hiding validation behind fallback routes
 
 The StockOS comparison showed that threaded video was part of the working
-configuration:
+configuration. The plumOS live success kept the PowerVR `mali_fbdev` display
+route and direct ALSA audio while applying the StockOS timing values:
 
 ```text
+video_driver = "gl"
+video_context_driver = "mali_fbdev"
 video_refresh_rate = "58.917103"
 vrr_runloop_enable = true
 video_threaded = true
-audio_driver = "pulse"
+threaded_data_runloop_enable = true
+audio_driver = "alsa"
+audio_device = "hw:0,0"
 audio_latency = 64
 ```
 
-Those values are a starting point, not a hard lock.
+Those are the current NES/QuickNES known-good defaults. Other cores may still
+need their own timing or audio validation.
 
 ## License Notice
 

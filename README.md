@@ -8,7 +8,7 @@ plumOS-built userspace を組み合わせた Linux SD カードイメージを�
 
 まずは V90S 実機で SD カードから起動し、内蔵画面に Linux コンソールが表示され、USB キーボードで入力でき、`ls` などの基本コマンドを実行できる状態を目標にします。
 
-Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達成済みです。現在は Step 2 として、RetroArch で NES ROM を起動し、60fps 映像、音声出力、V90S 本体コントローラー操作を確認する段階です。Step 2 の詳細は `docs/step2-retroarch-plan.md` と `docs/step2-knulli-runtime-armbian-plan.md` に記録します。
+Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達成済みです。Step 2 は、StockOS-derived RetroArch video timing defaults を live 適用した状態で、NES/QuickNES の FPS、スクロール、音程、音声出力、本体コントローラー操作が実機確認済みです。Step 2 の詳細は `docs/step2-retroarch-plan.md`、`docs/step2-knulli-runtime-armbian-plan.md`、`docs/validation/2026-07-10-step2-stockos-video-perfect-runtime.md` に記録します。
 
 ## Current strategy
 
@@ -88,7 +88,7 @@ p7 rootfs_data / SHARE ext4
 StockOS 由来の `boot0` / `boot_package` が未採取の場合は、互換性のある
 KNULLI V90S asset を fallback として使い、manifest に記録します。
 現在のRA入りStockOSレイアウト候補は
-`output/images/plumos-v90s-stockos-ra-20260710-1.img` です。
+`output/images/plumos-v90s-stockos-ra-20260710-2-stockos-video.img` です。
 
 旧 KNULLI/Armbian レイアウトを使う場合だけ、明示的に `knulli-image` を使います。
 
