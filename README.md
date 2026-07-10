@@ -87,8 +87,9 @@ p7 rootfs_data / SHARE ext4
 ```
 
 反復テストを速くするため、p1 の FAT 領域はデフォルトで `33M` に抑えます。
-StockOS 由来の `boot0` / `boot_package` が未採取の場合は、互換性のある
-KNULLI V90S asset を fallback として使い、manifest に記録します。
+StockOS 由来の `boot0` / `boot_package` が未採取の場合に互換性のある
+KNULLI V90S asset を使うには、診断用として
+`--allow-knulli-boot-fallback` を明示します。
 vendor runtime の正式入力は `artifacts/vendor/v90s-stockos-r1/`、正式出力は
 `output/vendor/v90s-stockos-r1/` です。`output/vendor/stockos-runtime` は移行中
 の互換エイリアスとして扱います。

@@ -148,7 +148,8 @@ For fast iteration, p1 defaults to `33M` instead of StockOS's larger FAT area.
 The assembled smoke image uses the StockOS-derived p2/p3 env and p4 Android boot
 partition from `output/vendor/v90s-stockos-r1`. If the extraction includes
 raw StockOS `boot0` and `boot_package` captures, they are used automatically;
-until then the manifest records the KNULLI V90S fallback assets.
+otherwise `--allow-knulli-boot-fallback` must be passed explicitly for a legacy
+diagnostic image that uses the KNULLI V90S fallback assets.
 
 ## Naming
 

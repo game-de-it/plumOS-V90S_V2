@@ -13,6 +13,9 @@ boot_package_img=""
 include_stock_overlay=0
 repack_rootfs=1
 keep_work=0
+allow_knulli_boot_fallback=0
+boot0_source=explicit
+boot_package_source=explicit
 
 usage() {
     cat <<'USAGE'
@@ -32,9 +35,12 @@ Options:
                         p6 rootfs/BATOCERA ext4 size, default 33M
   --share-size N        p7 rootfs_data/SHARE ext4 size, default 64M
   --boot0 PATH          raw Allwinner boot0 image; default vendor runtime if present,
-                        otherwise KNULLI V90S boot0 fallback
+                        otherwise requires --allow-knulli-boot-fallback
   --boot-package PATH   raw Allwinner boot_package.fex; default vendor runtime if
-                        present, otherwise KNULLI V90S boot package fallback
+                        present, otherwise requires --allow-knulli-boot-fallback
+  --allow-knulli-boot-fallback
+                        allow legacy KNULLI V90S boot0/boot_package fallback
+                        when raw StockOS boot-chain captures are absent
   --include-stock-overlay
                         include StockOS /media/BATOCERA/boot/overlay in p6
   --no-rootfs-repack    copy --rootfs-squashfs directly instead of adding
@@ -84,11 +90,17 @@ while [ "$#" -gt 0 ]; do
             ;;
         --boot0)
             boot0_img="$2"
+            boot0_source=explicit
             shift 2
             ;;
         --boot-package)
             boot_package_img="$2"
+            boot_package_source=explicit
             shift 2
+            ;;
+        --allow-knulli-boot-fallback)
+            allow_knulli_boot_fallback=1
+            shift
             ;;
         --include-stock-overlay)
             include_stock_overlay=1
@@ -158,15 +170,27 @@ done
 if [ -z "$boot0_img" ]; then
     if [ -f "$raw_boot_chain_dir/boot0-offset-131072.bin" ]; then
         boot0_img="$raw_boot_chain_dir/boot0-offset-131072.bin"
-    else
+        boot0_source=vendor-runtime
+    elif [ "$allow_knulli_boot_fallback" -eq 1 ]; then
         boot0_img=".cache/knulli-linux/board/allwinner/a133/powkiddy-v90s/partitions/boot0.img"
+        boot0_source=knulli-fallback
+    else
+        printf 'error: StockOS raw boot0 capture not found: %s/boot0-offset-131072.bin\n' "$raw_boot_chain_dir" >&2
+        printf 'hint: extract raw boot-chain captures or pass --allow-knulli-boot-fallback for a legacy diagnostic image\n' >&2
+        exit 1
     fi
 fi
 if [ -z "$boot_package_img" ]; then
     if [ -f "$raw_boot_chain_dir/boot-package-offset-16793600.bin" ]; then
         boot_package_img="$raw_boot_chain_dir/boot-package-offset-16793600.bin"
-    else
+        boot_package_source=vendor-runtime
+    elif [ "$allow_knulli_boot_fallback" -eq 1 ]; then
         boot_package_img=".cache/knulli-linux/board/allwinner/a133/powkiddy-v90s/partitions/boot_package.fex"
+        boot_package_source=knulli-fallback
+    else
+        printf 'error: StockOS raw boot_package capture not found: %s/boot-package-offset-16793600.bin\n' "$raw_boot_chain_dir" >&2
+        printf 'hint: extract raw boot-chain captures or pass --allow-knulli-boot-fallback for a legacy diagnostic image\n' >&2
+        exit 1
     fi
 fi
 if [ ! -f "$boot0_img" ]; then
@@ -356,7 +380,10 @@ rootfs_squashfs_sha256=$sha256_rootfs
 p5_batocera_squashfs_sha256=$sha256_p5
 rootfs_repacked_for_stockos_init=$repack_rootfs
 boot0=$boot0_img
+boot0_source=$boot0_source
 boot_package=$boot_package_img
+boot_package_source=$boot_package_source
+allow_knulli_boot_fallback=$allow_knulli_boot_fallback
 stockos_boot_partition=$raw_dir/mmcblk0p4-boot.bin
 stockos_boot_partition_sha256=$sha256_boot
 volumn_vfat_size=$volumn_vfat_size
@@ -364,7 +391,7 @@ batocera_boot_size=$batocera_boot_size
 share_size=$share_size
 include_stock_overlay=$include_stock_overlay
 partitions=p1:boot-resource/Volumn,p2:env,p3:env-redund,p4:boot,p5:batocera,p6:rootfs/BATOCERA,p7:rootfs_data/SHARE
-notice=Uses POWKIDDY V90S StockOS/Batocera-derived runtime inputs where available. boot0/boot_package fall back to KNULLI V90S assets unless raw StockOS boot-chain captures are present.
+notice=Uses POWKIDDY V90S StockOS/Batocera-derived runtime inputs. KNULLI boot0/boot_package assets are used only when --allow-knulli-boot-fallback is passed and raw StockOS boot-chain captures are absent.
 EOF
 
 printf 'created: %s/%s\n' "$out_dir" "$image_name"

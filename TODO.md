@@ -79,8 +79,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Generate `output/vendor/v90s-stockos-r1/SHA256SUMS`.
 - [x] Make `./scripts/docker-build.sh vendor-runtime` run consistently through
   the Docker entry point.
-- [ ] Keep KNULLI boot/runtime assets only as explicit legacy diagnostic inputs
-  or temporary fallback inputs, not as the main runtime identity.
+- [x] Require explicit opt-in before using KNULLI `boot0` / `boot_package`
+  fallback assets in StockOS-layout image assembly.
+- [ ] Rename or isolate remaining KNULLI-specific runtime script/profile names
+  that now describe the stable StockOS-derived runtime.
 
 ## Milestone 2: Build System Targets
 
