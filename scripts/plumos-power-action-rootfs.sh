@@ -2,13 +2,13 @@
 set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
-PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
-export PATH
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
+cd / 2>/dev/null || true
 
-ROOTFS_POWER_ACTION="${PLUMOS_POWER_ACTION_ROOTFS_HELPER:-/usr/sbin/plumos-power-action}"
-LOG_DIR="${PLUMOS_ROOT}/Logs"
-LOG_FILE="${PLUMOS_POWER_ACTION_LOG:-${LOG_DIR}/power-action.log}"
-LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/tmp/plumos-safe-shutdown.lock}"
+LOG_FILE="${PLUMOS_POWER_ACTION_LOG:-/run/plumos-power-action.log}"
+LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/tmp/plumos-power-action.lock}"
 
 ACTION=shutdown
 POWER_OFF=0
@@ -17,49 +17,12 @@ POWER_BACKEND="${PLUMOS_POWER_ACTION_POWER_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_POWER
 SLEEP_BACKEND="${PLUMOS_POWER_ACTION_SLEEP_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_SLEEP_BACKEND:-mem}}"
 WAKEUP_SEC="${PLUMOS_POWER_ACTION_SLEEP_WAKEUP_SEC:-${PLUMOS_SAFE_SLEEP_WAKEUP_SEC:-0}}"
 WAIT_SEC="${PLUMOS_POWER_ACTION_WAIT_SEC:-${PLUMOS_SAFE_SHUTDOWN_WAIT_SEC:-1}}"
-FINAL_WATCHDOG_SEC="${PLUMOS_POWER_ACTION_FINAL_WATCHDOG_SEC:-${PLUMOS_SAFE_SHUTDOWN_FINAL_WATCHDOG_SEC:-3}}"
-FINAL_QUIESCE="${PLUMOS_POWER_ACTION_FINAL_QUIESCE:-${PLUMOS_SAFE_SHUTDOWN_FINAL_QUIESCE:-1}}"
-
-has_arg() {
-  wanted="$1"
-  shift
-  for arg in "$@"; do
-    [ "$arg" = "$wanted" ] && return 0
-  done
-  return 1
-}
-
-delegate_to_rootfs_power_action() {
-  [ "${PLUMOS_POWER_ACTION_DISABLE_ROOTFS_HELPER:-0}" = "1" ] && return 1
-  [ -x "$ROOTFS_POWER_ACTION" ] || return 1
-
-  mkdir -p "$LOG_DIR" /run 2>/dev/null || true
-  printf '%s uptime=%s delegate rootfs_helper=%s args=%s\n' \
-    "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo unknown-time)" \
-    "$(cat /proc/uptime 2>/dev/null | awk '{print $1}' || echo unknown)" \
-    "$ROOTFS_POWER_ACTION" "$*" >> "$LOG_FILE" 2>/dev/null || true
-
-  if has_arg --dry-run "$@" || has_arg --sleep "$@" || has_arg --no-poweroff "$@"; then
-    exec "$ROOTFS_POWER_ACTION" "$@"
-  fi
-
-  if has_arg --reboot "$@" || has_arg --poweroff "$@"; then
-    PLUMOS_ROOT="$PLUMOS_ROOT" \
-    PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}" \
-    PLUMOS_POWER_ACTION_LOG="${PLUMOS_POWER_ACTION_ROOTFS_LOG:-/run/plumos-power-action.log}" \
-      "$ROOTFS_POWER_ACTION" "$@" </dev/null >/dev/null 2>&1 &
-    echo "result=power_action_scheduled"
-    exit 0
-  fi
-
-  exec "$ROOTFS_POWER_ACTION" "$@"
-}
-
-delegate_to_rootfs_power_action "$@"
+FINAL_UNMOUNT="${PLUMOS_POWER_ACTION_FINAL_UNMOUNT:-${PLUMOS_SAFE_SHUTDOWN_FINAL_UNMOUNT:-1}}"
+MIRROR_LOG="${PLUMOS_POWER_ACTION_MIRROR_LOG:-1}"
 
 usage() {
   cat <<'USAGE'
-Usage: plumos-safe-shutdown [options]
+Usage: plumos-power-action [options]
 
 Options:
   --shutdown             Run the shutdown action. Default.
@@ -67,27 +30,29 @@ Options:
   --sleep                Sync and enter sleep when supported.
   --poweroff             Power off after shutdown sync.
   --no-poweroff          Do not power off. Default.
-  --power-backend NAME   Power backend: auto, sysrq, poweroff, halt, busybox, none.
+  --power-backend NAME   Power backend: auto, sysrq, none. Other names are accepted as sysrq.
   --sleep-backend NAME   Sleep backend: mem, standby, freeze, none.
   --wakeup-sec N         Set RTC wakealarm before sleep when available.
   --hold-resume          Accepted for compatibility; no-op.
   --no-hold-resume       Accepted for compatibility; no-op.
-  --dry-run              Log actions without rebooting, sleeping, or powering off.
+  --dry-run              Log actions without rebooting, sleeping, powering off, or unmounting.
   --wait-sec N           Small delay after sync before final action. Default: 1.
-  --quiesce              Stop app-layer writers and remount /mnt/plumos read-only before final action. Default.
-  --no-quiesce           Skip app-layer quiesce before final action.
+  --unmount              Unmount /mnt/plumos before final sysrq. Default.
+  --no-unmount           Skip final /mnt/plumos unmount for diagnostics.
+  --quiesce              Compatibility alias for --unmount.
+  --no-quiesce           Compatibility alias for --no-unmount.
   -h, --help             Show this help.
 USAGE
 }
 
-mkdir -p "$LOG_DIR" 2>/dev/null || true
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 
 uptime_now() {
   if [ -r /proc/uptime ]; then
     read -r up _ < /proc/uptime || up=unknown
     printf '%s' "$up"
   else
-    printf '%s' "unknown"
+    printf '%s' unknown
   fi
 }
 
@@ -155,11 +120,11 @@ while [ "$#" -gt 0 ]; do
     --dry-run)
       DRY_RUN=1
       ;;
-    --quiesce)
-      FINAL_QUIESCE=1
+    --unmount|--quiesce)
+      FINAL_UNMOUNT=1
       ;;
-    --no-quiesce)
-      FINAL_QUIESCE=0
+    --no-unmount|--no-quiesce)
+      FINAL_UNMOUNT=0
       ;;
     -h|--help)
       usage
@@ -173,15 +138,6 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-
-case "$POWER_BACKEND" in
-  auto|poweroff|halt|busybox|sysrq|none)
-    ;;
-  *)
-    echo "error: invalid power backend: $POWER_BACKEND" >&2
-    exit 2
-    ;;
-esac
 
 case "$SLEEP_BACKEND" in
   mem|standby|freeze|none)
@@ -205,59 +161,18 @@ fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true; exit 143' INT TERM
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
-run_final_command() {
-  log "cmd: $*"
-  "$@"
-  rc=$?
-  log "cmd_returned rc=$rc cmd=$*"
+mount_source_for_path() {
+  wanted="$1"
+  while read -r source target fstype opts rest; do
+    [ "$target" = "$wanted" ] || continue
+    printf '%s %s %s\n' "$source" "$fstype" "$opts"
+    return 0
+  done < /proc/mounts
   return 1
 }
 
-run_final_command_with_watchdog() {
-  key="$1"
-  name="$2"
-  shift 2
-
-  marker=""
-  watchdog_pid=""
-  if [ "$FINAL_WATCHDOG_SEC" -gt 0 ] 2>/dev/null && [ -w /proc/sysrq-trigger ]; then
-    marker="/tmp/plumos-final-action.$$.$name"
-    if : > "$marker" 2>/dev/null; then
-      (
-        sleep "$FINAL_WATCHDOG_SEC" 2>/dev/null || true
-        [ -e "$marker" ] || exit 0
-        log "watchdog: trigger action=$name key=$key after=${FINAL_WATCHDOG_SEC}s"
-        echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
-        echo "$key" >/proc/sysrq-trigger 2>/dev/null || true
-      ) &
-      watchdog_pid=$!
-    else
-      marker=""
-    fi
-  fi
-
-  log "cmd: $*"
-  "$@"
-  rc=$?
-  [ -z "$marker" ] || rm -f "$marker" 2>/dev/null || true
-  [ -z "$watchdog_pid" ] || kill "$watchdog_pid" 2>/dev/null || true
-  log "cmd_returned rc=$rc cmd=$*"
-  return 1
-}
-
-trigger_sysrq() {
-  key="$1"
-  name="$2"
-  if [ ! -w /proc/sysrq-trigger ]; then
-    log "sysrq: unavailable action=$name"
-    return 1
-  fi
-  log "sysrq: trigger action=$name key=$key"
-  echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
-  echo "$key" >/proc/sysrq-trigger
-  sleep 2 2>/dev/null || true
-  log "sysrq: returned action=$name"
-  return 1
+is_mounted_path() {
+  mount_source_for_path "$1" >/dev/null 2>&1
 }
 
 safe_sync() {
@@ -268,22 +183,6 @@ safe_sync() {
   fi
   sync 2>/dev/null || true
   log "sync: done"
-}
-
-safe_unmount_sd2() {
-  if [ -x "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" ]; then
-    log "sd2: stopping content mounts"
-    if [ "$DRY_RUN" -eq 1 ]; then
-      "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" status >> "$LOG_FILE" 2>&1 || true
-    else
-      "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" stop >> "$LOG_FILE" 2>&1 || true
-    fi
-  fi
-}
-
-mounted_opts_for_path() {
-  path="$1"
-  awk -v p="$path" '$2 == p { print $4; found=1 } END { exit found ? 0 : 1 }' /proc/mounts 2>/dev/null
 }
 
 pid_cmdline() {
@@ -350,36 +249,106 @@ stop_app_layer_writers() {
   fi
 }
 
-remount_app_layer_ro() {
-  opts="$(mounted_opts_for_path "$PLUMOS_ROOT" || true)"
-  if [ -z "$opts" ]; then
-    log "quiesce: app-layer mount not found root=$PLUMOS_ROOT"
-    return 1
-  fi
-  case ",$opts," in
-    *,ro,*)
-      log "quiesce: app-layer already read-only opts=$opts"
-      return 0
-      ;;
-  esac
+log_plumos_blockers() {
+  count=0
+  for proc in /proc/[0-9]*; do
+    pid="${proc##*/}"
+    [ "$pid" != "$$" ] || continue
+    hit=0
+    for link in "$proc/cwd" "$proc/root" "$proc/exe" "$proc"/fd/*; do
+      target="$(readlink "$link" 2>/dev/null || true)"
+      case "$target" in
+        "$PLUMOS_ROOT"|"$PLUMOS_ROOT"/*)
+          hit=1
+          break
+          ;;
+      esac
+    done
+    [ "$hit" -eq 1 ] || continue
+    log "quiesce: blocker pid=$pid cmd=$(pid_cmdline "$pid")"
+    count=$((count + 1))
+    [ "$count" -lt 20 ] || break
+  done
+  [ "$count" -gt 0 ] || log "quiesce: no /mnt/plumos blockers found"
+}
 
-  log "quiesce: remount-ro begin opts=$opts"
-  sync 2>/dev/null || true
-  if mount -o remount,ro "$PLUMOS_ROOT" 2>/dev/null; then
+unmount_if_mounted() {
+  target="$1"
+  if ! is_mounted_path "$target"; then
+    log "umount: skip target=$target reason=not_mounted"
     return 0
   fi
+  log "umount: begin target=$target source=$(mount_source_for_path "$target" || true)"
+  if umount "$target" 2>> "$LOG_FILE"; then
+    log "umount: done target=$target"
+    return 0
+  fi
+  log "umount: failed target=$target"
+  return 1
+}
+
+stop_sd2_mounts() {
+  log "sd2: stopping content mounts"
+  unmount_if_mounted "$PLUMOS_ROOT/bios" || true
+  unmount_if_mounted "$PLUMOS_ROOT/roms" || true
+  unmount_if_mounted /run/plumos/sd2 || true
+}
+
+mirror_log_to_app_layer() {
+  [ "$MIRROR_LOG" = "1" ] || return 0
+  [ -d "$PLUMOS_ROOT/Logs" ] || return 0
+  cp "$LOG_FILE" "$PLUMOS_ROOT/Logs/power-action-rootfs.log" 2>/dev/null || true
+}
+
+remount_app_layer_ro() {
+  is_mounted_path "$PLUMOS_ROOT" || return 0
+  log "quiesce: remount-ro begin source=$(mount_source_for_path "$PLUMOS_ROOT" || true)"
+  mount -o remount,ro "$PLUMOS_ROOT" 2>> "$LOG_FILE" && {
+    log "quiesce: remount-ro done"
+    return 0
+  }
   log "quiesce: remount-ro failed"
   return 1
 }
 
-quiesce_app_layer_for_final_action() {
-  [ "$FINAL_QUIESCE" = "1" ] || { log "quiesce: disabled"; return 0; }
+unmount_app_layer_for_final_action() {
+  [ "$FINAL_UNMOUNT" = "1" ] || { log "quiesce: unmount disabled"; return 0; }
   [ "$DRY_RUN" -eq 0 ] || { log "quiesce: dry-run"; return 0; }
 
   log "quiesce: begin root=$PLUMOS_ROOT"
+  stop_sd2_mounts
   stop_app_layer_writers
   safe_sync
+  mirror_log_to_app_layer
+  sync 2>/dev/null || true
+
+  if unmount_if_mounted "$PLUMOS_ROOT"; then
+    return 0
+  fi
+
+  log_plumos_blockers
+  safe_sync
+  if unmount_if_mounted "$PLUMOS_ROOT"; then
+    return 0
+  fi
+
   remount_app_layer_ro || true
+}
+
+unmount_boot_fat_for_final_action() {
+  [ "$FINAL_UNMOUNT" = "1" ] || return 0
+  [ "$DRY_RUN" -eq 0 ] || return 0
+
+  info="$(mount_source_for_path /boot || true)"
+  [ -n "$info" ] || return 0
+  set -- $info
+  fstype="${2:-}"
+  case "$fstype" in
+    vfat|msdos|exfat)
+      safe_sync
+      unmount_if_mounted /boot || true
+      ;;
+  esac
 }
 
 set_wakealarm() {
@@ -391,6 +360,28 @@ set_wakealarm() {
   fi
   echo 0 >/sys/class/rtc/rtc0/wakealarm 2>/dev/null || true
   echo "+$WAKEUP_SEC" >/sys/class/rtc/rtc0/wakealarm 2>/dev/null || true
+}
+
+trigger_sysrq() {
+  key="$1"
+  name="$2"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "sysrq: dry-run action=$name key=$key"
+    echo "result=dry_run_$name"
+    return 0
+  fi
+  if [ ! -w /proc/sysrq-trigger ]; then
+    log "sysrq: unavailable action=$name"
+    echo "result=${name}_failed"
+    return 1
+  fi
+  log "sysrq: trigger action=$name key=$key"
+  echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
+  echo "$key" >/proc/sysrq-trigger
+  sleep 2 2>/dev/null || true
+  log "sysrq: returned action=$name"
+  echo "result=${name}_returned"
+  return 1
 }
 
 sleep_action() {
@@ -420,47 +411,19 @@ sleep_action() {
   esac
 }
 
-try_poweroff() {
-  backend="$1"
-  case "$backend" in
-    poweroff)
-      run_final_command_with_watchdog o poweroff poweroff -f
-      ;;
-    halt)
-      run_final_command_with_watchdog o halt halt -f
-      ;;
-    busybox)
-      run_final_command_with_watchdog o busybox-poweroff busybox poweroff -f
-      ;;
-    sysrq)
-      trigger_sysrq o poweroff
-      ;;
-    none)
-      log "poweroff: backend=none"
-      return 1
-      ;;
-  esac
-}
-
 reboot_action() {
-  safe_unmount_sd2
   safe_sync
-  log "reboot: requested"
+  log "reboot: requested backend=$POWER_BACKEND"
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "result=dry_run_reboot"
     return 0
   fi
-  quiesce_app_layer_for_final_action
-  trigger_sysrq b reboot ||
-    {
-      log "reboot: failed_all_backends"
-      echo "result=reboot_failed"
-      return 1
-    }
+  unmount_app_layer_for_final_action
+  unmount_boot_fat_for_final_action
+  trigger_sysrq b reboot
 }
 
 shutdown_action() {
-  safe_unmount_sd2
   safe_sync
   if [ "$POWER_OFF" -eq 0 ]; then
     log "shutdown: sync-only no-poweroff"
@@ -472,25 +435,12 @@ shutdown_action() {
     echo "result=dry_run_poweroff"
     return 0
   fi
-  quiesce_app_layer_for_final_action
-  if [ "$POWER_BACKEND" = auto ]; then
-    try_poweroff sysrq ||
-      {
-        log "poweroff: failed_all_backends"
-        echo "result=poweroff_failed"
-        return 1
-      }
-  else
-    try_poweroff "$POWER_BACKEND" ||
-      {
-        log "poweroff: failed backend=$POWER_BACKEND"
-        echo "result=poweroff_failed"
-        return 1
-      }
-  fi
+  unmount_app_layer_for_final_action
+  unmount_boot_fat_for_final_action
+  trigger_sysrq o poweroff
 }
 
-log "start action=$ACTION poweroff=$POWER_OFF dry_run=$DRY_RUN power_backend=$POWER_BACKEND sleep_backend=$SLEEP_BACKEND"
+log "start action=$ACTION poweroff=$POWER_OFF dry_run=$DRY_RUN power_backend=$POWER_BACKEND sleep_backend=$SLEEP_BACKEND root=$PLUMOS_ROOT"
 
 case "$ACTION" in
   sleep)

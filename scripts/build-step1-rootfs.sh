@@ -851,6 +851,11 @@ EOF
     chmod 0755 "$init_path"
 }
 
+install_power_action() {
+    root="$1"
+    install -D -m 0755 "$script_dir/plumos-power-action-rootfs.sh" "$root/usr/sbin/plumos-power-action"
+}
+
 build_stage1() {
     if [ ! -x "$knulli_ramdisk/bin/busybox" ]; then
         printf 'error: KNULLI ramdisk busybox not found: %s/bin/busybox\n' "$knulli_ramdisk" >&2
@@ -886,6 +891,7 @@ build_debian_minbase() {
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
     write_debian_init "$root/sbin/init"
+    install_power_action "$root"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     printf 'plumos-v90s-step1\n' > "$root/etc/hostname"
     cat > "$root/etc/plumos-step1-release" <<EOF
@@ -1116,6 +1122,7 @@ build_debian_retroarch_payload() {
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root" "$root/roms/nes"
     write_debian_init "$root/sbin/init"
+    install_power_action "$root"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"
     install -D -m 0755 "$script_dir/v90s-retroarch-stop.sh" "$root/usr/local/sbin/v90s-retroarch-stop"

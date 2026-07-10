@@ -338,6 +338,33 @@ LD_LIBRARY_PATH=/mnt/plumos/lib:...
 RETROARCH_CONFIG_DIR=/mnt/plumos/config/retroarch
 ```
 
+Power actions are a special case. The frontend may expose a compatibility
+entry point in the FAT32 app layer, but the final Reboot/Shutdown implementation
+must live in the system squashfs and run without depending on `/mnt/plumos`.
+Before the final sysrq reboot or poweroff, that rootfs-owned helper should:
+
+- stop SD2 bind mounts under `/mnt/plumos/roms` and `/mnt/plumos/bios`
+- stop app-layer writers such as the frontend, FTP, Samba, RetroArch, and
+  app-layer launch wrappers
+- avoid killing SSH/dropbear diagnostic sessions by process name
+- write final transient logs under `/run`, not into the FAT32 app layer
+- sync filesystems
+- unmount `/mnt/plumos` completely when possible
+- unmount `/boot` too when it is a writable FAT boot-resource mount
+- only then trigger sysrq reboot or poweroff
+
+The FAT32 app-layer helper should therefore be a thin compatibility wrapper
+around a rootfs command such as:
+
+```text
+/usr/sbin/plumos-power-action
+```
+
+This keeps the Windows/macOS-friendly update partition from being the final
+executor during power loss-sensitive operations. If the rootfs helper is absent
+on an old development image, that should be treated as a compatibility gap, not
+as the release design.
+
 The FAT32 app layer should include release metadata:
 
 ```text
