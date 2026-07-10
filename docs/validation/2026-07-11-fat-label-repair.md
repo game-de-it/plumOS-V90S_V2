@@ -112,3 +112,77 @@ p7 rootfs_data / PLUMOS FAT32
 
 The partition roles and numbering remain StockOS-compatible; only the FAT volume
 labels changed.
+
+## Live Boot Check After Repair
+
+The repaired SD card booted on the V90S and SSH returned at:
+
+```text
+root@192.0.2.120
+```
+
+Runtime labels are visible from the device:
+
+```text
+/dev/mmcblk0p1: LABEL="PLUMBOOT" TYPE="vfat"
+/dev/mmcblk0p7: LABEL="PLUMOS" TYPE="vfat"
+/dev/mmcblk1p1: LABEL="GAME" TYPE="vfat"
+```
+
+p7 is mounted read-write and accepts writes:
+
+```text
+/dev/mmcblk0p7 /mnt/plumos vfat rw,...,errors=remount-ro 0 0
+p7_write_ok
+```
+
+The sysrq-direct power helper is active:
+
+```text
+1c34c9670e782bd2f586402bbe97a4c1ba167e13c1d72f980d35b178da09adf4  /mnt/plumos/bin/plumos-safe-shutdown
+bin/plumos-safe-shutdown: OK
+```
+
+The RetroArch user config is present and writable on p7:
+
+```text
+e565ea5dfa3c57639c9a306722851124471fa2a281920b7578ee607562966151  /mnt/plumos/config/retroarch/retroarch-v90s.cfg
+config_save_on_exit = "true"
+video_driver = "gl"
+video_context_driver = "mali_fbdev"
+video_refresh_rate = "58.917103"
+video_threaded = "true"
+vrr_runloop_enable = "true"
+audio_driver = "alsa"
+audio_device = "hw:0,0"
+audio_latency = "64"
+```
+
+Network services are all running:
+
+```text
+ssh    running
+ftp    running
+sftp   running
+samba  running
+```
+
+SD2 is mounted and bind-mounted onto the plumOS content roots:
+
+```text
+/dev/mmcblk1p1 /run/plumos/sd2 vfat rw,...
+/dev/mmcblk1p1 /mnt/plumos/roms vfat rw,...
+/dev/mmcblk1p1 /mnt/plumos/bios vfat rw,...
+```
+
+Remaining caveat:
+
+```text
+FAT-fs (mmcblk0p7): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+```
+
+The filesystem did not remount read-only this time and the write probe passed,
+so the live state is usable. However, the warning means the power-action path
+should be improved further: before the final sysrq reboot/poweroff, plumOS
+should stop app-layer writers and remount or otherwise cleanly quiesce p7 so
+the FAT dirty bit is not left set.
