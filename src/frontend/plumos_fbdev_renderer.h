@@ -1552,7 +1552,7 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
                     plumos_fbdev_has_prefixed_line(lines, line_count,
                                                    "menu_screen=1") ||
                     settings_page;
-  entry_scale = settings_family ? 3 : 2;
+  entry_scale = 2;
   line_height = entry_scale * 12;
   cursor_x = settings_family ? 12 : 18;
   name_x = cursor_x + (settings_family ? 18 : 24);

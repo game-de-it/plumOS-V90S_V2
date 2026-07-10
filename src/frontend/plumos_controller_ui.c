@@ -7383,6 +7383,91 @@ static int ui_renderer_a30_tty_capable(const struct ui_state *ui) {
                 ui->renderer_mmf_gfx);
 }
 
+#ifdef PLUMOS_ENABLE_FBDEV_RENDERER
+static int ui_fbdev_uses_settings_family_layout(const struct ui_state *ui) {
+  if (!ui) {
+    return 0;
+  }
+  switch (ui->screen) {
+  case SCREEN_START_MENU:
+  case SCREEN_SETTINGS:
+  case SCREEN_HELP:
+  case SCREEN_CORE_SELECT:
+  case SCREEN_NETWORK_RESCUE:
+  case SCREEN_WIFI_CONNECT:
+  case SCREEN_USB_DISK_CONFIRM:
+  case SCREEN_USB_DISK_STARTING:
+  case SCREEN_THUMBNAIL_RESULTS:
+  case SCREEN_THUMBNAIL_RUNNING:
+  case SCREEN_SCRAPING:
+  case SCREEN_TOP_REFRESH_RUNNING:
+    return 1;
+  default:
+    return 0;
+  }
+}
+#endif
+
+#ifdef PLUMOS_ENABLE_FBDEV_RENDERER
+static int ui_fbdev_reserves_footer_space(const struct ui_state *ui) {
+  if (!ui) {
+    return 0;
+  }
+  switch (ui->screen) {
+  case SCREEN_SETTINGS:
+  case SCREEN_CORE_SELECT:
+  case SCREEN_WIFI_CONNECT:
+  case SCREEN_USB_DISK_CONFIRM:
+  case SCREEN_USB_DISK_STARTING:
+  case SCREEN_THUMBNAIL_RUNNING:
+  case SCREEN_SCRAPING:
+  case SCREEN_TOP_REFRESH_RUNNING:
+    return 1;
+  default:
+    return 0;
+  }
+}
+#endif
+
+static size_t ui_fbdev_text_window_size(const struct ui_state *ui) {
+#ifdef PLUMOS_ENABLE_FBDEV_RENDERER
+  int h = 480;
+  int settings_family;
+  int footer_reserved;
+  int entry_scale;
+  int line_height;
+  int first_entry_y;
+  int bottom_y;
+  size_t rows;
+
+  if (!ui || !ui->renderer_fbdev) {
+    return 0;
+  }
+  if (ui->renderer_active && ui->fbdev_renderer.var.yres > 0) {
+    h = (int)ui->fbdev_renderer.var.yres;
+  }
+
+  settings_family = ui_fbdev_uses_settings_family_layout(ui);
+  footer_reserved = ui_fbdev_reserves_footer_space(ui);
+  entry_scale = 2;
+  line_height = entry_scale * 12;
+  first_entry_y = settings_family ? 82 : 104;
+  bottom_y = h - (footer_reserved ? 76 : 34);
+  if (line_height <= 0 || bottom_y < first_entry_y) {
+    return 1;
+  }
+
+  rows = (size_t)((bottom_y - first_entry_y) / line_height) + 1;
+  if (rows > 18) {
+    rows = 18;
+  }
+  return rows ? rows : 1;
+#else
+  (void)ui;
+  return 0;
+#endif
+}
+
 static int ui_uses_graphic_mode(const struct ui_state *ui) {
   return ui_renderer_graphic_capable(ui) &&
          strcmp(ui->frontend_settings.ui_mode, "graphic") == 0;
@@ -7469,6 +7554,7 @@ static size_t ui_mmf_gfx_text_top_rom_window_size(const struct ui_state *ui) {
 }
 
 static size_t ui_list_window_size(const struct ui_state *ui) {
+  size_t fbdev_window;
   size_t mmf_text_window;
 
   if (ui_uses_graphic_mode(ui)) {
@@ -7478,6 +7564,10 @@ static size_t ui_list_window_size(const struct ui_state *ui) {
     if (ui_is_rom_list_screen(ui)) {
       return ui_graphic_rom_page_size(ui);
     }
+  }
+  fbdev_window = ui_fbdev_text_window_size(ui);
+  if (fbdev_window > 0) {
+    return fbdev_window;
   }
   mmf_text_window = ui_mmf_gfx_text_top_rom_window_size(ui);
   if (mmf_text_window > 0) {
@@ -7499,6 +7589,32 @@ static size_t ui_list_window_size(const struct ui_state *ui) {
     return 22;
   }
   return 10;
+}
+
+static size_t ui_scrolled_window_start(size_t cursor, size_t count,
+                                       size_t window) {
+  size_t start;
+  size_t max_start;
+
+  if (window == 0) {
+    window = 1;
+  }
+  if (count == 0 || count <= window) {
+    return 0;
+  }
+  if (cursor >= count) {
+    cursor = count - 1;
+  }
+  if (cursor + 1 > window) {
+    start = cursor + 1 - window;
+  } else {
+    start = 0;
+  }
+  max_start = count - window;
+  if (start > max_start) {
+    start = max_start;
+  }
+  return start;
 }
 
 static size_t ui_graphic_top_page_for_cursor(const struct ui_state *ui,
@@ -8121,8 +8237,19 @@ static void render_roms(struct ui_state *ui) {
 
 static void render_start_menu(struct ui_state *ui) {
   size_t i;
+  size_t window = ui_list_window_size(ui);
+  size_t start;
+  size_t end;
 
   trigger_sdcard_cleanup_from_start_menu(ui);
+  if (window == 0) {
+    window = 1;
+  }
+  start = ui_scrolled_window_start(ui->menu_cursor, ui->menu_count, window);
+  end = start + window;
+  if (end > ui->menu_count) {
+    end = ui->menu_count;
+  }
 
   ui_printf(ui, "plumOS controller UI - %s\n",
             ui->menu_title[0] ? ui->menu_title : "START");
@@ -8131,7 +8258,7 @@ static void render_start_menu(struct ui_state *ui) {
   ui_printf(ui, "entries=%zu cursor=%zu\n", ui->menu_count,
             ui->menu_count ? ui->menu_cursor + 1 : 0);
   ui_printf(ui, "\n");
-  for (i = 0; i < ui->menu_count; i++) {
+  for (i = start; i < end; i++) {
     const struct menu_entry *entry = &ui->menu_entries[i];
     if (ui_renderer_a30_tty_capable(ui)) {
       ui_printf(ui, "%c %2zu  %s\n",
@@ -8633,7 +8760,7 @@ static void render_settings(struct ui_state *ui) {
     render_brightness_test_settings(ui);
     return;
   }
-  start = (ui->settings_cursor / window) * window;
+  start = ui_scrolled_window_start(ui->settings_cursor, ui->setting_count, window);
   end = start + window;
   if (end > ui->setting_count) {
     end = ui->setting_count;
@@ -8834,10 +8961,13 @@ static void render_scraping(struct ui_state *ui) {
 
 static void render_thumbnail_results(struct ui_state *ui) {
   size_t i;
-  size_t window = UI_THUMBNAIL_RESULT_WINDOW;
+  size_t window = ui_list_window_size(ui);
   size_t start = 0;
   size_t end;
 
+  if (window == 0) {
+    window = UI_THUMBNAIL_RESULT_WINDOW;
+  }
   ui_printf(ui, "plumOS controller UI - %s\n",
             tr(ui, "scraping_results.title", "Scraping Results"));
   ui_printf(ui, "thumbnail_results_screen=1\n");
@@ -8846,7 +8976,8 @@ static void render_thumbnail_results(struct ui_state *ui) {
                "UP/DOWN: scroll  LEFT/RIGHT: page  A/SELECT: refresh  B: Apps  Q: quit"));
   clamp_thumbnail_result_cursor(ui);
   if (ui->thumbnail_result_count > 0) {
-    start = (ui->thumbnail_result_cursor / window) * window;
+    start = ui_scrolled_window_start(ui->thumbnail_result_cursor,
+                                     ui->thumbnail_result_count, window);
   }
   end = start + window;
   if (end > ui->thumbnail_result_count) {
@@ -8974,7 +9105,7 @@ static void render_wifi_connect(struct ui_state *ui) {
   }
   ui_printf(ui, "plumOS controller UI - Network Settings - Connect Wi-Fi\n");
   if (ui->wifi_stage == WIFI_CONNECT_SELECT) {
-    start = (ui->wifi_cursor / window) * window;
+    start = ui_scrolled_window_start(ui->wifi_cursor, ui->wifi_count, window);
     end = start + window;
     if (end > ui->wifi_count) {
       end = ui->wifi_count;
@@ -12640,11 +12771,11 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
     }
     if (action == ACTION_RIGHT) {
       ui_cursor_page_down(&ui->thumbnail_result_cursor, ui->thumbnail_result_count,
-                          UI_THUMBNAIL_RESULT_WINDOW);
+                          ui_list_window_size(ui));
       return;
     }
     if (action == ACTION_LEFT) {
-      ui_cursor_page_up(&ui->thumbnail_result_cursor, UI_THUMBNAIL_RESULT_WINDOW);
+      ui_cursor_page_up(&ui->thumbnail_result_cursor, ui_list_window_size(ui));
       return;
     }
     if (action == ACTION_B) {

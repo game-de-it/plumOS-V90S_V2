@@ -214,6 +214,8 @@ Build plumOS V90S as a V90S-specific distribution:
   including a `/dev/fb0` capture and single-frontend-process check.
 - [x] Align V90S settings-screen checkbox and option control placement with the
   MMF/A30-style frontend layout.
+- [x] Keep V90S START/settings/Wi-Fi list cursors inside the visible fbdev
+  screen by using a scroll window and 2x text for settings-family rows.
 
 ## Milestone 5: SD Image Layout
 
