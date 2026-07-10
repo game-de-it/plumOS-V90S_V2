@@ -215,14 +215,98 @@ scripts/docker-build.sh sd-image --app-layer-dir output/app-layer/v90s ...
 This is a compatibility route for frontend boot testing. The final release
 layout still needs the validated FAT32 app/update/data partition.
 
-## Real Device Status
+## Real Device Live Validation
 
-Real V90S frontend boot validation has not been performed yet.
+The app layer was copied to a running V90S over SSH:
 
-The next hardware validation should check:
+```text
+root@192.0.2.120:/mnt/plumos
+```
 
-- frontend appears after boot
+Remote inventory after deployment:
+
+```text
+files=334
+sha256sum -c checksums.sha256: OK
+```
+
+The test ROM was copied to:
+
+```text
+/mnt/plumos/Roms/nes/Super Mario Bros..nes
+```
+
+The frontend scanner detected it:
+
+```text
+PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+  /mnt/plumos/bin/plumos-library-scan --system nes
+```
+
+Important output:
+
+```text
+system nes                roms=1 thumbnails=0
+wrote: /mnt/plumos/state/frontend/systems/nes.json
+```
+
+The frontend was started independently from the SSH session:
+
+```text
+PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+  nohup /mnt/plumos/bin/plumos-frontend-launch \
+  >/mnt/plumos/Logs/frontend-ssh-start.log 2>&1 &
+```
+
+Running process:
+
+```text
+/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+```
+
+Framebuffer capture confirmed that the frontend is drawing the top menu:
+
+```text
+PLUMOS CONTROLLER UI - TOP
+1 NES
+2 FAVORITES
+3 RECENT
+STATUS: FBDEV RENDERER READY
+```
+
+The framebuffer capture used:
+
+```text
+dd if=/dev/fb0 bs=1228800 count=1
+```
+
+The local PNG proof was written under the ignored output directory:
+
+```text
+output/validation/frontend-live/fb0-bgra.png
+```
+
+The launch plan for the copied test ROM is executable:
+
+```text
+PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+  /mnt/plumos/bin/plumos-text-ui launch nes "nes/Super Mario Bros..nes" \
+  --profile retroarch:quicknes --no-scan
+```
+
+Important output:
+
+```text
+retroarch: /mnt/plumos/bin/plumos-retroarch-launch (exists)
+core: /mnt/plumos/cores/quicknes_libretro.so (exists)
+rom_exists: yes
+can_execute: yes
+execute: no (--execute not specified)
+```
+
+Still requiring physical validation:
+
 - V90S built-in controls navigate the frontend
-- NES ROM list is detected under `/mnt/plumos/Roms/nes`
-- launching a NES ROM starts RetroArch through the known-good PowerVR route
+- pressing the frontend open button launches the NES ROM
+- returning from RetroArch restores frontend control
 - RetroArch settings persist under `/mnt/plumos/config/retroarch`
