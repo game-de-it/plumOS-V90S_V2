@@ -367,6 +367,25 @@ fb_probe() {
     $bb sync
 }
 
+boot_fb_probe_enabled() {
+    [ "${PLUMOS_V90S_BOOT_FB_PROBE:-0}" = "1" ] && return 0
+    if [ -r /proc/cmdline ] &&
+        $bb grep -qw 'plumos.fb_probe=1' /proc/cmdline 2>/dev/null; then
+        return 0
+    fi
+    [ -e /mnt/share/plumos-enable-fb-probe ] && return 0
+    return 1
+}
+
+run_fb_probe_if_enabled() {
+    if boot_fb_probe_enabled; then
+        log "stage1: fb0 probe enabled"
+        fb_probe
+    else
+        log "stage1: fb0 probe skipped"
+    fi
+}
+
 $bb mount -t proc proc /proc 2>/dev/null || true
 $bb mount -t sysfs sysfs /sys 2>/dev/null || true
 if [ ! -c /dev/console ]; then
@@ -395,7 +414,7 @@ if [ -f /mnt/share/rootfs/step1-rootfs.squashfs ]; then
     payload="/mnt/share/rootfs/step1-rootfs.squashfs"
     log "stage1: using pre-mounted payload on /mnt/share"
     persist_stage1_log
-    fb_probe
+    run_fb_probe_if_enabled
     persist_stage1_log
 fi
 
@@ -408,7 +427,7 @@ for dev in /dev/mmcblk0p5 /dev/mmcblk1p5 /dev/mmcblk2p5 /dev/mmcblk0p4 /dev/mmcb
             payload="/mnt/share/rootfs/step1-rootfs.squashfs"
             log "stage1: found payload on $dev"
             persist_stage1_log
-            fb_probe
+            run_fb_probe_if_enabled
             persist_stage1_log
             break
         fi
@@ -621,6 +640,26 @@ fb_probe() {
     sync
 }
 
+boot_fb_probe_enabled() {
+    [ "${PLUMOS_V90S_BOOT_FB_PROBE:-0}" = "1" ] && return 0
+    if [ -r /proc/cmdline ] &&
+        grep -qw 'plumos.fb_probe=1' /proc/cmdline 2>/dev/null; then
+        return 0
+    fi
+    [ -e /mnt/share/plumos-enable-fb-probe ] && return 0
+    [ -e /mnt/plumos/config/system/enable-fb-probe ] && return 0
+    return 1
+}
+
+run_fb_probe_if_enabled() {
+    if boot_fb_probe_enabled; then
+        log "debian-init: fb0 probe enabled"
+        fb_probe
+    else
+        log "debian-init: fb0 probe skipped"
+    fi
+}
+
 plumos_app_layer_mounted() {
     grep -q '[[:space:]]/mnt/plumos[[:space:]]' /proc/mounts 2>/dev/null
 }
@@ -685,7 +724,7 @@ done
 
 log "plumOS V90S Step1 Debian minbase console"
 persist_debian_log
-fb_probe
+run_fb_probe_if_enabled
 persist_debian_log
 
 if [ -x /usr/local/sbin/v90s-pvr-probe ]; then

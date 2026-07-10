@@ -154,6 +154,11 @@ Build plumOS V90S as a V90S-specific distribution:
   present in release squashfs.
 - [ ] Make launch wrappers execute applications from `/mnt/plumos`.
 - [ ] Make boot diagnostics report missing or invalid app-layer metadata clearly.
+- [x] Disable the old fb0 black-screen/white-band boot probe by default; keep it
+  available only through explicit diagnostic opt-in.
+- [ ] Migrate the remaining rootfs-level `v90s-network-ssh-init` Wi-Fi/SSH
+  bring-up into the plumOS app-layer network control path before disabling the
+  old development hook.
 - [x] Add a development init hook that probes p7/p6 for `/mnt/plumos`
   app-layer metadata and starts `/mnt/plumos/bin/plumos-frontend-launch` when
   present.
