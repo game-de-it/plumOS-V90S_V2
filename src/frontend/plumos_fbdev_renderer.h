@@ -765,17 +765,6 @@ static void plumos_fbdev_load_motion(struct plumos_fbdev_motion *motion,
   }
 }
 
-static void plumos_fbdev_draw_text_right(struct plumos_fbdev_renderer *r, int x,
-                                         int y, int right, const char *text,
-                                         int scale, uint32_t color) {
-  int width = plumos_fbdev_text_width(text, scale);
-  int draw_x = right - width;
-  if (draw_x < x) {
-    draw_x = x;
-  }
-  plumos_fbdev_draw_text(r, draw_x, y, text, scale, color, right);
-}
-
 static void plumos_fbdev_draw_text_center(struct plumos_fbdev_renderer *r, int x,
                                           int y, int w, const char *text,
                                           int scale, uint32_t color) {
@@ -785,33 +774,6 @@ static void plumos_fbdev_draw_text_center(struct plumos_fbdev_renderer *r, int x
     draw_x = x;
   }
   plumos_fbdev_draw_text(r, draw_x, y, text, scale, color, x + w);
-}
-
-static void plumos_fbdev_draw_frame(struct plumos_fbdev_renderer *r, int x, int y,
-                                    int w, int h, int thickness, uint32_t color) {
-  int t;
-  if (thickness <= 0) {
-    thickness = 1;
-  }
-  for (t = 0; t < thickness; t++) {
-    plumos_fbdev_fill_rect(r, x + t, y + t, w - t * 2, 1, color);
-    plumos_fbdev_fill_rect(r, x + t, y + h - 1 - t, w - t * 2, 1, color);
-    plumos_fbdev_fill_rect(r, x + t, y + t, 1, h - t * 2, color);
-    plumos_fbdev_fill_rect(r, x + w - 1 - t, y + t, 1, h - t * 2, color);
-  }
-}
-
-static void plumos_fbdev_draw_shell(struct plumos_fbdev_renderer *r,
-                                    const struct plumos_fbdev_palette *p) {
-  int w = (int)r->var.xres;
-  int h = (int)r->var.yres;
-  plumos_fbdev_fill_rect(r, 0, 0, w, h, p->background);
-  plumos_fbdev_fill_rect(r, 0, 0, w, 52, p->panel_inner);
-  plumos_fbdev_fill_rect(r, 0, 51, w, 2, p->accent);
-  plumos_fbdev_fill_rect(r, 0, h - 32, w, 32, p->panel_inner);
-  plumos_fbdev_fill_rect(r, 0, h - 33, w, 1, p->line);
-  plumos_fbdev_draw_text(r, 24, 15, "plumOS", 3, p->foreground, w - 24);
-  plumos_fbdev_draw_text_right(r, 24, 21, w - 24, "V90S", 2, p->muted);
 }
 
 static void plumos_fbdev_time_label(char *out, size_t out_size) {
@@ -948,6 +910,31 @@ static void plumos_fbdev_draw_graphic_top_bar(
                          w - 12);
 }
 
+static void plumos_fbdev_draw_tty_top_bar(struct plumos_fbdev_renderer *r) {
+  char time_label[16];
+  char wifi_label[16];
+  char battery_label[24];
+  char right[80];
+  int w = (int)r->var.xres;
+  int right_width;
+  uint32_t bg = plumos_fbdev_pack_color(r, 0, 5, 4);
+  uint32_t border = plumos_fbdev_pack_color(r, 31, 82, 56);
+  uint32_t prompt = plumos_fbdev_pack_color(r, 158, 255, 199);
+  uint32_t muted = plumos_fbdev_pack_color(r, 179, 235, 219);
+
+  plumos_fbdev_time_label(time_label, sizeof(time_label));
+  plumos_fbdev_wifi_label(wifi_label, sizeof(wifi_label));
+  plumos_fbdev_battery_label(battery_label, sizeof(battery_label));
+  snprintf(right, sizeof(right), "%s  %s  %s", time_label, wifi_label,
+           battery_label);
+  right_width = plumos_fbdev_text_width(right, 2);
+
+  plumos_fbdev_fill_rect(r, 0, 0, w, 34, bg);
+  plumos_fbdev_fill_rect(r, 0, 34, w, 2, border);
+  plumos_fbdev_draw_text(r, 14, 10, "PLUMOS V90S TTY1", 2, prompt, w - 8);
+  plumos_fbdev_draw_text(r, w - 14 - right_width, 10, right, 2, muted, w - 8);
+}
+
 static const char *plumos_fbdev_find_value(
     char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
     const char *prefix) {
@@ -988,6 +975,92 @@ static void plumos_fbdev_screen_title(char *out, size_t out_size,
   if (!out[0]) {
     plumos_fbdev_copy_text(out, out_size, "plumOS");
   }
+}
+
+static int plumos_fbdev_title_is_settings_family(const char *title) {
+  return title && (strstr(title, "START") || strstr(title, "Apps") ||
+                   strstr(title, "APPS") || strstr(title, "Settings") ||
+                   strstr(title, "SETTINGS") || strstr(title, "HELP") ||
+                   strstr(title, "Thumbnail Results") ||
+                   strstr(title, "Scraping") ||
+                   strstr(title, "Network") || strstr(title, "NETWORK"));
+}
+
+static int plumos_fbdev_has_prefixed_line(
+    char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
+    const char *prefix) {
+  size_t i;
+  size_t prefix_len = prefix ? strlen(prefix) : 0;
+
+  if (!prefix || prefix_len == 0) {
+    return 0;
+  }
+  for (i = 0; i < line_count; i++) {
+    const char *line = plumos_fbdev_ltrim(lines[i]);
+    if (strncmp(line, prefix, prefix_len) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static int plumos_fbdev_entry_head(const char *line, int *selected,
+                                   char *number, size_t number_size,
+                                   const char **rest) {
+  const char *p = line;
+  size_t n = 0;
+
+  if (selected) {
+    *selected = 0;
+  }
+  if (number && number_size > 0) {
+    number[0] = '\0';
+  }
+  if (rest) {
+    *rest = "";
+  }
+  if (!line || !rest) {
+    return 0;
+  }
+  if (*p == '>') {
+    if (selected) {
+      *selected = 1;
+    }
+    p++;
+  }
+  while (*p == ' ') {
+    p++;
+  }
+  while (isdigit((unsigned char)*p) && number && n + 1 < number_size) {
+    number[n++] = *p++;
+  }
+  if (number && number_size > 0) {
+    number[n] = '\0';
+  }
+  while (isdigit((unsigned char)*p)) {
+    p++;
+  }
+  while (*p == ' ') {
+    p++;
+  }
+  *rest = p;
+  return number && number[0] && *p;
+}
+
+static void plumos_fbdev_compact_menu_entry(const char *line, char *out,
+                                            size_t out_size, int *selected) {
+  char number[16];
+  const char *rest;
+
+  if (!out || out_size == 0) {
+    return;
+  }
+  out[0] = '\0';
+  if (!plumos_fbdev_entry_head(line, selected, number, sizeof(number), &rest)) {
+    plumos_fbdev_copy_text(out, out_size, line);
+    return;
+  }
+  plumos_fbdev_copy_text(out, out_size, rest);
 }
 
 static int plumos_fbdev_parse_graphic_entry(const char *line, const char *prefix,
@@ -1262,32 +1335,40 @@ static int plumos_fbdev_render_top(struct plumos_fbdev_renderer *r,
 static void plumos_fbdev_draw_rom_preview(struct plumos_fbdev_renderer *r,
                                           const struct plumos_fbdev_palette *p,
                                           const struct plumos_fbdev_entry *entry,
-                                          const char *system_title,
                                           int x, int y, int w, int h) {
-  plumos_fbdev_fill_rect(r, x, y, w, h, p->media_panel);
-  plumos_fbdev_draw_frame(r, x, y, w, h, 1, p->line);
-  plumos_fbdev_fill_rect(r, x + 18, y + 20, w - 36, h / 2, p->panel_inner);
-  plumos_fbdev_draw_frame(r, x + 18, y + 20, w - 36, h / 2, 1, p->line);
-  if (!entry || !entry->media[0]
+  int media_x = x + 16;
+  int media_y = y + 18;
+  int media_w = w - 32;
+  int media_h = 156;
+  int thumbnail_drawn = 0;
+  char badge[8];
+
+  plumos_fbdev_fill_rect(r, x, y, w, h, p->panel);
+  plumos_fbdev_fill_rect(r, x + 3, y + 3, w - 6, h - 6, p->panel_inner);
+  plumos_fbdev_fill_rect(r, media_x, media_y, media_w, media_h,
+                         p->media_panel);
+  if (entry && entry->media[0]) {
 #ifdef PLUMOS_FBDEV_ENABLE_PNG
-      || !plumos_fbdev_draw_png_contain(r, entry->media, x + 22, y + 24,
-                                        w - 44, h / 2 - 8)
+    thumbnail_drawn =
+        plumos_fbdev_draw_png_contain(r, entry->media, media_x, media_y,
+                                      media_w, media_h);
 #endif
-  ) {
-    plumos_fbdev_draw_text_center(r, x + 18, y + 20 + h / 4 - 10, w - 36,
-                                  "NO IMAGE", 2, p->muted);
   }
   if (entry) {
-    plumos_fbdev_draw_text(r, x + 18, y + h - 70, entry->title, 2, p->foreground,
-                           x + w - 18);
-    if (entry->detail[0]) {
-      plumos_fbdev_draw_text(r, x + 18, y + h - 42, entry->detail, 1, p->muted,
-                             x + w - 18);
+    if (!thumbnail_drawn) {
+      plumos_fbdev_entry_badge(badge, sizeof(badge), entry->title);
+      plumos_fbdev_draw_text_center(r, media_x, media_y + 58, media_w, badge, 4,
+                                    p->foreground);
     }
-  }
-  if (system_title && system_title[0]) {
-    plumos_fbdev_draw_text(r, x + 18, y + h - 22, system_title, 1, p->accent,
-                           x + w - 18);
+    plumos_fbdev_draw_text(r, x + 16, y + 200, entry->title, 2, p->foreground,
+                           x + w - 16);
+    if (entry->detail[0]) {
+      plumos_fbdev_draw_text(r, x + 16, y + 232, entry->detail, 2, p->muted,
+                             x + w - 16);
+    }
+  } else {
+    plumos_fbdev_draw_text_center(r, media_x, media_y + 58, media_w, "NO ART",
+                                  3, p->muted);
   }
 }
 
@@ -1303,13 +1384,21 @@ static int plumos_fbdev_render_roms(struct plumos_fbdev_renderer *r,
   size_t i;
   int w = (int)r->var.xres;
   int h = (int)r->var.yres;
-  int pad = w >= 640 ? 24 : 12;
-  int list_x = pad;
-  int list_y = 88;
-  int list_w = (w * 58) / 100;
-  int row_h = 30;
+  int list_x = 18;
+  int list_y = 70;
+  int list_w = w > 680 ? 360 : w / 2 - 28;
+  int row_h = 38;
   int preview_x = list_x + list_w + 16;
-  int preview_w = w - preview_x - pad;
+  int preview_y = 72;
+  int preview_w = w - preview_x - 16;
+  int preview_h = h - preview_y - 16;
+
+  if (list_w < 190) {
+    list_w = 190;
+  }
+  if (preview_w < 160) {
+    preview_w = 160;
+  }
 
   system_value = plumos_fbdev_find_value(lines, line_count, "graphic_system=");
   if (system_value && system_value[0]) {
@@ -1328,31 +1417,28 @@ static int plumos_fbdev_render_roms(struct plumos_fbdev_renderer *r,
   }
   selected = plumos_fbdev_selected_entry(entries, count);
 
-  plumos_fbdev_draw_shell(r, p);
-  plumos_fbdev_draw_text(r, pad, 64, title, 2, p->foreground, w - pad);
-  plumos_fbdev_fill_rect(r, list_x, list_y, list_w, h - list_y - 52, p->panel);
-  plumos_fbdev_draw_frame(r, list_x, list_y, list_w, h - list_y - 52, 1, p->line);
+  plumos_fbdev_draw_graphic_top_bar(r, p, title);
 
   for (i = 0; i < count; i++) {
-    int y = list_y + 12 + (int)i * row_h;
-    int row_x = list_x + 10;
-    int row_w = list_w - 20;
+    int y = list_y + (int)i * row_h;
+    int name_x = list_x + 24;
+    int name_right_x = list_x + list_w - 10;
     uint32_t fg = entries[i].selected ? p->selection_foreground : p->foreground;
-    if (y + row_h > h - 54) {
+    if (y + row_h > h - 20) {
       break;
     }
     if (entries[i].selected) {
-      plumos_fbdev_fill_rect(r, row_x, y - 4, row_w, row_h - 2,
+      plumos_fbdev_fill_rect(r, list_x - 6, y - 7, list_w, row_h - 4,
                              p->selection_background);
-      plumos_fbdev_fill_rect(r, row_x, y - 4, 4, row_h - 2, p->accent);
     }
-    plumos_fbdev_draw_text(r, row_x + 12, y + 3, entries[i].title, 2, fg,
-                           row_x + row_w - 8);
+    plumos_fbdev_draw_text(r, list_x, y + 3, entries[i].selected ? ">" : " ",
+                           2, fg, name_right_x);
+    plumos_fbdev_draw_text(r, name_x, y, entries[i].title, 2, fg,
+                           name_right_x);
   }
 
-  plumos_fbdev_draw_rom_preview(r, p, selected, title, preview_x, list_y,
-                                preview_w, h - list_y - 52);
-  plumos_fbdev_draw_status(r, p, lines, line_count);
+  plumos_fbdev_draw_rom_preview(r, p, selected, preview_x, preview_y,
+                                preview_w, preview_h);
   return 1;
 }
 
@@ -1363,6 +1449,19 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
   if (strncmp(line, "graphic_", 8) == 0 ||
       strncmp(line, "entries=", 8) == 0 ||
       strncmp(line, "system=", 7) == 0 ||
+      strncmp(line, "target=", 7) == 0 ||
+      strncmp(line, "profile=", 8) == 0 ||
+      strncmp(line, "source:", 7) == 0 ||
+      strncmp(line, "menu_screen=", 12) == 0 ||
+      strncmp(line, "settings_screen=", 16) == 0 ||
+      strncmp(line, "scraping_screen=", 16) == 0 ||
+      strncmp(line, "thumbnail_results_screen=", 25) == 0 ||
+      strncmp(line, "thumbnail_running", 17) == 0 ||
+      strncmp(line, "top_refresh_running=", 20) == 0 ||
+      strncmp(line, "usb_disk_starting=", 18) == 0 ||
+      strncmp(line, "brightness_test=", 16) == 0 ||
+      strncmp(line, "wifi_keyboard_cursor=", 21) == 0 ||
+      strncmp(line, "wifi_password=", 14) == 0 ||
       strncmp(line, "prompt_path=", 12) == 0 ||
       strncmp(line, "footer", 6) == 0 ||
       strncmp(line, "status:", 7) == 0) {
@@ -1385,24 +1484,40 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
   size_t i;
   int w = (int)r->var.xres;
   int h = (int)r->var.yres;
-  int pad = w >= 640 ? 24 : 12;
-  int list_y = 90;
-  int row_h = 28;
+  int settings_family;
+  int entry_scale;
+  int line_height;
+  int cursor_x;
+  int name_x;
+  int y;
+  uint32_t accent;
+  const char *footer1;
+  const char *footer2;
 
   memset(selected, 0, sizeof(selected));
   plumos_fbdev_screen_title(title, sizeof(title), lines, line_count);
+  settings_family = plumos_fbdev_title_is_settings_family(title) ||
+                    plumos_fbdev_has_prefixed_line(lines, line_count,
+                                                   "menu_screen=1") ||
+                    plumos_fbdev_has_prefixed_line(lines, line_count,
+                                                   "settings_screen=1");
+  entry_scale = settings_family ? 3 : 2;
+  line_height = entry_scale * 12;
+  cursor_x = settings_family ? 12 : 18;
+  name_x = cursor_x + (settings_family ? 18 : 24);
+  accent = settings_family ? plumos_fbdev_pack_color(r, 56, 148, 255)
+                           : p->accent;
+  footer1 = plumos_fbdev_find_value(lines, line_count, "footer1=");
+  footer2 = plumos_fbdev_find_value(lines, line_count, "footer2=");
+
   for (i = 1; i < line_count && item_count < 18; i++) {
     const char *line = plumos_fbdev_ltrim(lines[i]);
     int is_selected = 0;
     if (plumos_fbdev_is_hidden_line(line)) {
       continue;
     }
-    if (line[0] == '>') {
-      is_selected = 1;
-      line++;
-      line = plumos_fbdev_ltrim(line);
-    }
-    plumos_fbdev_copy_text(items[item_count], sizeof(items[item_count]), line);
+    plumos_fbdev_compact_menu_entry(line, items[item_count],
+                                    sizeof(items[item_count]), &is_selected);
     selected[item_count] = is_selected;
     item_count++;
   }
@@ -1412,24 +1527,38 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
     item_count = 1;
   }
 
-  plumos_fbdev_draw_shell(r, p);
-  plumos_fbdev_draw_text(r, pad, 64, title, 2, p->foreground, w - pad);
-  plumos_fbdev_fill_rect(r, pad, list_y, w - pad * 2, h - list_y - 52, p->panel);
-  plumos_fbdev_draw_frame(r, pad, list_y, w - pad * 2, h - list_y - 52, 1, p->line);
+  plumos_fbdev_fill_rect(r, 0, 0, w, h, p->background);
+  plumos_fbdev_draw_tty_top_bar(r);
+  plumos_fbdev_fill_rect(r, 0, 0, 5, h, accent);
+  plumos_fbdev_draw_text(r, 14, 48, title, 2, p->muted, w - 8);
+  y = settings_family ? 82 : 104;
+
   for (i = 0; i < item_count; i++) {
-    int y = list_y + 12 + (int)i * row_h;
     uint32_t fg = selected[i] ? p->selection_foreground : p->foreground;
-    if (y + row_h > h - 54) {
+    if (y > h - 34) {
       break;
     }
     if (selected[i]) {
-      plumos_fbdev_fill_rect(r, pad + 10, y - 4, w - pad * 2 - 20, row_h - 2,
+      plumos_fbdev_fill_rect(r, 10, y - 7, w - 20,
+                             entry_scale * 7 + 10,
                              p->selection_background);
-      plumos_fbdev_fill_rect(r, pad + 10, y - 4, 4, row_h - 2, p->accent);
     }
-    plumos_fbdev_draw_text(r, pad + 28, y + 3, items[i], 2, fg, w - pad - 24);
+    plumos_fbdev_draw_text(r, cursor_x, y, selected[i] ? ">" : " ",
+                           entry_scale, fg, w - 8);
+    plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg,
+                           w - 8);
+    y += line_height;
   }
-  plumos_fbdev_draw_status(r, p, lines, line_count);
+  if ((footer1 && footer1[0]) || (footer2 && footer2[0])) {
+    plumos_fbdev_fill_rect(r, 0, h - 74, w, 74, p->panel_inner);
+    plumos_fbdev_fill_rect(r, 0, h - 76, w, 2, p->panel);
+    if (footer1 && footer1[0]) {
+      plumos_fbdev_draw_text(r, 14, h - 56, footer1, 2, p->muted, w - 8);
+    }
+    if (footer2 && footer2[0]) {
+      plumos_fbdev_draw_text(r, 14, h - 34, footer2, 2, p->muted, w - 8);
+    }
+  }
   return 1;
 }
 

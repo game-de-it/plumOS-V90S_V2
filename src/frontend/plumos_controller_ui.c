@@ -7379,7 +7379,8 @@ static int ui_renderer_fbdev_only(const struct ui_state *ui) {
 }
 
 static int ui_renderer_a30_tty_capable(const struct ui_state *ui) {
-  return ui && (ui->renderer_mali || ui->renderer_mmf_gfx);
+  return ui && (ui->renderer_mali || ui->renderer_fbdev ||
+                ui->renderer_mmf_gfx);
 }
 
 static int ui_uses_graphic_mode(const struct ui_state *ui) {
