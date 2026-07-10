@@ -3,6 +3,7 @@ set -eu
 
 vendor_runtime="${PLUMOS_V90S_VENDOR_RUNTIME_OUT:-output/vendor/v90s-stockos-r1}"
 rootfs_squashfs="output/rootfs-step1/stage1-userdata-loader.squashfs"
+rootfs_squashfs_was_default=1
 out_dir="output/images"
 image_name="plumos-v90s-stockos-smoke.img"
 volumn_vfat_size="33M"
@@ -68,6 +69,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         --rootfs-squashfs)
             rootfs_squashfs="$2"
+            rootfs_squashfs_was_default=0
             shift 2
             ;;
         --out-dir)
@@ -165,6 +167,11 @@ fi
 if [ -n "$app_layer_dir" ] && [ ! -d "$app_layer_dir" ]; then
     printf 'error: app-layer directory not found: %s\n' "$app_layer_dir" >&2
     exit 1
+fi
+if [ -n "$app_layer_dir" ] && [ "$rootfs_squashfs_was_default" -eq 1 ]; then
+    printf 'error: --app-layer-dir requires an explicit --rootfs-squashfs with /mnt/plumos init support\n' >&2
+    printf 'hint: build a current system rootfs first, then pass --rootfs-squashfs output/rootfs-step2-appfat/debian-bookworm-retroarch-knulli-step2.squashfs\n' >&2
+    exit 2
 fi
 for f in \
     "$raw_dir/mmcblk0p2-env.bin" \

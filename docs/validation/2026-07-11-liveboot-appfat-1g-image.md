@@ -151,6 +151,23 @@ fsck.fat 4.2 (2021-01-31)
 
 Host-side image generation and FAT32 app-layer verification passed.
 
+Real-device result:
+
+```text
+Boot logo did not proceed.
+```
+
+This image is superseded by:
+
+```text
+docs/validation/2026-07-11-appfat-boot-logo-stall-fix.md
+output/images/plumos-v90s-appfat-1g-20260711-2.img
+```
+
+The cause was not the p7 FAT32 filesystem itself. The image accidentally used
+the old default `stage1-userdata-loader.squashfs` because `--rootfs-squashfs`
+was not specified with `--app-layer-dir`.
+
 Real-device validation is still required:
 
 - p7 FAT32 must mount at `/mnt/plumos`
