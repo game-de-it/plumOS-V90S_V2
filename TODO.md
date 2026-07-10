@@ -110,11 +110,13 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [ ] Implement `picoarch`.
 - [ ] Implement `standalone`.
-- [ ] Implement `frontend`.
+- [x] Implement `frontend`.
 - [x] Implement `app-layer`.
 - [x] Implement `release`.
 - [ ] Implement `all` as the normal release build chain.
 - [ ] Emit manifest and sha256 metadata for every reusable build output.
+  - [x] `frontend` emits `output/frontend/v90s/frontend.manifest` and
+    `output/frontend/v90s/checksums.sha256`.
 
 ## Milestone 3: System Rootfs
 
@@ -143,6 +145,9 @@ Build plumOS V90S as a V90S-specific distribution:
   present in release squashfs.
 - [ ] Make launch wrappers execute applications from `/mnt/plumos`.
 - [ ] Make boot diagnostics report missing or invalid app-layer metadata clearly.
+- [x] Add a development init hook that probes p7/p6 for `/mnt/plumos`
+  app-layer metadata and starts `/mnt/plumos/bin/plumos-frontend-launch` when
+  present.
 
 ## Milestone 4: FAT32 App Layer
 
@@ -162,7 +167,11 @@ Build plumOS V90S as a V90S-specific distribution:
   - `picoarch/`
   - `standalone/`
   - `config/`
+  - `fonts/`
+  - `share/`
+  - `state/`
   - `themes/`
+  - `media/`
   - `Roms/`
   - `BIOS/`
   - `Saves/`
@@ -173,14 +182,16 @@ Build plumOS V90S as a V90S-specific distribution:
   - `licenses/`
 - [x] Copy RetroArch into the app layer.
 - [x] Copy supported libretro cores into the app layer.
-- [ ] Copy frontend into the app layer.
+- [x] Copy frontend into the app layer.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.
 - [x] Avoid symlink-dependent library layouts on FAT32.
 - [x] Generate app-layer `manifest.json`.
 - [x] Generate app-layer `checksums.sha256`.
-- [ ] Add boot or frontend startup validation for app-layer metadata.
+- [x] Add boot/frontend startup checks for app-layer metadata in the
+  development init path.
+- [ ] Validate frontend boot on real V90S hardware.
 
 ## Milestone 5: SD Image Layout
 
@@ -197,6 +208,9 @@ Build plumOS V90S as a V90S-specific distribution:
   shape until the FAT32 app-layer partition is validated.
 - [ ] Do not treat ext4 `SHARE` as the final release app-layer design.
 - [ ] Include app-layer manifest hash in the final SD image manifest.
+- [x] Add `--app-layer-dir` support to the StockOS-compatible image assembler
+  so current p7 development images can carry the app layer for frontend boot
+  tests.
 - [ ] Include vendor-runtime manifest hash in the final SD image manifest.
 - [ ] Include system-rootfs hash in the final SD image manifest.
 

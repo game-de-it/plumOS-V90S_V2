@@ -76,6 +76,7 @@ The V90S build entrypoint is:
 ./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh retroarch
 ./scripts/docker-build.sh cores
+./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh system-rootfs ...
 ./scripts/docker-build.sh app-layer ...
 ./scripts/docker-build.sh sd-image ...
@@ -103,14 +104,15 @@ Implemented compatibility aliases:
 Implemented app-layer target:
 
 ```sh
+./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
 ```
 
 This writes `output/app-layer/v90s/` with `VERSION`, `COMPAT_VENDOR`,
 `MOUNT_PATH`, `manifest.json`, `checksums.sha256`, standard user data
-directories, RetroArch, QuickNES, SDL2 PowerVR private libraries, and the current
-known-good RetroArch defaults template. Files are copied without symlinks so the
-tree can be placed on FAT32.
+directories, the MMF-derived V90S frontend, RetroArch, QuickNES, SDL2 PowerVR
+private libraries, and the current known-good RetroArch defaults template. Files
+are copied without symlinks so the tree can be placed on FAT32.
 
 Implemented update-only release target:
 
@@ -128,7 +130,6 @@ Reserved next targets:
 ```sh
 ./scripts/docker-build.sh picoarch
 ./scripts/docker-build.sh standalone
-./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh all
 ```
 
@@ -156,6 +157,20 @@ The current assembler is:
 ./scripts/docker-build.sh sd-image \
   --name plumos-v90s-stockos-smoke-20260710-1.img
 ```
+
+For current development images, the app layer can be copied into p7 `SHARE`:
+
+```sh
+./scripts/docker-build.sh frontend
+./scripts/docker-build.sh app-layer --strict
+./scripts/docker-build.sh sd-image \
+  --app-layer-dir output/app-layer/v90s \
+  --name plumos-v90s-stockos-frontend-YYYYMMDD-N.img
+```
+
+This is a compatibility bridge for frontend boot testing. The final release
+layout still needs a validated FAT32 app/update/data partition mounted at
+`/mnt/plumos`.
 
 The first RA-capable StockOS-layout image uses the current RetroArch payload as
 p5:

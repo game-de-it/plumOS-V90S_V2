@@ -9,6 +9,7 @@ retroarch_dir="${PLUMOS_V90S_RETROARCH_DIR:-output/retroarch-powervr}"
 retroarch_bin="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-powervr}"
 cores_dir="${PLUMOS_V90S_CORES_DIR:-output/libretro-quicknes}"
 sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
+frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
 strict=0
 
@@ -27,6 +28,7 @@ Options:
   --cores-dir PATH       Libretro cores payload; default output/libretro-quicknes.
   --sdl2-powervr-dir PATH
                           SDL2 PowerVR payload; default output/sdl2-powervr.
+  --frontend-dir PATH    Frontend payload; default output/frontend/v90s.
   --retroarch-config PATH
                           RetroArch defaults template; default configs/retroarch/v90s-powervr-quicknes.cfg.
   --strict               Fail if currently supported payloads are missing.
@@ -65,6 +67,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --sdl2-powervr-dir)
             sdl2_powervr_dir="$2"
+            shift 2
+            ;;
+        --frontend-dir)
+            frontend_dir="$2"
             shift 2
             ;;
         --retroarch-config)
@@ -111,6 +117,13 @@ copy_exec() {
     chmod 0755 "$dst"
 }
 
+copy_tree() {
+    src="$1"
+    dst="$2"
+    mkdir -p "$dst"
+    rsync -a --copy-links "$src"/ "$dst"/
+}
+
 record_file() {
     rel="$1"
     component="$2"
@@ -140,6 +153,17 @@ require_or_note_missing() {
     return 1
 }
 
+record_tree() {
+    src_root="$1"
+    component="$2"
+    source_root="$3"
+
+    find "$src_root" -type f | sort | while IFS= read -r src; do
+        rel="${src#"$src_root"/}"
+        record_file "$rel" "$component" "$source_root/$rel"
+    done
+}
+
 rm -rf "$out_dir"
 mkdir -p \
     "$out_dir/bin" \
@@ -149,7 +173,13 @@ mkdir -p \
     "$out_dir/picoarch" \
     "$out_dir/standalone" \
     "$out_dir/config/retroarch" \
+    "$out_dir/config/frontend" \
+    "$out_dir/config/system" \
+    "$out_dir/fonts" \
+    "$out_dir/share" \
+    "$out_dir/state/frontend" \
     "$out_dir/themes" \
+    "$out_dir/media" \
     "$out_dir/Roms" \
     "$out_dir/BIOS" \
     "$out_dir/Saves" \
@@ -219,6 +249,16 @@ if require_or_note_missing "$sdl2_lib_dir/libSDL2-2.0.so.0.3000.6" "sdl2-powervr
     fi
 fi
 
+frontend_root="$frontend_dir/plumos"
+if require_or_note_missing "$frontend_root/bin/plumos-frontend-launch" "frontend"; then
+    copy_tree "$frontend_root" "$out_dir"
+    record_tree "$frontend_root" "frontend" "$frontend_root"
+    if [ -f "$frontend_dir/frontend.manifest" ]; then
+        copy_file "$frontend_dir/frontend.manifest" "$out_dir/licenses/frontend-manifest.txt"
+        record_file "licenses/frontend-manifest.txt" "frontend" "$frontend_dir/frontend.manifest"
+    fi
+fi
+
 generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 {
     printf '{\n'
@@ -229,8 +269,9 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  "generated_at": "%s",\n' "$generated_at"
     printf '  "directories": [\n'
     printf '    "bin", "lib", "cores", "frontend", "picoarch", "standalone",\n'
-    printf '    "config", "themes", "Roms", "BIOS", "Saves", "States",\n'
-    printf '    "Screenshots", "Logs", "updates", "licenses"\n'
+    printf '    "config", "fonts", "share", "state", "themes", "media",\n'
+    printf '    "Roms", "BIOS", "Saves", "States", "Screenshots", "Logs",\n'
+    printf '    "updates", "licenses"\n'
     printf '  ],\n'
     printf '  "missing_optional": ['
     first=1

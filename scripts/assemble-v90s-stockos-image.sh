@@ -8,6 +8,7 @@ image_name="plumos-v90s-stockos-smoke.img"
 volumn_vfat_size="33M"
 batocera_boot_size="33M"
 share_size="64M"
+app_layer_dir="${PLUMOS_V90S_APP_LAYER_DIR:-}"
 boot0_img=""
 boot_package_img=""
 include_stock_overlay=0
@@ -34,6 +35,7 @@ Options:
   --batocera-boot-size N
                         p6 rootfs/BATOCERA ext4 size, default 33M
   --share-size N        p7 rootfs_data/SHARE ext4 size, default 64M
+  --app-layer-dir PATH  copy a built plumOS app layer into p7 SHARE
   --boot0 PATH          raw Allwinner boot0 image; default vendor runtime if present,
                         otherwise requires --allow-knulli-boot-fallback
   --boot-package PATH   raw Allwinner boot_package.fex; default vendor runtime if
@@ -86,6 +88,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --share-size)
             share_size="$2"
+            shift 2
+            ;;
+        --app-layer-dir)
+            app_layer_dir="$2"
             shift 2
             ;;
         --boot0)
@@ -154,6 +160,10 @@ if [ ! -d "$vendor_root" ]; then
 fi
 if [ ! -f "$rootfs_squashfs" ]; then
     printf 'error: rootfs squashfs not found: %s\n' "$rootfs_squashfs" >&2
+    exit 1
+fi
+if [ -n "$app_layer_dir" ] && [ ! -d "$app_layer_dir" ]; then
+    printf 'error: app-layer directory not found: %s\n' "$app_layer_dir" >&2
     exit 1
 fi
 for f in \
@@ -255,6 +265,13 @@ if [ "$repack_rootfs" -eq 1 ]; then
         -noappend -comp zstd -b 131072 -all-root >/dev/null
 else
     cp "$rootfs_squashfs" "$input_dir/batocera-rootfs.squashfs"
+fi
+app_layer_manifest_sha256=none
+if [ -n "$app_layer_dir" ]; then
+    rsync -a --copy-links "$app_layer_dir"/ "$root_dir/share"/
+    if [ -f "$app_layer_dir/manifest.json" ]; then
+        app_layer_manifest_sha256="$(sha256sum "$app_layer_dir/manifest.json" | awk '{print $1}')"
+    fi
 fi
 cp "$boot0_img" "$input_dir/boot0.img"
 cp "$boot_package_img" "$input_dir/boot_package.fex"
@@ -389,6 +406,8 @@ stockos_boot_partition_sha256=$sha256_boot
 volumn_vfat_size=$volumn_vfat_size
 batocera_boot_size=$batocera_boot_size
 share_size=$share_size
+app_layer_dir=${app_layer_dir:-none}
+app_layer_manifest_sha256=$app_layer_manifest_sha256
 include_stock_overlay=$include_stock_overlay
 partitions=p1:boot-resource/Volumn,p2:env,p3:env-redund,p4:boot,p5:batocera,p6:rootfs/BATOCERA,p7:rootfs_data/SHARE
 notice=Uses POWKIDDY V90S StockOS/Batocera-derived runtime inputs. KNULLI boot0/boot_package assets are used only when --allow-knulli-boot-fallback is passed and raw StockOS boot-chain captures are absent.

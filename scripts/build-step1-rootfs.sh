@@ -621,6 +621,46 @@ fb_probe() {
     sync
 }
 
+plumos_app_layer_mounted() {
+    grep -q '[[:space:]]/mnt/plumos[[:space:]]' /proc/mounts 2>/dev/null
+}
+
+plumos_app_layer_ready() {
+    [ -f /mnt/plumos/manifest.json ] &&
+    [ -f /mnt/plumos/checksums.sha256 ] &&
+    [ -x /mnt/plumos/bin/plumos-frontend-launch ]
+}
+
+prepare_plumos_app_layer() {
+    mkdir -p /mnt/plumos 2>/dev/null || true
+
+    if plumos_app_layer_ready; then
+        log "debian-init: app layer already available at /mnt/plumos"
+        return 0
+    fi
+
+    for dev in /dev/mmcblk0p7 /dev/mmcblk1p7 /dev/mmcblk2p7 /dev/mmcblk0p6 /dev/mmcblk1p6 /dev/mmcblk2p6; do
+        [ -b "$dev" ] || continue
+        for fstype in vfat ext4; do
+            if plumos_app_layer_mounted 2>/dev/null; then
+                umount /mnt/plumos 2>/dev/null || true
+            fi
+            log "debian-init: probing app layer dev=$dev fstype=$fstype"
+            if mount -t "$fstype" -o rw "$dev" /mnt/plumos >> "$LOG" 2>&1; then
+                if plumos_app_layer_ready; then
+                    log "debian-init: mounted app layer dev=$dev fstype=$fstype"
+                    return 0
+                fi
+                log "debian-init: app layer metadata/frontend missing on dev=$dev fstype=$fstype"
+                umount /mnt/plumos 2>/dev/null || true
+            fi
+        done
+    done
+
+    log "debian-init: app layer not found"
+    return 1
+}
+
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 if [ ! -c /dev/console ]; then
@@ -668,7 +708,19 @@ if [ -x /usr/local/sbin/v90s-network-ssh-init ]; then
     persist_debian_log
 fi
 
-if [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
+frontend_attempted=0
+if prepare_plumos_app_layer; then
+    frontend_attempted=1
+    log "debian-init: starting plumOS frontend"
+    persist_debian_log
+    sync
+    PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-frontend-launch
+    rc=$?
+    log "debian-init: plumOS frontend exited rc=$rc"
+    persist_debian_log
+fi
+
+if [ "$frontend_attempted" -eq 0 ] && [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
     log "debian-init: starting RetroArch launcher"
     persist_debian_log
     sync
@@ -722,7 +774,7 @@ build_debian_minbase() {
 
     debootstrap --arch=arm64 --variant=minbase "$suite" "$root" "$mirror"
 
-    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/root"
+    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
     write_debian_init "$root/sbin/init"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     printf 'plumos-v90s-step1\n' > "$root/etc/hostname"
@@ -910,7 +962,7 @@ build_debian_retroarch_payload() {
     fi
     debootstrap --arch=arm64 --variant=minbase --include="$retroarch_packages" "$suite" "$root" "$mirror"
 
-    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/root" "$root/roms/nes"
+    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root" "$root/roms/nes"
     write_debian_init "$root/sbin/init"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"

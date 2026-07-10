@@ -31,7 +31,7 @@ Commands:
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
   picoarch         Reserved for the V90S PicoArch build path.
   standalone       Reserved for V90S standalone emulator builds.
-  frontend         Reserved for the V90S frontend build path.
+  frontend         Build the V90S frontend ported from plumOS-MMF.
   release          Assemble update-only release packages from the app layer.
   all              Reserved for the normal release build chain.
 
@@ -195,11 +195,15 @@ case "$cmd" in
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/scripts/build-app-layer.sh "$@"
         ;;
+    frontend)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/scripts/build-frontend.sh "$@"
+        ;;
     release)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/scripts/build-release.sh "$@"
         ;;
-    picoarch|standalone|standalone-emulators|frontend|all)
+    picoarch|standalone|standalone-emulators|all)
         echo "error: $cmd is reserved but not implemented yet for V90S" >&2
         echo "hint: add docker/plumos-v90s-toolchain/scripts/build-$cmd.sh when the runtime contract is pinned" >&2
         exit 3

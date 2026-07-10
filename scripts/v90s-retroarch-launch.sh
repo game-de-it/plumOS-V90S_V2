@@ -4,8 +4,8 @@ set -u
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
-FAT_LOG_DIR=/boot/plumos-logs
-SHARE_DIR=/mnt/share
+FAT_LOG_DIR="${PLUMOS_V90S_FAT_LOG_DIR:-/boot/plumos-logs}"
+SHARE_DIR="${PLUMOS_V90S_SHARE_DIR:-/mnt/share}"
 LAUNCH_LOG=/tmp/plumos-v90s-retroarch-launch.log
 RETROARCH_LOG=/tmp/plumos-v90s-retroarch.log
 SHARE_LAUNCH_LOG=
@@ -433,13 +433,13 @@ write_config() {
 
     cat > "$cfg" <<EOF
 config_save_on_exit = "true"
-libretro_directory = "/usr/lib/aarch64-linux-gnu/libretro"
-libretro_info_path = "/usr/share/libretro/info"
-assets_directory = "/usr/share/libretro/assets"
-system_directory = "/root/.config/retroarch/system"
-savefile_directory = "/tmp"
-savestate_directory = "/tmp"
-content_database_path = "/usr/share/libretro/database/rdb"
+libretro_directory = "${PLUMOS_V90S_LIBRETRO_DIR:-/usr/lib/aarch64-linux-gnu/libretro}"
+libretro_info_path = "${PLUMOS_V90S_LIBRETRO_INFO_DIR:-/usr/share/libretro/info}"
+assets_directory = "${PLUMOS_V90S_RETROARCH_ASSETS_DIR:-/usr/share/libretro/assets}"
+system_directory = "${PLUMOS_V90S_SYSTEM_DIR:-/root/.config/retroarch/system}"
+savefile_directory = "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
+savestate_directory = "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
+content_database_path = "${PLUMOS_V90S_CONTENT_DATABASE_DIR:-/usr/share/libretro/database/rdb}"
 
 log_verbosity = "true"
 libretro_log_level = "0"
@@ -585,7 +585,10 @@ log "retroarch-launch: retroarch_bin=$RETROARCH_BIN"
 
 sdl2_runtime_dir=""
 sdl2_runtime_label=""
-if [ -d /usr/local/lib/plumos-sdl2-powervr ]; then
+if [ -n "${PLUMOS_V90S_SDL2_POWERVR_DIR:-}" ] && [ -d "$PLUMOS_V90S_SDL2_POWERVR_DIR" ]; then
+    sdl2_runtime_dir="$PLUMOS_V90S_SDL2_POWERVR_DIR"
+    sdl2_runtime_label="powervr-env"
+elif [ -d /usr/local/lib/plumos-sdl2-powervr ]; then
     sdl2_runtime_dir="/usr/local/lib/plumos-sdl2-powervr"
     sdl2_runtime_label="powervr"
 elif [ -d /usr/local/lib/plumos-sdl2-mali ]; then
@@ -596,7 +599,7 @@ fi
 if [ -n "$sdl2_runtime_dir" ]; then
     export LD_LIBRARY_PATH="$sdl2_runtime_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     log "retroarch-launch: custom SDL2 PowerVR runtime detected: $sdl2_runtime_dir ($sdl2_runtime_label)"
-    append_cmd "custom-sdl2-powervr-files" sh -c 'for d in /usr/local/lib/plumos-sdl2-powervr /usr/local/lib/plumos-sdl2-mali; do [ -d "$d" ] && find "$d" -maxdepth 1 -print 2>/dev/null; done; find /usr/local/bin -maxdepth 1 -name v90s-sdl2-video-probe -print 2>/dev/null || true; for f in /etc/plumos-sdl2-powervr-manifest.txt /etc/plumos-sdl2-mali-manifest.txt; do [ -f "$f" ] && echo "--- $f" && cat "$f"; done'
+    append_cmd "custom-sdl2-powervr-files" sh -c 'for d in "${PLUMOS_V90S_SDL2_POWERVR_DIR:-}" /usr/local/lib/plumos-sdl2-powervr /usr/local/lib/plumos-sdl2-mali; do [ -n "$d" ] && [ -d "$d" ] && find "$d" -maxdepth 1 -print 2>/dev/null; done; find /usr/local/bin -maxdepth 1 -name v90s-sdl2-video-probe -print 2>/dev/null || true; for f in /etc/plumos-sdl2-powervr-manifest.txt /etc/plumos-sdl2-mali-manifest.txt; do [ -f "$f" ] && echo "--- $f" && cat "$f"; done'
 fi
 if [ -d /usr/lib/powervr ]; then
     if [ -n "$sdl2_runtime_dir" ]; then
@@ -659,7 +662,7 @@ export XDG_RUNTIME_DIR=/run
 mkdir -p /root/.config/retroarch/system /tmp/retroarch-cache /run 2>/dev/null || true
 
 if [ -z "$sdl2_runtime_dir" ]; then
-    log "retroarch-launch: required SDL2 PowerVR runtime missing: /usr/local/lib/plumos-sdl2-powervr"
+    log "retroarch-launch: required SDL2 PowerVR runtime missing: ${PLUMOS_V90S_SDL2_POWERVR_DIR:-/usr/local/lib/plumos-sdl2-powervr}"
     mirror_logs
     exit 44
 fi
