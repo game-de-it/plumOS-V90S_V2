@@ -365,6 +365,223 @@ The build system should be shaped like the MMF workflow:
 Armbian and Buildroot can remain useful references, but they should not force the
 final distribution structure.
 
+### Build System Completion Plan
+
+The current build scripts started as Step 1/Step 2 bring-up tooling. They should
+now be reshaped into a distribution build system with a clear build graph and
+clear artifact ownership.
+
+`scripts/docker-build.sh` is the only official user-facing build entry point.
+Helper scripts may still exist under `scripts/` or
+`docker/plumos-v90s-toolchain/scripts/`, but normal documentation and release
+instructions should call them through `scripts/docker-build.sh`.
+
+The official target set should become:
+
+```text
+image              build the Docker toolchain image
+shell              open an interactive toolchain shell
+vendor-runtime     prepare v90s-stockos-r1 from artifacts/
+sdl2-powervr       build the patched SDL2 PowerVR compatibility payload
+retroarch          build RetroArch for the V90S PowerVR fbdev route
+cores              build supported libretro cores
+quicknes           compatibility alias for cores or one-core development
+picoarch           build V90S PicoArch/PICO payloads
+standalone         build supported standalone emulators
+frontend           build the plumOS frontend
+system-rootfs      build the read-only Linux system squashfs
+app-layer          assemble the FAT32 plumOS app/update/data tree
+sd-image           assemble the complete V90S SD-card image
+release            assemble full and update-only release packages
+all                build the normal release chain
+```
+
+Legacy or transitional targets may remain for bring-up work, but they must be
+named as such:
+
+```text
+rootfs             transitional alias for system-rootfs
+stockos-image      transitional alias for sd-image while the partition contract
+                  is still StockOS/Batocera-compatible
+knulli-image       legacy investigation target only
+```
+
+The build graph should be:
+
+```text
+artifacts/vendor/v90s-stockos-r1/
+  -> vendor-runtime
+  -> system-rootfs
+  -> app-layer
+  -> sd-image
+  -> release
+
+source pins and local patches
+  -> sdl2-powervr
+  -> retroarch
+  -> cores
+  -> picoarch
+  -> standalone
+  -> frontend
+  -> app-layer
+```
+
+`vendor-runtime` must prepare the stable hardware baseline:
+
+- default input: `artifacts/vendor/v90s-stockos-r1/`
+- default output: `output/vendor/v90s-stockos-r1/`
+- compatibility alias: `output/vendor/stockos-runtime`
+- manifest: `output/vendor/v90s-stockos-r1/vendor-runtime.manifest`
+- hashes: `output/vendor/v90s-stockos-r1/SHA256SUMS`
+
+The prepared vendor runtime should include the StockOS-derived boot and
+hardware-enabling pieces only. It should not become a generic place for
+plumOS-built applications.
+
+`system-rootfs` must build the read-only squashfs. It should contain:
+
+- init
+- mount and app-layer discovery logic
+- `/tmp`, `/run`, `/dev`, `/proc`, `/sys`, `/boot`, and `/mnt/plumos` setup
+- vendor runtime startup glue
+- PowerVR, audio, and input initialization
+- development-mode Wi-Fi and SSH support
+- safe process stop/restart helpers
+- minimal diagnostics and recovery console
+- launch wrappers that execute applications from the app layer
+- default configuration templates
+- base notices and licenses
+
+Release `system-rootfs` builds must not contain user ROMs, user Wi-Fi
+credentials, or normal app-layer payloads such as RetroArch, libretro cores,
+frontend, PicoArch, and standalone emulators. Development profiles may bundle a
+test ROM or temporary payload only when the profile name makes that explicit.
+
+`app-layer` must assemble the FAT32-visible plumOS tree. It should collect:
+
+- RetroArch
+- libretro cores
+- PicoArch/PICO payloads
+- standalone emulators
+- frontend
+- plumOS-owned private libraries
+- default and user-editable config directories
+- themes and assets
+- ROM, BIOS, saves, states, screenshots, and logs directories
+- license notices for bundled app-layer components
+- update metadata
+
+The app-layer output should use a stable tree layout under:
+
+```text
+output/app-layer/v90s/
+```
+
+The on-device mount path should be:
+
+```text
+/mnt/plumos
+```
+
+The release package paths should follow the MMF style:
+
+```text
+dist/plumos-v90s-sdroot-VERSION/
+dist/plumos-v90s-update-VERSION/
+```
+
+or archive equivalents generated from those directories.
+
+The app-layer metadata must include:
+
+```text
+VERSION
+manifest.json
+checksums.sha256
+COMPAT_VENDOR
+```
+
+`COMPAT_VENDOR` must be `v90s-stockos-r1` until the vendor runtime is
+intentionally revised.
+
+Every build target that emits a reusable artifact must emit checksums and a
+manifest. Text manifests are acceptable for intermediate artifacts, but release
+artifacts should have machine-readable JSON metadata.
+
+Minimum metadata for reusable artifacts:
+
+```text
+artifact_name
+artifact_type
+target
+version_or_git_ref
+source_url_or_input_path
+patches
+builder_image
+build_timestamp_utc
+compat_vendor
+output_path
+sha256
+```
+
+Minimum metadata for the final SD image:
+
+```text
+image
+image_sha256
+vendor_runtime_id
+vendor_runtime_manifest_sha256
+system_rootfs
+system_rootfs_sha256
+app_layer_manifest_sha256
+partition_layout
+boot_chain_inputs
+release_or_dev_profile
+```
+
+The image assembler should keep p1 through p4 compatible with StockOS until
+there is real-device evidence that they can be changed. p5 should be the
+plumOS system squashfs. One validated p6/p7 partition should become the
+FAT32 app layer. Until that validation is complete, the assembler may preserve
+the current p6/p7 shape as a development compatibility mode, but release
+builds should not treat ext4 `SHARE` as the final app-layer design.
+
+The build system must keep path ownership strict:
+
+- `artifacts/`: ignored input-only files supplied by the user or extracted from
+  devices
+- `.cache/`: ignored downloaded or cloned source/reference material
+- `output/`: ignored intermediate build output
+- `dist/`: ignored release packages and release staging directories
+- tracked repository files: build scripts, patches, configs, docs, manifests
+  templates, and source owned by plumOS
+
+Secrets and private content must not be baked into normal release artifacts:
+
+- Wi-Fi SSID and password are development-profile inputs only
+- SSH keys and root passwords are development-profile inputs only
+- commercial ROMs are development/test inputs only and stay under `artifacts/`
+
+Current implementation gaps to close:
+
+- change default vendor-runtime paths from the date-based StockOS extraction
+  names to `v90s-stockos-r1`
+- run `vendor-runtime` preparation through the Docker entry point consistently
+- implement `app-layer`
+- move RetroArch, cores, frontend, PicoArch, and standalone emulators out of the
+  release squashfs and into the FAT32 app layer
+- implement `frontend`, `picoarch`, and `standalone` targets instead of leaving
+  them reserved
+- convert or validate one p6/p7 partition as the FAT32 app layer
+- generate app-layer `manifest.json`, `checksums.sha256`, `VERSION`, and
+  `COMPAT_VENDOR`
+- make `release` produce full SD-root and update-only packages
+- rename KNULLI-specific script/profile names where they now describe the
+  stable StockOS-derived runtime, while preserving compatibility names only
+  where the underlying implementation still requires them
+- keep legacy KNULLI and Step 1/Step 2 bring-up paths available only as explicit
+  diagnostic targets
+
 ## Configuration Policy
 
 plumOS should ship known-good defaults but not lock users into them.
@@ -461,7 +678,8 @@ without improving the immediate product.
 
 Follow-up:
 
-Define persistent storage using p7 `rootfs_data` / `SHARE`.
+Define persistent storage and the app/update/data partition without assuming
+that p7 ext4 `rootfs_data` / `SHARE` remains the final design.
 
 ### 2026-07-10: Vendor Runtime Identity
 
@@ -514,3 +732,38 @@ Follow-up:
 
 Choose and validate the actual FAT32 app-layer partition, then define the
 release package layout and update-only package format.
+
+### 2026-07-10: Build System Completion Plan
+
+Decision:
+
+Keep `scripts/docker-build.sh` as the official build entry point and complete
+the build system around a distribution-oriented graph:
+
+```text
+vendor-runtime -> system-rootfs -> app-layer -> sd-image -> release
+```
+
+Application targets such as RetroArch, libretro cores, PicoArch, standalone
+emulators, and frontend should build into reusable outputs, then be collected
+into the FAT32 app layer rather than being baked into the release squashfs.
+
+Rationale:
+
+The current scripts already prove the important device bring-up path, but they
+still mix experimental Step 1/Step 2 payloads with the future release layout.
+The completed build system needs to preserve the working hardware baseline
+while making ordinary plumOS updates copy-over friendly on Windows and macOS.
+
+Constraints:
+
+Release rootfs builds must stay small and hardware-focused. Private ROMs,
+development Wi-Fi credentials, SSH credentials, and normal app-layer binaries
+must not be hidden inside the release squashfs. Each reusable output needs
+manifest and hash metadata so SD images and update packages can be audited.
+
+Follow-up:
+
+Implement the missing `app-layer`, `frontend`, `picoarch`, `standalone`, and
+`release` targets; migrate vendor-runtime defaults to `v90s-stockos-r1`; and
+validate which p6/p7 partition can safely become the FAT32 app layer.
