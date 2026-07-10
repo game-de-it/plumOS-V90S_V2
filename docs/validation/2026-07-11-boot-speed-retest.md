@@ -142,14 +142,44 @@ Deployed to the live device:
 9e9bef44418787313693ba35a6e2321db0dbaaae85737b28c1138881fddfd37f  /dev/mmcblk0p5
 ```
 
-## Remaining Validation
+## Reboot Validation After Netretry
 
-The V90S needs one more reboot after the netretry p5 write. Expected result:
+The user rebooted the V90S from the frontend after the final-action reboot
+watchdog was deployed. SSH returned at `192.0.2.120`.
 
-- frontend process still starts at about 2 seconds after boot;
-- SD2 mount still uses `fsck_mode=off`;
-- FTP and SSH start after the frontend without blocking it;
-- Samba may fail on the first early service pass, then should start on the
-  post-network retry;
-- boot log should contain `retrying enabled plumOS network services after
-  network init`.
+At collection time the device had been up for 64.97 seconds:
+
+```text
+64.97 120.90
+```
+
+The current boot log confirms that the intended fast path is still active:
+
+```text
+debian-init: fb0 probe skipped
+debian-init: starting PowerVR probe in background
+debian-init: starting network/SSH init in background
+debian-init: mounted app layer dev=/dev/mmcblk0p7 fstype=vfat
+debian-init: starting plumOS frontend
+debian-init: plumOS frontend pid=227
+debian-init: starting enabled plumOS network services in background reason=after-frontend
+debian-init: waiting for plumOS frontend pid=227
+debian-init: plumOS network services exited rc=2 reason=after-frontend
+debian-init: network/SSH init exited rc=0
+debian-init: retrying enabled plumOS network services after network init
+debian-init: plumOS network services retry exited rc=0
+```
+
+Process start offsets from `/proc/<pid>/stat`:
+
+```text
+frontend              2.39s  plumos-controller-ui-fbdev
+sshd                  5.82s  sshd listener
+wpa_supplicant        9.10s
+dhclient             14.33s
+samba                16.52s  smbd.bin via ld-linux-aarch64
+```
+
+This preserves the intended behavior: the frontend starts first, slow
+development networking does not block the UI, and Samba recovers on the
+post-network retry.

@@ -269,3 +269,29 @@ bin/plumos-safe-shutdown: OK
 
 The actual FE Reboot action needs one more user-side validation pass after this
 watchdog deployment.
+
+## Live Reboot Validation
+
+The user tested START menu Reboot again after the final-action watchdog was
+deployed and confirmed that the V90S rebooted successfully.
+
+After the reboot, SSH returned at:
+
+```text
+root@192.0.2.120
+```
+
+The latest power-action log still ends at the irreversible terminal command,
+which is expected when the watchdog/sysrq path completes the reboot:
+
+```text
+start action=reboot poweroff=0 dry_run=0 power_backend=auto sleep_backend=mem
+sd2: stopping content mounts
+sync: begin
+sync: done
+reboot: requested
+cmd: reboot -f
+```
+
+Boot-time validation after this reboot is recorded in
+`docs/validation/2026-07-11-boot-speed-retest.md`.
