@@ -178,6 +178,7 @@ assemble_base() {
   mkdir -p "$BIN_DIR" "$LIB_DIR" "$SSH_LIBEXEC_DIR" "$SAMBA_SBIN_DIR" "$DOC_DIR"
   cp -a "${PACKAGE_DIR}/." "$PLUMOS_DIR/"
   chmod 0755 "${BIN_DIR}/plumos-network-services"
+  chmod 0755 "${PLUMOS_DIR}/ssh/start-ssh.sh" "${PLUMOS_DIR}/ssh/stop-ssh.sh"
   : > "$MANIFEST"
   {
     echo "plumOS V90S network services"
@@ -329,8 +330,12 @@ Services:
     BusyBox tcpsvd + ftpd, port 21, max 20 concurrent connections.
     Use FileZilla's Force UTF-8 charset setting for Japanese ROM filenames.
   SFTP:
-    Installs an OpenSSH sftp-server payload. SSH itself remains managed by the
-    V90S system rootfs so app-layer service control never stops SSH.
+    Installs an OpenSSH sftp-server payload. SFTP depends on the same
+    plumOS-controlled SSH service.
+  SSH:
+    Controls the V90S OpenSSH daemon through /mnt/plumos/ssh/start-ssh.sh and
+    /mnt/plumos/ssh/stop-ssh.sh. SSH logins prefer /mnt/plumos/bin and then
+    /mnt/plumos/gnu/bin in PATH.
   Samba:
     Writable SMB share named SDCARD on port 445 for Windows/macOS network-drive
     mounting, max 20 connections. Use smb://V90S_IP/SDCARD or
@@ -343,6 +348,9 @@ Persistent service state:
 
 Runtime control:
   /mnt/plumos/bin/plumos-network-services status ftp
+  /mnt/plumos/bin/plumos-network-services status ssh
+  /mnt/plumos/bin/plumos-network-services start ssh
+  /mnt/plumos/bin/plumos-network-services stop ssh
   /mnt/plumos/bin/plumos-network-services start ftp
   /mnt/plumos/bin/plumos-network-services stop ftp
   /mnt/plumos/bin/plumos-network-services status samba

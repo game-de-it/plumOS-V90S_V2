@@ -196,7 +196,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy supported libretro cores into the app layer.
 - [x] Copy frontend into the app layer.
 - [x] Copy BusyBox and command-line userland into the app layer.
-- [x] Copy FTP/SFTP/Samba network service payloads into the app layer.
+- [x] Copy SSH/FTP/SFTP/Samba network service payloads into the app layer.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

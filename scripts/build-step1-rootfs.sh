@@ -710,6 +710,12 @@ fi
 
 frontend_attempted=0
 if prepare_plumos_app_layer; then
+    if [ -x /mnt/plumos/bin/plumos-network-services ]; then
+        log "debian-init: starting enabled plumOS network services"
+        persist_debian_log
+        PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-network-services start-enabled >> "$LOG" 2>&1 || true
+        persist_debian_log
+    fi
     frontend_attempted=1
     log "debian-init: starting plumOS frontend"
     persist_debian_log
@@ -903,12 +909,54 @@ KbdInteractiveAuthentication yes
 UsePAM no
 PermitEmptyPasswords no
 AuthorizedKeysFile .ssh/authorized_keys
+PermitUserEnvironment yes
+SetEnv PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos PATH=/mnt/plumos/bin:/mnt/plumos/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EOF
 
     if [ -n "$ssh_authorized_keys" ]; then
         install -m 0600 "$ssh_authorized_keys" "$root/root/.ssh/authorized_keys"
     fi
     chmod 0700 "$root/root/.ssh"
+    cat > "$root/root/.ssh/environment" <<'EOF'
+PLUMOS_ROOT=/mnt/plumos
+PLUMOS_SDCARD_ROOT=/mnt/plumos
+PATH=/mnt/plumos/bin:/mnt/plumos/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EOF
+    chmod 0600 "$root/root/.ssh/environment"
+
+    mkdir -p "$root/etc/profile.d"
+    cat > "$root/etc/profile.d/plumos-path.sh" <<'EOF'
+export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+case ":$PATH:" in
+    *":${PLUMOS_ROOT}/bin:"*) ;;
+    *) PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:${PATH}" ;;
+esac
+export PATH
+EOF
+
+    cat > "$root/root/.profile" <<'EOF'
+if [ -f /etc/profile ]; then
+    . /etc/profile
+fi
+export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+case ":$PATH:" in
+    *":${PLUMOS_ROOT}/bin:"*) ;;
+    *) PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:${PATH}" ;;
+esac
+export PATH
+EOF
+
+    cat > "$root/root/.bashrc" <<'EOF'
+export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+case ":$PATH:" in
+    *":${PLUMOS_ROOT}/bin:"*) ;;
+    *) PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:${PATH}" ;;
+esac
+export PATH
+EOF
 
     if [ -n "$ssh_root_password" ]; then
         root_hash="$(openssl passwd -6 "$ssh_root_password")"

@@ -1,0 +1,16 @@
+export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+export PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+export HISTFILE="${PLUMOS_SSH_HISTFILE:-${PLUMOS_ROOT}/state/ssh/ash_history}"
+export HISTSIZE="${PLUMOS_SSH_HISTSIZE:-9999}"
+export HISTFILESIZE="${PLUMOS_SSH_HISTFILESIZE:-9999}"
+
+_plumos_hist_dir="${HISTFILE%/*}"
+if [ -n "$_plumos_hist_dir" ] && [ "$_plumos_hist_dir" != "$HISTFILE" ]; then
+  "${PLUMOS_ROOT}/bin/mkdir" -p "$_plumos_hist_dir" 2>/dev/null || true
+fi
+if [ -n "$HISTFILE" ] && [ ! -e "$HISTFILE" ]; then
+  : > "$HISTFILE" 2>/dev/null || true
+fi
+unset _plumos_hist_dir

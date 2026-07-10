@@ -18,6 +18,8 @@ TCPSVD="${PLUMOS_ROOT}/bin/tcpsvd"
 FTPD="${PLUMOS_ROOT}/bin/ftpd"
 SFTP_SERVER="${PLUMOS_ROOT}/ssh/libexec/sftp-server"
 SFTP_SERVER_DISABLED="${PLUMOS_ROOT}/ssh/libexec/sftp-server.disabled"
+SSH_START="${PLUMOS_ROOT}/ssh/start-ssh.sh"
+SSH_STOP="${PLUMOS_ROOT}/ssh/stop-ssh.sh"
 SMBD="${PLUMOS_ROOT}/samba/sbin/smbd"
 NMBD="${PLUMOS_ROOT}/samba/sbin/nmbd"
 
@@ -127,7 +129,7 @@ print_status() {
 
 process_exists_by_name() {
   name="$1"
-  if [ -x "$BUSYBOX" ]; then
+  if [ -x "$BUSYBOX" ] && "$BUSYBOX" true >/dev/null 2>&1; then
     "$BUSYBOX" ps w 2>/dev/null | "$BUSYBOX" awk -v n="$name" '
       $1 ~ /^[0-9]+$/ && index($0, n) { found=1 }
       END { exit found ? 0 : 1 }
@@ -147,6 +149,18 @@ smbd_pid_file() {
 
 nmbd_pid_file() {
   printf '%s\n' "${RUN_DIR}/nmbd.pid"
+}
+
+ssh_pid_file() {
+  if [ -s "${PLUMOS_ROOT}/ssh/run/sshd.pid" ]; then
+    printf '%s\n' "${PLUMOS_ROOT}/ssh/run/sshd.pid"
+    return
+  fi
+  if [ -s "${PLUMOS_ROOT}/ssh/run/dropbear.pid" ]; then
+    printf '%s\n' "${PLUMOS_ROOT}/ssh/run/dropbear.pid"
+    return
+  fi
+  printf '%s\n' "${PLUMOS_ROOT}/ssh/run/sshd.pid"
 }
 
 kill_ftp_children() {
@@ -174,11 +188,19 @@ kill_ftp_children() {
 }
 
 status_ssh() {
-  if process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
-    print_status ssh running "SSH is managed by the system rootfs"
+  if pid_alive "$(ssh_pid_file)"; then
+    print_status ssh running "SSH service controlled by plumOS"
     return 0
   fi
-  print_status ssh system_managed "SSH control is intentionally not handled by app-layer services"
+  if process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
+    print_status ssh running "SSH running; pid file will be adopted on start"
+    return 0
+  fi
+  if [ ! -x "$SSH_START" ]; then
+    print_status ssh not_installed "SSH start script missing"
+    return 1
+  fi
+  print_status ssh stopped "SSH stopped"
   return 2
 }
 
@@ -204,8 +226,8 @@ status_sftp() {
     print_status sftp stopped "SFTP disabled"
     return 2
   fi
-  if process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
-    print_status sftp running "SFTP server installed; SSH remains system-managed"
+  if pid_alive "$(ssh_pid_file)" || process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
+    print_status sftp running "SFTP server installed; SSH service running"
     return 0
   fi
   print_status sftp stopped "SFTP server installed, SSH not running"
@@ -269,13 +291,26 @@ stop_ftp() {
 
 start_ssh() {
   set_service_enabled ssh 1
-  log "start skipped reason=system_managed" ssh
+  if [ ! -x "$SSH_START" ]; then
+    log "start failed reason=ssh_start_missing" ssh
+    status_ssh
+    return 1
+  fi
+  log "start" ssh
+  PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" "$SSH_START" >> "$LOG_FILE" 2>&1 || true
   status_ssh
 }
 
 stop_ssh() {
   set_service_enabled ssh 0
-  log "stop skipped reason=system_managed" ssh
+  set_service_enabled sftp 0
+  disable_sftp_server
+  log "stop" ssh
+  if [ -x "$SSH_STOP" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" "$SSH_STOP" >> "$LOG_FILE" 2>&1 || true
+  else
+    kill_pid_file "$(ssh_pid_file)" ssh "sshd" || true
+  fi
   status_ssh || true
   return 0
 }
@@ -288,7 +323,9 @@ start_sftp() {
     status_sftp
     return 1
   fi
-  log "start share=${SHARE_DIR} ssh=system_managed" sftp
+  set_service_enabled ssh 1
+  log "start share=${SHARE_DIR} ssh=plumos_controlled" sftp
+  start_ssh >/dev/null 2>&1 || true
   status_sftp
 }
 
@@ -399,9 +436,9 @@ Commands:
   start-enabled
 
 Services:
-  ssh      Existing system-rootfs SSH status only; stop is a no-op
+  ssh      plumOS-controlled SSH shell service
   ftp      BusyBox FTP on port ${FTP_PORT}, max ${TRANSFER_MAX_CONNECTIONS}, share ${SHARE_DIR}
-  sftp     SFTP server payload status; SSH remains system-managed
+  sftp     SFTP server payload; depends on SSH
   samba    SMB share //V90S_IP/SDCARD, max ${TRANSFER_MAX_CONNECTIONS}, backed by ${SHARE_DIR}
   all
 EOF
@@ -423,7 +460,7 @@ run_one() {
     stop:ftp) stop_ftp ;;
     stop:sftp) stop_sftp ;;
     stop:samba) stop_samba ;;
-    restart:ssh) start_ssh ;;
+    restart:ssh) stop_ssh >/dev/null 2>&1 || true; start_ssh ;;
     restart:ftp) stop_ftp >/dev/null 2>&1 || true; start_ftp ;;
     restart:sftp) stop_sftp >/dev/null 2>&1 || true; start_sftp ;;
     restart:samba) stop_samba >/dev/null 2>&1 || true; start_samba ;;
@@ -435,7 +472,7 @@ command="${1:-}"
 service="${2:-}"
 if [ "$command" = "start-enabled" ]; then
   rc=0
-  for svc in ftp sftp samba; do
+  for svc in ssh ftp sftp samba; do
     if service_enabled "$svc"; then
       run_one start "$svc" || rc=$?
     else
@@ -454,7 +491,7 @@ fi
 case "$service" in
   all)
     rc=0
-    for svc in ftp sftp samba; do
+    for svc in ssh ftp sftp samba; do
       run_one "$command" "$svc" || rc=$?
     done
     exit "$rc"

@@ -89,8 +89,10 @@ Docker build flow です。
 
 `userland` は BusyBox と補助コマンド群を `output/userland/v90s/` に生成します。
 `network-services` は FTP/SFTP/Samba のapp-layer payloadを
-`output/network-services/v90s/` に生成します。SSH本体はsystem rootfs管理とし、
-app-layer service controlはSSHプロセスを停止しません。
+`output/network-services/v90s/` に生成します。SSHも
+`plumos-network-services` の制御対象です。V90Sではsystem rootfs側のOpenSSHを
+app-layerの `ssh/start-ssh.sh` / `ssh/stop-ssh.sh` から起動または採用し、
+SSHログイン時は `/mnt/plumos/bin:/mnt/plumos/gnu/bin` をPATH先頭へ入れます。
 
 `app-layer` は FAT32 にコピーする plumOS 側ツリーを
 `output/app-layer/v90s/` に生成します。現在は RetroArch、QuickNES、frontend、

@@ -115,8 +115,9 @@ Implemented app-layer target:
 This writes `output/app-layer/v90s/` with `VERSION`, `COMPAT_VENDOR`,
 `MOUNT_PATH`, `manifest.json`, `checksums.sha256`, standard user data
 directories, the MMF-derived V90S frontend, BusyBox/command tools,
-FTP/SFTP/Samba service payloads, RetroArch, QuickNES, SDL2 PowerVR private
-libraries, and the current known-good RetroArch defaults template. Files are
+SSH/FTP/SFTP/Samba service payloads, RetroArch, QuickNES, SDL2 PowerVR private
+libraries, and the current known-good RetroArch defaults template. SSH logins
+prefer `/mnt/plumos/bin` and then `/mnt/plumos/gnu/bin` in PATH. Files are
 copied without symlinks so the tree can be placed on FAT32.
 
 Implemented update-only release target:

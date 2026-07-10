@@ -405,7 +405,8 @@ assemble_package() {
   cat > "${BIN_DIR}/plumos-env" <<'EOF'
 #!/bin/sh
 export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
-export PATH="${PLUMOS_ROOT}/gnu/bin:${PLUMOS_ROOT}/bin:${PATH}"
+export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-${PLUMOS_ROOT}}"
+export PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:${PATH}"
 if [ "$#" -eq 0 ]; then
   exec "${PLUMOS_ROOT}/bin/sh"
 fi

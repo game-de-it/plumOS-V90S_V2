@@ -490,12 +490,25 @@ test ROM or temporary payload only when the profile name makes that explicit.
 - license notices for bundled app-layer components
 - update metadata
 
-The app-layer network service controller must not own or stop the main SSH
-daemon. SSH is managed by the system rootfs. SFTP may provide an app-layer
-`sftp-server` payload, but enabling or disabling SFTP must not kill SSH or
-drop active development sessions. FTP and Samba stop/restart logic should use
-PID files plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before
-terminating processes.
+The app-layer network service controller owns the user-facing SSH service state
+alongside FTP, SFTP, and Samba so the frontend, logs, and troubleshooting view
+all agree. On V90S the app-layer controller may start or adopt the OpenSSH
+daemon supplied by the system rootfs, but the visible control command is still:
+
+```text
+/mnt/plumos/bin/plumos-network-services start|stop|status ssh
+```
+
+SSH login environments must prefer plumOS command tools:
+
+```text
+PATH=/mnt/plumos/bin:/mnt/plumos/gnu/bin:...
+```
+
+SFTP may provide an app-layer `sftp-server` payload, but it depends on the same
+SSH service state. FTP, SSH, and Samba stop/restart logic should use PID files
+plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before terminating
+processes.
 
 The app-layer output should use a stable tree layout under:
 
