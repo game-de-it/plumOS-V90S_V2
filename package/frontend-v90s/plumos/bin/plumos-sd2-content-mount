@@ -1,0 +1,211 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+SD2_MOUNT="${PLUMOS_SD2_MOUNT:-/run/plumos/sd2}"
+SD2_DEVICE="${PLUMOS_SD2_DEVICE:-}"
+FSCK_MODE="${PLUMOS_SD2_FSCK:-auto}"
+LOG_DIR="$PLUMOS_ROOT/Logs"
+LOG_FILE="$LOG_DIR/sd2-content-mount.log"
+PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+export PATH
+
+log() {
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+    printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || date)" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+is_mounted() {
+    grep -q "[[:space:]]$1[[:space:]]" /proc/mounts 2>/dev/null
+}
+
+print_status() {
+    printf 'sd2_mount=%s\n' "$SD2_MOUNT"
+    printf 'plumos_root=%s\n' "$PLUMOS_ROOT"
+    printf 'fsck_mode=%s\n' "$FSCK_MODE"
+    printf 'mounts:\n'
+    grep -E "[[:space:]]($SD2_MOUNT|$PLUMOS_ROOT/(roms|bios))[[:space:]]" /proc/mounts 2>/dev/null || true
+    printf 'devices:\n'
+    ls -l /dev/mmcblk* 2>/dev/null || true
+}
+
+blk_type() {
+    dev="$1"
+    if command -v blkid >/dev/null 2>&1; then
+        blkid "$dev" 2>/dev/null | sed -n 's/.*TYPE="\([^"]*\)".*/\1/p'
+    else
+        printf '\n'
+    fi
+}
+
+fsck_fat_if_needed() {
+    dev="$1"
+    fstype="$2"
+    fsck_bin=""
+
+    [ "$FSCK_MODE" != "0" ] || return 0
+    [ "$FSCK_MODE" != "off" ] || return 0
+    [ "$fstype" = "vfat" ] || [ "$fstype" = "msdos" ] || return 0
+
+    for candidate in fsck.fat dosfsck; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            fsck_bin="$candidate"
+            break
+        fi
+    done
+    if [ -z "$fsck_bin" ]; then
+        log "fsck: no FAT fsck tool available for $dev"
+        return 0
+    fi
+
+    log "fsck: running $fsck_bin -a -w $dev"
+    "$fsck_bin" -a -w "$dev" >> "$LOG_FILE" 2>&1
+    rc=$?
+    log "fsck: $dev rc=$rc"
+    if [ "$rc" -gt 1 ]; then
+        return 1
+    fi
+    return 0
+}
+
+mount_device() {
+    dev="$1"
+    fstype="$2"
+
+    mkdir -p "$SD2_MOUNT" 2>/dev/null || return 1
+    if is_mounted "$SD2_MOUNT"; then
+        return 0
+    fi
+
+    fsck_fat_if_needed "$dev" "$fstype" || return 1
+    log "mount: trying dev=$dev fstype=$fstype"
+    case "$fstype" in
+        vfat|msdos)
+            mount -t vfat -o rw,utf8,shortname=mixed,fmask=0022,dmask=0022,errors=remount-ro "$dev" "$SD2_MOUNT" >> "$LOG_FILE" 2>&1
+            ;;
+        exfat)
+            mount -t exfat -o rw,umask=0022 "$dev" "$SD2_MOUNT" >> "$LOG_FILE" 2>&1
+            ;;
+        ext4)
+            mount -t ext4 -o rw "$dev" "$SD2_MOUNT" >> "$LOG_FILE" 2>&1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+find_content_dir() {
+    base="$1"
+    shift
+    for name in "$@"; do
+        if [ -d "$base/$name" ]; then
+            printf '%s/%s\n' "$base" "$name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+bind_content_dir() {
+    src="$1"
+    dst="$2"
+    label="$3"
+
+    [ -d "$src" ] || return 1
+    mkdir -p "$dst" 2>/dev/null || return 1
+    if is_mounted "$dst"; then
+        log "bind: $dst already mounted; keeping current mount"
+        return 0
+    fi
+    mount --bind "$src" "$dst" >> "$LOG_FILE" 2>&1 || return 1
+    log "bind: $label $src -> $dst"
+    return 0
+}
+
+candidate_devices() {
+    if [ -n "$SD2_DEVICE" ]; then
+        printf '%s\n' "$SD2_DEVICE"
+        return
+    fi
+    for dev in /dev/mmcblk[1-9]p* /dev/mmcblk[1-9]; do
+        [ -b "$dev" ] || continue
+        printf '%s\n' "$dev"
+    done
+}
+
+start_sd2() {
+    rom_src=""
+    bios_src=""
+
+    if ! is_mounted "$SD2_MOUNT"; then
+        for dev in $(candidate_devices); do
+            fstype="$(blk_type "$dev")"
+            [ -n "$fstype" ] || fstype="vfat"
+            case "$fstype" in
+                vfat|msdos|exfat|ext4) ;;
+                *) continue ;;
+            esac
+            if mount_device "$dev" "$fstype"; then
+                log "mount: mounted SD2 dev=$dev fstype=$fstype on $SD2_MOUNT"
+                break
+            fi
+        done
+    fi
+
+    if ! is_mounted "$SD2_MOUNT"; then
+        log "start: no SD2 content card mounted"
+        return 1
+    fi
+
+    rom_src="$(find_content_dir "$SD2_MOUNT" roms ROMS Roms)" || true
+    bios_src="$(find_content_dir "$SD2_MOUNT" bios BIOS Bios)" || true
+
+    if [ -n "$rom_src" ]; then
+        bind_content_dir "$rom_src" "$PLUMOS_ROOT/roms" roms || true
+    else
+        log "start: SD2 roms directory not found"
+    fi
+    if [ -n "$bios_src" ]; then
+        bind_content_dir "$bios_src" "$PLUMOS_ROOT/bios" bios || true
+    else
+        log "start: SD2 bios directory not found"
+    fi
+
+    print_status
+    return 0
+}
+
+stop_sd2() {
+    sync 2>/dev/null || true
+    for target in "$PLUMOS_ROOT/bios" "$PLUMOS_ROOT/roms"; do
+        if is_mounted "$target"; then
+            umount "$target" >> "$LOG_FILE" 2>&1 || true
+            log "stop: unmounted $target"
+        fi
+    done
+    if is_mounted "$SD2_MOUNT"; then
+        umount "$SD2_MOUNT" >> "$LOG_FILE" 2>&1 || true
+        log "stop: unmounted $SD2_MOUNT"
+    fi
+}
+
+case "${1:-start}" in
+    start)
+        start_sd2
+        ;;
+    status)
+        print_status
+        ;;
+    stop)
+        stop_sd2
+        ;;
+    restart)
+        stop_sd2
+        start_sd2
+        ;;
+    *)
+        printf 'Usage: %s [start|status|stop|restart]\n' "$0" >&2
+        exit 2
+        ;;
+esac

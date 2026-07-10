@@ -218,6 +218,11 @@ Build plumOS V90S as a V90S-specific distribution:
   screen by using a scroll window and 2x text for settings-family rows.
 - [x] Formalize the V90S SD1 content roots as lowercase `roms/` and `bios/`,
   with FE ROM scanning rooted at `/mnt/plumos/roms`.
+- [x] Define SD2 as an optional ROM/BIOS-only content layer that is mounted
+  internally and bind-mounted onto `/mnt/plumos/roms` and `/mnt/plumos/bios`.
+- [x] Add `plumos-sd2-content-mount start|status|stop|restart` for SD2 content
+  mount control, including FAT fsck before FAT32/vfat mounts.
+- [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout
 

@@ -912,3 +912,64 @@ Do not add a permanent top-level `/mnt/plumos/Roms` scan fallback for V90S. If
 an existing test card needs migration, handle it as an explicit one-time file
 move or copy. Future system additions should reuse the MMF directory alias
 model, but only enable launch profiles that are actually supported on V90S.
+
+### 2026-07-11: V90S SD2 Content Layer
+
+Decision:
+
+Support SD2 as an optional external content layer for ROM and BIOS data only.
+SD1 remains the authoritative plumOS app/update/data layer mounted at:
+
+```text
+/mnt/plumos
+```
+
+When an SD2 content card is present, mount the SD2 filesystem at an internal
+runtime mount point such as:
+
+```text
+/run/plumos/sd2
+```
+
+Then bind-mount its content directories onto the existing plumOS content roots:
+
+```text
+/run/plumos/sd2/roms -> /mnt/plumos/roms
+/run/plumos/sd2/bios -> /mnt/plumos/bios
+```
+
+The frontend, library scanner, RetroArch launchers, BIOS lookup, network
+services, and user-facing paths should continue to use `/mnt/plumos` as the
+single visible root. Do not add a second scanner root for SD2.
+
+Rationale:
+
+V90S has two SD slots, but the app layer and update model should remain simple.
+Keeping SD1 as the OS/app layer and mapping only SD2 `roms` and `bios` into the
+existing paths allows SD1-only and SD1+SD2 operation to share the same FE and
+launcher contracts.
+
+Initial implementation rules:
+
+- Detect SD2 as a non-SD1 `mmcblk` device, normally `/dev/mmcblk1p1`.
+- Prefer FAT32/vfat and exFAT for user-managed SD2 media; ext4 may be accepted
+  for development cards.
+- For FAT32/vfat, run `fsck.fat` or `dosfsck` before mounting when available.
+- Accept `roms`/`ROMS`/`Roms` and `bios`/`BIOS`/`Bios` at the SD2 root, but
+  expose them through lowercase `/mnt/plumos/roms` and `/mnt/plumos/bios`.
+- If SD2 is absent, invalid, or missing either directory, leave SD1 content
+  roots in place and continue booting.
+- Do not require hot-unplug support for the first release. Treat SD2 as
+  insertion-at-boot media unless a later frontend flow explicitly unmounts it.
+
+Operational behavior:
+
+The app layer should provide a small helper:
+
+```text
+/mnt/plumos/bin/plumos-sd2-content-mount start|status|stop|restart
+```
+
+The normal frontend launch path should call `start` before opening the FE, so
+rebooting with SD2 inserted automatically exposes SD2 ROMs and BIOS files. The
+`status` and `stop` commands are for troubleshooting and safe manual unmounts.

@@ -112,6 +112,10 @@ log="$PLUMOS_ROOT/Logs/frontend.log"
 printf 'plumos-frontend-launch: starting V90S frontend\n' >> "$log"
 printf 'plumos-frontend-launch: PLUMOS_ROOT=%s\n' "$PLUMOS_ROOT" >> "$log"
 
+if [ -x "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" ]; then
+  "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
+fi
+
 exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s" >> "$log" 2>&1
 EOF
       ;;
