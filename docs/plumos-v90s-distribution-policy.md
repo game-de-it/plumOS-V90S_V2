@@ -226,7 +226,9 @@ names instead.
 
 ## Distribution Shape
 
-The current SD-card layout should follow the StockOS/Batocera contract:
+The boot-critical SD-card layout should continue to follow the
+StockOS/Batocera contract until there is real-device evidence that a partition
+can be removed safely:
 
 ```text
 p1 boot-resource / Volumn vfat
@@ -238,14 +240,105 @@ p6 rootfs / BATOCERA ext4
 p7 rootfs_data / SHARE ext4
 ```
 
-Current policy:
+Current boot policy:
 
-- keep p1 small for repeated test writes
-- keep p5 as the read-only main runtime squashfs
-- make p7 the persistent user data partition
-- mount or otherwise expose p7 so RetroArch config, saves, states, frontend
-  settings, logs, and Wi-Fi settings survive reboot
-- avoid relying on live overlay changes as the only copy of important settings
+- keep p1 small and reserved for boot-resource compatibility
+- keep p2, p3, and p4 unchanged unless intentionally replacing the vendor boot
+  flow
+- keep p5 as the read-only main system squashfs
+- do not use p1 as the large user/update area
+- validate any p6/p7 format or role change on real hardware before making it a
+  release default
+
+### System SquashFS and FAT32 App Layer
+
+plumOS V90S should use a split similar to the plumOS MMF release model.
+
+The basic Linux system belongs in the read-only squashfs. It should contain:
+
+- init and mount policy
+- minimal shell and diagnostic tools
+- vendor runtime integration
+- PowerVR/audio/input startup glue
+- Wi-Fi and SSH development-mode support
+- launch wrappers that define the stable runtime environment
+- default configuration templates
+- license and notice files needed for the base system
+
+The user-visible plumOS application layer belongs in a FAT32 partition that can
+be mounted on Windows or macOS and updated by copying files onto the SD card.
+This layer should contain:
+
+- frontend
+- RetroArch
+- libretro cores
+- PICO/PicoArch components
+- standalone emulators
+- plumOS-owned private libraries
+- themes and frontend assets
+- user-editable configuration
+- saves, states, screenshots, and logs
+- ROM and BIOS directories
+- update packages and manifests
+
+Normal OS updates are performed with the SD card mounted on a Windows or macOS
+host. The user copies an update package over the FAT32 app layer. Because the
+device is powered off during this workflow, updating while RetroArch or the
+frontend is running is out of scope for the normal release design.
+
+The app layer should be mounted at a stable path such as:
+
+```text
+/mnt/plumos
+```
+
+The exact partition used for this FAT32 app layer is still a hardware
+validation item. The intended direction is:
+
+```text
+p1-p4: keep StockOS boot contract
+p5:    plumOS system squashfs
+p6/p7: one user-visible FAT32 plumOS app/update/data area, once validated
+```
+
+Until the boot chain proves that p6/p7 can be simplified, image assembly may
+keep the existing partition count and assign the plumOS app layer to the safest
+validated partition.
+
+FAT32 limitations must be treated as part of the ABI:
+
+- no per-file Unix ownership or executable bits
+- no native symlink or hardlink support
+- weaker case-sensitivity behavior than Linux filesystems
+- no safe assumption that upstream Linux library trees can be copied unchanged
+
+For that reason, low-level vendor libraries should stay in the system squashfs
+or vendor runtime area. FAT32 should hold plumOS-built applications and private
+runtime libraries that are packaged to avoid symlink-dependent layouts.
+
+Launch wrappers in the squashfs should define the app-layer environment
+explicitly, including:
+
+```text
+PLUMOS_HOME=/mnt/plumos
+PATH=/mnt/plumos/bin:...
+LD_LIBRARY_PATH=/mnt/plumos/lib:...
+RETROARCH_CONFIG_DIR=/mnt/plumos/config/retroarch
+```
+
+The FAT32 app layer should include release metadata:
+
+```text
+VERSION
+manifest.json
+checksums.sha256
+COMPAT_VENDOR=v90s-stockos-r1
+```
+
+At boot or frontend startup, plumOS should verify the app-layer metadata well
+enough to detect obvious partial copies or vendor-runtime mismatches. If the
+metadata is invalid, the system should report the problem clearly in logs and on
+the development console instead of silently rewriting user configuration.
 
 ## Build System Direction
 
@@ -264,6 +357,9 @@ The build system should be shaped like the MMF workflow:
 - explicit targets for standalone emulators
 - explicit targets for frontend
 - explicit targets for rootfs and SD image assembly
+- explicit targets for FAT32 app-layer packaging
+- full SD-root style packages for first installs
+- update-only packages that can be copied over an existing FAT32 app layer
 - manifests and hashes for generated artifacts
 
 Armbian and Buildroot can remain useful references, but they should not force the
@@ -333,8 +429,11 @@ output/device-logs/runtime-snapshots/
 
 Add future decisions here before implementation.
 
-- How p7 `rootfs_data` / `SHARE` should be mounted and exposed.
-- Which files belong in persistent user data.
+- Which existing partition should become the validated FAT32 plumOS app layer.
+- Whether p6/p7 can be collapsed after the StockOS boot contract is fully
+  understood.
+- The final mount label and mount path for the FAT32 app layer.
+- The exact file layout under `/mnt/plumos`.
 - How frontend should launch RetroArch and standalone emulators.
 - How user RetroArch config should be reset, backed up, or migrated.
 - How release images should differ from development images.
@@ -382,3 +481,36 @@ Follow-up:
 Rename or alias prepared vendor output paths so future tooling can target
 `output/vendor/v90s-stockos-r1/` while preserving the current
 `output/vendor/stockos-runtime` compatibility path during migration.
+
+### 2026-07-10: System SquashFS plus FAT32 App Layer
+
+Decision:
+
+Use a two-layer distribution model. Keep the Linux base, init, mount policy,
+vendor-runtime integration, and hardware startup glue in a read-only system
+squashfs. Put the user-visible plumOS app layer on FAT32 so Windows and macOS
+users can update by copying files onto the SD card.
+
+The FAT32 app layer owns frontend, RetroArch, libretro cores, PICO/PicoArch,
+standalone emulators, plumOS private libraries, themes, user configuration,
+saves, states, screenshots, logs, ROM directories, BIOS directories, update
+metadata, and update packages.
+
+Rationale:
+
+This matches the proven plumOS MMF-style update workflow while preserving the
+V90S-specific StockOS boot and hardware runtime contract. Users should be able
+to apply normal plumOS updates without rebuilding or rewriting the whole SD
+image, and without depending on Linux filesystem tools on the host PC.
+
+Constraints:
+
+FAT32 is not a full Linux runtime filesystem. Do not place symlink-dependent
+vendor runtime trees there. Keep boot, kernel, PowerVR, audio, input, and other
+hardware-critical runtime pieces in the protected system/vendor layer unless a
+specific replacement is validated.
+
+Follow-up:
+
+Choose and validate the actual FAT32 app-layer partition, then define the
+release package layout and update-only package format.
