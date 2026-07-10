@@ -211,6 +211,8 @@ First implementation tasks:
 - [x] Build a StockOS-layout RA image by placing the current RetroArch-capable rootfs on p5 instead of the smoke stage1 rootfs.
 - [ ] Boot-test the StockOS-layout smoke image on V90S and compare logs/display behavior with the existing KNULLI-layout Step 1 image.
 - [ ] Boot-test `plumos-v90s-stockos-ra-20260710-1.img` on V90S and compare RetroArch display/input/audio behavior.
+- [x] Apply StockOS-derived RetroArch video defaults in the V90S launcher path: `video_threaded=true`, `video_refresh_rate=58.917103`, and `vrr_runloop_enable=true`.
+- [ ] Boot-test `plumos-v90s-stockos-ra-20260710-2-stockos-video.img` and compare pacing/audio against `-1`.
 - [ ] Add V90S Docker targets for PicoArch, standalone emulators, and the plumOS frontend.
 
 Validation buckets:

@@ -124,6 +124,15 @@ p5:
   --name plumos-v90s-stockos-ra-20260710-1.img
 ```
 
+The StockOS-video-defaults variant keeps the same layout and applies the
+observed StockOS RetroArch timing defaults:
+
+```sh
+./scripts/docker-build.sh stockos-image \
+  --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stockos-video/debian-bookworm-retroarch-knulli-step2.squashfs \
+  --name plumos-v90s-stockos-ra-20260710-2-stockos-video.img
+```
+
 For fast iteration, p1 defaults to `33M` instead of StockOS's larger FAT area.
 The assembled smoke image uses the StockOS-derived p2/p3 env and p4 Android boot
 partition from `output/vendor/stockos-runtime`. If a future extraction includes
