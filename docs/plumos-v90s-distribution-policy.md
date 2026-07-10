@@ -101,10 +101,29 @@ Vendor-runtime responsibilities:
 - low-level V90S input devices such as `adc_gamepad`
 - USB Wi-Fi kernel module support where needed for development access
 
-The vendor runtime should be versioned as an input, for example:
+The vendor runtime should be versioned as a stable input. The current vendor
+runtime ID is:
 
 ```text
-vendor-runtime-20260710-stockos
+v90s-stockos-r1
+```
+
+Use this ID as the durable hardware-baseline name unless the underlying
+StockOS-derived low-level runtime is intentionally replaced.
+
+Recommended paths:
+
+```text
+raw artifact path:      artifacts/vendor/v90s-stockos-r1/
+prepared output path:   output/vendor/v90s-stockos-r1/
+manifest:               output/vendor/v90s-stockos-r1/vendor-runtime.manifest
+display name:           V90S StockOS Vendor Runtime r1
+```
+
+The existing compatibility path may remain as a transitional alias:
+
+```text
+output/vendor/stockos-runtime
 ```
 
 When this layer changes, record:
@@ -114,6 +133,46 @@ When this layer changes, record:
 - captured partition/runtime inventory
 - hashes
 - real-device validation result
+
+The vendor manifest should include at least:
+
+```text
+id=v90s-stockos-r1
+source=POWKIDDY V90S StockOS/Batocera-derived runtime
+captured_at=2026-07-10
+kernel=Linux 4.9.191
+boot_model=a133-b6
+gpu=PowerVR GE8300
+display_route=mali_fbdev
+known_good_step2=yes
+known_good_doc=docs/validation/2026-07-10-step2-stockos-video-perfect-runtime.md
+```
+
+plumOS release versions and vendor runtime versions are separate. Normal
+development should advance plumOS versions while keeping the vendor runtime
+fixed:
+
+```text
+plumOS 0.1.0 + v90s-stockos-r1
+plumOS 0.2.0 + v90s-stockos-r1
+```
+
+Image names may include the vendor ID when useful:
+
+```text
+plumos-v90s-dev-20260710-vendor-r1.img
+plumos-v90s-ra-20260710-vendor-r1.img
+plumos-v90s-release-0.1.0-vendor-r1.img
+```
+
+Create `v90s-stockos-r2` only if one of these is true:
+
+- a different StockOS image or device source is used
+- `boot.img`, kernel, modules, PowerVR runtime, audio runtime, or input runtime
+  changes
+- a low-level display/audio/input replacement is required
+- the new runtime has equal or better real-device validation than
+  `v90s-stockos-r1`
 
 ### plumOS Runtime
 
@@ -304,3 +363,22 @@ without improving the immediate product.
 Follow-up:
 
 Define persistent storage using p7 `rootfs_data` / `SHARE`.
+
+### 2026-07-10: Vendor Runtime Identity
+
+Decision:
+
+Use `v90s-stockos-r1` as the stable vendor runtime ID.
+
+Rationale:
+
+The vendor runtime is expected to be effectively fixed. A short revision-style
+ID is clearer than a date-based ID because routine plumOS development should not
+imply new vendor runtime captures. Capture dates, source details, hashes, and
+known-good validation links belong in the vendor runtime manifest.
+
+Follow-up:
+
+Rename or alias prepared vendor output paths so future tooling can target
+`output/vendor/v90s-stockos-r1/` while preserving the current
+`output/vendor/stockos-runtime` compatibility path during migration.
