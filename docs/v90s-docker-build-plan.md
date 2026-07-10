@@ -45,16 +45,22 @@ Use three layers:
 The prepared vendor runtime is generated from the ignored artifact:
 
 ```sh
-./scripts/docker-build.sh stockos-runtime
+./scripts/docker-build.sh vendor-runtime
 ```
 
 Default input:
 
 ```text
-artifacts/20260710-stockos-runtime
+artifacts/vendor/v90s-stockos-r1
 ```
 
 Default prepared output:
+
+```text
+output/vendor/v90s-stockos-r1
+```
+
+The older prepared output path remains a compatibility alias during migration:
 
 ```text
 output/vendor/stockos-runtime
@@ -70,13 +76,16 @@ The V90S build entrypoint is:
 ./scripts/docker-build.sh quicknes
 ./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh retroarch
-./scripts/docker-build.sh rootfs ...
-./scripts/docker-build.sh stockos-image ...
+./scripts/docker-build.sh system-rootfs ...
+./scripts/docker-build.sh app-layer ...
 ./scripts/docker-build.sh sd-image ...
+./scripts/docker-build.sh release ...
 ```
 
-`sd-image` is an alias for the StockOS/Batocera layout. The older KNULLI-style
-image assembler remains available only as an explicit legacy command:
+`rootfs` is a transitional alias for `system-rootfs`. `stockos-image` is a
+transitional alias for `sd-image` while the partition contract remains
+StockOS/Batocera-compatible. The older KNULLI-style image assembler remains
+available only as an explicit legacy command:
 
 ```sh
 ./scripts/docker-build.sh knulli-image ...
@@ -111,7 +120,7 @@ p7 rootfs_data / SHARE ext4
 The current assembler is:
 
 ```sh
-./scripts/docker-build.sh stockos-image \
+./scripts/docker-build.sh sd-image \
   --name plumos-v90s-stockos-smoke-20260710-1.img
 ```
 
@@ -119,7 +128,7 @@ The first RA-capable StockOS-layout image uses the current RetroArch payload as
 p5:
 
 ```sh
-./scripts/docker-build.sh stockos-image \
+./scripts/docker-build.sh sd-image \
   --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stocklcd-persistent-ra-config/debian-bookworm-retroarch-knulli-step2.squashfs \
   --name plumos-v90s-stockos-ra-20260710-1.img
 ```
@@ -130,14 +139,14 @@ to `plumos-v90s-stockos-ra-20260710-1.img`, where the user confirmed FPS,
 scrolling, and audio pitch were perfect:
 
 ```sh
-./scripts/docker-build.sh stockos-image \
+./scripts/docker-build.sh sd-image \
   --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stockos-video/debian-bookworm-retroarch-knulli-step2.squashfs \
   --name plumos-v90s-stockos-ra-20260710-2-stockos-video.img
 ```
 
 For fast iteration, p1 defaults to `33M` instead of StockOS's larger FAT area.
 The assembled smoke image uses the StockOS-derived p2/p3 env and p4 Android boot
-partition from `output/vendor/stockos-runtime`. If a future extraction includes
+partition from `output/vendor/v90s-stockos-r1`. If the extraction includes
 raw StockOS `boot0` and `boot_package` captures, they are used automatically;
 until then the manifest records the KNULLI V90S fallback assets.
 

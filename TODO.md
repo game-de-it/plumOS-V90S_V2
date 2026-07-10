@@ -60,14 +60,14 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Milestone 1: Vendor Runtime Formalization
 
-- [ ] Move the default vendor input path to
+- [x] Move the default vendor input path to
   `artifacts/vendor/v90s-stockos-r1/`.
-- [ ] Move the default prepared vendor output path to
+- [x] Move the default prepared vendor output path to
   `output/vendor/v90s-stockos-r1/`.
-- [ ] Keep `output/vendor/stockos-runtime` only as a compatibility alias during
+- [x] Keep `output/vendor/stockos-runtime` only as a compatibility alias during
   migration.
-- [ ] Generate `output/vendor/v90s-stockos-r1/vendor-runtime.manifest`.
-- [ ] Ensure the vendor manifest includes:
+- [x] Generate `output/vendor/v90s-stockos-r1/vendor-runtime.manifest`.
+- [x] Ensure the vendor manifest includes:
   - `id=v90s-stockos-r1`
   - source image or extraction source
   - capture date
@@ -76,8 +76,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - GPU/display route
   - hashes
   - known-good validation document
-- [ ] Generate `output/vendor/v90s-stockos-r1/SHA256SUMS`.
-- [ ] Make `./scripts/docker-build.sh vendor-runtime` run consistently through
+- [x] Generate `output/vendor/v90s-stockos-r1/SHA256SUMS`.
+- [x] Make `./scripts/docker-build.sh vendor-runtime` run consistently through
   the Docker entry point.
 - [ ] Keep KNULLI boot/runtime assets only as explicit legacy diagnostic inputs
   or temporary fallback inputs, not as the main runtime identity.

@@ -65,15 +65,15 @@ Docker build flow です。
 
 ```sh
 ./scripts/docker-build.sh image
-./scripts/docker-build.sh stockos-runtime
+./scripts/docker-build.sh vendor-runtime
 ./scripts/docker-build.sh quicknes
-./scripts/docker-build.sh stockos-image --name plumos-v90s-stockos-smoke-20260710-1.img
-./scripts/docker-build.sh stockos-image \
+./scripts/docker-build.sh sd-image --name plumos-v90s-stockos-smoke-20260710-1.img
+./scripts/docker-build.sh sd-image \
   --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stocklcd-persistent-ra-config/debian-bookworm-retroarch-knulli-step2.squashfs \
   --name plumos-v90s-stockos-ra-20260710-1.img
 ```
 
-`stockos-image` は StockOS 実機スナップショットで確認したパーティション契約を
+`sd-image` は StockOS 実機スナップショットで確認したパーティション契約を
 再現します。
 
 ```text
@@ -89,6 +89,9 @@ p7 rootfs_data / SHARE ext4
 反復テストを速くするため、p1 の FAT 領域はデフォルトで `33M` に抑えます。
 StockOS 由来の `boot0` / `boot_package` が未採取の場合は、互換性のある
 KNULLI V90S asset を fallback として使い、manifest に記録します。
+vendor runtime の正式入力は `artifacts/vendor/v90s-stockos-r1/`、正式出力は
+`output/vendor/v90s-stockos-r1/` です。`output/vendor/stockos-runtime` は移行中
+の互換エイリアスとして扱います。
 現在のRA入りStockOSレイアウト候補は
 `output/images/plumos-v90s-stockos-ra-20260710-2-stockos-video.img` です。
 

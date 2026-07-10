@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-vendor_runtime="${PLUMOS_V90S_VENDOR_RUNTIME_OUT:-output/vendor/stockos-runtime}"
+vendor_runtime="${PLUMOS_V90S_VENDOR_RUNTIME_OUT:-output/vendor/v90s-stockos-r1}"
 rootfs_squashfs="output/rootfs-step1/stage1-userdata-loader.squashfs"
 out_dir="output/images"
 image_name="plumos-v90s-stockos-smoke.img"
@@ -21,7 +21,7 @@ Usage:
 
 Options:
   --vendor-runtime PATH
-                        prepared StockOS runtime; default output/vendor/stockos-runtime
+                        prepared StockOS runtime; default output/vendor/v90s-stockos-r1
   --rootfs-squashfs PATH
                         squashfs image for StockOS partition p5 "batocera";
                         default output/rootfs-step1/stage1-userdata-loader.squashfs
@@ -137,7 +137,7 @@ raw_boot_chain_dir="$vendor_runtime/raw-boot-chain"
 
 if [ ! -d "$vendor_root" ]; then
     printf 'error: vendor runtime root not found: %s\n' "$vendor_root" >&2
-    printf 'hint: run ./scripts/docker-build.sh stockos-runtime first\n' >&2
+    printf 'hint: run ./scripts/docker-build.sh vendor-runtime first\n' >&2
     exit 1
 fi
 if [ ! -f "$rootfs_squashfs" ]; then
@@ -335,12 +335,22 @@ sha256_img="$(sha256sum "$out_dir/$image_name" | awk '{print $1}')"
 sha256_rootfs="$(sha256sum "$rootfs_squashfs" | awk '{print $1}')"
 sha256_p5="$(sha256sum "$input_dir/batocera-rootfs.squashfs" | awk '{print $1}')"
 sha256_boot="$(sha256sum "$raw_dir/mmcblk0p4-boot.bin" | awk '{print $1}')"
+vendor_runtime_id=unknown
+vendor_manifest="$vendor_runtime/vendor-runtime.manifest"
+vendor_manifest_sha256=none
+if [ -f "$vendor_manifest" ]; then
+    vendor_runtime_id="$(awk -F= '$1 == "id" { print $2; exit }' "$vendor_manifest")"
+    vendor_manifest_sha256="$(sha256sum "$vendor_manifest" | awk '{print $1}')"
+fi
 
 cat > "$manifest" <<EOF
 image=$out_dir/$image_name
 sha256=$sha256_img
 layout=stockos-batocera-v90s
 vendor_runtime=$vendor_runtime
+vendor_runtime_id=$vendor_runtime_id
+vendor_runtime_manifest=$vendor_manifest
+vendor_runtime_manifest_sha256=$vendor_manifest_sha256
 rootfs_squashfs=$rootfs_squashfs
 rootfs_squashfs_sha256=$sha256_rootfs
 p5_batocera_squashfs_sha256=$sha256_p5

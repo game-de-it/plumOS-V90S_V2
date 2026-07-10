@@ -15,7 +15,8 @@ Commands:
   image            Build the V90S toolchain image.
   shell            Open a shell in the V90S toolchain image.
   run CMD...       Run an arbitrary command in the V90S toolchain image.
-  stockos-runtime  Prepare artifacts/20260710-stockos-runtime into output/vendor/stockos-runtime.
+  vendor-runtime   Prepare artifacts/vendor/v90s-stockos-r1 into output/vendor/v90s-stockos-r1.
+  stockos-runtime  Deprecated alias for vendor-runtime.
   quicknes         Build the current QuickNES libretro core.
   sdl2-powervr     Build the patched SDL2 PowerVR runtime.
   sdl2-mali        Deprecated alias for sdl2-powervr.
@@ -31,7 +32,9 @@ Commands:
 Environment:
   PLUMOS_V90S_DOCKER_IMAGE     Docker image tag. Default: ${IMAGE}
   PLUMOS_V90S_DOCKER_PLATFORM  Docker platform. Default: ${PLATFORM}
-  PLUMOS_V90S_STOCKOS_ARTIFACT StockOS extraction input for stockos-runtime.
+  PLUMOS_V90S_STOCKOS_ARTIFACT StockOS extraction input for vendor-runtime.
+  PLUMOS_V90S_VENDOR_RUNTIME_OUT
+                                  Prepared vendor runtime output.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target
@@ -64,14 +67,18 @@ ensure_image() {
 }
 
 docker_env=(
-    -e PLUMOS_V90S_STOCKOS_ARTIFACT="${PLUMOS_V90S_STOCKOS_ARTIFACT:-artifacts/20260710-stockos-runtime}"
-    -e PLUMOS_V90S_VENDOR_RUNTIME_OUT="${PLUMOS_V90S_VENDOR_RUNTIME_OUT:-output/vendor/stockos-runtime}"
+    -e PLUMOS_V90S_VENDOR_RUNTIME_ID="${PLUMOS_V90S_VENDOR_RUNTIME_ID:-v90s-stockos-r1}"
+    -e PLUMOS_V90S_VENDOR_RUNTIME_OUT="${PLUMOS_V90S_VENDOR_RUNTIME_OUT:-output/vendor/v90s-stockos-r1}"
+    -e PLUMOS_V90S_VENDOR_RUNTIME_COMPAT_OUT="${PLUMOS_V90S_VENDOR_RUNTIME_COMPAT_OUT:-output/vendor/stockos-runtime}"
     -e PLUMOS_V90S_WIFI_SSID="${PLUMOS_V90S_WIFI_SSID:-}"
     -e PLUMOS_V90S_WIFI_PSK="${PLUMOS_V90S_WIFI_PSK:-}"
     -e PLUMOS_V90S_SSH_AUTHORIZED_KEYS="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
     -e PLUMOS_V90S_SSH_ROOT_PASSWORD="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
     -e PLUMOS_V90S_RETROARCH_START_MODE="${PLUMOS_V90S_RETROARCH_START_MODE:-}"
 )
+if [ -n "${PLUMOS_V90S_STOCKOS_ARTIFACT:-}" ]; then
+    docker_env+=(-e PLUMOS_V90S_STOCKOS_ARTIFACT="$PLUMOS_V90S_STOCKOS_ARTIFACT")
+fi
 
 docker_run_user=(
     --rm
@@ -114,8 +121,14 @@ case "$cmd" in
         fi
         docker run "${docker_run_root[@]}" "$@"
         ;;
-    stockos-runtime|vendor-runtime)
-        "$ROOT_DIR/scripts/prepare-stockos-runtime.sh" "$@"
+    vendor-runtime)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/scripts/prepare-stockos-runtime.sh "$@"
+        ;;
+    stockos-runtime)
+        echo "warning: stockos-runtime is deprecated; use vendor-runtime" >&2
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/scripts/prepare-stockos-runtime.sh "$@"
         ;;
     quicknes|libretro-quicknes)
         ensure_image
