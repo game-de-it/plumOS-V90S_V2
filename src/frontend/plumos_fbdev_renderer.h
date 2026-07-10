@@ -1196,6 +1196,33 @@ static void plumos_fbdev_draw_status(struct plumos_fbdev_renderer *r,
   }
 }
 
+static int plumos_fbdev_render_top_refresh_running(
+    struct plumos_fbdev_renderer *r,
+    const struct plumos_fbdev_palette *p) {
+  const char *line1 = "REFRESH TOP";
+  const char *line2 = "PLEASE WAIT";
+  const char *line3 = "SCANNING SYSTEMS";
+  const char *line4 = "RELOADING TOP LIST";
+  int w = (int)r->var.xres;
+  int h = (int)r->var.yres;
+  int y1 = h / 2 - 112;
+  int y2 = y1 + 64;
+  int y3 = y2 + 76;
+  int y4 = y3 + 34;
+  uint32_t blue = plumos_fbdev_pack_color(r, 56, 148, 255);
+  uint32_t yellow = plumos_fbdev_pack_color(r, 255, 219, 71);
+  uint32_t text_color = plumos_fbdev_pack_color(r, 198, 240, 230);
+
+  plumos_fbdev_fill_rect(r, 0, 0, w, h, p->background);
+  plumos_fbdev_draw_tty_top_bar(r);
+  plumos_fbdev_fill_rect(r, 0, 0, 7, h, blue);
+  plumos_fbdev_draw_text_center(r, 0, y1, w, line1, 4, blue);
+  plumos_fbdev_draw_text_center(r, 0, y2, w, line2, 4, yellow);
+  plumos_fbdev_draw_text_center(r, 0, y3, w, line3, 2, text_color);
+  plumos_fbdev_draw_text_center(r, 0, y4, w, line4, 2, text_color);
+  return 1;
+}
+
 static void plumos_fbdev_entry_badge(char *out, size_t out_size,
                                      const char *title) {
   size_t pos = 0;
@@ -1504,6 +1531,7 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
       strncmp(line, "scraping_screen=", 16) == 0 ||
       strncmp(line, "thumbnail_results_screen=", 25) == 0 ||
       strncmp(line, "thumbnail_running", 17) == 0 ||
+      strncmp(line, "top_refresh_running=", 20) == 0 ||
       strncmp(line, "usb_disk_starting=", 18) == 0 ||
       strncmp(line, "brightness_test=", 16) == 0 ||
       strncmp(line, "wifi_keyboard_cursor=", 21) == 0 ||
@@ -1738,7 +1766,10 @@ static int plumos_fbdev_render_lines(struct plumos_fbdev_renderer *r,
   }
   plumos_fbdev_load_palette(r, &palette, lines, line_count);
   mode = plumos_fbdev_find_value(lines, line_count, "graphic_mode=");
-  if (mode && strcmp(mode, "top") == 0) {
+  if (plumos_fbdev_has_prefixed_line(lines, line_count,
+                                     "top_refresh_running=1")) {
+    ok = plumos_fbdev_render_top_refresh_running(r, &palette);
+  } else if (mode && strcmp(mode, "top") == 0) {
     ok = plumos_fbdev_render_top(r, lines, line_count, &palette);
   } else if (mode && (strcmp(mode, "roms") == 0 ||
                       strcmp(mode, "favorites") == 0 ||
