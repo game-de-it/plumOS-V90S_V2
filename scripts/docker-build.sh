@@ -25,7 +25,7 @@ Commands:
   quicknes         Compatibility alias for the current QuickNES-only core build.
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
-  app-layer        Reserved for FAT32 plumOS app/update/data layer assembly.
+  app-layer        Assemble the FAT32 plumOS app/update/data layer.
   sd-image         Assemble a StockOS/Batocera-compatible V90S SD-card image.
   stockos-image    Transitional alias for sd-image.
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
@@ -191,7 +191,11 @@ case "$cmd" in
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-image.sh "$@"
         ;;
-    app-layer|picoarch|standalone|standalone-emulators|frontend|release|all)
+    app-layer)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/scripts/build-app-layer.sh "$@"
+        ;;
+    picoarch|standalone|standalone-emulators|frontend|release|all)
         echo "error: $cmd is reserved but not implemented yet for V90S" >&2
         echo "hint: add docker/plumos-v90s-toolchain/scripts/build-$cmd.sh when the runtime contract is pinned" >&2
         exit 3

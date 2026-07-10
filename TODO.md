@@ -111,7 +111,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Implement `picoarch`.
 - [ ] Implement `standalone`.
 - [ ] Implement `frontend`.
-- [ ] Implement `app-layer`.
+- [x] Implement `app-layer`.
 - [ ] Implement `release`.
 - [ ] Implement `all` as the normal release build chain.
 - [ ] Emit manifest and sha256 metadata for every reusable build output.
@@ -146,15 +146,15 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Milestone 4: FAT32 App Layer
 
-- [ ] Define the app-layer tree under `output/app-layer/v90s/`.
-- [ ] Define the on-device mount path as `/mnt/plumos`.
-- [ ] Include app-layer metadata:
+- [x] Define the app-layer tree under `output/app-layer/v90s/`.
+- [x] Define the on-device mount path as `/mnt/plumos`.
+- [x] Include app-layer metadata:
   - `VERSION`
   - `manifest.json`
   - `checksums.sha256`
   - `COMPAT_VENDOR`
-- [ ] Set `COMPAT_VENDOR` to `v90s-stockos-r1`.
-- [ ] Add directories for:
+- [x] Set `COMPAT_VENDOR` to `v90s-stockos-r1`.
+- [x] Add directories for:
   - `bin/`
   - `lib/`
   - `cores/`
@@ -171,15 +171,15 @@ Build plumOS V90S as a V90S-specific distribution:
   - `Logs/`
   - `updates/`
   - `licenses/`
-- [ ] Copy RetroArch into the app layer.
-- [ ] Copy supported libretro cores into the app layer.
+- [x] Copy RetroArch into the app layer.
+- [x] Copy supported libretro cores into the app layer.
 - [ ] Copy frontend into the app layer.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
-- [ ] Copy plumOS-owned private libraries into the app layer.
-- [ ] Avoid symlink-dependent library layouts on FAT32.
-- [ ] Generate app-layer `manifest.json`.
-- [ ] Generate app-layer `checksums.sha256`.
+- [x] Copy plumOS-owned private libraries into the app layer.
+- [x] Avoid symlink-dependent library layouts on FAT32.
+- [x] Generate app-layer `manifest.json`.
+- [x] Generate app-layer `checksums.sha256`.
 - [ ] Add boot or frontend startup validation for app-layer metadata.
 
 ## Milestone 5: SD Image Layout

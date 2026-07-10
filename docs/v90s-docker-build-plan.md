@@ -100,13 +100,24 @@ Implemented compatibility aliases:
 ./scripts/docker-build.sh retroarch-knulli
 ```
 
+Implemented app-layer target:
+
+```sh
+./scripts/docker-build.sh app-layer --strict
+```
+
+This writes `output/app-layer/v90s/` with `VERSION`, `COMPAT_VENDOR`,
+`MOUNT_PATH`, `manifest.json`, `checksums.sha256`, standard user data
+directories, RetroArch, QuickNES, SDL2 PowerVR private libraries, and the current
+known-good RetroArch defaults template. Files are copied without symlinks so the
+tree can be placed on FAT32.
+
 Reserved next targets:
 
 ```sh
 ./scripts/docker-build.sh picoarch
 ./scripts/docker-build.sh standalone
 ./scripts/docker-build.sh frontend
-./scripts/docker-build.sh app-layer
 ./scripts/docker-build.sh release
 ./scripts/docker-build.sh all
 ```

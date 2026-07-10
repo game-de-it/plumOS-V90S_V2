@@ -68,6 +68,7 @@ Docker build flow です。
 ./scripts/docker-build.sh vendor-runtime
 ./scripts/docker-build.sh cores
 ./scripts/docker-build.sh retroarch
+./scripts/docker-build.sh app-layer --strict
 ./scripts/docker-build.sh system-rootfs \
   --profile debian-retroarch-powervr \
   --out-dir output/rootfs-step2 \
@@ -81,6 +82,12 @@ Docker build flow です。
 `quicknes` は現在の1 core開発用aliasです。通常の libretro core build 入口は
 `cores` です。`rootfs` は `system-rootfs`、`stockos-image` は `sd-image` の
 移行aliasとして残します。
+
+`app-layer` は FAT32 にコピーする plumOS 側ツリーを
+`output/app-layer/v90s/` に生成します。現在は RetroArch、QuickNES、
+SDL2 PowerVR private libs、既知良好RetroArch設定テンプレート、metadata、
+checksumを含みます。symlinkは使わず、FAT32上で成立する実体ファイルとして
+配置します。
 
 `sd-image` は StockOS 実機スナップショットで確認したパーティション契約を
 再現します。
