@@ -144,6 +144,22 @@ struct input_event {
 #define KEY_ENTER 28
 #endif
 
+#ifndef EV_ABS
+#define EV_ABS 0x03
+#endif
+#ifndef ABS_X
+#define ABS_X 0x00
+#endif
+#ifndef ABS_Y
+#define ABS_Y 0x01
+#endif
+#ifndef ABS_HAT0X
+#define ABS_HAT0X 0x10
+#endif
+#ifndef ABS_HAT0Y
+#define ABS_HAT0Y 0x11
+#endif
+
 #ifndef BTN_SOUTH
 #define BTN_SOUTH 304
 #endif
@@ -208,6 +224,8 @@ struct input_event {
 #define UI_RENDER_MAX_LINES 64
 #define UI_RENDER_LINE_MAX 512
 #define UI_THUMBNAIL_RESULT_MAX_LINES 256
+#define UI_ABS_REPEAT_CODE_BASE 0x10000u
+#define UI_ABS_AXIS_DEADZONE 512
 #define UI_KEY_REPEAT_DELAY_MS 350
 #define UI_KEY_REPEAT_INTERVAL_MS 95
 #define UI_SETTING_VALUE_REPEAT_INTERVAL_MS 250
@@ -13204,6 +13222,61 @@ static enum ui_action action_from_key_code(unsigned int code) {
   }
 }
 
+static enum ui_action action_from_abs_event(unsigned int code, int value,
+                                            int *released) {
+  if (released) {
+    *released = 0;
+  }
+  switch (code) {
+  case ABS_X:
+    if (value <= -UI_ABS_AXIS_DEADZONE) {
+      return ACTION_LEFT;
+    }
+    if (value >= UI_ABS_AXIS_DEADZONE) {
+      return ACTION_RIGHT;
+    }
+    if (released) {
+      *released = 1;
+    }
+    return ACTION_NONE;
+  case ABS_Y:
+    if (value <= -UI_ABS_AXIS_DEADZONE) {
+      return ACTION_UP;
+    }
+    if (value >= UI_ABS_AXIS_DEADZONE) {
+      return ACTION_DOWN;
+    }
+    if (released) {
+      *released = 1;
+    }
+    return ACTION_NONE;
+  case ABS_HAT0X:
+    if (value < 0) {
+      return ACTION_LEFT;
+    }
+    if (value > 0) {
+      return ACTION_RIGHT;
+    }
+    if (released) {
+      *released = 1;
+    }
+    return ACTION_NONE;
+  case ABS_HAT0Y:
+    if (value < 0) {
+      return ACTION_UP;
+    }
+    if (value > 0) {
+      return ACTION_DOWN;
+    }
+    if (released) {
+      *released = 1;
+    }
+    return ACTION_NONE;
+  default:
+    return ACTION_NONE;
+  }
+}
+
 static enum ui_action action_from_stdin_char(int ch) {
   switch (ch) {
   case 'w':
@@ -13509,6 +13582,30 @@ static void read_input_actions(struct ui_state *ui, int fd, int power_only,
       if (event_action == ACTION_NONE && ev.value == 1 && !power_only) {
         snprintf(ui->status, sizeof(ui->status), "unmapped key code=%u value=%d", ev.code,
                  ev.value);
+      }
+    } else if (!power_only && ev.type == EV_ABS) {
+      enum ui_action event_action;
+      unsigned int repeat_code;
+      int released = 0;
+      event_action = action_from_abs_event(ev.code, ev.value, &released);
+      repeat_code = UI_ABS_REPEAT_CODE_BASE | ev.code;
+      if (released) {
+        if (ui->repeat_action != ACTION_NONE && ui->repeat_key_code == repeat_code) {
+          ui->repeat_action = ACTION_NONE;
+          ui->repeat_key_code = 0;
+          ui->repeat_next_ms = 0;
+        }
+        continue;
+      }
+      if (event_action != ACTION_NONE) {
+        int repeat_interval_ms;
+        *action = event_action;
+        repeat_interval_ms = action_repeat_interval_ms(ui, event_action);
+        if (repeat_interval_ms > 0) {
+          ui->repeat_action = event_action;
+          ui->repeat_key_code = repeat_code;
+          ui->repeat_next_ms = current_time_ms() + UI_KEY_REPEAT_DELAY_MS;
+        }
       }
     }
   }

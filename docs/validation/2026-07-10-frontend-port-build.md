@@ -405,3 +405,52 @@ Still requiring physical validation:
 - pressing the frontend open button launches the NES ROM with continuous audio
 - returning from RetroArch restores frontend control
 - RetroArch settings persist under `/mnt/plumos/config/retroarch`
+
+## Frontend D-Pad Regression
+
+After the RetroArch route fix, the user reported that FE d-pad movement did not
+seem to work. Process inspection showed that the frontend itself was not double
+started:
+
+```text
+frontend_count=1
+/run/plumos-v90s/frontend.pid=2488
+/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+```
+
+The frontend had the expected input devices open:
+
+```text
+/proc/2488/fd/4 -> /dev/input/event4
+/proc/2488/fd/5 -> /dev/input/event0
+```
+
+`/dev/input/event4` is `adc_gamepad` and advertises absolute axes:
+
+```text
+Name="adc_gamepad"
+Handlers=event4
+EV=20000b
+ABS=3001b
+```
+
+The root cause was that `plumos_controller_ui.c` handled only `EV_KEY` events
+from evdev. V90S d-pad directions can arrive as `EV_ABS` axes, so those events
+were ignored by the FE even though the input device was open.
+
+The FE input loop now maps these axes to normal navigation actions:
+
+```text
+ABS_X / ABS_HAT0X -> left/right
+ABS_Y / ABS_HAT0Y -> up/down
+```
+
+The same key-repeat path is used for held d-pad directions. The updated app
+layer was live deployed over SSH, the old FE process was stopped by validating
+`/run/plumos-v90s/frontend.pid`, and the new FE was started as PID `2488`.
+
+Still requiring physical validation:
+
+- confirm V90S d-pad moves the FE cursor
+- confirm A/B/START/SELECT still map correctly in the FE
+- confirm launching and returning from RetroArch leaves one FE process
