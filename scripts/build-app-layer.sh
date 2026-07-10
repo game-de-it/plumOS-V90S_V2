@@ -197,8 +197,8 @@ mkdir -p \
     "$out_dir/state/frontend" \
     "$out_dir/themes" \
     "$out_dir/media" \
-    "$out_dir/Roms" \
-    "$out_dir/BIOS" \
+    "$out_dir/roms" \
+    "$out_dir/bios" \
     "$out_dir/Saves" \
     "$out_dir/States" \
     "$out_dir/Screenshots" \
@@ -330,7 +330,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  "directories": [\n'
     printf '    "bin", "lib", "cores", "frontend", "picoarch", "standalone",\n'
     printf '    "config", "fonts", "share", "state", "themes", "media",\n'
-    printf '    "Roms", "BIOS", "Saves", "States", "Screenshots", "Logs",\n'
+    printf '    "roms", "bios", "Saves", "States", "Screenshots", "Logs",\n'
     printf '    "updates", "licenses"\n'
     printf '  ],\n'
     printf '  "missing_optional": ['

@@ -10,9 +10,9 @@
       "enabled": true,
       "pinned": false,
       "directory_aliases": [
-        {"name": "FC", "source": "stockos", "priority": 10, "shared": true},
-        {"name": "nes", "source": "plumos", "priority": 20},
-        {"name": "famicom", "source": "plumos", "priority": 30}
+        {"name": "FC", "source": "miyoo", "priority": 10, "shared": true},
+        {"name": "nes", "source": "emulationstation", "priority": 20},
+        {"name": "famicom", "source": "emulationstation", "priority": 30}
       ],
       "extensions": ["nes", "unf", "unif", "zip"],
       "artwork": {

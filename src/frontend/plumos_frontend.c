@@ -814,7 +814,7 @@ int main(int argc, char **argv) {
   app_totals = scan_category(&ctx, sd_root, "App", "label");
   theme_totals = scan_category(&ctx, sd_root, "Themes", "name");
 
-  snprintf(recent_path, sizeof(recent_path), "%s/Roms/recentlist.json", sd_root);
+  snprintf(recent_path, sizeof(recent_path), "%s/roms/recentlist.json", sd_root);
   recent_size = file_size_or_negative(recent_path);
   if (recent_size >= 0) {
     char *recent_json = read_file(recent_path, NULL);

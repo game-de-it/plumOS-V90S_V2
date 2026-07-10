@@ -1211,15 +1211,10 @@ static void scan_alias_dir(struct scan_ctx *ctx, size_t system_index, const char
 }
 
 static void scan_systems(struct scan_ctx *ctx) {
-  char rom_root_a[PATH_MAX];
-  char rom_root_b[PATH_MAX];
-  const char *rom_roots[2];
+  char rom_root[PATH_MAX];
   size_t s;
 
-  join_path(rom_root_a, sizeof(rom_root_a), ctx->sdcard_root, "Roms");
-  join_path(rom_root_b, sizeof(rom_root_b), ctx->sdcard_root, "roms");
-  rom_roots[0] = rom_root_a;
-  rom_roots[1] = rom_root_b;
+  join_path(rom_root, sizeof(rom_root), ctx->sdcard_root, "roms");
 
   for (s = 0; s < ctx->system_count; s++) {
     const struct system_def *system = &ctx->systems[s];
@@ -1233,11 +1228,8 @@ static void scan_systems(struct scan_ctx *ctx) {
     }
 
     for (a = 0; a < system->alias_count; a++) {
-      size_t r;
-      for (r = 0; r < sizeof(rom_roots) / sizeof(rom_roots[0]); r++) {
-        scan_alias_dir(ctx, s, rom_roots[r], &system->aliases[a],
-                       a > 0 && system->aliases[a].shared);
-      }
+      scan_alias_dir(ctx, s, rom_root, &system->aliases[a],
+                     a > 0 && system->aliases[a].shared);
     }
   }
 }

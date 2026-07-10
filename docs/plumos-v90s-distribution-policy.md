@@ -558,6 +558,29 @@ COMPAT_VENDOR
 `COMPAT_VENDOR` must be `v90s-stockos-r1` until the vendor runtime is
 intentionally revised.
 
+User content directories in the V90S FAT32 app layer should follow the
+StockOS/Batocera lowercase convention for content roots:
+
+```text
+/mnt/plumos/roms/
+/mnt/plumos/bios/
+```
+
+The frontend library scanner must treat `/mnt/plumos/roms` as the single ROM
+root. System-specific folder compatibility belongs in
+`config/frontend/systems.json` through `directory_aliases`; for example NES can
+recognize both the Miyoo-style `FC` directory and the EmulationStation-style
+`nes` directory under the same lowercase root:
+
+```text
+/mnt/plumos/roms/FC/
+/mnt/plumos/roms/nes/
+```
+
+Do not revive a top-level `/mnt/plumos/Roms` fallback for V90S release behavior.
+If a migration helper is needed later, make it explicit and one-shot rather than
+adding another permanent scan root.
+
 Every build target that emits a reusable artifact must emit checksums and a
 manifest. Text manifests are acceptable for intermediate artifacts, but release
 artifacts should have machine-readable JSON metadata.
@@ -851,3 +874,41 @@ Follow-up:
 Build and boot-test a p7 FAT32 image on real V90S hardware, then record whether
 `/mnt/plumos` mounts correctly, the frontend starts from the app layer, and
 logs/configs remain visible from macOS or Windows.
+
+### 2026-07-11: V90S SD1 ROM and BIOS Roots
+
+Decision:
+
+Use lowercase StockOS/Batocera-style content roots inside the V90S FAT32
+app-layer partition:
+
+```text
+/mnt/plumos/roms/
+/mnt/plumos/bios/
+```
+
+For SD1-only operation, these are the authoritative locations for user ROMs and
+BIOS files. The frontend library scanner starts at `/mnt/plumos/roms`; system
+folder compatibility is expressed below that root through
+`config/frontend/systems.json` `directory_aliases`.
+
+Examples:
+
+```text
+/mnt/plumos/roms/FC/   # Miyoo-style Famicom/NES folder
+/mnt/plumos/roms/nes/  # EmulationStation-style NES folder
+```
+
+Rationale:
+
+V90S is StockOS/Batocera-derived at the boot/runtime boundary, so the user
+content root names should not carry the older MMF top-level `Roms/` and
+`BIOS/` convention. Keeping only one ROM root avoids duplicate scans and makes
+Windows/macOS copy-over updates easier to reason about.
+
+Constraints:
+
+Do not add a permanent top-level `/mnt/plumos/Roms` scan fallback for V90S. If
+an existing test card needs migration, handle it as an explicit one-time file
+move or copy. Future system additions should reuse the MMF directory alias
+model, but only enable launch profiles that are actually supported on V90S.

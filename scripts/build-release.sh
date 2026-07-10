@@ -88,8 +88,8 @@ if [ -f "$app_layer_dir/COMPAT_VENDOR" ]; then
     fi
 fi
 
-if find "$app_layer_dir/Roms" -type f 2>/dev/null | grep -q .; then
-    printf 'error: app-layer Roms/ contains files; release packages must not contain ROMs\n' >&2
+if find "$app_layer_dir/roms" -type f 2>/dev/null | grep -q .; then
+    printf 'error: app-layer roms/ contains files; release packages must not contain ROMs\n' >&2
     exit 1
 fi
 

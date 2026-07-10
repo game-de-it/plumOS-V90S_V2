@@ -184,8 +184,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - `state/`
   - `themes/`
   - `media/`
-  - `Roms/`
-  - `BIOS/`
+  - `roms/`
+  - `bios/`
   - `Saves/`
   - `States/`
   - `Screenshots/`
@@ -216,6 +216,8 @@ Build plumOS V90S as a V90S-specific distribution:
   MMF/A30-style frontend layout.
 - [x] Keep V90S START/settings/Wi-Fi list cursors inside the visible fbdev
   screen by using a scroll window and 2x text for settings-family rows.
+- [x] Formalize the V90S SD1 content roots as lowercase `roms/` and `bios/`,
+  with FE ROM scanning rooted at `/mnt/plumos/roms`.
 
 ## Milestone 5: SD Image Layout
 
