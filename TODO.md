@@ -2,566 +2,273 @@
 
 Last updated: 2026-07-10
 
+This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
+and Step 2 bring-up details are preserved in git history and `docs/validation/`.
+Do not use old Armbian-first or KNULLI-first notes as the current plan.
+
 ## Current Goal
 
-Step 2 status: achieved on the live StockOS-layout image after applying StockOS-derived RetroArch video timing defaults.
+Build plumOS V90S as a V90S-specific distribution:
 
-Step 1 status: achieved on device test 15 with `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
+- StockOS/Batocera-derived vendor runtime provides boot, kernel, PowerVR, audio,
+  and low-level input support.
+- plumOS owns userspace behavior, init, launchers, RetroArch, cores, standalone
+  emulators, frontend, configuration, image assembly, and releases.
+- The Linux base lives in a read-only system squashfs.
+- The user-visible app/update/data layer lives on a FAT32 partition mounted at
+  `/mnt/plumos`.
+- Normal updates are applied from Windows or macOS by copying update files onto
+  the SD card.
 
 ## Working Rules
 
-- Keep work in small git commits with clear investigation/build/test boundaries.
-- Keep repeated-test images small. Current assembly defaults are 33MB FAT boot-resource and 64MB userdata.
-- Use KNULLI only as the V90S boot-chain reference unless evidence shows a full KNULLI build is required.
-- Treat Armbian-derived userspace/rootfs as the main target.
-- Do not commit `artifacts/`; it may contain local ROMs or other test-only binaries.
-- User performs real-device validation; record each device result under `docs/validation/`.
-- Do not add automatic runtime fallback paths. Keep validation routes single and explicit so device results are attributable.
-- Stop live device processes only through recorded PID files plus `/proc/<pid>/comm` or `/proc/<pid>/cmdline` validation; do not use broad process-name kills that could affect SSH.
-
-## Done
-
-- [x] Initialize git repository and project notes.
-- [x] Investigate KNULLI V90S target, boot assets, Android `boot.img`, and SD image layout.
-- [x] Add Docker-based image assembly tooling.
-- [x] Add `scripts/assemble-v90s-image.sh` for KNULLI-boot-chain image generation.
-- [x] Validate host-side smoke image assembly with a tiny BusyBox squashfs.
-- [x] Reduce iteration image size from inherited multi-GB KNULLI layout to 33MB FAT plus 64MB userdata.
-- [x] Add a reproducible Step 1 rootfs builder with stage1 plus Debian Bookworm arm64 minbase payload.
-- [x] Add userdata payload support to the V90S image assembly script.
-- [x] Build `plumos-v90s-armbian-step1-20260709-1.img` for the first real-device boot attempt.
-- [x] Record device test 1: KNULLI boot logo appears, but no console yet.
-- [x] Add Android `boot.img` cmdline override support.
-- [x] Build `plumos-v90s-armbian-step1-20260709-2.img` with `root=/dev/mmcblk0p4`.
-- [x] Record device test 2: same KNULLI boot logo only.
-- [x] Add diagnostic initramfs support that writes `plumos-v90s-diag.log` to SD storage.
-- [x] Build `plumos-v90s-armbian-step1-20260709-3-diag.img`.
-- [x] Record device test 3: no FAT diagnostic log; boot package created `lcd_compatible_index.txt`.
-- [x] Inspect userdata ext4 from device test 3 and recover `plumos-v90s-diag.log`.
-- [x] Confirm the V90S booted Linux 4.9.191, reached diagnostic initramfs `/init`, found `/boot/knulli` on `/dev/mmcblk0p4`, and persisted logs to userdata `/dev/mmcblk0p5`.
-- [x] Fix diagnostic initramfs to loop-mount the `/boot/knulli` squashfs file before switching to stage1.
-- [x] Build `plumos-v90s-armbian-step1-20260709-4-diag-loop.img`.
-- [x] Record device test 4: diagnostic init still runs, but `/dev/loop0` squashfs mount fails.
-- [x] Add KNULLI-style file mount probe path before explicit loop mount fallback.
-- [x] Rebuild Debian minbase payload as gzip squashfs for kernel compatibility.
-- [x] Build `plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img`.
-- [x] Record device test 5: gzip stage1 squashfs is readable and loop-attached, but all squashfs mount attempts fail with `Invalid argument`.
-- [x] Switch Step 1 squashfs payload generation to zstd to match KNULLI a133 rootfs settings.
-- [x] Fix diagnostic dmesg tail command to BusyBox-compatible `tail -n 120`.
-- [x] Build `plumos-v90s-armbian-step1-20260709-6-diag-zstd.img`.
-- [x] Record device test 6: zstd `/boot/knulli` mounted successfully as the stage1 root, but the LCD still showed the KNULLI logo.
-- [x] Confirm the V90S/KNULLI kernel config has `CONFIG_VT_CONSOLE=y` but `# CONFIG_FRAMEBUFFER_CONSOLE is not set`.
-- [x] Add stage1 and Debian init logs that persist to userdata.
-- [x] Add a direct `/dev/fb0` write probe in stage1 and Debian init.
-- [x] Move the Debian payload loop mount from `/dev/loop0` to `/dev/loop1`.
-- [x] Build `plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img`.
-- [x] Record device test 7: diagnostic still reached stage1 root, but no stage1/Debian logs were present.
-- [x] Fix stage1 `/sbin/init` execution by adding `/bin/sh -> busybox`.
-- [x] Persist a diagnostic marker immediately before `switch_root`.
-- [x] Persist stage1/Debian logs before framebuffer writes.
-- [x] Build `plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img`.
-- [x] Record device test 8: diagnostic reached pre-`switch_root` marker, but no stage1/Debian logs were present.
-- [x] Add diagnostic userdata handoff mount at `/new_root/mnt/share`.
-- [x] Teach stage1 to use a pre-mounted `/mnt/share` payload before scanning block devices.
-- [x] Persist diagnostic logs through the handoff mount before `switch_root` and on the `switch_root` failure path.
-- [x] Build `plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img`.
-- [x] Record device test 9: diagnostic persisted through handoff and reached `boot: switching to stage1 /sbin/init`, but no stage1/Debian logs were present.
-- [x] Add tmpfs mounts for `/tmp` and `/run` before stage1/Debian init log writes.
-- [x] Add a diagnostic chroot preflight that runs stage1 `/bin/sh` and writes to the handoff share.
-- [x] Build `plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img`.
-- [x] Record device test 10: stage1 entered, used the pre-mounted share, mounted the Debian payload rootfs, then stopped before Debian logs.
-- [x] Add a diagnostic direct-payload path that mounts userdata payload and switches from initramfs to Debian rootfs in one handoff.
-- [x] Preserve moved `/dev` trees in stage1/Debian init and create `/dev/fb0` with `mknod` when sysfs exposes fb0.
-- [x] Build `plumos-v90s-armbian-step1-20260709-11-direct-payload.img`.
-- [x] Record device test 11: direct payload reached Debian init and Debian wrote to `/dev/fb0`, but the LCD still showed the KNULLI logo.
-- [x] Expand the fb0 probe to clear the full virtual framebuffer and write white bands to both pages.
-- [x] Build `plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img`.
-- [x] Record device test 12: boot logo disappeared and the full framebuffer probe became visible on the LCD.
-- [x] Add a small userspace framebuffer console that draws text to `/dev/fb0`, reads `/dev/input/event*`, and runs commands through `/bin/sh`.
-- [x] Build `plumos-v90s-armbian-step1-20260709-13-fb-console.img`.
-- [x] Record device test 13: framebuffer console image reached Debian init, but screen stayed black and console log stayed empty.
-- [x] Add framebuffer console stderr logging, startup marker drawing, and forced log flush/sync.
-- [x] Build `plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img`.
-- [x] Record device test 14: framebuffer console executed commands and read USB keyboard input, but text was not visible because the font table was never initialized.
-- [x] Fix framebuffer console font initialization and increase text scale.
-- [x] Copy Debian and framebuffer console logs to the FAT boot-resource partition under `plumos-logs/`.
-- [x] Build `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
-- [x] Record device test 15: framebuffer console text was visible, USB keyboard input worked, `df` executed, and FAT logs were readable from macOS.
-- [x] Define Step 2 as RetroArch bring-up: visible 60fps video, audible audio, and built-in controller input.
-- [x] Add `artifacts/` to `.gitignore`.
-- [x] Record Step 2 RetroArch plan in `docs/step2-retroarch-plan.md`.
-
-## Step 2: RetroArch Bring-up
-
-Target:
-
-- [x] Boot RetroArch from the generated V90S SD image.
-- [x] Launch local test ROM `artifacts/nes/Super Mario Bros..nes`.
-- [x] Show gameplay on the internal LCD.
-- [x] Reach approximately 60fps with no obvious pacing issue.
-- [x] Output audible sound.
-- [x] Use V90S built-in controls for Start, D-pad, A, and B.
-- [x] Save RetroArch launch/runtime logs for analysis; current StockOS-layout runtime writes them under `/mnt/share/` on the live overlay.
-
-Constraints:
-
-- [x] Keep `artifacts/` out of git.
-- [x] Keep FAT boot-resource near 33MB.
-- [x] Grow userdata only if RetroArch/core payloads require it.
-- [x] Keep Step 1 console image as a known-good recovery reference.
-
-First implementation tasks:
-
-- [x] Confirm the local NES test ROM exists before each Step 2 image build.
-- [x] Inventory RetroArch packaging/build options for Debian arm64 and KNULLI/Buildroot.
-- [x] Choose first NES libretro core for the fastest proof: Debian bookworm provides `libretro-nestopia`; `libretro-fceumm` was not available in the default repo.
-- [x] Add a Step 2 rootfs profile or launch mode.
-- [x] Add RetroArch config for the V90S runtime path:
-  - video driver
-  - audio driver
-  - input driver
-  - log verbosity
-  - FPS display or logging
-- [x] Add a launcher that writes:
-  - `plumos-v90s-retroarch-launch.log`
-  - `plumos-v90s-retroarch.log`
-- [x] Confirm V90S built-in controls work through RetroArch's SDL2 input mapping.
-- [x] Build first Step 2 RetroArch test image.
-- [x] User flashes first Step 2 image and verifies on real hardware.
-- [x] Analyze FAT logs and record result under `docs/validation/`.
-- [x] Build a second Step 2 image using KNULLI's A133/PowerVR graphics path instead of Debian stock RetroArch video drivers.
-- [x] Add the minimum KNULLI graphics components to the Debian payload:
-  - PowerVR GE8300 userspace libraries
-  - `pvrsrvkm.ko`, `dc_sunxi.ko`, and `rgx.*` firmware
-  - launch diagnostics for `/dev/dri`, `/dev/pvr*`, `pvrsrvctl`, EGL, and SDL video drivers
-- [x] Add patched SDL2 framebuffer EGL backend as a custom SDL2 `mali` runtime.
-- [x] User flashes PowerVR probe image and returns FAT logs.
-- [x] Analyze `plumos-v90s-pvr-probe.log` and decide whether the next branch is module/firmware repair or patched SDL2/RetroArch build.
-- [x] Fix the PowerVR probe to run `pvrsrvctl --start` from `/lib/modules/4.9.191`, matching KNULLI's a133 init flow.
-- [x] Build a third Step 2 image that verifies corrected `pvrsrvctl --start`.
-- [x] User flashes third PowerVR start-cwd image and returns FAT logs.
-- [x] Confirm `pvrsrvctl-start-cwd-moddir rc=0` and PowerVR debugfs status.
-- [x] Build patched SDL2 payload with the KNULLI V90S `mali` video driver.
-- [x] Add `v90s-sdl2-video-probe` to distinguish SDL2 fbdev/EGL failure from RetroArch failure.
-- [x] Build fourth Step 2 image with PowerVR plus patched SDL2: `plumos-v90s-armbian-step2-20260709-4-pvr-sdl2-mali.img`.
-- [x] User flashes fourth Step 2 image and returns FAT logs.
-- [x] Analyze SDL2 probe and RetroArch logs from fourth Step 2 image.
-- [x] Confirm custom SDL2 `mali` probe succeeds on real hardware and sees `adc_gamepad`.
-- [x] Add timed RetroArch launch diagnostics so `plumos-v90s-retroarch.log` survives when RA does not return.
-- [x] Build fifth Step 2 diagnostic image with timed RetroArch logging: `plumos-v90s-armbian-step2-20260709-5-retroarch-timeout-log.img`.
-- [x] User flashes fifth Step 2 diagnostic image and returns FAT logs.
-- [x] Analyze timed RetroArch logs from fifth Step 2 image.
-- [x] Confirm Debian RetroArch reaches ROM/core/audio/SDL2-Mali window creation but still does not show useful video.
-- [x] Add Wi-Fi and SSHD bring-up support for live device iteration.
-- [x] Build sixth Step 2 image with Wi-Fi and SSHD: `plumos-v90s-armbian-step2-20260709-6-wifi-ssh.img`.
-- [x] User flashes sixth Step 2 Wi-Fi/SSHD image and returns FAT logs.
-- [x] Record user clarification that V90S networking must use a USB Wi-Fi dongle, not an internal Wi-Fi device.
-- [x] Analyze sixth image FAT logs: network init entered, but stopped after Wi-Fi module inventory before sshd or RetroArch could run.
-- [x] Inspect KNULLI A133/V90S Wi-Fi support and confirm USB Realtek module coverage exists.
-- [x] Change network init to start sshd before Wi-Fi probing, log USB VID/PID, and load only matching USB Wi-Fi driver candidates.
-- [x] Build seventh Step 2 image with USB Wi-Fi dongle SSH diagnostics: `plumos-v90s-armbian-step2-20260709-7-usb-wifi-ssh.img`.
-- [x] User flashes seventh Step 2 USB Wi-Fi/SSHD image with the USB Wi-Fi dongle attached.
-- [x] Confirm Wi-Fi gets an IP address and SSH login works.
-- [x] Confirm `df` can be executed over SSH on the live V90S.
-- [x] Switch no-reflash iteration work to SSH as the default path.
-- [x] Use SSH to iterate on RetroArch runtime settings on the live V90S.
-- [x] Confirm live RetroArch display and built-in control operation with `video_driver=sdl2`, `SDL_VIDEODRIVER=mali`, and `SDL_RENDER_DRIVER=software`.
-- [x] Add V90S audio mixer setup before RetroArch launch.
-- [x] Confirm ALSA playback, DAPM output widgets, DAC FIFO counters, and speaker PA GPIO all become active during `speaker-test`.
-- [x] Test V90S speaker PA GPIO polarity over SSH by forcing PH6 low/high during playback.
-- [x] Test RetroArch gameplay audio while switching Headphone, LINEOUT, PA GPIO, DAC Swap, and all mixer controls to maximum values.
-- [x] Confirm `audio_device=default` is not useful on this image; RetroArch reports `failed_to_start_audio_driver`.
-- [x] Remove automatic video fallback attempts; keep the normal RetroArch route on `sdl2 + mali + software` only.
-- [x] Add PID-file based RetroArch stop tooling that validates `/proc/<pid>/comm` or `/proc/<pid>/cmdline` and avoids SSH/session-wide kills.
-- [x] Remove broad `killall sshd`/`killall wpa_supplicant` from network bring-up; leave existing daemons alone when PID files show they are running.
-- [x] Live-test the PID-file stop path over SSH; RetroArch stopped and the SSH session continued to respond.
-- [x] Negative-test a bad RetroArch PID file pointing at the SSH shell; the stop tool refused because `/proc/<pid>/comm` was not `retroarch`.
-- [x] Add an explicit SSH audio diagnostic tool that tests KNULLI-derived mixer profiles without changing the normal RetroArch route.
-- [x] Run `v90s-audio-diagnostic` on the live V90S and confirm `knulli_asound_state` produces a sustained audible tone.
-- [x] Patch the RetroArch launcher audio mixer setup to use the working KNULLI asound-state values.
-- [x] Confirm audible RetroArch game output after launching with the working KNULLI asound-state mixer setup.
-- [x] Build and live-test KNULLI-pinned QuickNES as a small diagnostic core; audio breakup stopped, but scrolling still showed pacing issues.
-- [x] Confirm `SDL_RENDER_DRIVER=opengles2` lowers CPU but makes the LCD image too dark on the current Debian RetroArch route.
-- [x] Confirm Debian RetroArch `video_driver=gl` reaches the GE8300 OpenGL ES stack, then crashes; generic Debian RetroArch is not the final video route.
-- [x] Make QuickNES the explicit default core path for the launcher.
-- [x] Add a reproducible QuickNES build helper pinned to KNULLI's commit.
-- [x] Require QuickNES when generating RetroArch payloads instead of silently selecting Nestopia/FCEUmm.
-- [x] Add Armbian Docker wrapper script for `inventory`, `inventory-boards`, `targets`, and later rootfs commands.
-- [x] Run `./scripts/run-armbian-build.sh inventory` successfully in Docker.
-- [x] Confirm Armbian inventory only sees V90S through the local userpatch spike, not an upstream complete target.
-- [x] Record the KNULLI runtime plus Armbian rootfs pivot in `docs/step2-knulli-runtime-armbian-plan.md`.
-- [x] Build or import KNULLI's RetroArch path with `--enable-mali_fbdev`.
-- [x] Add a `debian-retroarch-knulli` rootfs profile that keeps the KNULLI kernel/runtime base while packaging the userspace with the existing Armbian-style payload flow.
-- [x] Build KNULLI RetroArch test image: `plumos-v90s-armbian-step2-20260709-9-knulli-retroarch.img`.
-- [x] Compare the user's modified StockOS RA-running runtime against the current plumOS runtime over SSH.
-- [x] Confirm StockOS uses generated `retroarchcustom.cfg`, QuickNES, `video_refresh_rate=58.917103`, `vrr_runloop_enable=true`, `video_threaded=true`, Pulse/PipeWire audio, `schedutil`, and `irqbalance`.
-- [x] Extract StockOS boot/env partitions, kernel modules, PowerVR/SDL2/RetroArch/PipeWire runtime pieces, and configgen files into ignored `artifacts/20260710-stockos-runtime`.
-- [x] Decide to pivot from Armbian/Buildroot-first to a plumOS-V90S Docker toolchain using the StockOS/Batocera runtime extraction as the vendor baseline.
-- [x] Add initial `scripts/docker-build.sh` entrypoint and `docker/plumos-v90s-toolchain` image scaffold.
-- [x] Rename the plumOS-facing SDL2 runtime from `sdl2-mali` to `sdl2-powervr`, while keeping old command/path compatibility where needed.
-- [x] Add a repository notice for POWKIDDY StockOS/Batocera-derived runtime reuse.
-- [x] Add a StockOS/Batocera-layout SD image assembler using vendor runtime raw env/boot partitions.
-- [x] Build `plumos-v90s-stockos-smoke-20260710-1.img` with p1 Volumn, p2/p3 env, p4 boot, p5 batocera squashfs, p6 BATOCERA, and p7 SHARE.
-- [x] Extend StockOS extraction to capture raw `boot0` and `boot_package` areas for future fallback removal.
-- [x] Test the StockOS-generated RA timing profile on the current plumOS image before importing larger StockOS/Batocera runtime layers.
-- [x] Reproduce KNULLI/StockOS video/audio runtime contract before spending more time tuning generic Debian RetroArch.
-- [ ] If future cores still show timing/audio issues, test a Pulse/PipeWire-compatible audio path instead of direct ALSA ownership.
-- [ ] If future cores still show pacing issues, test StockOS-like CPU governor and `irqbalance` behavior.
-- [x] Move the SD image assembly path to StockOS/Batocera vendor-runtime inputs instead of KNULLI/Armbian-named inputs.
-- [x] Build a StockOS-layout RA image by placing the current RetroArch-capable rootfs on p5 instead of the smoke stage1 rootfs.
-- [ ] Boot-test the StockOS-layout smoke image on V90S and compare logs/display behavior with the existing KNULLI-layout Step 1 image.
-- [ ] Boot-test `plumos-v90s-stockos-ra-20260710-1.img` on V90S and compare RetroArch display/input/audio behavior.
-- [x] Apply StockOS-derived RetroArch video defaults in the V90S launcher path: `video_threaded=true`, `video_refresh_rate=58.917103`, and `vrr_runloop_enable=true`.
-- [x] Live-apply StockOS-derived RetroArch video defaults to `192.0.2.120`; user confirmed fps, scrolling, and audio pitch are perfect.
-- [ ] Boot-test `plumos-v90s-stockos-ra-20260710-2-stockos-video.img` and compare pacing/audio against `-1`.
-- [ ] Add V90S Docker targets for PicoArch, standalone emulators, and the plumOS frontend.
-
-Validation buckets:
-
-- [x] Video visible but FPS unknown.
-- [x] FPS near 60 observed, but slightly below 60 and not yet tuned.
-- [x] Audio diagnostic tone is audible with `knulli_asound_state`.
-- [x] Audible RetroArch game output confirmed.
-- [x] StockOS timing defaults produce user-confirmed perfect FPS/scrolling/audio pitch on the live V90S.
-- [x] Smooth StockOS/KNULLI-equivalent frame pacing confirmed with StockOS timing defaults.
-- [ ] USB keyboard input works only.
-- [x] Built-in controls work in game.
-- [ ] Built-in controls fail; event mapping needed.
-
-## Next: Armbian Rootfs Path
-
-- [x] Re-check build host capacity with `./scripts/check-host.sh`.
-- [x] Decide the first rootfs source:
-  - Option A: Armbian build framework rootfs output.
-  - Option B: temporary Armbian-like Debian/Ubuntu aarch64 console rootfs via `debootstrap`, used only to prove the V90S boot path.
-- [x] Fetch/update Armbian build framework with `./scripts/fetch-reference-sources.sh --with-armbian`.
-- [x] Create a reproducible script for the first minimal aarch64 console rootfs.
-- [x] Ensure the rootfs has:
-  - `/sbin/init`
-  - `/proc`, `/sys`, `/dev`, `/run` mount points
-  - root shell or deterministic root login for bring-up
-  - console shell/getty path for `tty0`/`tty1` and `ttyS0`
-  - no desktop stack
-- [x] Pack the rootfs as squashfs.
-- [x] Record rootfs build commands, size, hash, and package basis in `docs/validation/`.
-
-## Next: Image Assembly
-
-- [x] Assemble `plumos-v90s-armbian-step1-YYYYMMDD-1.img` with the Armbian-derived squashfs.
-- [x] Keep the FAT partition near the current 33MB default when possible.
-- [x] If the Armbian rootfs does not fit in the small FAT, prefer adding a rootfs partition or adjusting initramfs/root mounting over expanding FAT to a large size.
-- [x] Verify the generated image on the host:
-  - `ls -lh`
-  - `shasum -a 256`
-  - `file`
-  - `gpt -r show`
-  - squashfs contents check
-- [x] Add a validation note for the generated image.
-
-## Device Test 1
-
-- [x] Provide the generated image path and sha256 to the user.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Collect this report:
-
-```text
-image: output/images/plumos-v90s-armbian-step1-20260709-1.img
-sha256: d5ee904e669a5b0d292815cf2700f176f93bcb88b8f11d7946737ae1b94e850b
-SD card:
-
-boot result: KNULLI boot logo appears only
-screen: KNULLI boot logo visible
-USB keyboard: not testable yet
-
-commands:
-- uname -a: not reached
-- cat /proc/cmdline: not reached
-- mount: not reached
-- ls /: not reached
-- ls /dev/input: not reached
-- dmesg | tail -80: not reached
-
-notes: likely stuck before stage1 because boot.img cmdline used root=/dev/mmcblk0p1
-photo/log:
-```
-
-- [x] Commit the device result under `docs/validation/`.
-
-## Device Test 2
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-2.img`.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Check whether the screen advances beyond the KNULLI boot logo.
-- [x] Look for either stage1 text or the Debian minbase console:
-
-```text
-plumOS V90S stage1: looking for userdata rootfs payload
-plumOS V90S Step1 Debian minbase console
-```
-
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-
-## Device Test 3
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-3-diag.img`.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo.
-- [x] Power off and return the SD card to the host.
-- [x] Check FAT boot-resource partition for:
-
-```text
-plumos-v90s-diag.log
-boot/plumos-v90s-diag.log
-```
-
-- [x] Result: no FAT diagnostic log was present.
-- [x] Record extra FAT file `lcd_compatible_index.txt`, likely written by the boot package/U-Boot path.
-- [x] Check userdata ext4 for:
-
-```text
-rootfs/plumos-v90s-diag.log
-```
-
-- [x] Result: userdata contained both `/plumos-v90s-diag.log` and `/rootfs/plumos-v90s-diag.log`.
-- [x] Result: diagnostic init mounted `/dev/mmcblk0p4`, found `/boot/knulli`, then failed because the squashfs image file was mounted directly instead of through a loop device.
-- [x] Commit the no-log result and FAT extra-file evidence under `docs/validation/`.
-- [x] Defer serial UART for now because SD userdata logging proved the patched `boot.img` and initramfs path are active.
-
-## Device Test 4
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-4-diag-loop.img`.
-- [x] Host-verify that diagnostic initramfs contains the `/dev/loop0` squashfs mount path.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo or console.
-- [x] Check whether the screen advances beyond the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: `/boot/knulli` was found, explicit `losetup` did not report failure, but mounting `/dev/loop0` as squashfs failed.
-
-## Device Test 5
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-5-diag-mount-probe.img`.
-- [x] Host-verify that diagnostic initramfs tries KNULLI-style file mount first and records loop/mount diagnostics.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo or console.
-- [x] Check whether the screen advances beyond the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: `/boot/knulli` was readable and loop-attached, but all squashfs mount attempts failed with `Invalid argument`.
-
-## Device Test 6
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-6-diag-zstd.img`.
-- [x] Host-verify that stage1 and Debian payload squashfs files use zstd compression.
-- [x] Host-verify that diagnostic initramfs uses BusyBox-compatible `tail -n 120` for post-failure dmesg capture.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo or console.
-- [x] Check whether the screen advances beyond the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: zstd `/boot/knulli` mounted with the KNULLI-style file mount and listed a valid stage1 root.
-- [x] Result: likely no visible text console because the closed V90S/KNULLI kernel has no framebuffer console.
-
-## Device Test 7
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-7-stage1-fb-probe.img`.
-- [x] Host-verify that stage1 logs to userdata and uses `/dev/loop1` for the Debian payload.
-- [x] Host-verify that stage1 and Debian init include `/dev/fb0` white-band probes.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [x] Check whether the screen changes from the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: diagnostic still mounted zstd `/boot/knulli` as stage1 root.
-- [x] Result: no `plumos-v90s-stage1.log` or `plumos-v90s-debian-init.log` was present.
-- [x] Result: host inspection found stage1 `/sbin/init` uses `#!/bin/sh`, but stage1 lacked `/bin/sh`.
-
-## Device Test 8
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-8-stage1-sh-prepersist.img`.
-- [x] Host-verify that stage1 contains `/bin/sh -> busybox`.
-- [x] Host-verify that diagnostic init persists a pre-`switch_root` marker.
-- [x] Host-verify that stage1 persists logs before framebuffer probing.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [x] Check whether the screen changes from the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: diagnostic log included `boot: preparing to switch to stage1 /sbin/init`.
-- [x] Result: no `plumos-v90s-stage1.log` or `plumos-v90s-debian-init.log` was present.
-
-## Device Test 9
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-9-stage1-share-handoff.img`.
-- [x] Host-verify that diagnostic init mounts userdata at `/new_root/mnt/share` for stage1 handoff.
-- [x] Host-verify that stage1 uses pre-mounted `/mnt/share` before scanning block devices.
-- [x] Host-verify that diagnostic init persists through the handoff mount before `switch_root` and on `switch_root` failure.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [x] Check whether the screen changes from the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: diagnostic log confirmed `/new_root/bin/sh -> busybox`.
-- [x] Result: diagnostic mounted `/dev/mmcblk0p5` at `/new_root/mnt/share`.
-- [x] Result: diagnostic persisted through `persist_device=stage1-share`.
-- [x] Result: diagnostic reached `boot: switching to stage1 /sbin/init`; `boot: switch_root failed` was absent.
-- [x] Result: no `plumos-v90s-stage1.log` or `plumos-v90s-debian-init.log` was present.
-
-## Device Test 10
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-10-stage1-tmpfs-log.img`.
-- [x] Host-verify that stage1 and Debian init mount tmpfs on `/tmp` and `/run` before writing logs.
-- [x] Host-verify that diagnostic init runs a stage1 `/bin/sh` chroot preflight and writes `plumos-v90s-stage1-preflight.log`.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [x] Check whether the screen changes from the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: diagnostic log confirmed stage1 handoff mount and attempted stage1 preflight, but KNULLI busybox lacks the `chroot` applet.
-- [x] Result: stage1 log was present.
-- [x] Result: stage1 used the pre-mounted `/mnt/share` payload.
-- [x] Result: stage1 saw fb0 sysfs data but `/dev/fb0` was not present.
-- [x] Result: stage1 attached the Debian payload to `/dev/loop1`, mounted the payload rootfs, and reached `stage1: switching to payload rootfs`.
-- [x] Result: no `plumos-v90s-debian-init.log` was present.
-
-## Device Test 11
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-11-direct-payload.img`.
-- [x] Host-verify that diagnostic init mounts userdata payload directly on `/dev/loop2`.
-- [x] Host-verify that diagnostic init switches directly to payload `/sbin/init` before the stage1 fallback.
-- [x] Host-verify that stage1 and Debian init preserve existing `/dev` and can create `/dev/fb0`.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [x] Check whether the screen changes from the KNULLI boot logo.
-- [x] Result: screen still shows only the KNULLI boot logo; console did not appear.
-- [x] FAT diagnostic logs were not present.
-- [x] Userdata ext4 logs were recovered and analyzed.
-- [x] Result: direct payload route mounted `/dev/mmcblk0p5`, attached payload to `/dev/loop2`, mounted Debian rootfs, and switched to payload `/sbin/init`.
-- [x] Result: `plumos-v90s-debian-init.log` was present.
-- [x] Result: Debian init saw `fb0` as `640x480p-60`, `virtual_size=640,960`, `bits_per_pixel=32`, `stride=2560`.
-- [x] Result: Debian init wrote black and white probes to `/dev/fb0` successfully.
-- [x] Result: no `plumos-v90s-stage1.log` was present, as expected because the direct route did not fall back to stage1.
-
-## Device Test 12
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-12-fb-full-probe.img`.
-- [x] Host-verify that Debian init writes a full virtual framebuffer black fill and white bands to page 0 and page 1.
-- [x] Host-verify that direct payload route remains present.
-- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds at the boot logo, changed screen, or console.
-- [x] Check whether the screen changes from the KNULLI boot logo.
-- [x] Result: KNULLI boot logo disappeared.
-- [x] Result: screen changed to the expected black framebuffer with a white band near the top.
-- [x] Result: FAT diagnostic logs were not present.
-- [x] Result: userdata ext4 logs were recovered and analyzed.
-- [x] Result: direct payload route still reached Debian `/sbin/init`.
-- [x] Result: Debian init saw `fb0` as `640x480p-60`, `virtual_size=640,960`, `bits_per_pixel=32`, `stride=2560`.
-- [x] Result: Debian init wrote the full black fill and white bands to page 0 and page 1.
-- [x] Result: `/dev/fb0` userspace writes are visible on the V90S LCD.
-
-## Device Test 13
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-13-fb-console.img`.
-- [x] Host-verify that Debian payload contains `/usr/local/sbin/v90s-fb-console`.
-- [x] Host-verify that Debian init executes `v90s-fb-console` after the fb0 probe.
-- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds for framebuffer text to appear.
-- [x] Check whether startup text appears instead of the white-band probe.
-- [x] Result: KNULLI boot logo disappeared, then the screen stayed black.
-- [x] Result: USB keyboard key presses did not visibly affect the screen.
-- [x] Result: Caps Lock LED did not toggle, but this is not conclusive because the userspace console does not drive keyboard LEDs.
-- [x] Result: FAT stage1 hash matched the `-13` image.
-- [x] Result: userdata ext4 logs were recovered and analyzed.
-- [x] Result: Debian init reached `debian-init: starting framebuffer console`.
-- [x] Result: `plumos-v90s-fb-console.log` and `rootfs/plumos-v90s-fb-console.log` were present but 0 bytes.
-- [x] Result: dmesg showed the USB keyboard as `ELECOM ELECOM TK-FCP096`, `input3/input4`, `hidraw0/hidraw1`, and `usbhid`.
-
-## Device Test 14
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-14-fb-console-logged.img`.
-- [x] Host-verify that Debian init captures framebuffer console stdout/stderr to userdata.
-- [x] Host-verify that the framebuffer console no longer depends on Perl `Fcntl` constants.
-- [x] Host-verify that the framebuffer console writes a large start marker and forced-flushes logs.
-- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds for framebuffer text or a large white start marker to appear.
-- [x] Result: white frame/start marker appeared on the LCD.
-- [x] Result: text still did not appear.
-- [x] Result: typing `ls` and pressing Enter made the white frame blink.
-- [x] Result: userdata logs confirmed `uname -a`, `ls /`, and `ls /dev/input` ran automatically.
-- [x] Result: userdata logs confirmed USB keyboard input produced `> ls` and the command output.
-- [x] Result: remaining display issue was the framebuffer console font table being assigned after the infinite event loop.
-
-## Device Test 15
-
-- [x] Provide `output/images/plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img`.
-- [x] Host-verify that font bitmap initialization runs before the framebuffer console main loop.
-- [x] Host-verify that framebuffer text scale is increased.
-- [x] Host-verify that Debian init prepares `/boot/plumos-logs` on the FAT boot-resource partition.
-- [x] Host-verify that the framebuffer console writes directly to `/boot/plumos-logs/plumos-v90s-fb-console.log`.
-- [x] Host-verify compact 33MB FAT plus 64MB userdata layout.
-- [x] User flashes the image to SD and tests on V90S.
-- [x] Wait at least 60 seconds for framebuffer text to appear.
-- [x] Result: framebuffer console text appeared on the internal LCD.
-- [x] Result: USB keyboard input worked.
-- [x] Result: `df` was typed and executed.
-- [x] Result: command output was visible on screen.
-- [x] Result: FAT logs were present under `/Volumes/KNULLI/plumos-logs/` and readable without sudo.
-- [x] Attach a USB keyboard and type:
-
-```text
-df
-```
-
-- [x] Press Enter and check whether command output appears on screen.
-- [x] Return the SD card and check FAT logs without sudo:
-
-```text
-/Volumes/KNULLI/plumos-logs/session.txt
-/Volumes/KNULLI/plumos-logs/plumos-v90s-diag.log
-/Volumes/KNULLI/plumos-logs/plumos-v90s-debian-init.log
-/Volumes/KNULLI/plumos-logs/plumos-v90s-fb-console.log
-```
-
-## Console Command Check
-
-- [x] If the framebuffer console accepts keyboard input, run at least one command and verify output appears on screen.
-- [ ] Optional broader command inventory for the next validation pass:
-
-```sh
-uname -a
-cat /proc/cmdline
-mount
-ls /
-ls /dev/input
-dmesg | tail -80
-```
-
-- [ ] Commit the device result under `docs/validation/`.
-- [x] Commit the device result under `docs/validation/`.
-
-## Branches After Device Test
-
-- [x] If there is no visible boot activity, inspect boot offsets, boot package, GPT layout, and bootloader cmdline assumptions.
-- [x] If kernel boots but no console appears, focus on framebuffer console, `console=` parameters, getty, and init behavior.
-- [x] If `/dev/fb0` userspace writes work but framebuffer console is unavailable, add a tiny framebuffer terminal or boot-time getty bridge for Step 1.
-- [x] If console appears but USB keyboard fails, inspect USB host/input modules and `/dev/input` availability.
-- [x] If init fails, test a simpler init wrapper before debugging full systemd behavior.
-- [x] If `/boot_root/boot/knulli` is not found, confirm the real kernel cmdline and which partition the ramdisk mounts.
-
-## Later
-
-- [ ] Decide whether to keep squashfs-over-FAT or move rootfs to a dedicated partition for larger Armbian builds.
-- [ ] Add a helper for compressing/releasing test images.
-- [ ] Add an SD-writing checklist for macOS/Linux hosts.
-- [ ] Explore whether a native Armbian board/family definition is worth maintaining after Step 1 works.
-- [ ] Revisit open kernel / open U-Boot possibilities after the first boot-console proof.
+- Read `docs/plumos-v90s-distribution-policy.md` before design or
+  implementation work.
+- Keep work in small git commits with clear build, validation, or documentation
+  boundaries.
+- Keep `artifacts/`, `.cache/`, `output/`, and `dist/` out of git.
+- Treat `artifacts/` as input-only. It may contain private ROMs, extracted
+  vendor files, credentials, or other local-only material.
+- User performs real-device validation. Record each result under
+  `docs/validation/`.
+- Do not add hidden runtime fallback paths. Keep validation routes explicit.
+- Stop live device processes only through PID-file based tools that validate
+  `/proc/<pid>/comm` or `/proc/<pid>/cmdline`.
+- Do not use broad process-name kills that can affect SSH or unrelated sessions.
+- Release builds must not contain private ROMs, Wi-Fi credentials, SSH keys, or
+  root passwords.
+
+## Completed Baseline
+
+- [x] Step 1 boot console achieved: framebuffer console text visible, USB
+  keyboard input works, and commands such as `df` execute.
+- [x] Step 2 RetroArch baseline achieved on real V90S hardware.
+- [x] Known-good runtime documented in
+  `docs/validation/2026-07-10-step2-stockos-video-perfect-runtime.md`.
+- [x] Known-good RetroArch path: `video_driver=gl`,
+  `video_context_driver=mali_fbdev`, `video_refresh_rate=58.917103`,
+  `video_threaded=true`, `vrr_runloop_enable=true`, ALSA `hw:0,0`, QuickNES.
+- [x] User confirmed FPS, scrolling, controls, audio output, and audio pitch are
+  good on the live device.
+- [x] StockOS/Batocera runtime extracted into ignored artifacts.
+- [x] Initial Docker build entry point exists at `scripts/docker-build.sh`.
+- [x] Initial StockOS/Batocera-layout image assembler exists.
+- [x] Distribution policy documented.
+- [x] Vendor runtime identity documented as `v90s-stockos-r1`.
+- [x] System squashfs plus FAT32 app layer policy documented.
+- [x] Build system completion plan documented.
+
+## Milestone 1: Vendor Runtime Formalization
+
+- [ ] Move the default vendor input path to
+  `artifacts/vendor/v90s-stockos-r1/`.
+- [ ] Move the default prepared vendor output path to
+  `output/vendor/v90s-stockos-r1/`.
+- [ ] Keep `output/vendor/stockos-runtime` only as a compatibility alias during
+  migration.
+- [ ] Generate `output/vendor/v90s-stockos-r1/vendor-runtime.manifest`.
+- [ ] Ensure the vendor manifest includes:
+  - `id=v90s-stockos-r1`
+  - source image or extraction source
+  - capture date
+  - kernel version
+  - boot model
+  - GPU/display route
+  - hashes
+  - known-good validation document
+- [ ] Generate `output/vendor/v90s-stockos-r1/SHA256SUMS`.
+- [ ] Make `./scripts/docker-build.sh vendor-runtime` run consistently through
+  the Docker entry point.
+- [ ] Keep KNULLI boot/runtime assets only as explicit legacy diagnostic inputs
+  or temporary fallback inputs, not as the main runtime identity.
+
+## Milestone 2: Build System Targets
+
+- [ ] Make `scripts/docker-build.sh` expose the official target set:
+  - `image`
+  - `shell`
+  - `vendor-runtime`
+  - `sdl2-powervr`
+  - `retroarch`
+  - `cores`
+  - `quicknes`
+  - `picoarch`
+  - `standalone`
+  - `frontend`
+  - `system-rootfs`
+  - `app-layer`
+  - `sd-image`
+  - `release`
+  - `all`
+- [ ] Keep `rootfs` as a transitional alias for `system-rootfs`.
+- [ ] Keep `stockos-image` as a transitional alias for `sd-image` while the
+  partition contract remains StockOS/Batocera-compatible.
+- [ ] Keep `knulli-image` as a legacy investigation target only.
+- [ ] Implement `cores` as the normal libretro-core build target.
+- [ ] Keep `quicknes` as a compatibility or one-core development alias.
+- [ ] Implement `picoarch`.
+- [ ] Implement `standalone`.
+- [ ] Implement `frontend`.
+- [ ] Implement `app-layer`.
+- [ ] Implement `release`.
+- [ ] Implement `all` as the normal release build chain.
+- [ ] Emit manifest and sha256 metadata for every reusable build output.
+
+## Milestone 3: System Rootfs
+
+- [ ] Rename or introduce a release-oriented `system-rootfs` builder.
+- [ ] Keep Step 1/Step 2 rootfs profiles as explicit development or diagnostic
+  profiles only.
+- [ ] Keep release `system-rootfs` focused on:
+  - init
+  - mount policy
+  - `/tmp`, `/run`, `/dev`, `/proc`, `/sys`, `/boot`, `/mnt/plumos`
+  - vendor runtime startup glue
+  - PowerVR startup
+  - audio startup
+  - input startup
+  - development-mode Wi-Fi and SSH hooks
+  - safe process stop/restart helpers
+  - minimal diagnostics and recovery console
+  - app-layer launch wrappers
+  - default configuration templates
+  - base license and notice files
+- [ ] Remove normal RetroArch binaries from release squashfs.
+- [ ] Remove normal libretro cores from release squashfs.
+- [ ] Remove frontend, PicoArch, and standalone emulators from release squashfs.
+- [ ] Remove private ROMs from release squashfs.
+- [ ] Ensure development-only Wi-Fi credentials and SSH credentials are never
+  present in release squashfs.
+- [ ] Make launch wrappers execute applications from `/mnt/plumos`.
+- [ ] Make boot diagnostics report missing or invalid app-layer metadata clearly.
+
+## Milestone 4: FAT32 App Layer
+
+- [ ] Define the app-layer tree under `output/app-layer/v90s/`.
+- [ ] Define the on-device mount path as `/mnt/plumos`.
+- [ ] Include app-layer metadata:
+  - `VERSION`
+  - `manifest.json`
+  - `checksums.sha256`
+  - `COMPAT_VENDOR`
+- [ ] Set `COMPAT_VENDOR` to `v90s-stockos-r1`.
+- [ ] Add directories for:
+  - `bin/`
+  - `lib/`
+  - `cores/`
+  - `frontend/`
+  - `picoarch/`
+  - `standalone/`
+  - `config/`
+  - `themes/`
+  - `Roms/`
+  - `BIOS/`
+  - `Saves/`
+  - `States/`
+  - `Screenshots/`
+  - `Logs/`
+  - `updates/`
+  - `licenses/`
+- [ ] Copy RetroArch into the app layer.
+- [ ] Copy supported libretro cores into the app layer.
+- [ ] Copy frontend into the app layer.
+- [ ] Copy PicoArch/PICO payloads into the app layer.
+- [ ] Copy standalone emulators into the app layer.
+- [ ] Copy plumOS-owned private libraries into the app layer.
+- [ ] Avoid symlink-dependent library layouts on FAT32.
+- [ ] Generate app-layer `manifest.json`.
+- [ ] Generate app-layer `checksums.sha256`.
+- [ ] Add boot or frontend startup validation for app-layer metadata.
+
+## Milestone 5: SD Image Layout
+
+- [ ] Keep p1 through p4 compatible with the StockOS boot contract:
+  - p1 boot-resource / Volumn
+  - p2 env
+  - p3 env-redund
+  - p4 Android boot image
+- [ ] Keep p1 small and reserved for boot-resource compatibility.
+- [ ] Use p5 as the plumOS system squashfs.
+- [ ] Choose whether p6 or p7 becomes the FAT32 app/update/data partition.
+- [ ] Validate the chosen p6/p7 FAT32 layout on real hardware.
+- [ ] Keep an explicit development compatibility mode for the current p6/p7
+  shape until the FAT32 app-layer partition is validated.
+- [ ] Do not treat ext4 `SHARE` as the final release app-layer design.
+- [ ] Include app-layer manifest hash in the final SD image manifest.
+- [ ] Include vendor-runtime manifest hash in the final SD image manifest.
+- [ ] Include system-rootfs hash in the final SD image manifest.
+
+## Milestone 6: RetroArch Runtime Integration
+
+- [ ] Move the normal RetroArch launch path to `/mnt/plumos`.
+- [ ] Preserve the known-good V90S defaults:
+  - `video_driver = "gl"`
+  - `video_context_driver = "mali_fbdev"`
+  - `video_refresh_rate = "58.917103"`
+  - `video_threaded = "true"`
+  - `vrr_runloop_enable = "true"`
+  - `audio_driver = "alsa"`
+  - `audio_device = "hw:0,0"`
+  - `audio_latency = "64"`
+  - `input_driver = "sdl2"`
+  - `input_joypad_driver = "sdl2"`
+- [ ] Ensure users can save RetroArch settings.
+- [ ] Ensure frontend/config tooling does not overwrite user settings on every
+  launch.
+- [ ] Provide a resettable defaults mechanism.
+- [ ] Write RetroArch launch and runtime logs to the app layer.
+- [ ] Keep future Pulse/PipeWire audio experiments separate from the known-good
+  ALSA path unless real-device validation proves a replacement.
+- [ ] Keep future CPU governor or `irqbalance` experiments separate from the
+  known-good video/audio baseline unless validation proves a benefit.
+
+## Milestone 7: Release Packaging
+
+- [ ] Generate a full SD-root style package:
+  `dist/plumos-v90s-sdroot-VERSION/`.
+- [ ] Generate an update-only package:
+  `dist/plumos-v90s-update-VERSION/`.
+- [ ] Ensure update-only packages can be copied over the FAT32 app layer from
+  Windows or macOS.
+- [ ] Generate release `manifest.json`.
+- [ ] Generate release `checksums.sha256`.
+- [ ] Include license and notice files for:
+  - plumOS-owned files
+  - POWKIDDY StockOS/Batocera-derived runtime files
+  - RetroArch
+  - libretro cores
+  - bundled standalone emulators
+  - bundled frontend dependencies
+- [ ] Ensure release archives do not contain private ROMs or credentials.
+- [ ] Document the copy-over update workflow for Windows and macOS users.
+
+## Milestone 8: Validation
+
+- [ ] Build the first policy-aligned development image with:
+  - `v90s-stockos-r1` vendor runtime
+  - system squashfs on p5
+  - FAT32 app layer on the chosen p6/p7 partition
+  - RetroArch launched from `/mnt/plumos`
+- [ ] User boot-tests the development image on V90S.
+- [ ] Record boot result under `docs/validation/`.
+- [ ] Confirm LCD output.
+- [ ] Confirm built-in controls.
+- [ ] Confirm audio output.
+- [ ] Confirm FPS, scrolling, and audio pitch remain at the known-good level.
+- [ ] Confirm RetroArch settings persist after reboot.
+- [ ] Confirm logs are visible from macOS or Windows through the FAT32 app
+  layer.
+- [ ] Test an update-only package by copying it onto the SD card from macOS or
+  Windows.
+- [ ] Record the update test result under `docs/validation/`.
+
+## Deferred Reference Work
+
+- [ ] Revisit Armbian only as a userspace/rootfs reference or component build
+  helper.
+- [ ] Revisit Buildroot only as a component build reference.
+- [ ] Keep old KNULLI investigation paths available for comparison, but do not
+  use them as the distribution identity.
+- [ ] Add more libretro cores after the app-layer split is stable.
+- [ ] Add standalone emulators after the app-layer split is stable.
+- [ ] Add frontend workflows after the app-layer split is stable.
