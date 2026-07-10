@@ -243,20 +243,20 @@ Build plumOS V90S as a V90S-specific distribution:
   block the already-synced FE Reboot/Shutdown path before reaching sysrq.
 - [x] Change the normal FE Reboot/Shutdown path to direct sysrq after SD2 stop
   and sync, because BusyBox `reboot` / `poweroff` can return or hang on V90S.
-- [ ] Repair and revalidate the p7 FAT32 app layer after the kernel remounted
+- [x] Repair and revalidate the p7 FAT32 app layer after the kernel remounted
   `/mnt/plumos` read-only due to FAT corruption.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout
 
 - [ ] Keep p1 through p4 compatible with the StockOS boot contract:
-  - p1 boot-resource / Volumn
+  - p1 boot-resource / PLUMBOOT
   - p2 env
   - p3 env-redund
   - p4 Android boot image
 - [ ] Keep p1 small and reserved for boot-resource compatibility.
 - [ ] Use p5 as the plumOS system squashfs.
-- [x] Use p7 `rootfs_data` / `SHARE` as the current development FAT32
+- [x] Use p7 `rootfs_data` / `PLUMOS` as the current development FAT32
   app/update/data partition.
 - [ ] Validate the chosen p6/p7 FAT32 layout on real hardware.
 - [x] Increase the development FAT32 app-layer capacity to 1024MB so the full

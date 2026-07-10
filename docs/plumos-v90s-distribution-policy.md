@@ -231,13 +231,13 @@ StockOS/Batocera contract until there is real-device evidence that a partition
 can be removed safely:
 
 ```text
-p1 boot-resource / Volumn vfat
+p1 boot-resource / PLUMBOOT vfat
 p2 env
 p3 env-redund
 p4 boot Android boot image
 p5 batocera squashfs
 p6 rootfs / BATOCERA ext4
-p7 rootfs_data / SHARE, StockOS observed as ext4; plumOS development images use FAT32
+p7 rootfs_data / PLUMOS, StockOS observed as ext4/SHARE; plumOS development images use FAT32
 ```
 
 Current boot policy:
@@ -294,7 +294,7 @@ The app layer should be mounted at a stable path such as:
 
 The exact partition used for this FAT32 app layer is still a hardware
 validation item for release images. The current development direction is to use
-p7 `rootfs_data` / `SHARE` as a 1GB FAT32 app/update/data partition so the full
+p7 `rootfs_data` / `PLUMOS` as a 1GB FAT32 app/update/data partition so the full
 generated app layer can be carried in a single SD image. The intended release
 direction remains:
 
@@ -313,7 +313,7 @@ not from the early boot-test image. The July 11 live V90S p7 was only about
 55MB, which is enough for a targeted FE/RA/Wi-Fi update but too small for the
 current full app-layer output that includes userland and network-service
 payloads. The StockOS-compatible development assembler now defaults p7 to a
-1024MB FAT32 `SHARE` image. If the generated app layer grows past that budget,
+1024MB FAT32 `PLUMOS` image. If the generated app layer grows past that budget,
 increase the partition size deliberately or split optional payloads before
 treating full app-layer metadata as deployable to that partition.
 
@@ -620,7 +620,7 @@ The image assembler should keep p1 through p4 compatible with StockOS until
 there is real-device evidence that they can be changed. p5 should be the
 plumOS system squashfs. One validated p6/p7 partition should become the
 FAT32 app layer. The development assembler currently keeps p6 as the small
-StockOS-compatible `BATOCERA` ext4 partition and formats p7 `SHARE` as 1GB
+StockOS-compatible `BATOCERA` ext4 partition and formats p7 `PLUMOS` as 1GB
 FAT32 for app-layer validation. Release builds should not regress to ext4
 `SHARE` as the final app-layer design unless real-device evidence proves that a
 different layout is required.
@@ -852,7 +852,7 @@ validate which p6/p7 partition can safely become the FAT32 app layer.
 
 Decision:
 
-Use p7 `rootfs_data` / `SHARE` as a 1024MB FAT32 partition in the
+Use p7 `rootfs_data` / `PLUMOS` as a 1024MB FAT32 partition in the
 StockOS-compatible development image assembler.
 
 Rationale:
