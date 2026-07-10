@@ -34,6 +34,7 @@ RUN apt-get update \
     genimage \
     gettext \
     git \
+    iproute2 \
     jq \
     libasound2-dev \
     libegl-dev \
@@ -50,6 +51,7 @@ RUN apt-get update \
     meson \
     mtools \
     ninja-build \
+    openssh-sftp-server \
     patch \
     parted \
     pigz \
@@ -58,7 +60,11 @@ RUN apt-get update \
     python3-pip \
     qemu-user-static \
     rsync \
+    samba \
+    samba-common-bin \
+    samba-libs \
     squashfs-tools \
+    strace \
     tar \
     u-boot-tools \
     unzip \

@@ -23,6 +23,8 @@ Commands:
   retroarch-knulli Deprecated alias for the legacy KNULLI-named RetroArch builder.
   cores            Build supported libretro cores.
   quicknes         Compatibility alias for the current QuickNES-only core build.
+  userland         Build plumOS BusyBox and command-line tools.
+  network-services Build plumOS FTP/SFTP/Samba service package.
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
   app-layer        Assemble the FAT32 plumOS app/update/data layer.
@@ -144,6 +146,14 @@ case "$cmd" in
         echo "warning: quicknes is a one-core development alias; use cores for normal core builds" >&2
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-libretro-quicknes.sh "$@"
+        ;;
+    userland|busybox)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-busybox.sh "$@"
+        ;;
+    network-services|net-services)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-network-services.sh "$@"
         ;;
     sdl2-powervr|sdl2-ge8300)
         ensure_image

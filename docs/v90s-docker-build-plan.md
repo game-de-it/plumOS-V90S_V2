@@ -73,6 +73,8 @@ The V90S build entrypoint is:
 ```sh
 ./scripts/docker-build.sh image
 ./scripts/docker-build.sh shell
+./scripts/docker-build.sh userland
+./scripts/docker-build.sh network-services
 ./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh retroarch
 ./scripts/docker-build.sh cores
@@ -104,15 +106,18 @@ Implemented compatibility aliases:
 Implemented app-layer target:
 
 ```sh
+./scripts/docker-build.sh userland
+./scripts/docker-build.sh network-services
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
 ```
 
 This writes `output/app-layer/v90s/` with `VERSION`, `COMPAT_VENDOR`,
 `MOUNT_PATH`, `manifest.json`, `checksums.sha256`, standard user data
-directories, the MMF-derived V90S frontend, RetroArch, QuickNES, SDL2 PowerVR
-private libraries, and the current known-good RetroArch defaults template. Files
-are copied without symlinks so the tree can be placed on FAT32.
+directories, the MMF-derived V90S frontend, BusyBox/command tools,
+FTP/SFTP/Samba service payloads, RetroArch, QuickNES, SDL2 PowerVR private
+libraries, and the current known-good RetroArch defaults template. Files are
+copied without symlinks so the tree can be placed on FAT32.
 
 Implemented update-only release target:
 

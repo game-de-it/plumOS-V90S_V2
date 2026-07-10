@@ -66,8 +66,11 @@ Docker build flow です。
 ```sh
 ./scripts/docker-build.sh image
 ./scripts/docker-build.sh vendor-runtime
-./scripts/docker-build.sh cores
+./scripts/docker-build.sh userland
+./scripts/docker-build.sh network-services
 ./scripts/docker-build.sh retroarch
+./scripts/docker-build.sh cores
+./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
 ./scripts/docker-build.sh release
 ./scripts/docker-build.sh system-rootfs \
@@ -84,11 +87,16 @@ Docker build flow です。
 `cores` です。`rootfs` は `system-rootfs`、`stockos-image` は `sd-image` の
 移行aliasとして残します。
 
+`userland` は BusyBox と補助コマンド群を `output/userland/v90s/` に生成します。
+`network-services` は FTP/SFTP/Samba のapp-layer payloadを
+`output/network-services/v90s/` に生成します。SSH本体はsystem rootfs管理とし、
+app-layer service controlはSSHプロセスを停止しません。
+
 `app-layer` は FAT32 にコピーする plumOS 側ツリーを
-`output/app-layer/v90s/` に生成します。現在は RetroArch、QuickNES、
-SDL2 PowerVR private libs、既知良好RetroArch設定テンプレート、metadata、
-checksumを含みます。symlinkは使わず、FAT32上で成立する実体ファイルとして
-配置します。
+`output/app-layer/v90s/` に生成します。現在は RetroArch、QuickNES、frontend、
+BusyBox/command tools、FTP/SFTP/Samba payload、SDL2 PowerVR private libs、
+既知良好RetroArch設定テンプレート、metadata、checksumを含みます。symlinkは
+使わず、FAT32上で成立する実体ファイルとして配置します。
 
 `release` は `output/app-layer/v90s/` から update-only package を
 `dist/plumos-v90s-update-VERSION/`、`.tar.gz`、`.zip` として生成します。

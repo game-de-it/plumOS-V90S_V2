@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -90,6 +90,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - `image`
   - `shell`
   - `vendor-runtime`
+  - `userland`
+  - `network-services`
   - `sdl2-powervr`
   - `retroarch`
   - `cores`
@@ -108,6 +110,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Keep `knulli-image` as a legacy investigation target only.
 - [x] Implement `cores` as the normal libretro-core build target.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
+- [x] Implement `userland` for BusyBox and command-line tools.
+- [x] Implement `network-services` for FTP/SFTP/Samba app-layer payloads.
 - [ ] Implement `picoarch`.
 - [ ] Implement `standalone`.
 - [x] Implement `frontend`.
@@ -117,6 +121,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Emit manifest and sha256 metadata for every reusable build output.
   - [x] `frontend` emits `output/frontend/v90s/frontend.manifest` and
     `output/frontend/v90s/checksums.sha256`.
+  - [x] `userland` emits `output/userland/v90s/userland.manifest` and
+    `output/userland/v90s/checksums.sha256`.
+  - [x] `network-services` emits
+    `output/network-services/v90s/network-services.manifest` and
+    `output/network-services/v90s/checksums.sha256`.
 
 ## Milestone 3: System Rootfs
 
@@ -161,11 +170,14 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Set `COMPAT_VENDOR` to `v90s-stockos-r1`.
 - [x] Add directories for:
   - `bin/`
+  - `gnu/`
   - `lib/`
   - `cores/`
   - `frontend/`
   - `picoarch/`
   - `standalone/`
+  - `ssh/`
+  - `samba/`
   - `config/`
   - `fonts/`
   - `share/`
@@ -183,6 +195,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy RetroArch into the app layer.
 - [x] Copy supported libretro cores into the app layer.
 - [x] Copy frontend into the app layer.
+- [x] Copy BusyBox and command-line userland into the app layer.
+- [x] Copy FTP/SFTP/Samba network service payloads into the app layer.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

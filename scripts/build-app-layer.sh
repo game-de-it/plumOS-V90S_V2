@@ -10,6 +10,8 @@ retroarch_bin="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-powervr}"
 cores_dir="${PLUMOS_V90S_CORES_DIR:-output/libretro-quicknes}"
 sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
 frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
+userland_dir="${PLUMOS_V90S_USERLAND_DIR:-output/userland/v90s}"
+network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-services/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
 strict=0
 
@@ -29,6 +31,9 @@ Options:
   --sdl2-powervr-dir PATH
                           SDL2 PowerVR payload; default output/sdl2-powervr.
   --frontend-dir PATH    Frontend payload; default output/frontend/v90s.
+  --userland-dir PATH    BusyBox/command tools payload; default output/userland/v90s.
+  --network-services-dir PATH
+                          FTP/SFTP/Samba payload; default output/network-services/v90s.
   --retroarch-config PATH
                           RetroArch defaults template; default configs/retroarch/v90s-powervr-quicknes.cfg.
   --strict               Fail if currently supported payloads are missing.
@@ -71,6 +76,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         --frontend-dir)
             frontend_dir="$2"
+            shift 2
+            ;;
+        --userland-dir)
+            userland_dir="$2"
+            shift 2
+            ;;
+        --network-services-dir)
+            network_services_dir="$2"
             shift 2
             ;;
         --retroarch-config)
@@ -167,6 +180,8 @@ record_tree() {
 rm -rf "$out_dir"
 mkdir -p \
     "$out_dir/bin" \
+    "$out_dir/gnu/bin" \
+    "$out_dir/gnu/libexec" \
     "$out_dir/lib/plumos-sdl2-powervr" \
     "$out_dir/cores" \
     "$out_dir/frontend" \
@@ -177,6 +192,8 @@ mkdir -p \
     "$out_dir/config/system" \
     "$out_dir/fonts" \
     "$out_dir/share" \
+    "$out_dir/ssh/libexec" \
+    "$out_dir/samba/sbin" \
     "$out_dir/state/frontend" \
     "$out_dir/themes" \
     "$out_dir/media" \
@@ -209,6 +226,26 @@ record_file "VERSION" "metadata" "generated"
 record_file "COMPAT_VENDOR" "metadata" "generated"
 record_file "MOUNT_PATH" "metadata" "generated"
 record_file "licenses/NOTICE.txt" "notice" "generated"
+
+userland_root="$userland_dir/plumos"
+if require_or_note_missing "$userland_root/bin/busybox" "userland"; then
+    copy_tree "$userland_root" "$out_dir"
+    record_tree "$userland_root" "userland" "$userland_root"
+    if [ -f "$userland_dir/userland.manifest" ]; then
+        copy_file "$userland_dir/userland.manifest" "$out_dir/licenses/userland-manifest.txt"
+        record_file "licenses/userland-manifest.txt" "userland" "$userland_dir/userland.manifest"
+    fi
+fi
+
+network_services_root="$network_services_dir/plumos"
+if require_or_note_missing "$network_services_root/bin/plumos-network-services" "network-services"; then
+    copy_tree "$network_services_root" "$out_dir"
+    record_tree "$network_services_root" "network-services" "$network_services_root"
+    if [ -f "$network_services_dir/network-services.manifest" ]; then
+        copy_file "$network_services_dir/network-services.manifest" "$out_dir/licenses/network-services-manifest.txt"
+        record_file "licenses/network-services-manifest.txt" "network-services" "$network_services_dir/network-services.manifest"
+    fi
+fi
 
 if require_or_note_missing "$retroarch_config_src" "retroarch-config"; then
     copy_file "$retroarch_config_src" "$out_dir/config/retroarch/v90s-powervr-quicknes.cfg"

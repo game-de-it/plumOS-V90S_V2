@@ -352,6 +352,8 @@ The build system should be shaped like the MMF workflow:
 
 - Docker-based cross-build and packaging environment
 - explicit targets for vendor runtime preparation
+- explicit targets for command-line userland tools
+- explicit targets for FTP/SFTP/Samba transfer service payloads
 - explicit targets for RetroArch
 - explicit targets for libretro cores
 - explicit targets for standalone emulators
@@ -382,6 +384,8 @@ The official target set should become:
 image              build the Docker toolchain image
 shell              open an interactive toolchain shell
 vendor-runtime     prepare v90s-stockos-r1 from artifacts/
+userland           build BusyBox and command-line tools for the app layer
+network-services   build FTP/SFTP/Samba payloads for the app layer
 sdl2-powervr       build the patched SDL2 PowerVR compatibility payload
 retroarch          build RetroArch for the V90S PowerVR fbdev route
 cores              build supported libretro cores
@@ -428,6 +432,8 @@ artifacts/vendor/v90s-stockos-r1/
   -> release
 
 source pins and local patches
+  -> userland
+  -> network-services
   -> sdl2-powervr
   -> retroarch
   -> cores
@@ -470,6 +476,8 @@ test ROM or temporary payload only when the profile name makes that explicit.
 
 `app-layer` must assemble the FAT32-visible plumOS tree. It should collect:
 
+- BusyBox and command-line userland tools
+- FTP/SFTP/Samba transfer service payloads
 - RetroArch
 - libretro cores
 - PicoArch/PICO payloads
@@ -481,6 +489,13 @@ test ROM or temporary payload only when the profile name makes that explicit.
 - ROM, BIOS, saves, states, screenshots, and logs directories
 - license notices for bundled app-layer components
 - update metadata
+
+The app-layer network service controller must not own or stop the main SSH
+daemon. SSH is managed by the system rootfs. SFTP may provide an app-layer
+`sftp-server` payload, but enabling or disabling SFTP must not kill SSH or
+drop active development sessions. FTP and Samba stop/restart logic should use
+PID files plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before
+terminating processes.
 
 The app-layer output should use a stable tree layout under:
 

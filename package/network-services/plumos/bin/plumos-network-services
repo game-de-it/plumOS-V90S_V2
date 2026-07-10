@@ -1,0 +1,469 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+SHARE_DIR="${PLUMOS_NETWORK_SHARE_DIR:-${PLUMOS_SDCARD_ROOT}}"
+RUN_DIR="${PLUMOS_ROOT}/run"
+LOG_DIR="${PLUMOS_ROOT}/Logs"
+CONFIG_DIR="${PLUMOS_ROOT}/config/network"
+FTP_PORT="${PLUMOS_FTP_PORT:-21}"
+TRANSFER_MAX_CONNECTIONS="${PLUMOS_TRANSFER_MAX_CONNECTIONS:-20}"
+SMB_CONF="${CONFIG_DIR}/smb.conf"
+SERVICES_CONF="${CONFIG_DIR}/services.conf"
+LOG_FILE="${LOG_DIR}/network-services.log"
+
+BUSYBOX="${PLUMOS_ROOT}/bin/busybox"
+TCPSVD="${PLUMOS_ROOT}/bin/tcpsvd"
+FTPD="${PLUMOS_ROOT}/bin/ftpd"
+SFTP_SERVER="${PLUMOS_ROOT}/ssh/libexec/sftp-server"
+SFTP_SERVER_DISABLED="${PLUMOS_ROOT}/ssh/libexec/sftp-server.disabled"
+SMBD="${PLUMOS_ROOT}/samba/sbin/smbd"
+NMBD="${PLUMOS_ROOT}/samba/sbin/nmbd"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR" "$CONFIG_DIR"
+
+log() {
+  printf '%s service=%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)" "${2:-network}" "$1" >> "$LOG_FILE"
+}
+
+close_inherited_display_fds() {
+  for fd in 3 4 5 6 7 8 9; do
+    target="$(readlink "/proc/$$/fd/${fd}" 2>/dev/null || true)"
+    case "$target" in
+      /dev/fb0)
+        eval "exec ${fd}<&- ${fd}>&-" 2>/dev/null || true
+        ;;
+    esac
+  done
+}
+
+pid_alive() {
+  pid_file="$1"
+  [ -s "$pid_file" ] || return 1
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+pid_matches() {
+  pid="$1"
+  expected="$2"
+  cmdline="$(tr '\000' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
+  comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
+  case "${cmdline} ${comm}" in
+    *"$expected"*) return 0 ;;
+  esac
+  return 1
+}
+
+kill_pid_file() {
+  pid_file="$1"
+  name="$2"
+  expected="$3"
+  if pid_alive "$pid_file"; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    if ! pid_matches "$pid" "$expected"; then
+      log "refuse stop pid=${pid} reason=cmdline_mismatch expected=${expected}" "$name"
+      rm -f "$pid_file"
+      return 1
+    fi
+    kill "$pid" 2>/dev/null || true
+    sleep 1
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
+    log "stopped pid=${pid}" "$name"
+  fi
+  rm -f "$pid_file"
+}
+
+config_key() {
+  case "$1" in
+    ssh) printf '%s\n' "ssh_enabled" ;;
+    ftp) printf '%s\n' "ftp_enabled" ;;
+    sftp) printf '%s\n' "sftp_enabled" ;;
+    samba) printf '%s\n' "samba_enabled" ;;
+    *) return 1 ;;
+  esac
+}
+
+service_enabled() {
+  service="$1"
+  key="$(config_key "$service")" || return 1
+  [ -r "$SERVICES_CONF" ] || { [ "$service" = "ssh" ] && return 0; return 1; }
+  value="$(sed -n "s/^${key}=//p" "$SERVICES_CONF" 2>/dev/null | tail -n 1)"
+  [ -n "$value" ] || { [ "$service" = "ssh" ] && return 0; return 1; }
+  [ "$value" = "1" ] || [ "$value" = "true" ] || [ "$value" = "on" ]
+}
+
+set_service_enabled() {
+  service="$1"
+  enabled="$2"
+  key="$(config_key "$service")" || return 1
+  tmp="${SERVICES_CONF}.tmp"
+  mkdir -p "$CONFIG_DIR"
+  if [ -r "$SERVICES_CONF" ]; then
+    grep -v "^${key}=" "$SERVICES_CONF" > "$tmp" 2>/dev/null || true
+  else
+    : > "$tmp"
+  fi
+  printf '%s=%s\n' "$key" "$enabled" >> "$tmp"
+  mv "$tmp" "$SERVICES_CONF"
+}
+
+print_status() {
+  service="$1"
+  state="$2"
+  summary="$3"
+  printf 'service=%s\n' "$service"
+  printf 'state=%s\n' "$state"
+  printf 'summary=%s\n' "$summary"
+  if service_enabled "$service"; then
+    printf 'enabled=1\n'
+  else
+    printf 'enabled=0\n'
+  fi
+  printf 'share_dir=%s\n' "$SHARE_DIR"
+}
+
+process_exists_by_name() {
+  name="$1"
+  if [ -x "$BUSYBOX" ]; then
+    "$BUSYBOX" ps w 2>/dev/null | "$BUSYBOX" awk -v n="$name" '
+      $1 ~ /^[0-9]+$/ && index($0, n) { found=1 }
+      END { exit found ? 0 : 1 }
+    '
+    return $?
+  fi
+  ps 2>/dev/null | awk -v n="$name" 'index($0, n) { found=1 } END { exit found ? 0 : 1 }'
+}
+
+ftp_pid_file() {
+  printf '%s\n' "${RUN_DIR}/plumos-ftp.pid"
+}
+
+smbd_pid_file() {
+  printf '%s\n' "${RUN_DIR}/smbd.pid"
+}
+
+nmbd_pid_file() {
+  printf '%s\n' "${RUN_DIR}/nmbd.pid"
+}
+
+kill_ftp_children() {
+  [ -x "$BUSYBOX" ] || return 0
+  pids="$("$BUSYBOX" ps w 2>/dev/null | "$BUSYBOX" awk -v bb="$BUSYBOX" -v ftpd="$FTPD" '
+    $1 ~ /^[0-9]+$/ {
+      line = $0
+      if (index(line, bb " ftpd ") || index(line, ftpd " ")) {
+        print $1
+      }
+    }
+  ')"
+  [ -n "$pids" ] || return 0
+
+  for pid in $pids; do
+    [ "$pid" = "$$" ] && continue
+    kill "$pid" 2>/dev/null || true
+  done
+  sleep 1
+  for pid in $pids; do
+    [ "$pid" = "$$" ] && continue
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
+  done
+  log "stopped sessions pids=$(printf '%s' "$pids" | tr '\n' ' ')" ftp
+}
+
+status_ssh() {
+  if process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
+    print_status ssh running "SSH is managed by the system rootfs"
+    return 0
+  fi
+  print_status ssh system_managed "SSH control is intentionally not handled by app-layer services"
+  return 2
+}
+
+status_ftp() {
+  if [ ! -x "$TCPSVD" ] || [ ! -x "$FTPD" ]; then
+    print_status ftp not_installed "FTP not installed"
+    return 1
+  fi
+  if pid_alive "$(ftp_pid_file)"; then
+    print_status ftp running "FTP port ${FTP_PORT}, max ${TRANSFER_MAX_CONNECTIONS}"
+    return 0
+  fi
+  print_status ftp stopped "FTP stopped"
+  return 2
+}
+
+status_sftp() {
+  if [ ! -f "$SFTP_SERVER" ] && [ ! -f "$SFTP_SERVER_DISABLED" ]; then
+    print_status sftp not_installed "SFTP server not installed"
+    return 1
+  fi
+  if [ ! -f "$SFTP_SERVER" ]; then
+    print_status sftp stopped "SFTP disabled"
+    return 2
+  fi
+  if process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
+    print_status sftp running "SFTP server installed; SSH remains system-managed"
+    return 0
+  fi
+  print_status sftp stopped "SFTP server installed, SSH not running"
+  return 2
+}
+
+enable_sftp_server() {
+  if [ ! -f "$SFTP_SERVER" ] && [ -f "$SFTP_SERVER_DISABLED" ]; then
+    mv "$SFTP_SERVER_DISABLED" "$SFTP_SERVER"
+  fi
+}
+
+disable_sftp_server() {
+  if [ -f "$SFTP_SERVER" ]; then
+    mv "$SFTP_SERVER" "$SFTP_SERVER_DISABLED"
+  fi
+}
+
+status_samba() {
+  if [ ! -x "$SMBD" ]; then
+    print_status samba not_installed "Samba not installed"
+    return 1
+  fi
+  if pid_alive "$(smbd_pid_file)"; then
+    print_status samba running "Samba share SDCARD, max ${TRANSFER_MAX_CONNECTIONS}"
+    return 0
+  fi
+  print_status samba stopped "Samba stopped"
+  return 2
+}
+
+start_ftp() {
+  set_service_enabled ftp 1
+  if [ ! -x "$TCPSVD" ] || [ ! -x "$FTPD" ]; then
+    log "start failed reason=not_installed" ftp
+    status_ftp
+    return 1
+  fi
+  if pid_alive "$(ftp_pid_file)"; then
+    status_ftp
+    return 0
+  fi
+  log "start port=${FTP_PORT} max=${TRANSFER_MAX_CONNECTIONS} share=${SHARE_DIR}" ftp
+  (
+    close_inherited_display_fds
+    exec "$TCPSVD" -vE -c "$TRANSFER_MAX_CONNECTIONS" 0.0.0.0 "$FTP_PORT" \
+      "$FTPD" -w -A -t 300 -T 3600 "$SHARE_DIR" >> "$LOG_FILE" 2>&1 < /dev/null
+  ) &
+  echo "$!" > "$(ftp_pid_file)"
+  sleep 1
+  status_ftp
+}
+
+stop_ftp() {
+  set_service_enabled ftp 0
+  kill_pid_file "$(ftp_pid_file)" ftp "tcpsvd" || true
+  kill_ftp_children
+  status_ftp || true
+  return 0
+}
+
+start_ssh() {
+  set_service_enabled ssh 1
+  log "start skipped reason=system_managed" ssh
+  status_ssh
+}
+
+stop_ssh() {
+  set_service_enabled ssh 0
+  log "stop skipped reason=system_managed" ssh
+  status_ssh || true
+  return 0
+}
+
+start_sftp() {
+  set_service_enabled sftp 1
+  enable_sftp_server
+  if [ ! -f "$SFTP_SERVER" ]; then
+    log "start failed reason=not_installed" sftp
+    status_sftp
+    return 1
+  fi
+  log "start share=${SHARE_DIR} ssh=system_managed" sftp
+  status_sftp
+}
+
+stop_sftp() {
+  set_service_enabled sftp 0
+  log "stop shared_ssh=false" sftp
+  disable_sftp_server
+  status_sftp || true
+  return 0
+}
+
+write_smb_conf() {
+  mkdir -p "${CONFIG_DIR}/samba-private" \
+    /tmp/plumos-samba/lock \
+    /tmp/plumos-samba/state \
+    /tmp/plumos-samba/cache \
+    /tmp/plumos-samba/ncalrpc
+  cat > "${CONFIG_DIR}/smbpasswd" <<EOF
+root:0:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:4F26822B803282B051EF3A3CD7A5F58D:[U          ]:LCT-FFFFFFFF:
+EOF
+  chmod 0600 "${CONFIG_DIR}/smbpasswd" 2>/dev/null || true
+  cat > "${CONFIG_DIR}/smbusers" <<EOF
+root = plumos
+EOF
+  cat > "$SMB_CONF" <<EOF
+[global]
+   workgroup = WORKGROUP
+   netbios name = PLUMOS-V90S
+   server string = plumOS V90S
+   server role = standalone server
+   security = user
+   passdb backend = smbpasswd:${CONFIG_DIR}/smbpasswd
+   username map = ${CONFIG_DIR}/smbusers
+   encrypt passwords = yes
+   map to guest = Never
+   guest account = root
+   usershare allow guests = yes
+   load printers = no
+   disable spoolss = yes
+   printing = bsd
+   printcap name = /dev/null
+   server min protocol = SMB2
+   smb ports = 445
+   max smbd processes = ${TRANSFER_MAX_CONNECTIONS}
+   disable netbios = yes
+   bind interfaces only = no
+   pid directory = ${RUN_DIR}
+   lock directory = /tmp/plumos-samba/lock
+   state directory = /tmp/plumos-samba/state
+   cache directory = /tmp/plumos-samba/cache
+   ncalrpc dir = /tmp/plumos-samba/ncalrpc
+   private dir = ${CONFIG_DIR}/samba-private
+   log file = ${LOG_DIR}/samba-%m.log
+   max log size = 256
+
+[SDCARD]
+   path = ${SHARE_DIR}
+   browseable = yes
+   read only = no
+   guest ok = no
+   guest only = no
+   valid users = root
+   force user = root
+   max connections = ${TRANSFER_MAX_CONNECTIONS}
+   create mask = 0666
+   directory mask = 0777
+EOF
+}
+
+start_samba() {
+  set_service_enabled samba 1
+  if [ ! -x "$SMBD" ]; then
+    log "start failed reason=not_installed" samba
+    status_samba
+    return 1
+  fi
+  if pid_alive "$(smbd_pid_file)"; then
+    status_samba
+    return 0
+  fi
+  write_smb_conf
+  log "start max=${TRANSFER_MAX_CONNECTIONS} share=${SHARE_DIR}" samba
+  (
+    close_inherited_display_fds
+    exec "$SMBD" -D -s "$SMB_CONF" >> "$LOG_FILE" 2>&1 < /dev/null
+  ) || true
+  sleep 1
+  status_samba
+}
+
+stop_samba() {
+  set_service_enabled samba 0
+  kill_pid_file "$(nmbd_pid_file)" nmbd "nmbd" || true
+  kill_pid_file "$(smbd_pid_file)" smbd "smbd" || true
+  status_samba || true
+  return 0
+}
+
+usage() {
+  cat <<EOF
+Usage: $0 COMMAND SERVICE
+
+Commands:
+  status SERVICE
+  start SERVICE
+  stop SERVICE
+  restart SERVICE
+  start-enabled
+
+Services:
+  ssh      Existing system-rootfs SSH status only; stop is a no-op
+  ftp      BusyBox FTP on port ${FTP_PORT}, max ${TRANSFER_MAX_CONNECTIONS}, share ${SHARE_DIR}
+  sftp     SFTP server payload status; SSH remains system-managed
+  samba    SMB share //V90S_IP/SDCARD, max ${TRANSFER_MAX_CONNECTIONS}, backed by ${SHARE_DIR}
+  all
+EOF
+}
+
+run_one() {
+  command="$1"
+  service="$2"
+  case "$command:$service" in
+    status:ssh) status_ssh ;;
+    status:ftp) status_ftp ;;
+    status:sftp) status_sftp ;;
+    status:samba) status_samba ;;
+    start:ssh) start_ssh ;;
+    start:ftp) start_ftp ;;
+    start:sftp) start_sftp ;;
+    start:samba) start_samba ;;
+    stop:ssh) stop_ssh ;;
+    stop:ftp) stop_ftp ;;
+    stop:sftp) stop_sftp ;;
+    stop:samba) stop_samba ;;
+    restart:ssh) start_ssh ;;
+    restart:ftp) stop_ftp >/dev/null 2>&1 || true; start_ftp ;;
+    restart:sftp) stop_sftp >/dev/null 2>&1 || true; start_sftp ;;
+    restart:samba) stop_samba >/dev/null 2>&1 || true; start_samba ;;
+    *) usage >&2; return 2 ;;
+  esac
+}
+
+command="${1:-}"
+service="${2:-}"
+if [ "$command" = "start-enabled" ]; then
+  rc=0
+  for svc in ftp sftp samba; do
+    if service_enabled "$svc"; then
+      run_one start "$svc" || rc=$?
+    else
+      [ "$svc" = "sftp" ] && disable_sftp_server
+      log "skip disabled" "$svc"
+    fi
+  done
+  exit "$rc"
+fi
+
+if [ -z "$command" ] || [ -z "$service" ]; then
+  usage >&2
+  exit 2
+fi
+
+case "$service" in
+  all)
+    rc=0
+    for svc in ftp sftp samba; do
+      run_one "$command" "$svc" || rc=$?
+    done
+    exit "$rc"
+    ;;
+  ssh|ftp|sftp|samba)
+    run_one "$command" "$service"
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
