@@ -158,6 +158,9 @@ Build plumOS V90S as a V90S-specific distribution:
   available only through explicit diagnostic opt-in.
 - [x] Start the frontend before slow development services by backgrounding
   PowerVR probe, rootfs Wi-Fi/SSH init, and app-layer network services.
+- [x] Retry app-layer network services after rootfs Wi-Fi/DHCP completion so
+  Samba is not lost when the first non-blocking service pass runs before
+  interfaces are ready.
 - [x] Stop blocking FE startup on normal SD2 FAT fsck; frontend launch mounts
   SD2 with boot fsck disabled by default and keeps explicit fsck opt-in.
 - [x] Reduce normal boot log sync pressure; keep forced boot-log sync behind an

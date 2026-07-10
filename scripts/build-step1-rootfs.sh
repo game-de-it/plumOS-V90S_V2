@@ -715,6 +715,45 @@ prepare_plumos_app_layer() {
     return 1
 }
 
+start_plumos_network_services_bg() {
+    reason="$1"
+    [ -x /mnt/plumos/bin/plumos-network-services ] || return 0
+
+    log "debian-init: starting enabled plumOS network services in background reason=$reason"
+    persist_debian_log
+    (
+        PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-network-services start-enabled >> "$LOG" 2>&1
+        rc=$?
+        log "debian-init: plumOS network services exited rc=$rc reason=$reason"
+        persist_debian_log
+    ) &
+}
+
+retry_plumos_network_services_after_network() {
+    network_rc="$1"
+    [ "$network_rc" -eq 0 ] 2>/dev/null || return 0
+
+    tries=0
+    while [ "$tries" -lt 30 ]; do
+        [ -x /mnt/plumos/bin/plumos-network-services ] && break
+        tries=$((tries + 1))
+        sleep 1
+    done
+
+    if [ ! -x /mnt/plumos/bin/plumos-network-services ]; then
+        log "debian-init: plumOS network services retry skipped; app layer unavailable"
+        persist_debian_log
+        return 0
+    fi
+
+    log "debian-init: retrying enabled plumOS network services after network init"
+    persist_debian_log
+    PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-network-services start-enabled >> "$LOG" 2>&1
+    rc=$?
+    log "debian-init: plumOS network services retry exited rc=$rc"
+    persist_debian_log
+}
+
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 if [ ! -c /dev/console ]; then
@@ -761,6 +800,7 @@ if [ -x /usr/local/sbin/v90s-network-ssh-init ]; then
         rc=$?
         log "debian-init: network/SSH init exited rc=$rc"
         persist_debian_log
+        retry_plumos_network_services_after_network "$rc"
     ) &
 fi
 
@@ -780,16 +820,7 @@ if prepare_plumos_app_layer; then
     log "debian-init: plumOS frontend pid=$frontend_pid"
     persist_debian_log
 
-    if [ -x /mnt/plumos/bin/plumos-network-services ]; then
-        log "debian-init: starting enabled plumOS network services in background"
-        persist_debian_log
-        (
-            PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-network-services start-enabled >> "$LOG" 2>&1
-            rc=$?
-            log "debian-init: plumOS network services exited rc=$rc"
-            persist_debian_log
-        ) &
-    fi
+    start_plumos_network_services_bg after-frontend
 fi
 
 if [ "$frontend_attempted" -eq 0 ] && [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
