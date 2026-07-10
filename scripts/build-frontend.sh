@@ -42,6 +42,32 @@ build_c_tool() {
   chmod 0755 "$out"
 }
 
+build_fbdev_controller() {
+  local out="$BIN_DIR/plumos-controller-ui-fbdev"
+  local png_cflags=""
+  local png_libs=""
+
+  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libpng; then
+    png_cflags="$(pkg-config --cflags libpng)"
+    png_libs="$(pkg-config --libs libpng)"
+  else
+    png_libs="-lpng -lz"
+  fi
+
+  # shellcheck disable=SC2086
+  "$CC" \
+    "${common_cflags[@]}" \
+    $png_cflags \
+    -DPLUMOS_ENABLE_FBDEV_RENDERER=1 \
+    -DPLUMOS_FBDEV_ENABLE_PNG=1 \
+    "$SRC_DIR/plumos_controller_ui.c" \
+    -o "$out" \
+    "${ldflags[@]}" \
+    $png_libs
+  "$STRIP" "$out" 2>/dev/null || true
+  chmod 0755 "$out"
+}
+
 install_wrapper() {
   local name="$1"
   local path="$BIN_DIR/$name"
@@ -85,6 +111,63 @@ printf 'plumos-frontend-launch: starting V90S frontend\n' >> "$log"
 printf 'plumos-frontend-launch: PLUMOS_ROOT=%s\n' "$PLUMOS_ROOT" >> "$log"
 
 exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s" >> "$log" 2>&1
+EOF
+      ;;
+    plumos-frontend-stop)
+      cat > "$path" <<'EOF'
+#!/bin/sh
+set -eu
+
+action="${1:-stop}"
+
+frontend_pids() {
+  pidof plumos-controller-ui-fbdev 2>/dev/null || true
+}
+
+print_status() {
+  pids="$(frontend_pids)"
+  if [ -z "$pids" ]; then
+    printf 'plumos-frontend-stop: frontend not running\n'
+    return 0
+  fi
+  for pid in $pids; do
+    cmd="$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    printf 'plumos-frontend-stop: pid=%s cmd=%s\n' "$pid" "$cmd"
+  done
+}
+
+stop_frontend() {
+  pids="$(frontend_pids)"
+  if [ -z "$pids" ]; then
+    printf 'plumos-frontend-stop: frontend not running\n'
+    return 0
+  fi
+  for pid in $pids; do
+    printf 'plumos-frontend-stop: TERM pid=%s\n' "$pid"
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  for _ in 1 2 3; do
+    sleep 1
+    [ -z "$(frontend_pids)" ] && return 0
+  done
+  for pid in $(frontend_pids); do
+    printf 'plumos-frontend-stop: KILL pid=%s\n' "$pid"
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
+case "$action" in
+  status)
+    print_status
+    ;;
+  stop)
+    stop_frontend
+    ;;
+  *)
+    printf 'Usage: plumos-frontend-stop [stop|status]\n' >&2
+    exit 64
+    ;;
+esac
 EOF
       ;;
     plumos-retroarch-launch)
@@ -255,11 +338,11 @@ build_c_tool "$SRC_DIR/plumos_frontend.c" "$BIN_DIR/plumos-frontend"
 build_c_tool "$SRC_DIR/plumos_library_scan.c" "$BIN_DIR/plumos-library-scan"
 build_c_tool "$SRC_DIR/plumos_text_ui.c" "$BIN_DIR/plumos-text-ui"
 build_c_tool "$SRC_DIR/plumos_controller_ui.c" "$BIN_DIR/plumos-controller-ui"
-build_c_tool "$SRC_DIR/plumos_controller_ui.c" "$BIN_DIR/plumos-controller-ui-fbdev" \
-  -DPLUMOS_ENABLE_FBDEV_RENDERER=1
+build_fbdev_controller
 
 install_wrapper plumos-controller-ui-v90s
 install_wrapper plumos-frontend-launch
+install_wrapper plumos-frontend-stop
 install_wrapper plumos-retroarch-launch
 install_wrapper plumos-retroarch-menu-launch
 install_wrapper plumos-picoarch-launch
@@ -276,6 +359,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   printf 'plumos_root=/mnt/plumos\n'
   printf 'renderer=fbdev\n'
   printf 'launcher=bin/plumos-frontend-launch\n'
+  printf 'frontend_stop=bin/plumos-frontend-stop\n'
   printf 'retroarch_bridge=bin/plumos-retroarch-launch\n'
   printf 'picoarch_bridge=bin/plumos-picoarch-launch\n'
   printf 'standalone_bridge=bin/plumos-standalone-launch\n'

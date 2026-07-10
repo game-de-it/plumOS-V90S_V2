@@ -607,3 +607,106 @@ fecac0e4af0707015fe0ee02b1b78d0f7d1f64388ca7bc027a3b8e2c42409509
 
 That stale page was not a live RetroArch process; `/proc` showed
 `retroarch_count=0`.
+
+## MMF-Style Graphic TOP Live Validation
+
+The V90S fbdev renderer now follows the MMF graphic TOP contract instead of the
+temporary formal mock layout. The controller emits the same line protocol shape:
+
+```text
+graphic_mode=top
+graphic_theme_motion<TAB>top_layout<TAB>tile_grid
+graphic_entry<TAB>selected<TAB>title<TAB>detail<TAB>media
+```
+
+Current MMF leaves the TOP `detail` field empty, so the V90S TOP does not draw
+ROM counts unless the controller later supplies that field. System logo PNGs are
+loaded from the MMF theme-compatible path:
+
+```text
+/mnt/plumos/themes/default/logos/systems/<system_id>.png
+```
+
+The V90S fbdev controller is built with libpng support:
+
+```text
+PLUMOS_FBDEV_ENABLE_PNG=1
+NEEDED: libpng16.so.16
+```
+
+Host build proof:
+
+```text
+./scripts/docker-build.sh image
+./scripts/docker-build.sh frontend
+./scripts/docker-build.sh app-layer
+```
+
+Important hashes:
+
+```text
+e935922d60467a0d64de7ff6b27d87522106d2eb130ec00039cf251a957037cf  output/app-layer/v90s/bin/plumos-controller-ui-fbdev
+6714edbb4801741076c98395b8dc22b40dd61df954ff0353baffecb4088585f7  output/app-layer/v90s/bin/plumos-frontend-stop
+74d1ef74c22479d315f9759b315041e77590b42ce3a1056706d528bbb86ff5a5  output/app-layer/v90s/themes/default/logos/systems/nes.png
+```
+
+The same hashes were confirmed on the live V90S:
+
+```text
+e935922d60467a0d64de7ff6b27d87522106d2eb130ec00039cf251a957037cf  /mnt/plumos/bin/plumos-controller-ui-fbdev
+74d1ef74c22479d315f9759b315041e77590b42ce3a1056706d528bbb86ff5a5  /mnt/plumos/themes/default/logos/systems/nes.png
+```
+
+The app-layer checksum passed on both host and live V90S:
+
+```text
+cd output/app-layer/v90s && sha256sum -c checksums.sha256: OK
+cd /mnt/plumos && sha256sum -c checksums.sha256: OK
+```
+
+Process cleanup was required because earlier manual validation had left
+multiple frontend instances. After stopping only `plumos-controller-ui-fbdev`
+and restarting through `plumos-frontend-launch`, the live device had exactly one
+frontend process:
+
+```text
+pidof plumos-controller-ui-fbdev: 2245
+```
+
+The app layer now includes a frontend-specific stop helper so future FE restarts
+do not rely on process-name grep patterns that can match the SSH command line:
+
+```text
+/mnt/plumos/bin/plumos-frontend-stop status
+plumos-frontend-stop: pid=2245 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+```
+
+Framebuffer capture confirmed the MMF-style TOP on page 0:
+
+```text
+output/validation/frontend-mmf-top-live/fb0-page0-wifi.png
+03fb247ce047b8f6df60ed7baf40276439cb31b4c02ed347278ad11ab63eccfc
+```
+
+Observed page 0 contents:
+
+```text
+PLUMOS V90S GUI
+12:36  WIFI  BAT --
+NES / FAVORITES / RECENT
+MMF-style tile grid
+system logo PNGs visible
+no TOP ROM counts because detail is empty
+STATUS: FBDEV RENDERER READY
+```
+
+Framebuffer page 1 still contained a stale RetroArch menu from an earlier run:
+
+```text
+output/validation/frontend-mmf-top-live/fb0-page1-wifi.png
+448e928f3f797c572a33202229d7c181d4f9834adda49761ca857d1494b65d4b
+```
+
+This was only the inactive framebuffer page. The live frontend process count was
+one, and the theme directory was cleaned so no AppleDouble `._*` files remain on
+the device.

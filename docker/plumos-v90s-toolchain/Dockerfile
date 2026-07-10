@@ -39,6 +39,7 @@ RUN apt-get update \
     libegl-dev \
     libfreetype6-dev \
     libgles-dev \
+    libpng-dev \
     libpipewire-0.3-dev \
     libpulse-dev \
     libsdl2-dev \
