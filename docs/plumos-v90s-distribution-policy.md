@@ -406,6 +406,17 @@ stockos-image      transitional alias for sd-image while the partition contract
 knulli-image       legacy investigation target only
 ```
 
+Implementation naming rule:
+
+- plumOS-facing RetroArch artifacts use `retroarch-powervr` and
+  `output/retroarch-powervr`
+- `retroarch-knulli` remains only as a compatibility alias or legacy
+  investigation name
+- KNULLI source paths may still appear where the file is genuinely a reference
+  patch/source input
+- live device transfer should use `live-transfer-retroarch-powervr.sh` unless a
+  historical validation note explicitly requires the old KNULLI-named helper
+
 The build graph should be:
 
 ```text

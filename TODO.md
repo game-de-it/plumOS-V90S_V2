@@ -81,12 +81,12 @@ Build plumOS V90S as a V90S-specific distribution:
   the Docker entry point.
 - [x] Require explicit opt-in before using KNULLI `boot0` / `boot_package`
   fallback assets in StockOS-layout image assembly.
-- [ ] Rename or isolate remaining KNULLI-specific runtime script/profile names
+- [x] Rename or isolate remaining KNULLI-specific runtime script/profile names
   that now describe the stable StockOS-derived runtime.
 
 ## Milestone 2: Build System Targets
 
-- [ ] Make `scripts/docker-build.sh` expose the official target set:
+- [x] Make `scripts/docker-build.sh` expose the official target set:
   - `image`
   - `shell`
   - `vendor-runtime`
@@ -102,12 +102,12 @@ Build plumOS V90S as a V90S-specific distribution:
   - `sd-image`
   - `release`
   - `all`
-- [ ] Keep `rootfs` as a transitional alias for `system-rootfs`.
-- [ ] Keep `stockos-image` as a transitional alias for `sd-image` while the
+- [x] Keep `rootfs` as a transitional alias for `system-rootfs`.
+- [x] Keep `stockos-image` as a transitional alias for `sd-image` while the
   partition contract remains StockOS/Batocera-compatible.
-- [ ] Keep `knulli-image` as a legacy investigation target only.
-- [ ] Implement `cores` as the normal libretro-core build target.
-- [ ] Keep `quicknes` as a compatibility or one-core development alias.
+- [x] Keep `knulli-image` as a legacy investigation target only.
+- [x] Implement `cores` as the normal libretro-core build target.
+- [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [ ] Implement `picoarch`.
 - [ ] Implement `standalone`.
 - [ ] Implement `frontend`.

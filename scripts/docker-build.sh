@@ -17,17 +17,23 @@ Commands:
   run CMD...       Run an arbitrary command in the V90S toolchain image.
   vendor-runtime   Prepare artifacts/vendor/v90s-stockos-r1 into output/vendor/v90s-stockos-r1.
   stockos-runtime  Deprecated alias for vendor-runtime.
-  quicknes         Build the current QuickNES libretro core.
   sdl2-powervr     Build the patched SDL2 PowerVR runtime.
   sdl2-mali        Deprecated alias for sdl2-powervr.
   retroarch        Build the V90S RetroArch binary with the PowerVR fbdev context.
-  rootfs           Build a V90S rootfs payload using scripts/build-step1-rootfs.sh.
-  stockos-image    Assemble a StockOS/Batocera-layout V90S SD-card image.
-  sd-image         Alias for stockos-image.
+  retroarch-knulli Deprecated alias for the legacy KNULLI-named RetroArch builder.
+  cores            Build supported libretro cores.
+  quicknes         Compatibility alias for the current QuickNES-only core build.
+  system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
+  rootfs           Transitional alias for system-rootfs.
+  app-layer        Reserved for FAT32 plumOS app/update/data layer assembly.
+  sd-image         Assemble a StockOS/Batocera-compatible V90S SD-card image.
+  stockos-image    Transitional alias for sd-image.
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
   picoarch         Reserved for the V90S PicoArch build path.
   standalone       Reserved for V90S standalone emulator builds.
   frontend         Reserved for the V90S frontend build path.
+  release          Reserved for release package assembly.
+  all              Reserved for the normal release build chain.
 
 Environment:
   PLUMOS_V90S_DOCKER_IMAGE     Docker image tag. Default: ${IMAGE}
@@ -130,7 +136,12 @@ case "$cmd" in
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/scripts/prepare-stockos-runtime.sh "$@"
         ;;
+    cores|libretro-cores)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-libretro-quicknes.sh "$@"
+        ;;
     quicknes|libretro-quicknes)
+        echo "warning: quicknes is a one-core development alias; use cores for normal core builds" >&2
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-libretro-quicknes.sh "$@"
         ;;
@@ -148,13 +159,31 @@ case "$cmd" in
         docker run \
             -e PLUMOS_V90S_BUILD_IN_CONTAINER=1 \
             "${docker_run_user[@]}" \
+            /workspace/scripts/build-retroarch-powervr.sh "$@"
+        ;;
+    retroarch-knulli)
+        echo "warning: retroarch-knulli is a legacy investigation alias; use retroarch" >&2
+        ensure_image
+        docker run \
+            -e PLUMOS_V90S_BUILD_IN_CONTAINER=1 \
+            "${docker_run_user[@]}" \
             /workspace/scripts/build-retroarch-knulli.sh "$@"
         ;;
-    rootfs)
+    system-rootfs)
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/build-step1-rootfs.sh "$@"
         ;;
-    stockos-image|stockos-sd-image|sd-image|image-assemble)
+    rootfs)
+        echo "warning: rootfs is a transitional alias; use system-rootfs" >&2
+        ensure_image
+        docker run "${docker_run_root[@]}" /workspace/scripts/build-step1-rootfs.sh "$@"
+        ;;
+    sd-image)
+        ensure_image
+        docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-stockos-image.sh "$@"
+        ;;
+    stockos-image|stockos-sd-image|image-assemble)
+        echo "warning: stockos-image is a transitional alias; use sd-image" >&2
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-stockos-image.sh "$@"
         ;;
@@ -162,7 +191,7 @@ case "$cmd" in
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-image.sh "$@"
         ;;
-    picoarch|standalone|standalone-emulators|frontend)
+    app-layer|picoarch|standalone|standalone-emulators|frontend|release|all)
         echo "error: $cmd is reserved but not implemented yet for V90S" >&2
         echo "hint: add docker/plumos-v90s-toolchain/scripts/build-$cmd.sh when the runtime contract is pinned" >&2
         exit 3

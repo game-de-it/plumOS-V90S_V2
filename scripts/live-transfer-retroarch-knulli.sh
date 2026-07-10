@@ -19,7 +19,7 @@ usage() {
 Usage:
   live-transfer-retroarch-knulli.sh IP [--config PATH] [--refresh-rate RATE] [--menu|--content] [--transfer-only]
 
-Copies the locally built KNULLI-style RetroArch binary, QuickNES core, and
+Copies the locally built V90S PowerVR RetroArch binary, QuickNES core, and
 V90S launcher/stop scripts to a running device over SSH. By default it safely
 stops the managed RetroArch PID and starts the explicit mali_fbdev route.
 
@@ -98,6 +98,7 @@ fi
 remote="$user@$ip"
 ssh_opts="-p $port -o ConnectTimeout=8 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 scp_opts="-P $port -o ConnectTimeout=8 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+remote_retroarch="/tmp/$(basename "$retroarch_src")"
 remote_config_path=
 
 printf 'transfer target: %s\n' "$remote"
@@ -136,10 +137,10 @@ else
     ssh $ssh_opts "$remote" "rm -f /tmp/plumos-v90s-live-start-mode"
 fi
 
-ssh $ssh_opts "$remote" 'sh -s' <<'REMOTE_SETUP'
+ssh $ssh_opts "$remote" "REMOTE_RETROARCH='$remote_retroarch' sh -s" <<'REMOTE_SETUP'
 set -eu
-chmod 0755 /tmp/retroarch-knulli /tmp/v90s-retroarch-launch.sh /tmp/v90s-retroarch-stop.sh
-sha256sum /tmp/retroarch-knulli /tmp/quicknes_libretro.so
+chmod 0755 "$REMOTE_RETROARCH" /tmp/v90s-retroarch-launch.sh /tmp/v90s-retroarch-stop.sh
+sha256sum "$REMOTE_RETROARCH" /tmp/quicknes_libretro.so
 REMOTE_SETUP
 
 if [ "$launch" -eq 0 ]; then
@@ -147,12 +148,11 @@ if [ "$launch" -eq 0 ]; then
     exit 0
 fi
 
-ssh $ssh_opts "$remote" 'sh -s' <<'REMOTE_LAUNCH'
+ssh $ssh_opts "$remote" "REMOTE_RETROARCH='$remote_retroarch' sh -s" <<'REMOTE_LAUNCH'
 set -eu
 /tmp/v90s-retroarch-stop.sh status || true
 /tmp/v90s-retroarch-stop.sh stop
 cat > /tmp/plumos-v90s-live-env.sh <<'ENV'
-export PLUMOS_V90S_RETROARCH_BIN=/tmp/retroarch-knulli
 export PLUMOS_V90S_CORE=/tmp/quicknes_libretro.so
 export PLUMOS_V90S_ROM='/roms/nes/Super Mario Bros..nes'
 export PLUMOS_V90S_VIDEO_DRIVER=gl
@@ -164,6 +164,7 @@ export PLUMOS_V90S_AUDIO_DRIVER=alsa
 export PLUMOS_V90S_SDL_VIDEODRIVER=mali
 export PLUMOS_V90S_SDL_RENDER_DRIVER=software
 ENV
+echo "export PLUMOS_V90S_RETROARCH_BIN=$REMOTE_RETROARCH" >> /tmp/plumos-v90s-live-env.sh
 if [ -s /tmp/plumos-v90s-live-start-mode ]; then
     live_start_mode="$(sed -n '1p' /tmp/plumos-v90s-live-start-mode)"
     echo "export PLUMOS_V90S_RETROARCH_START_MODE=$live_start_mode" >> /tmp/plumos-v90s-live-env.sh

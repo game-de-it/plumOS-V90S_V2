@@ -66,12 +66,21 @@ Docker build flow です。
 ```sh
 ./scripts/docker-build.sh image
 ./scripts/docker-build.sh vendor-runtime
-./scripts/docker-build.sh quicknes
+./scripts/docker-build.sh cores
+./scripts/docker-build.sh retroarch
+./scripts/docker-build.sh system-rootfs \
+  --profile debian-retroarch-powervr \
+  --out-dir output/rootfs-step2 \
+  --rom "artifacts/nes/Super Mario Bros..nes"
 ./scripts/docker-build.sh sd-image --name plumos-v90s-stockos-smoke-20260710-1.img
 ./scripts/docker-build.sh sd-image \
-  --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stocklcd-persistent-ra-config/debian-bookworm-retroarch-knulli-step2.squashfs \
+  --rootfs-squashfs output/rootfs-step2/debian-bookworm-retroarch-powervr-step2.squashfs \
   --name plumos-v90s-stockos-ra-20260710-1.img
 ```
+
+`quicknes` は現在の1 core開発用aliasです。通常の libretro core build 入口は
+`cores` です。`rootfs` は `system-rootfs`、`stockos-image` は `sd-image` の
+移行aliasとして残します。
 
 `sd-image` は StockOS 実機スナップショットで確認したパーティション契約を
 再現します。

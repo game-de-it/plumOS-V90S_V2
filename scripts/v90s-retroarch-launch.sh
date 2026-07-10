@@ -103,7 +103,7 @@ pid_is_retroarch() {
     cmdline="$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
 
     case "$comm" in
-        retroarch|retroarch-knull|retroarch-knulli)
+        retroarch|retroarch-knull|retroarch-knulli|retroarch-powervr)
             ;;
         *)
             return 1

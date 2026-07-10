@@ -73,9 +73,9 @@ The V90S build entrypoint is:
 ```sh
 ./scripts/docker-build.sh image
 ./scripts/docker-build.sh shell
-./scripts/docker-build.sh quicknes
 ./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh retroarch
+./scripts/docker-build.sh cores
 ./scripts/docker-build.sh system-rootfs ...
 ./scripts/docker-build.sh app-layer ...
 ./scripts/docker-build.sh sd-image ...
@@ -91,12 +91,24 @@ available only as an explicit legacy command:
 ./scripts/docker-build.sh knulli-image ...
 ```
 
+Implemented compatibility aliases:
+
+```sh
+./scripts/docker-build.sh quicknes
+./scripts/docker-build.sh rootfs
+./scripts/docker-build.sh stockos-image
+./scripts/docker-build.sh retroarch-knulli
+```
+
 Reserved next targets:
 
 ```sh
 ./scripts/docker-build.sh picoarch
 ./scripts/docker-build.sh standalone
 ./scripts/docker-build.sh frontend
+./scripts/docker-build.sh app-layer
+./scripts/docker-build.sh release
+./scripts/docker-build.sh all
 ```
 
 These should follow the MMF style: each target gets a focused script under
@@ -128,8 +140,13 @@ The first RA-capable StockOS-layout image uses the current RetroArch payload as
 p5:
 
 ```sh
+./scripts/docker-build.sh system-rootfs \
+  --profile debian-retroarch-powervr \
+  --out-dir output/rootfs-step2 \
+  --rom "artifacts/nes/Super Mario Bros..nes"
+
 ./scripts/docker-build.sh sd-image \
-  --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stocklcd-persistent-ra-config/debian-bookworm-retroarch-knulli-step2.squashfs \
+  --rootfs-squashfs output/rootfs-step2/debian-bookworm-retroarch-powervr-step2.squashfs \
   --name plumos-v90s-stockos-ra-20260710-1.img
 ```
 
@@ -140,7 +157,7 @@ scrolling, and audio pitch were perfect:
 
 ```sh
 ./scripts/docker-build.sh sd-image \
-  --rootfs-squashfs output/rootfs-step2-retroarch-knulli-stockos-video/debian-bookworm-retroarch-knulli-step2.squashfs \
+  --rootfs-squashfs output/rootfs-step2/debian-bookworm-retroarch-powervr-step2.squashfs \
   --name plumos-v90s-stockos-ra-20260710-2-stockos-video.img
 ```
 
@@ -159,12 +176,18 @@ GE8300. Use:
 ```text
 sdl2-powervr
 /usr/local/lib/plumos-sdl2-powervr
+retroarch-powervr
+output/retroarch-powervr
 ```
 
 Some upstream/KNULLI/Batocera implementation names still contain `mali`, such as
 `SDL_VIDEODRIVER=mali` and RetroArch's `mali_fbdev` context. Those should be
 treated as upstream compatibility names until the implementation itself is
 renamed or replaced.
+
+The old `retroarch-knulli` binary/output names remain compatibility aliases for
+historical validation and live-transfer notes. New plumOS-facing commands should
+use `retroarch`, `retroarch-powervr`, and `live-transfer-retroarch-powervr.sh`.
 
 ## RetroArch Policy
 

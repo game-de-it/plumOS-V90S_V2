@@ -2,13 +2,15 @@
 set -eu
 
 version="v1.22.2"
-out_dir="output/retroarch-knulli"
+out_dir="${PLUMOS_V90S_RETROARCH_OUT:-output/retroarch-knulli}"
 work_dir="output/build/retroarch-${version}"
 knulli_src=".cache/knulli-linux"
 pvr_dir=".cache/ge8300-drivers"
 sdl2_powervr_dir="output/sdl2-powervr"
 local_patch_dir="patches/retroarch"
 docker_image="${PLUMOS_V90S_RETROARCH_DOCKER_IMAGE:-debian:bookworm}"
+binary_name="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-knulli}"
+compat_out="${PLUMOS_V90S_RETROARCH_COMPAT_OUT:-}"
 apply_patches=0
 
 usage() {
@@ -20,6 +22,8 @@ Options:
   --version TAG          RetroArch tag; default v1.22.2 from KNULLI
   --out-dir PATH        output directory; default output/retroarch-knulli
   --work-dir PATH       source/build directory; default output/build/retroarch-TAG
+  --binary-name NAME    installed binary name; default retroarch-knulli
+  --compat-out PATH     optional compatibility output symlink path
   --knulli-src PATH     KNULLI source checkout; default .cache/knulli-linux
   --pvr-dir PATH        GE8300 driver checkout; default .cache/ge8300-drivers
   --sdl2-powervr-dir PATH
@@ -45,6 +49,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         --work-dir)
             work_dir="$2"
+            shift 2
+            ;;
+        --binary-name)
+            binary_name="$2"
+            shift 2
+            ;;
+        --compat-out)
+            compat_out="$2"
             shift 2
             ;;
         --knulli-src)
@@ -241,14 +253,43 @@ else
 fi
 
 mkdir -p "$out_dir/usr/local/bin"
-install -m 0755 "$work_dir/.stage/usr/bin/retroarch" "$out_dir/usr/local/bin/retroarch-knulli"
+install -m 0755 "$work_dir/.stage/usr/bin/retroarch" "$out_dir/usr/local/bin/$binary_name"
+if [ "$binary_name" != "retroarch-knulli" ]; then
+    ln -sfn "$binary_name" "$out_dir/usr/local/bin/retroarch-knulli"
+fi
 if [ -d "$work_dir/.stage/usr/share/retroarch" ]; then
     mkdir -p "$out_dir/usr/local/share"
     rm -rf "$out_dir/usr/local/share/retroarch"
     cp -a "$work_dir/.stage/usr/share/retroarch" "$out_dir/usr/local/share/retroarch"
 fi
 
-sha256sum "$out_dir/usr/local/bin/retroarch-knulli" > "$out_dir/retroarch-knulli.sha256"
+sha256sum "$out_dir/usr/local/bin/$binary_name" > "$out_dir/$binary_name.sha256"
+if [ "$binary_name" != "retroarch-knulli" ]; then
+    sha256sum "$out_dir/usr/local/bin/retroarch-knulli" > "$out_dir/retroarch-knulli.sha256"
+fi
+
+compat_note=none
+if [ -n "$compat_out" ] && [ "$compat_out" != "$out_dir" ]; then
+    if [ -L "$compat_out" ]; then
+        rm -f "$compat_out"
+    fi
+    if [ -e "$compat_out" ]; then
+        compat_note="skipped-existing:$compat_out"
+        printf 'warning: compatibility output path already exists, not replacing: %s\n' "$compat_out" >&2
+    else
+        mkdir -p "$(dirname "$compat_out")"
+        out_parent="$(dirname "$out_dir")"
+        compat_parent="$(dirname "$compat_out")"
+        if [ "$out_parent" = "$compat_parent" ]; then
+            compat_target="$(basename "$out_dir")"
+        else
+            compat_target="$(CDPATH= cd -- "$out_dir" && pwd)"
+        fi
+        ln -s "$compat_target" "$compat_out"
+        compat_note="$compat_out->$compat_target"
+    fi
+fi
+
 cat > "$out_dir/manifest.txt" <<EOF
 source=https://github.com/libretro/RetroArch.git
 version=$version
@@ -259,8 +300,11 @@ local_patches=$([ -s "$applied_local_patches_file" ] && tr '\n' ' ' < "$applied_
 pvr_lib_dir=$pvr_lib_dir
 sdl2_powervr_dir=$sdl2_powervr_dir
 configure=--enable-mali_fbdev --enable-egl --enable-opengles --enable-opengles3 --enable-sdl2 --enable-alsa --disable-x11 --disable-wayland --disable-kms
-output=$out_dir/usr/local/bin/retroarch-knulli
-sha256=$(awk '{print $1}' "$out_dir/retroarch-knulli.sha256")
+binary_name=$binary_name
+compat_binary=retroarch-knulli
+compat_output=$compat_note
+output=$out_dir/usr/local/bin/$binary_name
+sha256=$(awk '{print $1}' "$out_dir/$binary_name.sha256")
 EOF
 
-printf 'created: %s/usr/local/bin/retroarch-knulli\n' "$out_dir"
+printf 'created: %s/usr/local/bin/%s\n' "$out_dir" "$binary_name"

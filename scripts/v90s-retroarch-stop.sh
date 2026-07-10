@@ -47,7 +47,7 @@ process_matches() {
             comm="$(pid_comm "$pid" 2>/dev/null || true)"
             cmdline="$(pid_cmdline "$pid" 2>/dev/null || true)"
             case "$comm" in
-                retroarch|retroarch-knull|retroarch-knulli)
+                retroarch|retroarch-knull|retroarch-knulli|retroarch-powervr)
                     ;;
                 *)
                     return 1
