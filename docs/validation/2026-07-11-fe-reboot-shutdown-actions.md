@@ -359,3 +359,88 @@ b5d53ab4ee246b46fbae96d06064af34abb090bf1476acb145884e5382950797  output/app-lay
 Live deployment could not be completed because `/mnt/plumos` was already
 read-only. The next step is to repair p7 with FAT fsck from macOS or from an
 offline maintenance path, then deploy the updated helper.
+
+## Follow-up: p7 quiesce before final sysrq
+
+After p7 was repaired and remounted read-write, the helper was updated so the
+normal FE Reboot/Shutdown path quiesces the app layer before the irreversible
+sysrq action.
+
+The new final-action sequence is:
+
+1. Stop SD2 bind mounts with `plumos-sd2-content-mount stop`.
+2. `sync`.
+3. Stop known app-layer writers:
+   - V90S frontend processes.
+   - app-layer FTP server processes.
+   - app-layer Samba server processes.
+   - RetroArch and the V90S RetroArch launch wrapper.
+4. `sync` again.
+5. Remount `/mnt/plumos` read-only.
+6. Trigger direct sysrq:
+   - Reboot: `echo b >/proc/sysrq-trigger`
+   - Shutdown: `echo o >/proc/sysrq-trigger`
+
+The quiesce step deliberately does not match or stop `sshd`, `dropbear`, or the
+active SSH shell. This keeps the diagnostic SSH path outside the app-layer
+writer cleanup while still stopping services that can write to p7 during normal
+frontend-driven power actions.
+
+The behavior is enabled by default and can be disabled only for diagnostics:
+
+```text
+--quiesce
+--no-quiesce
+PLUMOS_POWER_ACTION_FINAL_QUIESCE=0
+PLUMOS_SAFE_SHUTDOWN_FINAL_QUIESCE=0
+```
+
+Local checks:
+
+```text
+sh -n package/frontend-v90s/plumos/bin/plumos-safe-shutdown
+result=dry_run_reboot
+result=dry_run_poweroff
+```
+
+Rebuilt app-layer hashes:
+
+```text
+bf9c0eeb9dec2f77592b01c77341eb57fa861e8500d1fb2f785b9c7d991eb6a8  output/app-layer/v90s/bin/plumos-safe-shutdown
+d9f4e4795757a84f5fcc5b50d01f2d96bae7db527a0c6f1d3649db4b5d553499  output/app-layer/v90s/manifest.json
+8ba1cd0e6028033b405dfde3fd37022846008f95eeb463dadf5c5163ccfc4a63  output/app-layer/v90s/checksums.sha256
+```
+
+Live deployment to `root@192.0.2.120:/mnt/plumos` completed. Verification
+from `/mnt/plumos`:
+
+```text
+bin/plumos-safe-shutdown: OK
+manifest.json: OK
+result=dry_run_reboot
+result=dry_run_poweroff
+/dev/mmcblk0p7 /mnt/plumos vfat rw,...,errors=remount-ro 0 0
+```
+
+A non-destructive live process audit using the same match rules showed that the
+current stop set is limited to app-layer writers:
+
+```text
+would_stop_pids:
+1165 ... /mnt/plumos/samba/sbin/smbd.bin ...
+1167 ... /mnt/plumos/samba/sbin/smbd.bin ...
+1168 ... /mnt/plumos/samba/sbin/smbd.bin ...
+229 /mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+740 /mnt/plumos/bin/busybox tcpsvd ... /mnt/plumos/bin/ftpd ...
+
+ssh_pids:
+757 sshd: ... [listener]
+1263 sshd: root@notty
+```
+
+Actual Reboot/Shutdown was not triggered by Codex. The remaining validation is a
+user-side FE Reboot followed by checking that the next boot no longer reports:
+
+```text
+FAT-fs (mmcblk0p7): Volume was not properly unmounted.
+```

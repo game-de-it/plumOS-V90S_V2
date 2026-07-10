@@ -17,6 +17,7 @@ SLEEP_BACKEND="${PLUMOS_POWER_ACTION_SLEEP_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_SLEEP
 WAKEUP_SEC="${PLUMOS_POWER_ACTION_SLEEP_WAKEUP_SEC:-${PLUMOS_SAFE_SLEEP_WAKEUP_SEC:-0}}"
 WAIT_SEC="${PLUMOS_POWER_ACTION_WAIT_SEC:-${PLUMOS_SAFE_SHUTDOWN_WAIT_SEC:-1}}"
 FINAL_WATCHDOG_SEC="${PLUMOS_POWER_ACTION_FINAL_WATCHDOG_SEC:-${PLUMOS_SAFE_SHUTDOWN_FINAL_WATCHDOG_SEC:-3}}"
+FINAL_QUIESCE="${PLUMOS_POWER_ACTION_FINAL_QUIESCE:-${PLUMOS_SAFE_SHUTDOWN_FINAL_QUIESCE:-1}}"
 
 usage() {
   cat <<'USAGE'
@@ -35,6 +36,8 @@ Options:
   --no-hold-resume       Accepted for compatibility; no-op.
   --dry-run              Log actions without rebooting, sleeping, or powering off.
   --wait-sec N           Small delay after sync before final action. Default: 1.
+  --quiesce              Stop app-layer writers and remount /mnt/plumos read-only before final action. Default.
+  --no-quiesce           Skip app-layer quiesce before final action.
   -h, --help             Show this help.
 USAGE
 }
@@ -113,6 +116,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --dry-run)
       DRY_RUN=1
+      ;;
+    --quiesce)
+      FINAL_QUIESCE=1
+      ;;
+    --no-quiesce)
+      FINAL_QUIESCE=0
       ;;
     -h|--help)
       usage
@@ -234,6 +243,107 @@ safe_unmount_sd2() {
   fi
 }
 
+mounted_opts_for_path() {
+  path="$1"
+  awk -v p="$path" '$2 == p { print $4; found=1 } END { exit found ? 0 : 1 }' /proc/mounts 2>/dev/null
+}
+
+pid_cmdline() {
+  pid="$1"
+  tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true
+}
+
+pid_matches_app_layer_writer() {
+  pid="$1"
+  cmdline="$(pid_cmdline "$pid")"
+  case "$cmdline" in
+    *"$PLUMOS_ROOT/bin/plumos-controller-ui-fbdev"*|\
+    *"$PLUMOS_ROOT/bin/plumos-controller-ui-v90s"*|\
+    *"$PLUMOS_ROOT/bin/plumos-frontend-launch"*|\
+    *"$PLUMOS_ROOT/bin/busybox tcpsvd "*|\
+    *"$PLUMOS_ROOT/bin/tcpsvd "*|\
+    *"$PLUMOS_ROOT/bin/busybox ftpd "*|\
+    *"$PLUMOS_ROOT/bin/ftpd "*|\
+    *"$PLUMOS_ROOT/samba/sbin/smbd.bin"*|\
+    *"$PLUMOS_ROOT/samba/sbin/nmbd"*|\
+    *"$PLUMOS_ROOT/bin/v90s-retroarch-launch"*|\
+    *"$PLUMOS_ROOT/bin/retroarch"*|\
+    *" --config $PLUMOS_ROOT/config/retroarch/retroarch-v90s.cfg "*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+stop_app_layer_writers() {
+  pids=""
+  for proc in /proc/[0-9]*; do
+    pid="${proc##*/}"
+    [ "$pid" != "$$" ] || continue
+    [ -r "$proc/cmdline" ] || continue
+    if pid_matches_app_layer_writer "$pid"; then
+      pids="${pids}${pids:+ }$pid"
+    fi
+  done
+
+  if [ -z "$pids" ]; then
+    log "quiesce: no app-layer writers found"
+    return 0
+  fi
+
+  log "quiesce: TERM pids=$pids"
+  for pid in $pids; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 1 2>/dev/null || true
+
+  still_alive=""
+  for pid in $pids; do
+    if kill -0 "$pid" 2>/dev/null; then
+      still_alive="${still_alive}${still_alive:+ }$pid"
+    fi
+  done
+  if [ -n "$still_alive" ]; then
+    log "quiesce: KILL pids=$still_alive"
+    for pid in $still_alive; do
+      kill -KILL "$pid" 2>/dev/null || true
+    done
+    sleep 1 2>/dev/null || true
+  fi
+}
+
+remount_app_layer_ro() {
+  opts="$(mounted_opts_for_path "$PLUMOS_ROOT" || true)"
+  if [ -z "$opts" ]; then
+    log "quiesce: app-layer mount not found root=$PLUMOS_ROOT"
+    return 1
+  fi
+  case ",$opts," in
+    *,ro,*)
+      log "quiesce: app-layer already read-only opts=$opts"
+      return 0
+      ;;
+  esac
+
+  log "quiesce: remount-ro begin opts=$opts"
+  sync 2>/dev/null || true
+  if mount -o remount,ro "$PLUMOS_ROOT" 2>/dev/null; then
+    return 0
+  fi
+  log "quiesce: remount-ro failed"
+  return 1
+}
+
+quiesce_app_layer_for_final_action() {
+  [ "$FINAL_QUIESCE" = "1" ] || { log "quiesce: disabled"; return 0; }
+  [ "$DRY_RUN" -eq 0 ] || { log "quiesce: dry-run"; return 0; }
+
+  log "quiesce: begin root=$PLUMOS_ROOT"
+  stop_app_layer_writers
+  safe_sync
+  remount_app_layer_ro || true
+}
+
 set_wakealarm() {
   [ "$WAKEUP_SEC" -gt 0 ] || return 0
   [ -e /sys/class/rtc/rtc0/wakealarm ] || return 0
@@ -302,6 +412,7 @@ reboot_action() {
     echo "result=dry_run_reboot"
     return 0
   fi
+  quiesce_app_layer_for_final_action
   trigger_sysrq b reboot ||
     {
       log "reboot: failed_all_backends"
@@ -323,6 +434,7 @@ shutdown_action() {
     echo "result=dry_run_poweroff"
     return 0
   fi
+  quiesce_app_layer_for_final_action
   if [ "$POWER_BACKEND" = auto ]; then
     try_poweroff sysrq ||
       {

@@ -245,8 +245,10 @@ Build plumOS V90S as a V90S-specific distribution:
   and sync, because BusyBox `reboot` / `poweroff` can return or hang on V90S.
 - [x] Repair and revalidate the p7 FAT32 app layer after the kernel remounted
   `/mnt/plumos` read-only due to FAT corruption.
-- [ ] Improve FE Reboot/Shutdown further so p7 `PLUMOS` is cleanly quiesced
-  before final sysrq and does not boot with the FAT dirty warning.
+- [x] Improve FE Reboot/Shutdown so app-layer writers are stopped and p7
+  `PLUMOS` is remounted read-only before final sysrq reboot/poweroff.
+- [ ] Validate that a user-side FE Reboot no longer leaves p7 `PLUMOS` with
+  the FAT dirty warning on the next boot.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout

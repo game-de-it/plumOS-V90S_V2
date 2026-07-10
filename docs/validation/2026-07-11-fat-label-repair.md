@@ -186,3 +186,15 @@ so the live state is usable. However, the warning means the power-action path
 should be improved further: before the final sysrq reboot/poweroff, plumOS
 should stop app-layer writers and remount or otherwise cleanly quiesce p7 so
 the FAT dirty bit is not left set.
+
+## Follow-up: quiesce countermeasure deployed
+
+The FE Reboot/Shutdown helper was updated and deployed after this live check.
+Before final sysrq reboot/poweroff it now stops known app-layer writers, keeps
+the SSH diagnostic path out of the kill list, syncs, and remounts
+`/mnt/plumos` read-only. Detailed implementation and deployment evidence are in
+`docs/validation/2026-07-11-fe-reboot-shutdown-actions.md`.
+
+The next proof point is a user-side FE Reboot followed by checking that p7
+`PLUMOS` mounts read-write and the boot log no longer contains the FAT dirty
+warning.
