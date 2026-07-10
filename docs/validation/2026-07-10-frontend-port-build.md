@@ -454,3 +454,75 @@ Still requiring physical validation:
 - confirm V90S d-pad moves the FE cursor
 - confirm A/B/START/SELECT still map correctly in the FE
 - confirm launching and returning from RetroArch leaves one FE process
+
+User follow-up confirmed that the V90S d-pad moves the FE cursor.
+
+## Formal fbdev Frontend Design Pass
+
+The first V90S frontend screen was still effectively a development text view.
+Even though `config/frontend/settings.json` selected `graphic` mode, the V90S
+fbdev renderer was not marked as graphic-capable and its renderer drew internal
+line protocol text directly.
+
+The fbdev frontend now treats V90S as a graphic frontend target while still
+using only `/dev/fb0`. The renderer consumes the existing frontend line protocol
+instead of exposing it:
+
+```text
+graphic_mode=top
+graphic_mode=roms
+graphic_mode=favorites
+graphic_mode=recent
+graphic_mode=gallery
+graphic_entry<TAB>selected<TAB>title<TAB>detail<TAB>media
+graphic_theme_color<TAB>name<TAB>#rrggbb
+```
+
+Visible layout behavior:
+
+```text
+TOP       -> plumOS/V90S shell, SYSTEMS heading, selected system tiles
+ROM lists -> plumOS/V90S shell, system heading, ROM list, selected detail panel
+menus     -> plumOS/V90S shell, formal list view with internal metadata hidden
+```
+
+The fbdev renderer intentionally does not draw the old shortcut/help strings or
+the `graphic_*` protocol rows. It also does not run a continuous 16 ms refresh
+loop on static fbdev screens; periodic refresh is retained only for rescue
+network and background ROM scan status.
+
+Host rebuild:
+
+```text
+./scripts/docker-build.sh frontend
+./scripts/docker-build.sh app-layer --strict
+```
+
+Result:
+
+```text
+created: output/frontend/v90s
+created: output/app-layer/v90s
+sha256sum -c output/app-layer/v90s/checksums.sha256: OK
+```
+
+The rebuilt frontend binary is still the expected V90S target:
+
+```text
+output/app-layer/v90s/bin/plumos-controller-ui-fbdev:
+ELF 64-bit LSB pie executable, ARM aarch64
+```
+
+Live deployment was not completed during this pass because the previously known
+SSH address was no longer reachable:
+
+```text
+root@192.0.2.120: port 22 timed out
+192.0.2.100: ping OK, port 22 open, but SSH banner timed out
+192.0.2.108: ping OK, port 22 refused
+```
+
+The next live validation step is to reconnect V90S SSH, copy
+`output/app-layer/v90s` to `/mnt/plumos` without deleting ROMs/Saves, restart
+only the validated frontend PID from `/run/plumos-v90s/frontend.pid`, and capture
+`/dev/fb0` for visual proof.

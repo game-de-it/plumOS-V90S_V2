@@ -7371,7 +7371,11 @@ static void clear_screen(struct ui_state *ui) {
 }
 
 static int ui_renderer_graphic_capable(const struct ui_state *ui) {
-  return ui && (ui->renderer_mali || ui->renderer_mmf_gfx);
+  return ui && (ui->renderer_mali || ui->renderer_fbdev || ui->renderer_mmf_gfx);
+}
+
+static int ui_renderer_fbdev_only(const struct ui_state *ui) {
+  return ui && ui->renderer_fbdev && !ui->renderer_mali && !ui->renderer_mmf_gfx;
 }
 
 static int ui_renderer_a30_tty_capable(const struct ui_state *ui) {
@@ -13684,6 +13688,9 @@ static int ui_needs_periodic_refresh(const struct ui_state *ui) {
   if (!ui) {
     return 0;
   }
+  if (ui_renderer_fbdev_only(ui)) {
+    return ui->rescue_network || ui->rom_scan_refresh_pid > 0;
+  }
   if (ui->rescue_network) {
     return 1;
   }
@@ -13711,6 +13718,12 @@ static int ui_needs_periodic_refresh(const struct ui_state *ui) {
 static int ui_periodic_refresh_interval_ms(const struct ui_state *ui) {
   if (!ui) {
     return 0;
+  }
+  if (ui_renderer_fbdev_only(ui)) {
+    if (ui->rom_scan_refresh_pid > 0) {
+      return 250;
+    }
+    return ui->rescue_network ? 1000 : 0;
   }
   if (ui_renderer_graphic_capable(ui) && ui->top_transition_active) {
     return 16;

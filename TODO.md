@@ -191,7 +191,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Generate app-layer `checksums.sha256`.
 - [x] Add boot/frontend startup checks for app-layer metadata in the
   development init path.
-- [ ] Validate frontend boot on real V90S hardware.
+- [x] Validate frontend boot on real V90S hardware.
+- [ ] Live-validate the formal V90S fbdev frontend design after SSH reconnect,
+  including a `/dev/fb0` capture and single-frontend-process check.
 
 ## Milestone 5: SD Image Layout
 
