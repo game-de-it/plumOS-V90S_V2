@@ -199,6 +199,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba network service payloads into the app layer.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network
   services are reachable from the frontend.
+- [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
+  Mac client.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

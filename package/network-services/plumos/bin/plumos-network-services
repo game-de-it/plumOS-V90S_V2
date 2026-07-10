@@ -7,6 +7,9 @@ SHARE_DIR="${PLUMOS_NETWORK_SHARE_DIR:-${PLUMOS_SDCARD_ROOT}}"
 RUN_DIR="${PLUMOS_ROOT}/run"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 CONFIG_DIR="${PLUMOS_ROOT}/config/network"
+SAMBA_RUNTIME_DIR="${PLUMOS_SAMBA_RUNTIME_DIR:-/tmp/plumos-samba}"
+SAMBA_PRIVATE_DIR="${SAMBA_RUNTIME_DIR}/private"
+SAMBA_LOG_DIR="${SAMBA_RUNTIME_DIR}/log"
 FTP_PORT="${PLUMOS_FTP_PORT:-21}"
 TRANSFER_MAX_CONNECTIONS="${PLUMOS_TRANSFER_MAX_CONNECTIONS:-20}"
 SMB_CONF="${CONFIG_DIR}/smb.conf"
@@ -338,16 +341,18 @@ stop_sftp() {
 }
 
 write_smb_conf() {
-  mkdir -p "${CONFIG_DIR}/samba-private" \
-    /tmp/plumos-samba/lock \
-    /tmp/plumos-samba/state \
-    /tmp/plumos-samba/cache \
-    /tmp/plumos-samba/ncalrpc
-  cat > "${CONFIG_DIR}/smbpasswd" <<EOF
+  mkdir -p "$SAMBA_PRIVATE_DIR" \
+    "$SAMBA_LOG_DIR" \
+    "${SAMBA_RUNTIME_DIR}/lock" \
+    "${SAMBA_RUNTIME_DIR}/state" \
+    "${SAMBA_RUNTIME_DIR}/cache" \
+    "${SAMBA_RUNTIME_DIR}/ncalrpc"
+  chmod 0700 "$SAMBA_PRIVATE_DIR" "$SAMBA_LOG_DIR" 2>/dev/null || true
+  cat > "${SAMBA_PRIVATE_DIR}/smbpasswd" <<EOF
 root:0:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:4F26822B803282B051EF3A3CD7A5F58D:[U          ]:LCT-FFFFFFFF:
 EOF
-  chmod 0600 "${CONFIG_DIR}/smbpasswd" 2>/dev/null || true
-  cat > "${CONFIG_DIR}/smbusers" <<EOF
+  chmod 0600 "${SAMBA_PRIVATE_DIR}/smbpasswd" 2>/dev/null || true
+  cat > "${SAMBA_PRIVATE_DIR}/smbusers" <<EOF
 root = plumos
 EOF
   cat > "$SMB_CONF" <<EOF
@@ -357,8 +362,8 @@ EOF
    server string = plumOS V90S
    server role = standalone server
    security = user
-   passdb backend = smbpasswd:${CONFIG_DIR}/smbpasswd
-   username map = ${CONFIG_DIR}/smbusers
+   passdb backend = smbpasswd:${SAMBA_PRIVATE_DIR}/smbpasswd
+   username map = ${SAMBA_PRIVATE_DIR}/smbusers
    encrypt passwords = yes
    map to guest = Never
    guest account = root
@@ -373,12 +378,12 @@ EOF
    disable netbios = yes
    bind interfaces only = no
    pid directory = ${RUN_DIR}
-   lock directory = /tmp/plumos-samba/lock
-   state directory = /tmp/plumos-samba/state
-   cache directory = /tmp/plumos-samba/cache
-   ncalrpc dir = /tmp/plumos-samba/ncalrpc
-   private dir = ${CONFIG_DIR}/samba-private
-   log file = ${LOG_DIR}/samba-%m.log
+   lock directory = ${SAMBA_RUNTIME_DIR}/lock
+   state directory = ${SAMBA_RUNTIME_DIR}/state
+   cache directory = ${SAMBA_RUNTIME_DIR}/cache
+   ncalrpc dir = ${SAMBA_RUNTIME_DIR}/ncalrpc
+   private dir = ${SAMBA_PRIVATE_DIR}
+   log file = ${SAMBA_LOG_DIR}/samba-%m.log
    max log size = 256
 
 [SDCARD]
