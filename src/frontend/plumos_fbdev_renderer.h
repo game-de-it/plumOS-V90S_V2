@@ -31,6 +31,11 @@ struct plumos_fbdev_renderer {
   int bytes_per_pixel;
   int rotation_180;
   long active_offset;
+  long visible_offset;
+  long frame_bytes;
+  uint32_t visible_yoffset;
+  uint32_t draw_yoffset;
+  int double_buffer;
   struct fb_var_screeninfo var;
   struct fb_fix_screeninfo fix;
 };
@@ -106,6 +111,80 @@ static void plumos_fbdev_fill_rect(struct plumos_fbdev_renderer *r, int x, int y
       plumos_fbdev_put_pixel(r, xx, yy, color);
     }
   }
+}
+
+static int plumos_fbdev_frame_offset_valid(const struct plumos_fbdev_renderer *r,
+                                           long offset) {
+  return r && offset >= 0 && r->frame_bytes > 0 &&
+         offset + r->frame_bytes <= (long)r->map_size;
+}
+
+static long plumos_fbdev_yoffset_to_offset(const struct plumos_fbdev_renderer *r,
+                                           uint32_t yoffset) {
+  if (!r) {
+    return -1;
+  }
+  return (long)yoffset * (long)r->fix.line_length;
+}
+
+static void plumos_fbdev_wait_vsync(struct plumos_fbdev_renderer *r) {
+#ifdef FBIO_WAITFORVSYNC
+  int arg = 0;
+
+  if (r && r->fd >= 0) {
+    (void)ioctl(r->fd, FBIO_WAITFORVSYNC, &arg);
+  }
+#else
+  (void)r;
+#endif
+}
+
+static int plumos_fbdev_present(struct plumos_fbdev_renderer *r) {
+  struct fb_var_screeninfo next_var;
+  uint32_t next_draw_yoffset;
+  long next_draw_offset;
+
+  if (!r || !r->mem) {
+    return 0;
+  }
+  if (!r->double_buffer) {
+    return 1;
+  }
+
+  next_var = r->var;
+  next_var.xoffset = 0;
+  next_var.yoffset = r->draw_yoffset;
+#ifdef FB_ACTIVATE_VBL
+  next_var.activate = FB_ACTIVATE_VBL;
+#endif
+
+  plumos_fbdev_wait_vsync(r);
+  if (ioctl(r->fd, FBIOPAN_DISPLAY, &next_var) != 0) {
+    if (plumos_fbdev_frame_offset_valid(r, r->visible_offset) &&
+        r->visible_offset != r->active_offset) {
+      memcpy(r->mem + r->visible_offset, r->mem + r->active_offset,
+             (size_t)r->frame_bytes);
+      r->active_offset = r->visible_offset;
+    }
+    r->double_buffer = 0;
+    return 0;
+  }
+
+  r->var = next_var;
+  r->visible_yoffset = r->draw_yoffset;
+  r->visible_offset = r->active_offset;
+  next_draw_yoffset = r->visible_yoffset == 0 ? r->var.yres : 0;
+  next_draw_offset = plumos_fbdev_yoffset_to_offset(r, next_draw_yoffset);
+  if (!plumos_fbdev_frame_offset_valid(r, next_draw_offset) ||
+      next_draw_yoffset + r->var.yres > r->var.yres_virtual) {
+    r->double_buffer = 0;
+    r->active_offset = r->visible_offset;
+    r->draw_yoffset = r->visible_yoffset;
+    return 1;
+  }
+  r->draw_yoffset = next_draw_yoffset;
+  r->active_offset = next_draw_offset;
+  return 1;
 }
 
 #ifdef PLUMOS_FBDEV_ENABLE_PNG
@@ -1358,6 +1437,9 @@ static int plumos_fbdev_renderer_init(struct plumos_fbdev_renderer *r,
                                       const char *fb_path, char *error,
                                       size_t error_size) {
   long map_size;
+  long visible_offset;
+  long draw_offset;
+  const char *double_buffer_env;
   const char *path = fb_path && fb_path[0] ? fb_path : "/dev/fb0";
 
   if (!r) {
@@ -1389,16 +1471,35 @@ static int plumos_fbdev_renderer_init(struct plumos_fbdev_renderer *r,
   }
   map_size = r->fix.smem_len ? (long)r->fix.smem_len
                              : (long)r->fix.line_length * (long)r->var.yres_virtual;
-  r->active_offset = (long)r->var.yoffset * (long)r->fix.line_length +
-                     (long)r->var.xoffset * (long)r->bytes_per_pixel;
-  if (map_size <= 0 || r->active_offset < 0 ||
-      r->active_offset + (long)r->fix.line_length * (long)r->var.yres > map_size) {
+  r->frame_bytes = (long)r->fix.line_length * (long)r->var.yres;
+  r->visible_yoffset = r->var.yoffset;
+  visible_offset = (long)r->visible_yoffset * (long)r->fix.line_length +
+                   (long)r->var.xoffset * (long)r->bytes_per_pixel;
+  r->visible_offset = visible_offset;
+  r->active_offset = visible_offset;
+  r->draw_yoffset = r->visible_yoffset;
+  if (map_size <= 0 || r->visible_offset < 0 ||
+      r->visible_offset + r->frame_bytes > map_size) {
     snprintf(error, error_size, "invalid fb active page");
     close(r->fd);
     r->fd = -1;
     return 0;
   }
   r->map_size = (size_t)map_size;
+  double_buffer_env = getenv("PLUMOS_FBDEV_DOUBLE_BUFFER");
+  if ((!double_buffer_env || strcmp(double_buffer_env, "0") != 0) &&
+      r->var.yres_virtual >= r->var.yres * 2U &&
+      r->var.yoffset + r->var.yres <= r->var.yres_virtual) {
+    r->draw_yoffset = r->var.yoffset < r->var.yres ? r->var.yres : 0;
+    draw_offset = plumos_fbdev_yoffset_to_offset(r, r->draw_yoffset);
+    if (plumos_fbdev_frame_offset_valid(r, draw_offset) &&
+        r->draw_yoffset + r->var.yres <= r->var.yres_virtual) {
+      r->active_offset = draw_offset;
+      r->double_buffer = 1;
+    } else {
+      r->draw_yoffset = r->visible_yoffset;
+    }
+  }
   r->mem = mmap(NULL, r->map_size, PROT_READ | PROT_WRITE, MAP_SHARED, r->fd, 0);
   if (r->mem == MAP_FAILED) {
     r->mem = NULL;
@@ -1443,7 +1544,10 @@ static int plumos_fbdev_render_lines(struct plumos_fbdev_renderer *r,
   } else {
     ok = plumos_fbdev_render_generic(r, lines, line_count, &palette);
   }
-  msync(r->mem, r->map_size, MS_SYNC);
+  msync(r->mem, r->map_size, MS_ASYNC);
+  if (ok) {
+    plumos_fbdev_present(r);
+  }
   return ok;
 }
 
