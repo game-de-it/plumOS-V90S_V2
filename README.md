@@ -24,6 +24,8 @@ Step 1 は `plumos-v90s-armbian-step1-20260709-15-fb-text-fat-logs.img` で達�
   自由に設定変更できる plumOS runtime を作る方向にします。
 
 V90S Docker build 方針は `docs/v90s-docker-build-plan.md` に記録しています。
+ディストリビューション全体の意思決定は
+`docs/plumos-v90s-distribution-policy.md` に追記していきます。
 入口は MMF と同じように `scripts/docker-build.sh` です。
 
 ## Host status
