@@ -77,11 +77,17 @@ That bridge translates the MMF frontend launch contract into the existing V90S
 RetroArch launcher environment:
 
 ```text
-PLUMOS_V90S_RETROARCH_BIN=/mnt/plumos/bin/retroarch
+PLUMOS_V90S_RETROARCH_BIN=/usr/local/bin/retroarch
 PLUMOS_V90S_CORE=/mnt/plumos/cores/quicknes_libretro.so
+PLUMOS_V90S_ROUTE_CONFIG=/mnt/plumos/config/retroarch/plumos-v90s-retroarch-route
 PLUMOS_V90S_RETROARCH_CONFIG_PATH=/mnt/plumos/config/retroarch/retroarch-v90s.cfg
 PLUMOS_V90S_SDL2_POWERVR_DIR=/mnt/plumos/lib/plumos-sdl2-powervr
 ```
+
+The current FE bridge intentionally uses the vendor/rootfs RetroArch binary at
+`/usr/local/bin/retroarch`. The app-layer RetroArch binary exists as a packaged
+artifact, but this live rootfs does not yet provide its complete dependency
+closure (`libpipewire-0.3.so.0` was missing during live validation).
 
 The default NES system uses:
 
@@ -226,7 +232,7 @@ root@192.0.2.120:/mnt/plumos
 Remote inventory after deployment:
 
 ```text
-files=334
+files=335
 sha256sum -c checksums.sha256: OK
 ```
 
@@ -304,9 +310,98 @@ can_execute: yes
 execute: no (--execute not specified)
 ```
 
+## Frontend RetroArch Audio Regression
+
+The first FE-launched NES run regressed to the old audio breakup behavior.
+The cause was not the documented StockOS timing values themselves. They were
+present in the repo, but the FE launch path was still allowing the older rootfs
+route file to override them:
+
+```text
+/etc/plumos-v90s-retroarch-route
+PLUMOS_V90S_VIDEO_THREADED=false
+```
+
+The resulting live launch log showed:
+
+```text
+retroarch-launch: route video=gl context=mali_fbdev threaded=false \
+  input=sdl2 joypad=sdl2 audio=alsa sdl_video=mali sdl_render=software
+```
+
+The persistent RetroArch config also had to be repaired because
+`v90s-retroarch-launch` reuses an existing config instead of rewriting it on
+every launch:
+
+```text
+/mnt/plumos/config/retroarch/retroarch-v90s.cfg
+video_threaded = "false"
+```
+
+The fix is to keep the FE/app-layer path independent of the rootfs `/etc`
+route file:
+
+```text
+PLUMOS_V90S_ROUTE_CONFIG=/mnt/plumos/config/retroarch/plumos-v90s-retroarch-route
+```
+
+That app-layer route file preserves explicit overrides but defaults to the
+StockOS-derived known-good route:
+
+```text
+PLUMOS_V90S_RETROARCH_BIN=/usr/local/bin/retroarch
+PLUMOS_V90S_VIDEO_DRIVER=gl
+PLUMOS_V90S_VIDEO_CONTEXT_DRIVER=mali_fbdev
+PLUMOS_V90S_VIDEO_THREADED=true
+PLUMOS_V90S_VIDEO_REFRESH_RATE=58.917103
+PLUMOS_V90S_VRR_RUNLOOP_ENABLE=true
+PLUMOS_V90S_AUDIO_DRIVER=alsa
+PLUMOS_V90S_AUDIO_LATENCY=64
+```
+
+The live device was updated over SSH without deleting ROMs/Saves. The existing
+RetroArch config was patched to the same known-good values:
+
+```text
+video_refresh_rate = "58.917103"
+video_threaded = "true"
+threaded_data_runloop_enable = "true"
+vrr_runloop_enable = "true"
+video_vsync = "true"
+video_swap_interval = "1"
+audio_driver = "alsa"
+audio_device = "hw:0,0"
+audio_latency = "64"
+audio_sync = "true"
+```
+
+Post-fix live launch proof:
+
+```text
+retroarch-launch: route_config=/mnt/plumos/config/retroarch/plumos-v90s-retroarch-route present=yes
+retroarch-launch: retroarch_bin=/usr/local/bin/retroarch
+retroarch-launch: route video=gl context=mali_fbdev threaded=true input=sdl2 joypad=sdl2 audio=alsa sdl_video=mali sdl_render=software
+```
+
+RetroArch then stayed running:
+
+```text
+/usr/local/bin/retroarch --verbose --config /mnt/plumos/config/retroarch/retroarch-v90s.cfg \
+  -L /mnt/plumos/cores/quicknes_libretro.so \
+  /mnt/plumos/Roms/nes/Super Mario Bros..nes
+```
+
+Important RetroArch log lines:
+
+```text
+[INFO] [Video] Starting threaded video driver...
+[INFO] [Audio] Set audio input rate to: 44100.00 Hz.
+[INFO] [Audio] Started synchronous audio driver.
+```
+
 Still requiring physical validation:
 
 - V90S built-in controls navigate the frontend
-- pressing the frontend open button launches the NES ROM
+- pressing the frontend open button launches the NES ROM with continuous audio
 - returning from RetroArch restores frontend control
 - RetroArch settings persist under `/mnt/plumos/config/retroarch`

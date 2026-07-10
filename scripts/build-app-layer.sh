@@ -215,6 +215,29 @@ if require_or_note_missing "$retroarch_config_src" "retroarch-config"; then
     record_file "config/retroarch/v90s-powervr-quicknes.cfg" "retroarch-config" "$retroarch_config_src"
 fi
 
+cat > "$out_dir/config/retroarch/plumos-v90s-retroarch-route" <<'EOF'
+# plumOS V90S app-layer RetroArch route defaults.
+#
+# This file is sourced by bin/v90s-retroarch-launch when FE/app-layer launchers
+# set PLUMOS_V90S_ROUTE_CONFIG. Use default assignments so explicit user or
+# launcher environment overrides remain possible.
+
+: "${PLUMOS_V90S_RETROARCH_BIN:=/usr/local/bin/retroarch}"
+: "${PLUMOS_V90S_VIDEO_DRIVER:=gl}"
+: "${PLUMOS_V90S_VIDEO_CONTEXT_DRIVER:=mali_fbdev}"
+: "${PLUMOS_V90S_VIDEO_THREADED:=true}"
+: "${PLUMOS_V90S_VIDEO_REFRESH_RATE:=58.917103}"
+: "${PLUMOS_V90S_VRR_RUNLOOP_ENABLE:=true}"
+: "${PLUMOS_V90S_INPUT_DRIVER:=sdl2}"
+: "${PLUMOS_V90S_JOYPAD_DRIVER:=sdl2}"
+: "${PLUMOS_V90S_AUDIO_DRIVER:=alsa}"
+: "${PLUMOS_V90S_AUDIO_LATENCY:=64}"
+: "${PLUMOS_V90S_SDL_VIDEODRIVER:=mali}"
+: "${PLUMOS_V90S_SDL_RENDER_DRIVER:=software}"
+EOF
+chmod 0644 "$out_dir/config/retroarch/plumos-v90s-retroarch-route"
+record_file "config/retroarch/plumos-v90s-retroarch-route" "retroarch-route" "generated"
+
 retroarch_src="$retroarch_dir/usr/local/bin/$retroarch_bin"
 if require_or_note_missing "$retroarch_src" "retroarch"; then
     copy_exec "$retroarch_src" "$out_dir/bin/retroarch"
