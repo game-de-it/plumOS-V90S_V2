@@ -7,7 +7,7 @@ out_dir="output/images"
 image_name="plumos-v90s-stockos-smoke.img"
 volumn_vfat_size="33M"
 batocera_boot_size="33M"
-share_size="64M"
+share_size="1024M"
 app_layer_dir="${PLUMOS_V90S_APP_LAYER_DIR:-}"
 boot0_img=""
 boot_package_img=""
@@ -34,7 +34,7 @@ Options:
   --volumn-vfat-size N  p1 boot-resource/Volumn FAT size, default 33M
   --batocera-boot-size N
                         p6 rootfs/BATOCERA ext4 size, default 33M
-  --share-size N        p7 rootfs_data/SHARE ext4 size, default 64M
+  --share-size N        p7 rootfs_data/SHARE FAT32 size, default 1024M
   --app-layer-dir PATH  copy a built plumOS app layer into p7 SHARE
   --boot0 PATH          raw Allwinner boot0 image; default vendor runtime if present,
                         otherwise requires --allow-knulli-boot-fallback
@@ -56,7 +56,7 @@ This assembles the StockOS/Batocera partition contract observed on V90S:
   p4 boot Android boot image
   p5 batocera squashfs
   p6 rootfs / BATOCERA ext4
-  p7 rootfs_data / SHARE ext4
+  p7 rootfs_data / SHARE FAT32
 USAGE
 }
 
@@ -241,7 +241,7 @@ rm -f "$out_dir/$image_name" "$manifest" \
     "$out_dir/plumos-v90s-stockos.img" \
     "$out_dir/volumn.vfat" \
     "$out_dir/batocera-boot.ext4" \
-    "$out_dir/share.ext4"
+    "$out_dir/share.vfat"
 
 rsync -a "$volumn_src"/ "$root_dir/volumn"/
 if [ "$include_stock_overlay" -eq 1 ]; then
@@ -298,11 +298,9 @@ image batocera-boot.ext4 {
         mountpoint = "/batocera"
 }
 
-image share.ext4 {
-        ext4 {
-                label = "SHARE"
-                use-mke2fs = "true"
-                extraargs = "-m 0 -O ^metadata_csum"
+image share.vfat {
+        vfat {
+                extraargs = "-F 32 -n SHARE"
         }
         size = "$share_size"
         mountpoint = "/share"
@@ -354,7 +352,7 @@ image plumos-v90s-stockos.img {
 
         partition rootfs_data {
                 partition-type-uuid = "F"
-                image = "share.ext4"
+                image = "share.vfat"
         }
 }
 EOF
@@ -370,12 +368,14 @@ if [ -f "$out_dir/plumos-v90s-stockos.img" ]; then
     mv "$out_dir/plumos-v90s-stockos.img" "$out_dir/$image_name"
 fi
 
-rm -f "$out_dir/volumn.vfat" "$out_dir/batocera-boot.ext4" "$out_dir/share.ext4"
+rm -f "$out_dir/volumn.vfat" "$out_dir/batocera-boot.ext4" "$out_dir/share.vfat"
 
 sha256_img="$(sha256sum "$out_dir/$image_name" | awk '{print $1}')"
 sha256_rootfs="$(sha256sum "$rootfs_squashfs" | awk '{print $1}')"
 sha256_p5="$(sha256sum "$input_dir/batocera-rootfs.squashfs" | awk '{print $1}')"
 sha256_boot="$(sha256sum "$raw_dir/mmcblk0p4-boot.bin" | awk '{print $1}')"
+sha256_boot0="$(sha256sum "$boot0_img" | awk '{print $1}')"
+sha256_boot_package="$(sha256sum "$boot_package_img" | awk '{print $1}')"
 vendor_runtime_id=unknown
 vendor_manifest="$vendor_runtime/vendor-runtime.manifest"
 vendor_manifest_sha256=none
@@ -398,8 +398,10 @@ p5_batocera_squashfs_sha256=$sha256_p5
 rootfs_repacked_for_stockos_init=$repack_rootfs
 boot0=$boot0_img
 boot0_source=$boot0_source
+boot0_sha256=$sha256_boot0
 boot_package=$boot_package_img
 boot_package_source=$boot_package_source
+boot_package_sha256=$sha256_boot_package
 allow_knulli_boot_fallback=$allow_knulli_boot_fallback
 stockos_boot_partition=$raw_dir/mmcblk0p4-boot.bin
 stockos_boot_partition_sha256=$sha256_boot
@@ -409,7 +411,7 @@ share_size=$share_size
 app_layer_dir=${app_layer_dir:-none}
 app_layer_manifest_sha256=$app_layer_manifest_sha256
 include_stock_overlay=$include_stock_overlay
-partitions=p1:boot-resource/Volumn,p2:env,p3:env-redund,p4:boot,p5:batocera,p6:rootfs/BATOCERA,p7:rootfs_data/SHARE
+partitions=p1:boot-resource/Volumn,p2:env,p3:env-redund,p4:boot,p5:batocera,p6:rootfs/BATOCERA,p7:rootfs_data/SHARE-FAT32
 notice=Uses POWKIDDY V90S StockOS/Batocera-derived runtime inputs. KNULLI boot0/boot_package assets are used only when --allow-knulli-boot-fallback is passed and raw StockOS boot-chain captures are absent.
 EOF
 

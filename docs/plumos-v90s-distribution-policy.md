@@ -237,7 +237,7 @@ p3 env-redund
 p4 boot Android boot image
 p5 batocera squashfs
 p6 rootfs / BATOCERA ext4
-p7 rootfs_data / SHARE ext4
+p7 rootfs_data / SHARE, StockOS observed as ext4; plumOS development images use FAT32
 ```
 
 Current boot policy:
@@ -293,7 +293,10 @@ The app layer should be mounted at a stable path such as:
 ```
 
 The exact partition used for this FAT32 app layer is still a hardware
-validation item. The intended direction is:
+validation item for release images. The current development direction is to use
+p7 `rootfs_data` / `SHARE` as a 1GB FAT32 app/update/data partition so the full
+generated app layer can be carried in a single SD image. The intended release
+direction remains:
 
 ```text
 p1-p4: keep StockOS boot contract
@@ -309,8 +312,10 @@ The chosen FAT32 app-layer partition must be sized from the generated payload,
 not from the early boot-test image. The July 11 live V90S p7 was only about
 55MB, which is enough for a targeted FE/RA/Wi-Fi update but too small for the
 current full app-layer output that includes userland and network-service
-payloads. Either increase the final FAT32 app-layer capacity or split optional
-payloads before treating full app-layer metadata as deployable to that partition.
+payloads. The StockOS-compatible development assembler now defaults p7 to a
+1024MB FAT32 `SHARE` image. If the generated app layer grows past that budget,
+increase the partition size deliberately or split optional payloads before
+treating full app-layer metadata as deployable to that partition.
 
 FAT32 limitations must be treated as part of the ABI:
 
@@ -591,9 +596,11 @@ release_or_dev_profile
 The image assembler should keep p1 through p4 compatible with StockOS until
 there is real-device evidence that they can be changed. p5 should be the
 plumOS system squashfs. One validated p6/p7 partition should become the
-FAT32 app layer. Until that validation is complete, the assembler may preserve
-the current p6/p7 shape as a development compatibility mode, but release
-builds should not treat ext4 `SHARE` as the final app-layer design.
+FAT32 app layer. The development assembler currently keeps p6 as the small
+StockOS-compatible `BATOCERA` ext4 partition and formats p7 `SHARE` as 1GB
+FAT32 for app-layer validation. Release builds should not regress to ext4
+`SHARE` as the final app-layer design unless real-device evidence proves that a
+different layout is required.
 
 The build system must keep path ownership strict:
 
@@ -695,7 +702,8 @@ output/device-logs/runtime-snapshots/
 
 Add future decisions here before implementation.
 
-- Which existing partition should become the validated FAT32 plumOS app layer.
+- Whether p7 `rootfs_data` / `SHARE` is the final validated FAT32 plumOS app
+  layer, or only a development-image bridge.
 - Whether p6/p7 can be collapsed after the StockOS boot contract is fully
   understood.
 - The final mount label and mount path for the FAT32 app layer.
@@ -816,3 +824,30 @@ Follow-up:
 Implement the missing `app-layer`, `frontend`, `picoarch`, `standalone`, and
 `release` targets; migrate vendor-runtime defaults to `v90s-stockos-r1`; and
 validate which p6/p7 partition can safely become the FAT32 app layer.
+
+### 2026-07-11: 1GB FAT32 p7 Development Image
+
+Decision:
+
+Use p7 `rootfs_data` / `SHARE` as a 1024MB FAT32 partition in the
+StockOS-compatible development image assembler.
+
+Rationale:
+
+The earlier 55MB live p7 was useful for narrow SSH-deployed FE/RA/Wi-Fi tests,
+but it cannot contain the full plumOS app layer once userland and network
+service payloads are included. A 1GB FAT32 p7 keeps p1 small, preserves the
+StockOS boot-critical partitions, and allows Windows/macOS copy-over update
+testing with all plumOS-owned data present.
+
+Constraints:
+
+p7 FAT32 is still a hardware validation point. Keep p1 through p4 unchanged and
+keep p6 as the small StockOS-compatible `BATOCERA` ext4 partition until there is
+real-device evidence that the boot chain can tolerate a simpler layout.
+
+Follow-up:
+
+Build and boot-test a p7 FAT32 image on real V90S hardware, then record whether
+`/mnt/plumos` mounts correctly, the frontend starts from the app layer, and
+logs/configs remain visible from macOS or Windows.

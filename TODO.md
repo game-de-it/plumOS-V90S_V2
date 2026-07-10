@@ -218,20 +218,21 @@ Build plumOS V90S as a V90S-specific distribution:
   - p4 Android boot image
 - [ ] Keep p1 small and reserved for boot-resource compatibility.
 - [ ] Use p5 as the plumOS system squashfs.
-- [ ] Choose whether p6 or p7 becomes the FAT32 app/update/data partition.
+- [x] Use p7 `rootfs_data` / `SHARE` as the current development FAT32
+  app/update/data partition.
 - [ ] Validate the chosen p6/p7 FAT32 layout on real hardware.
-- [ ] Increase the validated FAT32 app-layer capacity or split optional
-  userland/network payloads so the generated app-layer can be deployed without
-  exceeding the current 55MB live p7.
+- [x] Increase the development FAT32 app-layer capacity to 1024MB so the full
+  generated app-layer can be included without exceeding the current payload
+  size.
 - [ ] Keep an explicit development compatibility mode for the current p6/p7
   shape until the FAT32 app-layer partition is validated.
-- [ ] Do not treat ext4 `SHARE` as the final release app-layer design.
-- [ ] Include app-layer manifest hash in the final SD image manifest.
+- [x] Stop treating ext4 `SHARE` as the current app-layer development design.
+- [x] Include app-layer manifest hash in the SD image manifest.
 - [x] Add `--app-layer-dir` support to the StockOS-compatible image assembler
   so current p7 development images can carry the app layer for frontend boot
   tests.
-- [ ] Include vendor-runtime manifest hash in the final SD image manifest.
-- [ ] Include system-rootfs hash in the final SD image manifest.
+- [x] Include vendor-runtime manifest hash in the SD image manifest.
+- [x] Include system-rootfs hash in the SD image manifest.
 
 ## Milestone 6: RetroArch Runtime Integration
 
