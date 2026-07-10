@@ -23,6 +23,7 @@ menu.entry.network-settings.name=Rede
 menu.entry.performance-settings.name=Desempenho
 menu.entry.apps.name=Aplicativos
 menu.entry.help.name=Ajuda
+menu.entry.reboot.name=Reiniciar
 menu.entry.shutdown.name=Desligar
 menu.status.start_ready=Menu START pronto
 menu.status.start_load_failed=não foi possível carregar START

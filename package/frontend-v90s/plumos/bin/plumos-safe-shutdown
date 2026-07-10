@@ -1,0 +1,300 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+export PATH
+
+LOG_DIR="${PLUMOS_ROOT}/Logs"
+LOG_FILE="${PLUMOS_POWER_ACTION_LOG:-${LOG_DIR}/power-action.log}"
+LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/tmp/plumos-safe-shutdown.lock}"
+
+ACTION=shutdown
+POWER_OFF=0
+DRY_RUN=0
+POWER_BACKEND="${PLUMOS_POWER_ACTION_POWER_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_POWER_BACKEND:-auto}}"
+SLEEP_BACKEND="${PLUMOS_POWER_ACTION_SLEEP_BACKEND:-${PLUMOS_SAFE_SHUTDOWN_SLEEP_BACKEND:-mem}}"
+WAKEUP_SEC="${PLUMOS_POWER_ACTION_SLEEP_WAKEUP_SEC:-${PLUMOS_SAFE_SLEEP_WAKEUP_SEC:-0}}"
+WAIT_SEC="${PLUMOS_POWER_ACTION_WAIT_SEC:-${PLUMOS_SAFE_SHUTDOWN_WAIT_SEC:-1}}"
+
+usage() {
+  cat <<'USAGE'
+Usage: plumos-safe-shutdown [options]
+
+Options:
+  --shutdown             Run the shutdown action. Default.
+  --reboot               Sync and reboot the OS.
+  --sleep                Sync and enter sleep when supported.
+  --poweroff             Power off after shutdown sync.
+  --no-poweroff          Do not power off. Default.
+  --power-backend NAME   Power backend: auto, poweroff, halt, busybox, sysrq, none.
+  --sleep-backend NAME   Sleep backend: mem, standby, freeze, none.
+  --wakeup-sec N         Set RTC wakealarm before sleep when available.
+  --hold-resume          Accepted for compatibility; no-op.
+  --no-hold-resume       Accepted for compatibility; no-op.
+  --dry-run              Log actions without rebooting, sleeping, or powering off.
+  --wait-sec N           Small delay after sync before final action. Default: 1.
+  -h, --help             Show this help.
+USAGE
+}
+
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+uptime_now() {
+  if [ -r /proc/uptime ]; then
+    read -r up _ < /proc/uptime || up=unknown
+    printf '%s' "$up"
+  else
+    printf '%s' "unknown"
+  fi
+}
+
+log() {
+  printf '%s uptime=%s %s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo unknown-time)" \
+    "$(uptime_now)" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+is_non_negative_int() {
+  case "$1" in
+    ""|*[!0-9]*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --shutdown)
+      ACTION=shutdown
+      ;;
+    --reboot)
+      ACTION=reboot
+      ;;
+    --sleep)
+      ACTION=sleep
+      ;;
+    --poweroff)
+      POWER_OFF=1
+      ;;
+    --no-poweroff)
+      POWER_OFF=0
+      ;;
+    --power-backend)
+      shift
+      [ "$#" -gt 0 ] || { echo "error: --power-backend expects a value" >&2; exit 2; }
+      POWER_BACKEND="$1"
+      ;;
+    --sleep-backend)
+      shift
+      [ "$#" -gt 0 ] || { echo "error: --sleep-backend expects a value" >&2; exit 2; }
+      SLEEP_BACKEND="$1"
+      ;;
+    --wakeup-sec)
+      shift
+      if [ "$#" -eq 0 ] || ! is_non_negative_int "$1"; then
+        echo "error: --wakeup-sec expects a non-negative integer" >&2
+        exit 2
+      fi
+      WAKEUP_SEC="$1"
+      ;;
+    --wait-sec)
+      shift
+      if [ "$#" -eq 0 ] || ! is_non_negative_int "$1"; then
+        echo "error: --wait-sec expects a non-negative integer" >&2
+        exit 2
+      fi
+      WAIT_SEC="$1"
+      ;;
+    --hold-resume|--no-hold-resume)
+      :
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "error: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+case "$POWER_BACKEND" in
+  auto|poweroff|halt|busybox|sysrq|none)
+    ;;
+  *)
+    echo "error: invalid power backend: $POWER_BACKEND" >&2
+    exit 2
+    ;;
+esac
+
+case "$SLEEP_BACKEND" in
+  mem|standby|freeze|none)
+    ;;
+  *)
+    echo "error: invalid sleep backend: $SLEEP_BACKEND" >&2
+    exit 2
+    ;;
+esac
+
+if [ "$ACTION" = sleep ] && [ "$POWER_OFF" -eq 1 ]; then
+  echo "error: --sleep cannot be combined with --poweroff" >&2
+  exit 2
+fi
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  log "already_running action=$ACTION"
+  echo "result=already_running"
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true; exit 143' INT TERM
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+
+run_or_log() {
+  log "cmd: $*"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    return 0
+  fi
+  "$@"
+}
+
+safe_sync() {
+  log "sync: begin"
+  sync 2>/dev/null || true
+  if [ "$WAIT_SEC" -gt 0 ]; then
+    sleep "$WAIT_SEC" 2>/dev/null || true
+  fi
+  sync 2>/dev/null || true
+  log "sync: done"
+}
+
+safe_unmount_sd2() {
+  if [ -x "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" ]; then
+    log "sd2: stopping content mounts"
+    if [ "$DRY_RUN" -eq 1 ]; then
+      "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" status >> "$LOG_FILE" 2>&1 || true
+    else
+      "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" stop >> "$LOG_FILE" 2>&1 || true
+    fi
+  fi
+}
+
+set_wakealarm() {
+  [ "$WAKEUP_SEC" -gt 0 ] || return 0
+  [ -e /sys/class/rtc/rtc0/wakealarm ] || return 0
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "sleep: dry-run wakealarm +$WAKEUP_SEC"
+    return 0
+  fi
+  echo 0 >/sys/class/rtc/rtc0/wakealarm 2>/dev/null || true
+  echo "+$WAKEUP_SEC" >/sys/class/rtc/rtc0/wakealarm 2>/dev/null || true
+}
+
+sleep_action() {
+  safe_sync
+  case "$SLEEP_BACKEND" in
+    none)
+      log "sleep: backend=none"
+      echo "result=sleep_backend_none"
+      return 0
+      ;;
+    mem|standby|freeze)
+      if ! grep -qw "$SLEEP_BACKEND" /sys/power/state 2>/dev/null; then
+        log "sleep: unsupported backend=$SLEEP_BACKEND states=$(cat /sys/power/state 2>/dev/null || echo none)"
+        echo "result=sleep_unsupported"
+        return 1
+      fi
+      set_wakealarm
+      log "sleep: backend=$SLEEP_BACKEND"
+      if [ "$DRY_RUN" -eq 1 ]; then
+        echo "result=dry_run_sleep"
+        return 0
+      fi
+      echo "$SLEEP_BACKEND" >/sys/power/state
+      echo "result=sleep_returned"
+      return 0
+      ;;
+  esac
+}
+
+try_poweroff() {
+  backend="$1"
+  case "$backend" in
+    poweroff)
+      run_or_log poweroff
+      ;;
+    halt)
+      run_or_log halt -p
+      ;;
+    busybox)
+      run_or_log busybox poweroff
+      ;;
+    sysrq)
+      if [ "$DRY_RUN" -eq 1 ]; then
+        log "sysrq: dry-run poweroff"
+      else
+        echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
+        echo o >/proc/sysrq-trigger
+      fi
+      ;;
+    none)
+      log "poweroff: backend=none"
+      return 1
+      ;;
+  esac
+}
+
+reboot_action() {
+  safe_unmount_sd2
+  safe_sync
+  log "reboot: requested"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "result=dry_run_reboot"
+    return 0
+  fi
+  reboot || busybox reboot || {
+    echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
+    echo b >/proc/sysrq-trigger
+  }
+}
+
+shutdown_action() {
+  safe_unmount_sd2
+  safe_sync
+  if [ "$POWER_OFF" -eq 0 ]; then
+    log "shutdown: sync-only no-poweroff"
+    echo "result=shutdown_sync_only"
+    return 0
+  fi
+  log "poweroff: requested backend=$POWER_BACKEND"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "result=dry_run_poweroff"
+    return 0
+  fi
+  if [ "$POWER_BACKEND" = auto ]; then
+    try_poweroff poweroff || try_poweroff busybox || try_poweroff halt || try_poweroff sysrq
+  else
+    try_poweroff "$POWER_BACKEND"
+  fi
+}
+
+log "start action=$ACTION poweroff=$POWER_OFF dry_run=$DRY_RUN power_backend=$POWER_BACKEND sleep_backend=$SLEEP_BACKEND"
+
+case "$ACTION" in
+  sleep)
+    sleep_action
+    ;;
+  reboot)
+    reboot_action
+    ;;
+  shutdown)
+    shutdown_action
+    ;;
+esac

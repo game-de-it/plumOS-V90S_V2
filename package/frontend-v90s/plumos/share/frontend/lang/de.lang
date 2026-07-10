@@ -23,6 +23,7 @@ menu.entry.network-settings.name=Netzwerk
 menu.entry.performance-settings.name=Leistung
 menu.entry.apps.name=Apps
 menu.entry.help.name=Hilfe
+menu.entry.reboot.name=Neustart
 menu.entry.shutdown.name=Ausschalten
 menu.status.start_ready=START-Menü bereit
 menu.status.start_load_failed=START-Menü konnte nicht geladen werden

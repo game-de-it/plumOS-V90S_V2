@@ -23,6 +23,7 @@ menu.entry.network-settings.name=ネットワーク設定
 menu.entry.performance-settings.name=性能設定
 menu.entry.apps.name=アプリ
 menu.entry.help.name=ヘルプ
+menu.entry.reboot.name=再起動
 menu.entry.shutdown.name=シャットダウン
 menu.status.start_ready=START メニュー準備完了
 menu.status.start_load_failed=START メニューを読み込めません

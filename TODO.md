@@ -222,6 +222,9 @@ Build plumOS V90S as a V90S-specific distribution:
   internally and bind-mounted onto `/mnt/plumos/roms` and `/mnt/plumos/bios`.
 - [x] Add `plumos-sd2-content-mount start|status|stop|restart` for SD2 content
   mount control, including FAT fsck before FAT32/vfat mounts.
+- [x] Expose FE reboot and shutdown actions through
+  `/mnt/plumos/bin/plumos-safe-shutdown`, with SD2 content mounts stopped and
+  filesystem sync performed before reboot or poweroff.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout

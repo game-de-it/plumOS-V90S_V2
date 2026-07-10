@@ -23,6 +23,7 @@ menu.entry.network-settings.name=网络设置
 menu.entry.performance-settings.name=性能设置
 menu.entry.apps.name=应用
 menu.entry.help.name=帮助
+menu.entry.reboot.name=重启
 menu.entry.shutdown.name=关机
 menu.status.start_ready=START 菜单已就绪
 menu.status.start_load_failed=无法载入 START 菜单

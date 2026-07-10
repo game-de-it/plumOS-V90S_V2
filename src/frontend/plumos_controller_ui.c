@@ -814,6 +814,7 @@ static int ui_append_rom_entry(struct ui_state *ui, const struct rom_entry *entr
 
 static const struct power_entry POWER_ENTRIES[] = {
     {"sleep", "Sleep", "sync and enter sleep"},
+    {"reboot", "Reboot", "sync and restart OS"},
     {"shutdown", "Shutdown", "sync and power off"},
     {"cancel", "Cancel", "return without changing state"},
 };
@@ -10624,12 +10625,14 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
   size_t pos = 0;
   int rc;
 
-  if (!action || (strcmp(action, "shutdown") != 0 && strcmp(action, "sleep") != 0)) {
+  if (!action || (strcmp(action, "shutdown") != 0 &&
+                  strcmp(action, "reboot") != 0 &&
+                  strcmp(action, "sleep") != 0)) {
     set_status(ui, "power action is invalid");
     return 0;
   }
   if (!join_path(script, sizeof(script), ui->plumos_root, "bin/plumos-safe-shutdown") ||
-      !join_path(log_dir, sizeof(log_dir), ui->plumos_root, "logs") ||
+      !join_path(log_dir, sizeof(log_dir), ui->plumos_root, "Logs") ||
       !join_path(log_path, sizeof(log_path), log_dir, "frontend-power-action.log")) {
     set_status(ui, "power action path too long");
     return 0;
@@ -10693,6 +10696,11 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
       set_status(ui, "power action command too long");
       return 0;
     }
+  } else if (strcmp(action, "reboot") == 0) {
+    if (!append_string(cmd, sizeof(cmd), &pos, " --no-hold-resume")) {
+      set_status(ui, "power action command too long");
+      return 0;
+    }
   } else if (poweroff) {
     if (!append_string(cmd, sizeof(cmd), &pos, " --poweroff --power-backend ") ||
         !append_shell_quoted(cmd, sizeof(cmd), &pos, power_backend) ||
@@ -10727,6 +10735,8 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
   if (WIFEXITED(rc) && WEXITSTATUS(rc) == 0) {
     if (strcmp(action, "sleep") == 0) {
       snprintf(ui->status, sizeof(ui->status), "sleep complete backend=%s", sleep_backend);
+    } else if (strcmp(action, "reboot") == 0) {
+      copy_string(ui->status, sizeof(ui->status), "reboot requested");
     } else {
       snprintf(ui->status, sizeof(ui->status), "shutdown complete%s",
                poweroff ? " poweroff" : " (no poweroff)");
@@ -13021,6 +13031,8 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
         open_thumbnail_results_screen(ui);
       } else if (strcmp(entry->action, "system:sleep") == 0) {
         run_power_action(ui, "sleep", 0);
+      } else if (strcmp(entry->action, "system:reboot") == 0) {
+        run_power_action(ui, "reboot", 0);
       } else if (strcmp(entry->action, "system:shutdown") == 0) {
         run_power_action(ui, "shutdown", 1);
       } else if (strcmp(entry->action, "menu:apps") == 0) {
