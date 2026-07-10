@@ -157,12 +157,27 @@ fi
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true; exit 143' INT TERM
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
-run_or_log() {
+run_final_command() {
   log "cmd: $*"
-  if [ "$DRY_RUN" -eq 1 ]; then
-    return 0
-  fi
   "$@"
+  rc=$?
+  log "cmd_returned rc=$rc cmd=$*"
+  return 1
+}
+
+trigger_sysrq() {
+  key="$1"
+  name="$2"
+  if [ ! -w /proc/sysrq-trigger ]; then
+    log "sysrq: unavailable action=$name"
+    return 1
+  fi
+  log "sysrq: trigger action=$name key=$key"
+  echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
+  echo "$key" >/proc/sysrq-trigger
+  sleep 2 2>/dev/null || true
+  log "sysrq: returned action=$name"
+  return 1
 }
 
 safe_sync() {
@@ -228,21 +243,16 @@ try_poweroff() {
   backend="$1"
   case "$backend" in
     poweroff)
-      run_or_log poweroff
+      run_final_command poweroff -f
       ;;
     halt)
-      run_or_log halt -p
+      run_final_command halt -f
       ;;
     busybox)
-      run_or_log busybox poweroff
+      run_final_command busybox poweroff -f
       ;;
     sysrq)
-      if [ "$DRY_RUN" -eq 1 ]; then
-        log "sysrq: dry-run poweroff"
-      else
-        echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
-        echo o >/proc/sysrq-trigger
-      fi
+      trigger_sysrq o poweroff
       ;;
     none)
       log "poweroff: backend=none"
@@ -259,10 +269,14 @@ reboot_action() {
     echo "result=dry_run_reboot"
     return 0
   fi
-  reboot || busybox reboot || {
-    echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
-    echo b >/proc/sysrq-trigger
-  }
+  run_final_command reboot -f ||
+    run_final_command busybox reboot -f ||
+    trigger_sysrq b reboot ||
+    {
+      log "reboot: failed_all_backends"
+      echo "result=reboot_failed"
+      return 1
+    }
 }
 
 shutdown_action() {
@@ -279,9 +293,22 @@ shutdown_action() {
     return 0
   fi
   if [ "$POWER_BACKEND" = auto ]; then
-    try_poweroff poweroff || try_poweroff busybox || try_poweroff halt || try_poweroff sysrq
+    try_poweroff poweroff ||
+      try_poweroff busybox ||
+      try_poweroff halt ||
+      try_poweroff sysrq ||
+      {
+        log "poweroff: failed_all_backends"
+        echo "result=poweroff_failed"
+        return 1
+      }
   else
-    try_poweroff "$POWER_BACKEND"
+    try_poweroff "$POWER_BACKEND" ||
+      {
+        log "poweroff: failed backend=$POWER_BACKEND"
+        echo "result=poweroff_failed"
+        return 1
+      }
   fi
 }
 

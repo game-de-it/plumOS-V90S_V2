@@ -141,3 +141,79 @@ plumos-frontend-stop: pid=2974 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --
 Actual reboot and poweroff were not executed by Codex, to avoid interrupting
 SSH without the user's explicit real-device confirmation. The next validation
 step is to trigger Reboot and Shutdown from the FE on the device.
+
+## Follow-up: returned reboot/poweroff commands
+
+The user tested Reboot and Shutdown from the START menu and reported that
+nothing appeared to happen.
+
+The live log proved that the START menu action did reach the helper:
+
+```text
+start action=reboot poweroff=0 dry_run=0 power_backend=auto sleep_backend=mem
+sd2: stopping content mounts
+sync: begin
+sync: done
+reboot: requested
+```
+
+Shutdown also reached the helper:
+
+```text
+start action=shutdown poweroff=1 dry_run=0 power_backend=auto sleep_backend=mem
+sd2: stopping content mounts
+sync: begin
+sync: done
+poweroff: requested backend=auto
+cmd: poweroff
+```
+
+On the live device, `reboot`, `poweroff`, and `halt` resolve to app-layer
+BusyBox wrappers:
+
+```text
+/mnt/plumos/bin/reboot
+/mnt/plumos/bin/poweroff
+/mnt/plumos/bin/halt
+```
+
+BusyBox supports forced terminal actions:
+
+```text
+reboot [-d DELAY] [-nf]
+poweroff [-d DELAY] [-nf]
+```
+
+The issue was that the first helper version treated a returned `reboot` or
+`poweroff` command as success. On this runtime those commands can return after
+asking init to act, while the system keeps running. The helper now treats any
+returned terminal command as failure and proceeds to the next backend:
+
+```text
+reboot -f -> busybox reboot -f -> sysrq b
+poweroff -f -> busybox poweroff -f -> halt -f -> sysrq o
+```
+
+Updated live hash:
+
+```text
+0648e9bd78ef90b4326dee898181a1c4eb993e7fbdc3f800567c8419a3af2f0b  /mnt/plumos/bin/plumos-safe-shutdown
+```
+
+Updated output hashes:
+
+```text
+0648e9bd78ef90b4326dee898181a1c4eb993e7fbdc3f800567c8419a3af2f0b  output/app-layer/v90s/bin/plumos-safe-shutdown
+aea582067bfe365994237a018b54b5dc4dc3cebb84bae1504e06eb62a04d6b39  output/app-layer/v90s/manifest.json
+ddeece97a003478341a0ff09db0319d881957d64e37272f6198f07779b4a2401  output/app-layer/v90s/checksums.sha256
+```
+
+Dry-run was rechecked on the live device after deployment:
+
+```text
+result=dry_run_reboot
+result=dry_run_poweroff
+```
+
+Actual reboot and poweroff still need user-side real-device validation because
+running either action intentionally drops SSH.
