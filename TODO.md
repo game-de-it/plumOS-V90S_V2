@@ -249,6 +249,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `PLUMOS` is remounted read-only before final sysrq reboot/poweroff.
 - [ ] Validate that a user-side FE Reboot no longer leaves p7 `PLUMOS` with
   the FAT dirty warning on the next boot.
+- [ ] Replace the final p7 read-only remount with a stronger final-stage path
+  that runs outside `/mnt/plumos`, unmounts p7 completely, and then triggers
+  sysrq reboot/poweroff.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout

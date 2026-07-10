@@ -444,3 +444,67 @@ user-side FE Reboot followed by checking that the next boot no longer reports:
 ```text
 FAT-fs (mmcblk0p7): Volume was not properly unmounted.
 ```
+
+## Live boot check after quiesce deployment
+
+The user booted the V90S after the quiesce-capable helper was deployed.
+
+The live device was reachable at:
+
+```text
+root@192.0.2.120
+```
+
+The core runtime state is healthy:
+
+```text
+/dev/mmcblk0p7 /mnt/plumos vfat rw,...,errors=remount-ro 0 0
+p7_write_ok
+/dev/mmcblk0p1: LABEL="PLUMBOOT" TYPE="vfat"
+/dev/mmcblk0p7: LABEL="PLUMOS" TYPE="vfat"
+/dev/mmcblk1p1: LABEL="GAME" TYPE="vfat"
+bf9c0eeb9dec2f77592b01c77341eb57fa861e8500d1fb2f785b9c7d991eb6a8  /mnt/plumos/bin/plumos-safe-shutdown
+d9f4e4795757a84f5fcc5b50d01f2d96bae7db527a0c6f1d3649db4b5d553499  /mnt/plumos/manifest.json
+```
+
+The previous FE power action reached the new quiesce path:
+
+```text
+start action=reboot poweroff=0 dry_run=0 power_backend=auto sleep_backend=mem
+sd2: stopping content mounts
+sync: begin
+sync: done
+reboot: requested
+quiesce: begin root=/mnt/plumos
+quiesce: TERM pids=1165 1167 1168 229 740
+quiesce: KILL pids=229
+sync: begin
+sync: done
+quiesce: remount-ro begin opts=rw,...
+```
+
+However, the next boot still reports the FAT dirty warning:
+
+```text
+FAT-fs (mmcblk0p7): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+```
+
+There was no read-only remount on this boot, and the p7 write probe passed, so
+the system is usable. The quiesce countermeasure appears to have avoided the
+previous FAT corruption/read-only failure, but it did not clear the FAT dirty
+bit. The likely next fix is stronger than remounting read-only: run the final
+power action from a rootfs or `/tmp` second-stage helper, stop app-layer users,
+fully unmount `/mnt/plumos`, then trigger sysrq.
+
+Other live state after boot:
+
+```text
+service=ssh state=running
+service=ftp state=running
+service=sftp state=running
+service=samba state=running
+/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+/dev/mmcblk1p1 /run/plumos/sd2 vfat rw,...
+/dev/mmcblk1p1 /mnt/plumos/roms vfat rw,...
+/dev/mmcblk1p1 /mnt/plumos/bios vfat rw,...
+```
