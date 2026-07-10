@@ -512,7 +512,6 @@ prepare_fat_logs() {
             echo "plumOS V90S boot log session"
             date 2>/dev/null || true
         } > "$FAT_LOG_DIR/session.txt" 2>/dev/null || true
-        sync
     fi
 }
 
@@ -539,7 +538,23 @@ copy_to_fat_logs() {
     if [ -f /mnt/share/plumos-v90s-network-ssh.log ]; then
         cp /mnt/share/plumos-v90s-network-ssh.log "$FAT_LOG_DIR/plumos-v90s-network-ssh.log" 2>/dev/null || true
     fi
-    sync
+}
+
+boot_log_sync_enabled() {
+    [ "${PLUMOS_V90S_BOOT_SYNC_LOGS:-0}" = "1" ] && return 0
+    if [ -r /proc/cmdline ] &&
+        grep -qw 'plumos.sync_boot_logs=1' /proc/cmdline 2>/dev/null; then
+        return 0
+    fi
+    [ -e /mnt/share/plumos-sync-boot-logs ] && return 0
+    [ -e /mnt/plumos/config/system/sync-boot-logs ] && return 0
+    return 1
+}
+
+boot_log_sync() {
+    if boot_log_sync_enabled; then
+        sync
+    fi
 }
 
 persist_debian_log() {
@@ -548,9 +563,9 @@ persist_debian_log() {
         if [ -d /mnt/share/rootfs ]; then
             cp "$LOG" /mnt/share/rootfs/plumos-v90s-debian-init.log 2>/dev/null || true
         fi
-        sync
     fi
     copy_to_fat_logs
+    boot_log_sync
 }
 
 ensure_fb0_node() {
@@ -728,56 +743,75 @@ run_fb_probe_if_enabled
 persist_debian_log
 
 if [ -x /usr/local/sbin/v90s-pvr-probe ]; then
-    log "debian-init: starting PowerVR probe"
+    log "debian-init: starting PowerVR probe in background"
     persist_debian_log
-    sync
-    /usr/local/sbin/v90s-pvr-probe
-    rc=$?
-    log "debian-init: PowerVR probe exited rc=$rc"
-    persist_debian_log
+    (
+        /usr/local/sbin/v90s-pvr-probe >> "$LOG" 2>&1
+        rc=$?
+        log "debian-init: PowerVR probe exited rc=$rc"
+        persist_debian_log
+    ) &
 fi
 
 if [ -x /usr/local/sbin/v90s-network-ssh-init ]; then
-    log "debian-init: starting network/SSH init"
+    log "debian-init: starting network/SSH init in background"
     persist_debian_log
-    sync
-    /usr/local/sbin/v90s-network-ssh-init
-    rc=$?
-    log "debian-init: network/SSH init exited rc=$rc"
-    persist_debian_log
+    (
+        /usr/local/sbin/v90s-network-ssh-init >> "$LOG" 2>&1
+        rc=$?
+        log "debian-init: network/SSH init exited rc=$rc"
+        persist_debian_log
+    ) &
 fi
 
 frontend_attempted=0
+frontend_pid=""
 if prepare_plumos_app_layer; then
-    if [ -x /mnt/plumos/bin/plumos-network-services ]; then
-        log "debian-init: starting enabled plumOS network services"
-        persist_debian_log
-        PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-network-services start-enabled >> "$LOG" 2>&1 || true
-        persist_debian_log
-    fi
     frontend_attempted=1
     log "debian-init: starting plumOS frontend"
     persist_debian_log
-    sync
-    PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-frontend-launch
-    rc=$?
-    log "debian-init: plumOS frontend exited rc=$rc"
+    (
+        PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-frontend-launch
+        rc=$?
+        log "debian-init: plumOS frontend exited rc=$rc"
+        persist_debian_log
+    ) &
+    frontend_pid=$!
+    log "debian-init: plumOS frontend pid=$frontend_pid"
     persist_debian_log
+
+    if [ -x /mnt/plumos/bin/plumos-network-services ]; then
+        log "debian-init: starting enabled plumOS network services in background"
+        persist_debian_log
+        (
+            PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-network-services start-enabled >> "$LOG" 2>&1
+            rc=$?
+            log "debian-init: plumOS network services exited rc=$rc"
+            persist_debian_log
+        ) &
+    fi
 fi
 
 if [ "$frontend_attempted" -eq 0 ] && [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
     log "debian-init: starting RetroArch launcher"
     persist_debian_log
-    sync
     /usr/local/sbin/v90s-retroarch-launch
     rc=$?
     log "debian-init: RetroArch launcher exited rc=$rc"
     persist_debian_log
 fi
 
+if [ "$frontend_attempted" -eq 1 ] && [ -n "$frontend_pid" ]; then
+    log "debian-init: waiting for plumOS frontend pid=$frontend_pid"
+    persist_debian_log
+    wait "$frontend_pid"
+    rc=$?
+    log "debian-init: plumOS frontend wait returned rc=$rc"
+    persist_debian_log
+fi
+
 log "debian-init: entering idle loop; framebuffer console fallback disabled"
 persist_debian_log
-sync
 
 while :; do
     sleep 3600

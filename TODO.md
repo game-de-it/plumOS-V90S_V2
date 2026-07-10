@@ -156,6 +156,12 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Make boot diagnostics report missing or invalid app-layer metadata clearly.
 - [x] Disable the old fb0 black-screen/white-band boot probe by default; keep it
   available only through explicit diagnostic opt-in.
+- [x] Start the frontend before slow development services by backgrounding
+  PowerVR probe, rootfs Wi-Fi/SSH init, and app-layer network services.
+- [x] Stop blocking FE startup on normal SD2 FAT fsck; frontend launch mounts
+  SD2 with boot fsck disabled by default and keeps explicit fsck opt-in.
+- [x] Reduce normal boot log sync pressure; keep forced boot-log sync behind an
+  explicit diagnostic opt-in.
 - [ ] Migrate the remaining rootfs-level `v90s-network-ssh-init` Wi-Fi/SSH
   bring-up into the plumOS app-layer network control path before disabling the
   old development hook.

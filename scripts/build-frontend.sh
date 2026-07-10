@@ -113,7 +113,29 @@ printf 'plumos-frontend-launch: starting V90S frontend\n' >> "$log"
 printf 'plumos-frontend-launch: PLUMOS_ROOT=%s\n' "$PLUMOS_ROOT" >> "$log"
 
 if [ -x "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" ]; then
-  "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
+  sd2_mode="${PLUMOS_FRONTEND_SD2_MODE:-sync}"
+  case "$sd2_mode" in
+    off|disabled|0)
+      printf 'plumos-frontend-launch: SD2 mount skipped mode=%s\n' "$sd2_mode" >> "$log"
+      ;;
+    background|bg)
+      (
+        export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-off}"
+        printf 'plumos-frontend-launch: SD2 mount background fsck=%s\n' "$PLUMOS_SD2_FSCK" >> "$log"
+        "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
+      ) &
+      ;;
+    sync|"")
+      export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-off}"
+      printf 'plumos-frontend-launch: SD2 mount sync fsck=%s\n' "$PLUMOS_SD2_FSCK" >> "$log"
+      "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
+      ;;
+    *)
+      export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-off}"
+      printf 'plumos-frontend-launch: unknown SD2 mode=%s; using sync fsck=%s\n' "$sd2_mode" "$PLUMOS_SD2_FSCK" >> "$log"
+      "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
+      ;;
+  esac
 fi
 
 exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s" >> "$log" 2>&1
