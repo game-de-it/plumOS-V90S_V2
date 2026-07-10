@@ -18,6 +18,12 @@
           "action": "internal:system-settings"
         },
         {
+          "id": "network-settings",
+          "display_name": "Network Settings",
+          "kind": "internal",
+          "action": "internal:network-settings"
+        },
+        {
           "id": "apps",
           "display_name": "Apps",
           "kind": "submenu",
