@@ -212,6 +212,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Validate frontend boot on real V90S hardware.
 - [x] Live-validate the formal V90S fbdev frontend design after SSH reconnect,
   including a `/dev/fb0` capture and single-frontend-process check.
+- [x] Align V90S settings-screen checkbox and option control placement with the
+  MMF/A30-style frontend layout.
 
 ## Milestone 5: SD Image Layout
 

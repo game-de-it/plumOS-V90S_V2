@@ -23,6 +23,10 @@
 #define PLUMOS_FBDEV_RENDER_LINE_MAX 512
 #endif
 
+#ifndef PLUMOS_FBDEV_SETTING_FLASH_MARKER
+#define PLUMOS_FBDEV_SETTING_FLASH_MARKER "@{F:"
+#endif
+
 #ifndef PLUMOS_FBDEV_RENDERER_GLYPHS_ONLY
 struct plumos_fbdev_renderer {
   int fd;
@@ -558,6 +562,17 @@ static const char *plumos_fbdev_ltrim(const char *s) {
   return s ? s : "";
 }
 
+static void plumos_fbdev_trim_right(char *s) {
+  size_t len;
+  if (!s) {
+    return;
+  }
+  len = strlen(s);
+  while (len > 0 && isspace((unsigned char)s[len - 1])) {
+    s[--len] = '\0';
+  }
+}
+
 static int plumos_fbdev_text_width(const char *text, int scale) {
   int width = 0;
   const char *p;
@@ -599,6 +614,38 @@ static void plumos_fbdev_copy_range(char *out, size_t out_size,
 
 static void plumos_fbdev_copy_text(char *out, size_t out_size, const char *text) {
   plumos_fbdev_copy_range(out, out_size, text, text ? text + strlen(text) : NULL);
+}
+
+static int plumos_fbdev_split_setting_control(const char *in, char *label,
+                                              size_t label_size, char *control,
+                                              size_t control_size) {
+  const char *choice;
+  char *marker;
+
+  if (!in || !label || label_size == 0 || !control || control_size == 0) {
+    return 0;
+  }
+  label[0] = '\0';
+  control[0] = '\0';
+
+  if ((strncmp(in, "[x] ", 4) == 0 || strncmp(in, "[ ] ", 4) == 0) && in[4]) {
+    plumos_fbdev_copy_range(control, control_size, in, in + 3);
+    plumos_fbdev_copy_text(label, label_size, in + 4);
+    return label[0] != '\0' && control[0] != '\0';
+  }
+
+  choice = strstr(in, " < ");
+  if (!choice || !strstr(choice + 1, " >")) {
+    return 0;
+  }
+  plumos_fbdev_copy_range(label, label_size, in, choice);
+  plumos_fbdev_copy_text(control, control_size, choice + 1);
+  marker = strstr(control, PLUMOS_FBDEV_SETTING_FLASH_MARKER);
+  if (marker) {
+    *marker = '\0';
+  }
+  plumos_fbdev_trim_right(control);
+  return label[0] != '\0' && control[0] != '\0';
 }
 
 static int plumos_fbdev_hex_digit(char c) {
@@ -1485,10 +1532,13 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
   int w = (int)r->var.xres;
   int h = (int)r->var.yres;
   int settings_family;
+  int settings_page;
   int entry_scale;
   int line_height;
   int cursor_x;
   int name_x;
+  int right_x;
+  int cell_width;
   int y;
   uint32_t accent;
   const char *footer1;
@@ -1496,15 +1546,18 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
 
   memset(selected, 0, sizeof(selected));
   plumos_fbdev_screen_title(title, sizeof(title), lines, line_count);
+  settings_page = plumos_fbdev_has_prefixed_line(lines, line_count,
+                                                 "settings_screen=1");
   settings_family = plumos_fbdev_title_is_settings_family(title) ||
                     plumos_fbdev_has_prefixed_line(lines, line_count,
                                                    "menu_screen=1") ||
-                    plumos_fbdev_has_prefixed_line(lines, line_count,
-                                                   "settings_screen=1");
+                    settings_page;
   entry_scale = settings_family ? 3 : 2;
   line_height = entry_scale * 12;
   cursor_x = settings_family ? 12 : 18;
   name_x = cursor_x + (settings_family ? 18 : 24);
+  right_x = w - 14;
+  cell_width = 6 * entry_scale;
   accent = settings_family ? plumos_fbdev_pack_color(r, 56, 148, 255)
                            : p->accent;
   footer1 = plumos_fbdev_find_value(lines, line_count, "footer1=");
@@ -1545,8 +1598,31 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
     }
     plumos_fbdev_draw_text(r, cursor_x, y, selected[i] ? ">" : " ",
                            entry_scale, fg, w - 8);
-    plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg,
-                           w - 8);
+    if (settings_page) {
+      char setting_label[160];
+      char setting_control[80];
+      int control_width;
+      int control_x;
+
+      if (plumos_fbdev_split_setting_control(items[i], setting_label,
+                                             sizeof(setting_label),
+                                             setting_control,
+                                             sizeof(setting_control))) {
+        control_width = plumos_fbdev_text_width(setting_control, entry_scale);
+        control_x = right_x - control_width;
+        if (control_x < name_x + 6 * cell_width) {
+          control_x = name_x + 6 * cell_width;
+        }
+        plumos_fbdev_draw_text(r, name_x, y, setting_label, entry_scale, fg,
+                               control_x - cell_width);
+        plumos_fbdev_draw_text(r, control_x, y, setting_control, entry_scale, fg,
+                               right_x);
+      } else {
+        plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg, w - 8);
+      }
+    } else {
+      plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg, w - 8);
+    }
     y += line_height;
   }
   if ((footer1 && footer1[0]) || (footer2 && footer2[0])) {
