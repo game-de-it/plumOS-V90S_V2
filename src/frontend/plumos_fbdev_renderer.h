@@ -1504,7 +1504,6 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
       strncmp(line, "scraping_screen=", 16) == 0 ||
       strncmp(line, "thumbnail_results_screen=", 25) == 0 ||
       strncmp(line, "thumbnail_running", 17) == 0 ||
-      strncmp(line, "top_refresh_running=", 20) == 0 ||
       strncmp(line, "usb_disk_starting=", 18) == 0 ||
       strncmp(line, "brightness_test=", 16) == 0 ||
       strncmp(line, "wifi_keyboard_cursor=", 21) == 0 ||
