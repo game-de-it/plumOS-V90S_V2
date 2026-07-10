@@ -104,7 +104,42 @@ Confirmed the image contains:
 
 ## Real-device Status
 
-Pending. The next device test should confirm:
+Live deploy completed after the user confirmed SSH access to
+`root@192.0.2.120` with password authentication.
+
+Deployed file:
+
+```text
+/mnt/plumos/config/frontend/menus.json
+sha256=981f299184b4106cd24c2025d5b2e578f9435596119fb156d6e86d09d50be442
+```
+
+Previous file was preserved on the device:
+
+```text
+/mnt/plumos/config/frontend/menus.json.bak-20260608-054720
+sha256=af92ea7da182608ba8c07defaf8253567ce4dff7ec1dc2240fa04686418c57ad
+```
+
+Device-side grep confirmed:
+
+```text
+21:          "id": "network-settings",
+24:          "action": "internal:network-settings"
+```
+
+Frontend restart used only the frontend PID-scoped helper:
+
+```text
+plumos-frontend-stop: pid=605 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+plumos-frontend-stop: TERM pid=605
+plumos-frontend-stop: pid=875 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+manual_restart_pid=875
+```
+
+No broad process-name kill was used.
+
+The next user-visible device test should confirm:
 
 - START menu shows `Network Settings`.
 - Wi-Fi scan does not hang when no USB Wi-Fi dongle is attached.
