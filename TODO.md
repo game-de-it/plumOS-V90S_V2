@@ -236,6 +236,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Register ADB in the FE NW Service screen and validate the frontend-facing
   service controller can stop/start ADB while keeping
   `/mnt/plumos/config/network/services.conf` in sync.
+- [x] Validate that NW Service checkboxes use the persistent `enabled=` state
+  while service status reports exact live process state for SSH, FTP, SFTP,
+  Samba, and ADB.
 - [x] Validate the FE navigation/action path for
   `START -> Network Settings -> NW Service -> ADB` by running the controller UI
   script path that presses `A` on the ADB checkbox and confirming `adb devices`

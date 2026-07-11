@@ -63,6 +63,14 @@ pid_matches() {
   return 1
 }
 
+pid_file_matches() {
+  pid_file="$1"
+  expected="$2"
+  pid_alive "$pid_file" || return 1
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  pid_matches "$pid" "$expected"
+}
+
 kill_pid_file() {
   pid_file="$1"
   name="$2"
@@ -134,14 +142,19 @@ print_status() {
 
 process_exists_by_name() {
   name="$1"
-  if [ -x "$BUSYBOX" ] && "$BUSYBOX" true >/dev/null 2>&1; then
-    "$BUSYBOX" ps w 2>/dev/null | "$BUSYBOX" awk -v n="$name" '
-      $1 ~ /^[0-9]+$/ && index($0, n) { found=1 }
-      END { exit found ? 0 : 1 }
-    '
-    return $?
-  fi
-  ps 2>/dev/null | awk -v n="$name" 'index($0, n) { found=1 } END { exit found ? 0 : 1 }'
+  [ -n "$name" ] || return 1
+  for proc in /proc/[0-9]*; do
+    [ -d "$proc" ] || continue
+    pid="${proc##*/}"
+    [ "$pid" = "$$" ] && continue
+    comm="$(cat "$proc/comm" 2>/dev/null || true)"
+    cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+    [ "$comm" = "$name" ] && return 0
+    case "$cmdline" in
+      "$name "*|"$name:"*|*"/$name "*|*"/$name") return 0 ;;
+    esac
+  done
+  return 1
 }
 
 ftp_pid_file() {
@@ -193,7 +206,8 @@ kill_ftp_children() {
 }
 
 status_ssh() {
-  if pid_alive "$(ssh_pid_file)"; then
+  if pid_file_matches "$(ssh_pid_file)" "sshd" ||
+     pid_file_matches "$(ssh_pid_file)" "dropbear"; then
     print_status ssh running "SSH service controlled by plumOS"
     return 0
   fi
@@ -214,7 +228,7 @@ status_ftp() {
     print_status ftp not_installed "FTP not installed"
     return 1
   fi
-  if pid_alive "$(ftp_pid_file)"; then
+  if pid_file_matches "$(ftp_pid_file)" "tcpsvd"; then
     print_status ftp running "FTP port ${FTP_PORT}, max ${TRANSFER_MAX_CONNECTIONS}"
     return 0
   fi
@@ -231,7 +245,10 @@ status_sftp() {
     print_status sftp stopped "SFTP disabled"
     return 2
   fi
-  if pid_alive "$(ssh_pid_file)" || process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
+  if pid_file_matches "$(ssh_pid_file)" "sshd" ||
+     pid_file_matches "$(ssh_pid_file)" "dropbear" ||
+     process_exists_by_name "sshd" ||
+     process_exists_by_name "dropbear"; then
     print_status sftp running "SFTP server installed; SSH service running"
     return 0
   fi
@@ -256,7 +273,7 @@ status_samba() {
     print_status samba not_installed "Samba not installed"
     return 1
   fi
-  if pid_alive "$(smbd_pid_file)"; then
+  if pid_file_matches "$(smbd_pid_file)" "smbd"; then
     print_status samba running "Samba share SDCARD, max ${TRANSFER_MAX_CONNECTIONS}"
     return 0
   fi

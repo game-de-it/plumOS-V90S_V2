@@ -540,8 +540,18 @@ The app-layer network service controller owns the user-facing Wi-Fi and SSH
 service state alongside FTP, SFTP, Samba, and ADB so the frontend, logs, and
 troubleshooting view all agree. On V90S the Wi-Fi path must assume an external
 USB dongle rather than internal Wi-Fi, and scan/connect actions must return a
-bounded failure when no dongle or no supported interface is present. The
-app-layer controller may start or adopt the OpenSSH daemon supplied by the
+bounded failure when no dongle or no supported interface is present.
+
+`Network Settings -> NW Service` checkboxes are persistent service toggles, not
+momentary status lamps. Turning a checkbox ON must start the service now and
+write `*_enabled=1` so boot-time `plumos-network-services start-enabled` starts
+it on the next boot. Turning it OFF must stop the service now and write
+`*_enabled=0` so the next boot leaves it disabled. The frontend should display
+the saved `enabled=` value from `plumos-network-services status`, while the
+status text must still report the real runtime state using exact PID-file and
+`/proc/<pid>/comm` or `/proc/<pid>/cmdline` checks.
+
+The app-layer controller may start or adopt the OpenSSH daemon supplied by the
 system rootfs, but the visible SSH control command is still:
 
 ```text
