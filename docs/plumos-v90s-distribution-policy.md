@@ -341,6 +341,13 @@ RETROARCH_CONFIG_DIR=/mnt/plumos/config/retroarch
 Power actions are a special case. The frontend may expose a compatibility
 entry point in the FAT32 app layer, but the final Reboot/Shutdown implementation
 must live in the system squashfs and run without depending on `/mnt/plumos`.
+For the same reason, the system squashfs/rootfs owns the first writable mount of
+p7 `PLUMOS`: before mounting p7 read-write, init should run a bounded
+`fsck.fat -a`/`dosfsck -a` pass when the target is FAT32/vfat and the tool is
+available. If the check reports an unrecoverable error or times out, the init
+path should avoid a normal writable app-layer mount instead of continuing to
+write into a suspicious FAT filesystem.
+
 Before the final sysrq reboot or poweroff, that rootfs-owned helper should:
 
 - stop SD2 bind mounts under `/mnt/plumos/roms` and `/mnt/plumos/bios`
@@ -981,7 +988,9 @@ Initial implementation rules:
 - Detect SD2 as a non-SD1 `mmcblk` device, normally `/dev/mmcblk1p1`.
 - Prefer FAT32/vfat and exFAT for user-managed SD2 media; ext4 may be accepted
   for development cards.
-- For FAT32/vfat, run `fsck.fat` or `dosfsck` before mounting when available.
+- For FAT32/vfat, run a bounded `fsck.fat -a` or `dosfsck -a` before mounting
+  when available. Keep the timeout short enough that a damaged SD2 cannot block
+  FE startup forever.
 - Accept `roms`/`ROMS`/`Roms` and `bios`/`BIOS`/`Bios` at the SD2 root, but
   expose them through lowercase `/mnt/plumos/roms` and `/mnt/plumos/bios`.
 - If SD2 is absent, invalid, or missing either directory, leave SD1 content

@@ -161,8 +161,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Retry app-layer network services after rootfs Wi-Fi/DHCP completion so
   Samba is not lost when the first non-blocking service pass runs before
   interfaces are ready.
-- [x] Stop blocking FE startup on normal SD2 FAT fsck; frontend launch mounts
-  SD2 with boot fsck disabled by default and keeps explicit fsck opt-in.
+- [x] Keep SD2 FAT fsck enabled by default, but guard it with a short timeout
+  so a bad SD2 cannot block FE startup indefinitely.
 - [x] Reduce normal boot log sync pressure; keep forced boot-log sync behind an
   explicit diagnostic opt-in.
 - [ ] Migrate the remaining rootfs-level `v90s-network-ssh-init` Wi-Fi/SSH
@@ -250,7 +250,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Replace the final p7 read-only remount with a stronger final-stage path
   that runs outside `/mnt/plumos`, unmounts p7 completely, and then triggers
   sysrq reboot/poweroff.
-- [ ] Validate `plumos-v90s-appfat-1g-powerclean-20260711-1.img` on hardware
+- [x] Add rootfs-side mount-before-fsck protection for p7 `PLUMOS` using
+  `dosfstools`/`fsck.fat` so dirty FAT can be repaired before app-layer use.
+- [ ] Validate `plumos-v90s-appfat-1g-fatguard-20260711-1.img` on hardware
   and confirm FE Reboot no longer leaves p7 `PLUMOS` with the FAT dirty
   warning on the next boot.
 - [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.

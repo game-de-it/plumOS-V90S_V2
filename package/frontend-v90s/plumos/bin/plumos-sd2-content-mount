@@ -5,6 +5,7 @@ PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 SD2_MOUNT="${PLUMOS_SD2_MOUNT:-/run/plumos/sd2}"
 SD2_DEVICE="${PLUMOS_SD2_DEVICE:-}"
 FSCK_MODE="${PLUMOS_SD2_FSCK:-auto}"
+FSCK_TIMEOUT="${PLUMOS_SD2_FSCK_TIMEOUT:-15}"
 LOG_DIR="$PLUMOS_ROOT/Logs"
 LOG_FILE="$LOG_DIR/sd2-content-mount.log"
 PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
@@ -42,6 +43,7 @@ fsck_fat_if_needed() {
     dev="$1"
     fstype="$2"
     fsck_bin=""
+    rc=0
 
     [ "$FSCK_MODE" != "0" ] || return 0
     [ "$FSCK_MODE" != "off" ] || return 0
@@ -58,8 +60,12 @@ fsck_fat_if_needed() {
         return 0
     fi
 
-    log "fsck: running $fsck_bin -a -w $dev"
-    "$fsck_bin" -a -w "$dev" >> "$LOG_FILE" 2>&1
+    log "fsck: running $fsck_bin -a $dev timeout=${FSCK_TIMEOUT}s"
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$FSCK_TIMEOUT" "$fsck_bin" -a "$dev" >> "$LOG_FILE" 2>&1
+    else
+        "$fsck_bin" -a "$dev" >> "$LOG_FILE" 2>&1
+    fi
     rc=$?
     log "fsck: $dev rc=$rc"
     if [ "$rc" -gt 1 ]; then

@@ -685,6 +685,53 @@ plumos_app_layer_ready() {
     [ -x /mnt/plumos/bin/plumos-frontend-launch ]
 }
 
+fsck_fat_app_layer_if_needed() {
+    dev="$1"
+    mode="${PLUMOS_APP_LAYER_FSCK:-auto}"
+    timeout_sec="${PLUMOS_APP_LAYER_FSCK_TIMEOUT:-8}"
+    fsck_bin=""
+    rc=0
+
+    [ "$mode" != "0" ] || return 0
+    [ "$mode" != "off" ] || return 0
+
+    if command -v blkid >/dev/null 2>&1; then
+        fstype="$(blkid -o value -s TYPE "$dev" 2>/dev/null || true)"
+        case "$fstype" in
+            vfat|msdos|"")
+                ;;
+            *)
+                log "debian-init: fsck skip dev=$dev detected_fstype=$fstype"
+                return 0
+                ;;
+        esac
+    fi
+
+    for candidate in fsck.fat dosfsck; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            fsck_bin="$candidate"
+            break
+        fi
+    done
+    if [ -z "$fsck_bin" ]; then
+        log "debian-init: fsck skip dev=$dev reason=no_fat_fsck_tool"
+        return 0
+    fi
+
+    log "debian-init: fsck running dev=$dev tool=$fsck_bin timeout=${timeout_sec}s"
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$timeout_sec" "$fsck_bin" -a "$dev" >> "$LOG" 2>&1
+    else
+        "$fsck_bin" -a "$dev" >> "$LOG" 2>&1
+    fi
+    rc=$?
+    log "debian-init: fsck done dev=$dev rc=$rc"
+    if [ "$rc" -gt 1 ]; then
+        return 1
+    fi
+    return 0
+}
+
 prepare_plumos_app_layer() {
     mkdir -p /mnt/plumos 2>/dev/null || true
 
@@ -700,6 +747,12 @@ prepare_plumos_app_layer() {
                 umount /mnt/plumos 2>/dev/null || true
             fi
             log "debian-init: probing app layer dev=$dev fstype=$fstype"
+            if [ "$fstype" = "vfat" ]; then
+                if ! fsck_fat_app_layer_if_needed "$dev"; then
+                    log "debian-init: app layer fsck failed dev=$dev; skipping rw mount"
+                    continue
+                fi
+            fi
             if mount -t "$fstype" -o rw "$dev" /mnt/plumos >> "$LOG" 2>&1; then
                 if plumos_app_layer_ready; then
                     log "debian-init: mounted app layer dev=$dev fstype=$fstype"
@@ -887,7 +940,7 @@ build_debian_minbase() {
     rm -rf "$root"
     mkdir -p "$root"
 
-    debootstrap --arch=arm64 --variant=minbase "$suite" "$root" "$mirror"
+    debootstrap --arch=arm64 --variant=minbase --include=dosfstools "$suite" "$root" "$mirror"
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
     write_debian_init "$root/sbin/init"
@@ -1114,7 +1167,7 @@ build_debian_retroarch_payload() {
     rm -rf "$root"
     mkdir -p "$root"
 
-    retroarch_packages="retroarch,alsa-utils,input-utils,procps,psmisc,kmod"
+    retroarch_packages="retroarch,alsa-utils,input-utils,procps,psmisc,kmod,dosfstools"
     if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
         retroarch_packages="${retroarch_packages},openssh-server,wpasupplicant,isc-dhcp-client,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates"
     fi

@@ -120,18 +120,18 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" ]; then
       ;;
     background|bg)
       (
-        export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-off}"
+        export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-auto}"
         printf 'plumos-frontend-launch: SD2 mount background fsck=%s\n' "$PLUMOS_SD2_FSCK" >> "$log"
         "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
       ) &
       ;;
     sync|"")
-      export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-off}"
+      export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-auto}"
       printf 'plumos-frontend-launch: SD2 mount sync fsck=%s\n' "$PLUMOS_SD2_FSCK" >> "$log"
       "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
       ;;
     *)
-      export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-off}"
+      export PLUMOS_SD2_FSCK="${PLUMOS_SD2_BOOT_FSCK:-auto}"
       printf 'plumos-frontend-launch: unknown SD2 mode=%s; using sync fsck=%s\n' "$sd2_mode" "$PLUMOS_SD2_FSCK" >> "$log"
       "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
       ;;
