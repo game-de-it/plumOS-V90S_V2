@@ -1493,6 +1493,43 @@ static int read_network_service_status(struct ui_state *ui, const char *service,
   return installed;
 }
 
+static int config_bool_value(const char *value, int default_value) {
+  if (!value || !value[0]) {
+    return default_value;
+  }
+  if (strcmp(value, "1") == 0 ||
+      strcmp(value, "true") == 0 ||
+      strcmp(value, "on") == 0 ||
+      strcmp(value, "yes") == 0) {
+    return 1;
+  }
+  if (strcmp(value, "0") == 0 ||
+      strcmp(value, "false") == 0 ||
+      strcmp(value, "off") == 0 ||
+      strcmp(value, "no") == 0) {
+    return 0;
+  }
+  return default_value;
+}
+
+static int read_network_service_enabled(struct ui_state *ui, const char *service,
+                                        int default_value) {
+  char config_path[PATH_MAX];
+  char key[64];
+  char value[64];
+
+  if (!ui || !service || !service[0] ||
+      !join_path(config_path, sizeof(config_path), ui->plumos_root,
+                 "config/network/services.conf") ||
+      snprintf(key, sizeof(key), "%s_enabled", service) >= (int)sizeof(key)) {
+    return default_value;
+  }
+  if (!read_key_value_file(config_path, key, value, sizeof(value))) {
+    return default_value;
+  }
+  return config_bool_value(value, default_value);
+}
+
 static int write_text_file(const char *path, const char *text) {
   int fd;
   size_t len;
@@ -3967,7 +4004,7 @@ static void init_device_settings(struct device_settings *device) {
   copy_string(device->status, sizeof(device->status), "plumOS defaults");
 }
 
-static void load_device_runtime_status(struct ui_state *ui) {
+static void load_wifi_runtime_status(struct ui_state *ui) {
   struct device_settings *device = &ui->device;
 
   device->wifi_runtime_enabled = runtime_wifi_enabled();
@@ -3987,6 +4024,27 @@ static void load_device_runtime_status(struct ui_state *ui) {
                       sizeof(device->wifi_linkspeed));
   read_key_value_file(ui->wpa_status_path, "FREQUENCY", device->wifi_frequency,
                       sizeof(device->wifi_frequency));
+}
+
+static void load_network_service_saved_state(struct ui_state *ui) {
+  struct device_settings *device = &ui->device;
+
+  device->ssh_service_running =
+      read_network_service_enabled(ui, "ssh", 1);
+  device->ftp_service_running =
+      read_network_service_enabled(ui, "ftp", 0);
+  device->sftp_service_running =
+      read_network_service_enabled(ui, "sftp", 0);
+  device->samba_service_running =
+      read_network_service_enabled(ui, "samba", 0);
+  device->adb_service_running =
+      read_network_service_enabled(ui, "adb", 0);
+}
+
+static void load_device_runtime_status(struct ui_state *ui) {
+  struct device_settings *device = &ui->device;
+
+  load_wifi_runtime_status(ui);
   read_network_service_status(ui, "ssh", device->ssh_status,
                               sizeof(device->ssh_status),
                               &device->ssh_service_running);
@@ -4020,7 +4078,7 @@ static int load_device_settings(struct ui_state *ui) {
 
   update_device_backend_status(&ui->device);
 
-  load_device_runtime_status(ui);
+  load_network_service_saved_state(ui);
 
   json = read_file(ui->system_config_path, &json_size);
   if (!json) {
@@ -5705,6 +5763,7 @@ static int load_settings_entries(struct ui_state *ui) {
     break;
   case SETTINGS_CATEGORY_NETWORK_INFORMATION:
     load_device_settings(ui);
+    load_device_runtime_status(ui);
     add_network_information_entries(ui);
     break;
   case SETTINGS_CATEGORY_PERFORMANCE:
@@ -10275,7 +10334,7 @@ static int run_network_wifi_control(struct ui_state *ui, int enable) {
     }
     rc = pclose(pipe);
     settle_input_after_child(ui);
-    load_device_runtime_status(ui);
+    load_wifi_runtime_status(ui);
     if (connected && rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 0) {
       ui->device.wifi_enabled = 1;
       ui->device.wifi_runtime_enabled = 1;

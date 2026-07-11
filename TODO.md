@@ -218,6 +218,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Live-validate the FE `Network Settings -> Wi-Fi` checkbox for runtime
   OFF/ON control: OFF stops `wpa_supplicant` and removes the IP, ON reconnects
   `wlan0`, restores the IP, and persists `wifi_enabled`.
+- [x] Make `Network Settings` and `NW Service` open from saved config state
+  instead of synchronously spawning every network-service status command; keep
+  full runtime checks on the `INFORMATION` screen.
 - [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
   Mac client.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi
