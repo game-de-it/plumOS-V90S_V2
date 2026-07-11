@@ -251,6 +251,11 @@ Build plumOS V90S as a V90S-specific distribution:
   `START -> Network Settings -> NW Service -> ADB` by running the controller UI
   script path that presses `A` on the ADB checkbox and confirming `adb devices`
   disappears on OFF and returns on ON.
+- [x] Investigate the 2026-07-12 ADB disconnect seen after SSH was re-enabled:
+  it was not an `adbd` idle timeout. V90S had `adb_enabled=1`, `adbd` alive,
+  FunctionFS mounted, but `gadget_bound=0`, `udc_state=not attached`, and macOS
+  no longer enumerated `plumOS V90S ADB`; restarting only ADB over SSH rebound
+  the gadget and restored `adb devices`.
 - [ ] Physically confirm the FE ADB checkbox can be toggled with V90S controls
   during normal menu navigation.
 - [ ] Investigate ADB host re-enumeration after repeated cable-attached
