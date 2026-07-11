@@ -252,10 +252,10 @@ Build plumOS V90S as a V90S-specific distribution:
   sysrq reboot/poweroff.
 - [x] Add rootfs-side mount-before-fsck protection for p7 `PLUMOS` using
   `dosfstools`/`fsck.fat` so dirty FAT can be repaired before app-layer use.
-- [ ] Validate `plumos-v90s-appfat-1g-fatguard-20260711-1.img` on hardware
+- [x] Validate `plumos-v90s-appfat-1g-fatguard-20260711-1.img` on hardware
   and confirm FE Reboot no longer leaves p7 `PLUMOS` with the FAT dirty
   warning on the next boot.
-- [ ] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
+- [x] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
 
 ## Milestone 5: SD Image Layout
 

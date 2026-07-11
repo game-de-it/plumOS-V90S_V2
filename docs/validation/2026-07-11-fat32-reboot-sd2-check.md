@@ -121,7 +121,7 @@ FSCK_TIMEOUT="${PLUMOS_SD2_FSCK_TIMEOUT:-15}"
 fsck: running $fsck_bin -a $dev timeout=${FSCK_TIMEOUT}s
 ```
 
-## Next Validation
+## Validation Plan
 
 Build a new image, boot with SD2 inserted, then confirm dmesg contains no dirty
 FAT warning for either:
@@ -129,4 +129,74 @@ FAT warning for either:
 ```text
 mmcblk0p7
 mmcblk1p1
+```
+
+## Follow-up Validation
+
+The `fatguard` image was booted on hardware, a game was launched from FE, and
+the device was rebooted through the FE Reboot action. The device was then
+inspected over SSH at `192.0.2.120`.
+
+The app-layer and SD2 mounts were writable:
+
+```text
+/dev/mmcblk0p7 /mnt/plumos vfat rw,...,errors=remount-ro 0 0
+/dev/mmcblk1p1 /run/plumos/sd2 vfat rw,...,errors=remount-ro 0 0
+/dev/mmcblk1p1 /mnt/plumos/roms vfat rw,...,errors=remount-ro 0 0
+/dev/mmcblk1p1 /mnt/plumos/bios vfat rw,...,errors=remount-ro 0 0
+p7_write_test=ok
+sd2_write_test=ok
+```
+
+dmesg contained no dirty-warning lines for `mmcblk0p7` or `mmcblk1p1`. The only
+FAT-related dmesg lines were the existing non-target probe failure for
+`mmcblk0p4`:
+
+```text
+FAT-fs (mmcblk0p4): invalid media value (0x00)
+FAT-fs (mmcblk0p4): Can't find a valid FAT filesystem
+```
+
+p7 fsck ran before the first writable app-layer mount:
+
+```text
+debian-init: fsck running dev=/dev/mmcblk0p7 tool=fsck.fat timeout=8s
+fsck.fat 4.2 (2021-01-31)
+/dev/mmcblk0p7: 1200 files, 37690/261627 clusters
+debian-init: fsck done dev=/dev/mmcblk0p7 rc=1
+debian-init: mounted app layer dev=/dev/mmcblk0p7 fstype=vfat
+```
+
+SD2 fsck also ran. On the first boot it cleared the pre-existing dirty bit, and
+after FE Reboot the second check was clean:
+
+```text
+fsck: running fsck.fat -a /dev/mmcblk1p1 timeout=15s
+Dirty bit is set. Fs was not properly unmounted and some data may be corrupt.
+ Automatically removing dirty bit.
+/dev/mmcblk1p1: 16903 files, 2095956/7629871 clusters
+fsck: /dev/mmcblk1p1 rc=1
+
+fsck: running fsck.fat -a /dev/mmcblk1p1 timeout=15s
+/dev/mmcblk1p1: 16903 files, 2095956/7629871 clusters
+fsck: /dev/mmcblk1p1 rc=0
+```
+
+The FE Reboot action still delegated to the rootfs-owned helper and stopped SD2
+bind mounts before reboot:
+
+```text
+delegate rootfs_helper=/usr/sbin/plumos-power-action args=--reboot --no-hold-resume
+sd2: stopping content mounts
+umount: done target=/mnt/plumos/bios
+umount: done target=/mnt/plumos/roms
+umount: done target=/run/plumos/sd2
+```
+
+Validation result:
+
+```text
+fatguard_reboot_validation=pass
+p7_dirty_warning=absent
+sd2_dirty_warning=absent_after_fsck_and_reboot
 ```
