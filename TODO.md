@@ -209,6 +209,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy RetroArch into the app layer.
 - [x] Copy supported libretro cores into the app layer.
 - [x] Copy frontend into the app layer.
+- [x] Port the MMF-style FE Apps menu path to V90S with live-device validated
+  `Scraping`, `File Manager`, and `RetroArch` entries.
+- [x] Add the V90S-adapted MMF thumbnail scraper as
+  `/mnt/plumos/bin/plumos-thumbnail-scraper`, using `/mnt/plumos/roms` and
+  `/mnt/plumos/media/<system>/images`.
 - [x] Copy BusyBox and command-line userland into the app layer.
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
 - [x] Add the MMF-compatible default `config/system/settings.json` so frontend
@@ -263,6 +268,10 @@ Build plumOS V90S as a V90S-specific distribution:
   `plumOS V90S ADB` but `adb devices` stays empty.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
+- [ ] Port a real V90S file-manager payload to replace the current safe file
+  overview app once NextCommander or a stock-compatible equivalent is validated.
+- [ ] Port and validate a V90S native Music Player before making
+  `music_player` visible in Apps.
 - [x] Copy plumOS-owned private libraries into the app layer.
 - [x] Avoid symlink-dependent library layouts on FAT32.
 - [x] Generate app-layer `manifest.json`.

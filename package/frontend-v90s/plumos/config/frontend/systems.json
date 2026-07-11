@@ -25,8 +25,11 @@
       "default_launch_profile": "retroarch:quicknes",
       "default_cpu_policy": "ondemand",
       "scraper": {
-        "enabled": false,
-        "reason": "v90s_initial_frontend_port"
+        "enabled": true,
+        "reason": "simple_rom_crc",
+        "extensions": ["nes", "unf", "unif", "zip"],
+        "crc_workers": {"default": 2, "bulk": 2, "max": 2},
+        "download_workers": {"default": 2, "bulk": 2, "max": 2}
       }
     }
   ]

@@ -2,11 +2,62 @@
   "version": 1,
   "apps": [
     {
+      "id": "scraping",
+      "display_name": "Scraping",
+      "kind": "tool",
+      "launch_profile": "internal:scraping",
+      "visible": true,
+      "menu": "apps"
+    },
+    {
+      "id": "file_manager",
+      "display_name": "File Manager",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-file-manager",
+      "show_results": true,
+      "visible": true,
+      "menu": "apps"
+    },
+    {
       "id": "retroarch",
       "display_name": "RetroArch",
       "kind": "emulator",
       "launch_profile": "shell:/mnt/plumos/bin/plumos-retroarch-menu-launch",
       "visible": true,
+      "menu": "apps"
+    },
+    {
+      "id": "music_player",
+      "display_name": "Music Player",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-music-player-launch",
+      "visible": false,
+      "menu": "apps"
+    },
+    {
+      "id": "thumbnail-plan",
+      "display_name": "Thumbnail Plan",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-thumbnail-scraper --all --limit 50",
+      "show_results": true,
+      "visible": false,
+      "menu": "apps"
+    },
+    {
+      "id": "thumbnail-fetch",
+      "display_name": "Fetch Thumbnails",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-thumbnail-scraper --fetch --all --limit 20",
+      "show_results": true,
+      "visible": false,
+      "menu": "apps"
+    },
+    {
+      "id": "thumbnail-results",
+      "display_name": "Thumbnail Results",
+      "kind": "info",
+      "launch_profile": "internal:thumbnail-results",
+      "visible": false,
       "menu": "apps"
     },
     {

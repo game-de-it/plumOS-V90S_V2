@@ -1,0 +1,75 @@
+#!/bin/sh
+# Small V90S-safe file overview app for the frontend Apps menu.
+
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:$PATH"
+export PLUMOS_ROOT PLUMOS_SDCARD_ROOT PATH
+
+target="${1:-$PLUMOS_ROOT}"
+limit="${PLUMOS_FILE_MANAGER_LIMIT:-36}"
+
+case "$limit" in
+  ''|*[!0-9]*|0) limit=36 ;;
+esac
+
+print_header() {
+  printf 'plumOS File Manager\n'
+  printf 'root\t%s\n' "$PLUMOS_ROOT"
+  printf 'target\t%s\n' "$target"
+  printf '\n'
+}
+
+print_mounts() {
+  printf '[mounts]\n'
+  df -h "$PLUMOS_ROOT" 2>/dev/null || true
+  if [ -d /run/plumos/sd2 ]; then
+    df -h /run/plumos/sd2 2>/dev/null || true
+  fi
+  printf '\n'
+}
+
+ignored_entry() {
+  name="$1"
+  case "$name" in
+    ._*|.DS_Store|.Spotlight-V100|.fseventsd|.Trashes|Thumbs.db|desktop.ini|FSCK*.REC)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+list_dir() {
+  dir="$1"
+  title="$2"
+
+  printf '[%s]\n' "$title"
+  if [ ! -d "$dir" ]; then
+    printf 'missing\t%s\n\n' "$dir"
+    return 0
+  fi
+
+  find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null |
+    sort |
+    while IFS= read -r entry; do
+      name="${entry##*/}"
+      ignored_entry "$name" && continue
+      if [ -d "$entry" ]; then
+        printf 'dir\t%s\n' "$name"
+      else
+        size="$(wc -c < "$entry" 2>/dev/null | tr -d ' ' || true)"
+        printf 'file\t%s\t%s\n' "$name" "${size:-0}"
+      fi
+    done |
+    head -n "$limit"
+  printf '\n'
+}
+
+print_header
+print_mounts
+list_dir "$target" "target"
+list_dir "$PLUMOS_ROOT/roms" "roms"
+list_dir "$PLUMOS_ROOT/bios" "bios"
+list_dir "$PLUMOS_ROOT/media" "media"
