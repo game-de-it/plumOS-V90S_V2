@@ -13905,6 +13905,9 @@ static int ui_periodic_refresh_interval_ms(const struct ui_state *ui) {
     if (ui->rom_scan_refresh_pid > 0) {
       return 250;
     }
+    if (ui_uses_graphic_mode(ui) && ui_is_rom_list_screen(ui)) {
+      return UI_GRAPHIC_SCROLL_REFRESH_MS;
+    }
     return ui->rescue_network ? 1000 : 0;
   }
   if (ui_renderer_graphic_capable(ui) && ui->top_transition_active) {

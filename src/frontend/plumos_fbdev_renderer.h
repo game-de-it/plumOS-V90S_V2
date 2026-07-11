@@ -12,6 +12,7 @@
 #include <strings.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -86,6 +87,7 @@ struct plumos_fbdev_renderer {
   long active_offset;
   long visible_offset;
   long frame_bytes;
+  long long marquee_focus_ms;
   uint32_t visible_yoffset;
   uint32_t draw_yoffset;
   int double_buffer;
@@ -1363,6 +1365,43 @@ static void plumos_fbdev_draw_text_font(struct plumos_fbdev_renderer *r,
                                  max_width, color);
 }
 
+static long long plumos_fbdev_time_ms(void) {
+  struct timeval tv;
+  if (gettimeofday(&tv, NULL) != 0) {
+    return (long long)time(NULL) * 1000LL;
+  }
+  return (long long)tv.tv_sec * 1000LL + (long long)(tv.tv_usec / 1000);
+}
+
+static int plumos_fbdev_marquee_offset(struct plumos_fbdev_renderer *r,
+                                       int text_width, int available_width,
+                                       int step_px) {
+  int overflow;
+  int scroll_ms;
+  int cycle_ms;
+  int phase_ms;
+  long long elapsed_ms;
+  const int hold_ms = 1000;
+  const int pixels_per_second = 80;
+
+  (void)step_px;
+  overflow = text_width - available_width;
+  if (overflow <= 0) {
+    return 0;
+  }
+  elapsed_ms = plumos_fbdev_time_ms() - (r ? r->marquee_focus_ms : 0);
+  if (elapsed_ms < hold_ms) {
+    return 0;
+  }
+  scroll_ms = (overflow * 1000 + pixels_per_second - 1) / pixels_per_second;
+  cycle_ms = scroll_ms + hold_ms;
+  phase_ms = (int)((elapsed_ms - hold_ms) % (long long)cycle_ms);
+  if (phase_ms >= scroll_ms) {
+    return overflow;
+  }
+  return (phase_ms * pixels_per_second) / 1000;
+}
+
 static void plumos_fbdev_draw_text(struct plumos_fbdev_renderer *r, int x, int y,
                                    const char *text, int scale, uint32_t color,
                                    int max_width) {
@@ -2345,6 +2384,11 @@ static void plumos_fbdev_draw_rom_preview(struct plumos_fbdev_renderer *r,
   int media_h = 156;
   int thumbnail_drawn = 0;
   char badge[8];
+  int text_x = x + 16;
+  int text_right_x = x + w - 16;
+  int text_available_w = text_right_x - text_x;
+  int title_scroll_px = 0;
+  int detail_scroll_px = 0;
 
   plumos_fbdev_fill_rect(r, x, y, w, h, p->panel);
   plumos_fbdev_fill_rect(r, x + 3, y + 3, w - 6, h - 6, p->panel_inner);
@@ -2363,12 +2407,28 @@ static void plumos_fbdev_draw_rom_preview(struct plumos_fbdev_renderer *r,
       plumos_fbdev_draw_text_center(r, media_x, media_y + 58, media_w, badge, 4,
                                     p->foreground);
     }
-  plumos_fbdev_draw_text_font(r, x + 16, y + 200, entry->title, 2, 1,
-                              p->foreground, x + w - 16);
-  if (entry->detail[0]) {
-      plumos_fbdev_draw_text_font(r, x + 16, y + 232, entry->detail, 2, 1,
-                                  p->muted, x + w - 16);
-  }
+    if (text_available_w > 0) {
+      int title_width =
+          plumos_fbdev_text_width_font(r, entry->title, 2, 1);
+      int detail_width =
+          plumos_fbdev_text_width_font(r, entry->detail, 2, 1);
+      if (title_width > text_available_w) {
+        title_scroll_px =
+            plumos_fbdev_marquee_offset(r, title_width, text_available_w, 12);
+      }
+      if (detail_width > text_available_w) {
+        detail_scroll_px =
+            plumos_fbdev_marquee_offset(r, detail_width, text_available_w, 12);
+      }
+    }
+    plumos_fbdev_draw_text_clipped(r, text_x - title_scroll_px, y + 200,
+                                   entry->title, 2, 1, text_x, text_right_x,
+                                   p->foreground);
+    if (entry->detail[0]) {
+      plumos_fbdev_draw_text_clipped(r, text_x - detail_scroll_px, y + 232,
+                                     entry->detail, 2, 1, text_x,
+                                     text_right_x, p->muted);
+    }
   } else {
     plumos_fbdev_draw_text_center(r, media_x, media_y + 58, media_w, "NO ART",
                                   3, p->muted);
@@ -2426,6 +2486,7 @@ static int plumos_fbdev_render_roms(struct plumos_fbdev_renderer *r,
     int y = list_y + (int)i * row_h;
     int name_x = list_x + 24;
     int name_right_x = list_x + list_w - 10;
+    int scroll_px = 0;
     uint32_t fg = entries[i].selected ? p->selection_foreground : p->foreground;
     if (y + row_h > h - 20) {
       break;
@@ -2433,11 +2494,21 @@ static int plumos_fbdev_render_roms(struct plumos_fbdev_renderer *r,
     if (entries[i].selected) {
       plumos_fbdev_fill_rect(r, list_x - 6, y - 7, list_w, row_h - 4,
                              p->selection_background);
+      if (name_right_x > name_x) {
+        int title_width =
+            plumos_fbdev_text_width_font(r, entries[i].title, 2, 1);
+        int available_width = name_right_x - name_x;
+        if (title_width > available_width) {
+          scroll_px =
+              plumos_fbdev_marquee_offset(r, title_width, available_width, 12);
+        }
+      }
     }
     plumos_fbdev_draw_text(r, list_x, y + 3, entries[i].selected ? ">" : " ",
                            2, fg, name_right_x);
-    plumos_fbdev_draw_text_font(r, name_x, y, entries[i].title, 2, 1, fg,
-                                name_right_x);
+    plumos_fbdev_draw_text_clipped(r, name_x - scroll_px, y,
+                                   entries[i].title, 2, 1, name_x,
+                                   name_right_x, fg);
   }
 
   plumos_fbdev_draw_rom_preview(r, p, selected, preview_x, preview_y,
@@ -2761,21 +2832,27 @@ static void plumos_fbdev_draw_gallery_footer(
   const char *title =
       selected && selected->title[0] ? selected->title : "NO ENTRY";
   int title_width = plumos_fbdev_text_width_font(r, title, 3, 1);
+  int available_width;
+  int scroll_px = 0;
   int title_x;
 
   if (text_right <= text_left) {
     text_left = 24;
     text_right = w - 24;
   }
-  if (title_width > text_right - text_left) {
-    title_x = text_left;
+  available_width = text_right - text_left;
+  if (title_width > available_width) {
+    scroll_px =
+        plumos_fbdev_marquee_offset(r, title_width, available_width, 12);
+    title_x = text_left - scroll_px;
   } else {
     title_x = (w - title_width) / 2;
   }
   plumos_fbdev_fill_rect(r, 0, footer_y, w, 84, p->panel_inner);
   plumos_fbdev_fill_rect(r, 0, footer_y, w, 2, p->accent);
-  plumos_fbdev_draw_text_font(r, title_x, footer_y + 23, title, 3, 1,
-                              p->selection_foreground, text_right);
+  plumos_fbdev_draw_text_clipped(r, title_x, footer_y + 23, title, 3, 1,
+                                 text_left, text_right,
+                                 p->selection_foreground);
   plumos_fbdev_draw_text(r, 24, footer_y + 27, "<", 3, p->muted, w - 24);
   plumos_fbdev_draw_text(r, w - 42, footer_y + 27, ">", 3, p->muted, w - 16);
 }
@@ -3130,7 +3207,10 @@ static int plumos_fbdev_render_lines(struct plumos_fbdev_renderer *r,
 }
 
 static void plumos_fbdev_renderer_reset_marquee(struct plumos_fbdev_renderer *r) {
-  (void)r;
+  if (!r) {
+    return;
+  }
+  r->marquee_focus_ms = plumos_fbdev_time_ms();
 }
 
 static void plumos_fbdev_renderer_shutdown(struct plumos_fbdev_renderer *r) {
