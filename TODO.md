@@ -211,8 +211,13 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy frontend into the app layer.
 - [x] Copy BusyBox and command-line userland into the app layer.
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
+- [x] Add the MMF-compatible default `config/system/settings.json` so frontend
+  system settings such as `wifi_enabled` can persist on V90S.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network
   services are reachable from the frontend.
+- [x] Live-validate the FE `Network Settings -> Wi-Fi` checkbox for runtime
+  OFF/ON control: OFF stops `wpa_supplicant` and removes the IP, ON reconnects
+  `wlan0`, restores the IP, and persists `wifi_enabled`.
 - [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
   Mac client.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi

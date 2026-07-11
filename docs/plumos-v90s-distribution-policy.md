@@ -542,6 +542,13 @@ troubleshooting view all agree. On V90S the Wi-Fi path must assume an external
 USB dongle rather than internal Wi-Fi, and scan/connect actions must return a
 bounded failure when no dongle or no supported interface is present.
 
+`Network Settings -> Wi-Fi` controls the running USB Wi-Fi connection through
+`plumos-network-control --wifi on|off` and persists the user's requested state
+as `wifi_enabled` in `/mnt/plumos/config/system/settings.json`. Boot-time Wi-Fi
+bring-up must eventually honor the same key; while the legacy rootfs
+`v90s-network-ssh-init` hook remains, this is a known migration boundary rather
+than a separate source of truth.
+
 `Network Settings -> NW Service` checkboxes are persistent service toggles, not
 momentary status lamps. Turning a checkbox ON must start the service now and
 write `*_enabled=1` so boot-time `plumos-network-services start-enabled` starts
