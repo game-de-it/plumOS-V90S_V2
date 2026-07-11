@@ -324,6 +324,54 @@ adb shell id
 uid=0(root) gid=0(root) groups=0(root)
 ```
 
+## Live Visible Screen Mismatch
+
+The first FE toggle validation used a separate controller-UI process, so it did
+not prove that the already-running visible FE process had picked up the new
+binary. A direct framebuffer capture of the user's visible screen showed the
+problem:
+
+```text
+NETWORK SETTINGS - NW SERVICE
+SSH
+FTP
+SFTP
+SAMBA
+USB DISK MODE
+```
+
+ADB was absent even though the file on disk contained the ADB strings. The
+running process explained the mismatch:
+
+```text
+/proc/1692/exe -> /mnt/plumos/bin/plumos-controller-ui-fbdev (deleted)
+```
+
+The FAT32 app-layer binary had been replaced while the old FE process was still
+running, so the visible screen was rendered by the deleted pre-ADB executable.
+Restarting only the frontend through the safe frontend stop/launch scripts fixed
+the mismatch:
+
+```text
+/mnt/plumos/bin/plumos-frontend-stop stop
+nohup /mnt/plumos/bin/plumos-frontend-launch \
+  >/mnt/plumos/Logs/frontend-restart-adb-menu-fixed.log 2>&1 &
+
+/proc/9046/exe -> /mnt/plumos/bin/plumos-controller-ui-fbdev
+```
+
+A later framebuffer capture of `NETWORK SETTINGS - NW SERVICE` showed the
+expected row:
+
+```text
+SSH
+FTP
+SFTP
+SAMBA
+ADB
+USB DISK MODE
+```
+
 ## Validation Still Needed
 
 - Confirm the same FE checkbox row manually with the physical V90S controls
