@@ -4563,6 +4563,9 @@ static int font_path_is_bitmap_only(const char *path) {
 static int choose_mali_font_path(struct ui_state *ui, const char *requested,
                                  char *out, size_t out_size) {
   static const char *rel_candidates[] = {
+      "fonts/ui.ttf",
+      "fonts/default.ttf",
+      "fonts/default.otf",
       "plumos/fonts/ui.ttf",
       "plumos/fonts/default.ttf",
       "plumos/fonts/default.otf",
@@ -4604,6 +4607,7 @@ static int choose_mali_font_path(struct ui_state *ui, const char *requested,
 static int choose_mali_fallback_font_path(struct ui_state *ui, const char *primary,
                                           char *out, size_t out_size) {
   static const char *rel_candidates[] = {
+      "fonts/cjk-fallback.ttc",
       "plumos/fonts/cjk-fallback.ttc",
       "RetroArch/.retroarch/assets/pkg/chinese-fallback-font.ttf",
       "RetroArch/.retroarch/system/msyh.ttf",

@@ -18,6 +18,14 @@ frontend by following the plumOS MMF frontend font path.
 - Forced font rendering for ROM titles/details and gallery footer text, where
   user ROM filenames appear.
 - Kept the built-in ASCII glyph route for lightweight UI labels.
+- Added V90S app-layer direct font candidates:
+  - `fonts/default.otf`
+  - `fonts/cjk-fallback.ttc`
+
+The direct `fonts/` candidates are required because V90S mounts the app layer
+itself at `/mnt/plumos`. The MMF-style `plumos/fonts/...` candidates are still
+kept as compatibility candidates for layouts where the SD root contains a nested
+`plumos/` directory.
 
 ## Build
 
@@ -47,16 +55,15 @@ plumos/fonts/cjk-fallback.ttc
 Hashes:
 
 ```text
-6ef19148e25e1e77ba2d43f9f6d29c0736274d0260e53440ec1810d7568394a8  output/app-layer/v90s/bin/plumos-controller-ui-fbdev
+4b3b096087fb5f8e5db3bd2580b640d4abb6c22868e0b851c4d7e638a5ebf898  output/app-layer/v90s/bin/plumos-controller-ui-fbdev
 783bdf40891ca3df088e6d9a832fdc80ce81fe1f0db8716bd280bc86535b0c81  output/app-layer/v90s/fonts/default.otf
 e4bca8df123ce01b104780f576ea1a58b9a5ff1662a91124b6d3180cb6c88212  output/app-layer/v90s/fonts/cjk-fallback.ttc
 ```
 
 ## Offscreen Render Check
 
-Because the live V90S SSH endpoint was not reachable during this work, a small
-Docker-side offscreen render test exercised the same fbdev text functions with
-the bundled fonts.
+A small Docker-side offscreen render test exercised the same fbdev text
+functions with the bundled fonts.
 
 Generated:
 
@@ -73,19 +80,61 @@ The test rendered these sample ROM names legibly:
 がんばれゴエモン！からくり道中.nes
 ```
 
-## Live Device Status
+## Live Device Deployment
 
-Network scan results during this task:
+Device:
 
 ```text
-192.0.2.1
-192.0.2.6
-192.0.2.100
+ssh root@192.0.2.120
 ```
 
-`192.0.2.100` accepted a TCP connection on port 22 but timed out during SSH
-banner exchange, so it was not treated as a valid V90S SSH target. The previous
-V90S address `192.0.2.120` was not reachable.
+Deployment:
 
-Live deploy and real `/dev/fb0` screenshot should be performed after V90S SSH is
-reachable again.
+```text
+scp output/app-layer/v90s/bin/plumos-controller-ui-fbdev \
+  root@192.0.2.120:/tmp/plumos-controller-ui-fbdev.new
+/mnt/plumos/bin/plumos-frontend-stop stop
+mv /tmp/plumos-controller-ui-fbdev.new /mnt/plumos/bin/plumos-controller-ui-fbdev
+chmod 0755 /mnt/plumos/bin/plumos-controller-ui-fbdev
+nohup env PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+  /mnt/plumos/bin/plumos-frontend-launch &
+```
+
+Device hash after deploy:
+
+```text
+4b3b096087fb5f8e5db3bd2580b640d4abb6c22868e0b851c4d7e638a5ebf898  /mnt/plumos/bin/plumos-controller-ui-fbdev
+```
+
+Font load proof from the live framebuffer status line:
+
+```text
+FBDEV RENDERER READY FONT=/MNT/PLUMOS/FONTS/DEFAUL...
+```
+
+Captured framebuffer PNGs:
+
+```text
+output/validation/plumos-fb0-fontpath-page0.png
+output/validation/plumos-fb0-jp-roms-font3-page0.png
+```
+
+`plumos-fb0-jp-roms-font3-page0.png` shows Japanese NES ROM titles rendered
+legibly in the ROM list and preview panel:
+
+```text
+つっぱり大相撲
+アイスクライマー
+アトランチスの謎
+イー・アル・カンフー
+エキサイトバイク
+ギャラガ
+グラディウス
+スーパーマリオUSA
+```
+
+The live ROM cache also retained valid UTF-8:
+
+```text
+roms 86 non_ascii 26 square_titles 0
+```
