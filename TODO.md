@@ -217,12 +217,20 @@ Build plumOS V90S as a V90S-specific distribution:
   Mac client.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi
   dongles. It exposes a dedicated transfer image, not `/mnt/plumos` itself.
+- [x] Add a USB command mailbox to USB Disk Mode so diagnostics can be queued
+  as `commands/run.sh` plus `commands/ALLOW_EXECUTE` and results are written
+  back to `RESULT-LATEST.txt` and `results/` after V90S remounts the transfer
+  image.
 - [ ] Physically validate USB Disk Mode from macOS with a data-capable USB
   cable and confirm the `PLUMUSB` drive appears, can be ejected, and remounts
   on V90S at `/mnt/plumos/usb-transfer`.
-- [ ] Investigate command execution over USB. The current StockOS-derived
-  kernel has Mass Storage and FunctionFS, but not USB Ethernet
-  ECM/RNDIS/NCM or ACM serial; likely routes are ADB userspace via FunctionFS
+- [ ] Physically validate the USB command mailbox from macOS by copying a
+  diagnostic `commands/run.sh`, creating `commands/ALLOW_EXECUTE`, ejecting
+  `PLUMUSB`, unplugging USB, and confirming the result files on the next USB
+  Disk Mode session.
+- [ ] Revisit true interactive command execution over USB later. The current
+  StockOS-derived kernel has Mass Storage and FunctionFS, but not USB Ethernet
+  ECM/RNDIS/NCM or ACM serial; future routes are ADB userspace via FunctionFS
   or a custom FunctionFS/libusb command channel.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.

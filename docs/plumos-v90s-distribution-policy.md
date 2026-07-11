@@ -559,6 +559,16 @@ SSH service state. FTP, SSH, and Samba stop/restart logic should use PID files
 plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before terminating
 processes.
 
+USB cable diagnostics are a separate path from Wi-Fi/SSH. With the current
+StockOS-derived kernel, USB Ethernet and USB ACM serial are not available, so
+the supported near-term cable path is USB Disk Mode plus a command mailbox in
+the dedicated `PLUMUSB` transfer image. The mailbox may execute an explicitly
+armed `commands/run.sh` after the PC ejects the drive and the V90S remounts the
+image, then write command output back under `results/`. This does not make
+`/mnt/plumos` itself a shared live USB disk, and it should remain a diagnostic
+route for recovering logs and network state when the USB Wi-Fi dongle is
+unavailable.
+
 The app-layer output should use a stable tree layout under:
 
 ```text

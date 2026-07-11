@@ -14,6 +14,10 @@ IMAGE="${PLUMOS_USB_DISK_IMAGE:-${STATE_DIR}/plumos-usb-transfer.img}"
 MOUNT_DIR="${PLUMOS_USB_DISK_MOUNT:-${PLUMOS_ROOT}/usb-transfer}"
 IMAGE_SIZE_MB="${PLUMOS_USB_DISK_SIZE_MB:-64}"
 CONNECT_TIMEOUT_SECONDS="${PLUMOS_USB_DISK_CONNECT_TIMEOUT_SECONDS:-45}"
+COMMAND_TIMEOUT_SECONDS="${PLUMOS_USB_COMMAND_TIMEOUT_SECONDS:-120}"
+COMMAND_DIR_NAME="${PLUMOS_USB_COMMAND_DIR_NAME:-commands}"
+RESULTS_DIR_NAME="${PLUMOS_USB_RESULTS_DIR_NAME:-results}"
+PROCESSED_DIR_NAME="${PLUMOS_USB_PROCESSED_DIR_NAME:-processed}"
 GADGET_NAME="${PLUMOS_USB_DISK_GADGET_NAME:-plumos_usb_disk}"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 FUNCTION_NAME="mass_storage.usb0"
@@ -45,10 +49,19 @@ Commands:
   leave     Unexport the USB drive and mount the transfer image on V90S.
   mount     Mount the transfer image on V90S without exporting it.
   unmount   Unmount the transfer image from V90S.
+  process-commands
+            Execute an armed commands/run.sh from the transfer image.
   status    Print USB disk mode state.
 
 The exported disk is a separate image file, not /mnt/plumos itself. This avoids
 sharing the live FAT32 app layer with the PC and V90S at the same time.
+
+USB command mailbox:
+  1. Put a shell script at commands/run.sh on the PLUMUSB drive.
+  2. Create an empty commands/ALLOW_EXECUTE file.
+  3. Eject PLUMUSB on the PC and unplug the USB cable.
+  4. V90S executes the script after remounting the transfer image.
+  5. Read RESULT-LATEST.txt and results/<timestamp>/ on the next USB session.
 USAGE
 }
 
@@ -132,7 +145,212 @@ mount_image() {
   if command -v fsck.fat >/dev/null 2>&1; then
     fsck.fat -a "$IMAGE" >> "$LOG_FILE" 2>&1 || true
   fi
-  mount -t vfat -o loop,rw,utf8 "$IMAGE" "$MOUNT_DIR" >> "$LOG_FILE" 2>&1
+  mount -t vfat -o loop,rw,utf8 "$IMAGE" "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || return 1
+  prepare_transfer_tree
+}
+
+prepare_transfer_tree() {
+  [ -d "$MOUNT_DIR" ] || return 0
+  mkdir -p \
+    "${MOUNT_DIR}/${COMMAND_DIR_NAME}" \
+    "${MOUNT_DIR}/${RESULTS_DIR_NAME}" \
+    "${MOUNT_DIR}/${PROCESSED_DIR_NAME}" 2>/dev/null || true
+
+  if [ ! -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/README.TXT" ]; then
+    cat > "${MOUNT_DIR}/${COMMAND_DIR_NAME}/README.TXT" <<'EOF' 2>/dev/null || true
+plumOS V90S USB command mailbox
+
+To run one command batch on V90S:
+
+1. Copy your shell script to commands/run.sh.
+2. Create an empty commands/ALLOW_EXECUTE file.
+3. Eject the PLUMUSB drive from your PC.
+4. Unplug the USB cable.
+5. V90S runs commands/run.sh after it remounts this transfer image.
+6. Re-enter USB Disk Mode and read RESULT-LATEST.txt plus results/.
+
+The command runs with /mnt/plumos/bin early in PATH and /mnt/plumos as cwd.
+This is a diagnostic path, not an interactive shell.
+EOF
+  fi
+
+  if [ ! -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/run.sh.example" ]; then
+    cat > "${MOUNT_DIR}/${COMMAND_DIR_NAME}/run.sh.example" <<'EOF' 2>/dev/null || true
+#!/bin/sh
+set -u
+
+echo "plumOS USB command example"
+date
+uname -a
+id
+ip addr 2>/dev/null || ifconfig -a 2>/dev/null || true
+plumos-network-services status 2>/dev/null || true
+plumos-network-control status 2>/dev/null || true
+df -h
+EOF
+  fi
+}
+
+make_result_dir() {
+  stamp="$(date '+%Y%m%d-%H%M%S' 2>/dev/null || echo unknown)"
+  base="${MOUNT_DIR}/${RESULTS_DIR_NAME}/${stamp}"
+  candidate="$base"
+  n=0
+  while ! mkdir "$candidate" 2>/dev/null; do
+    n=$((n + 1))
+    candidate="${base}-${n}"
+    [ "$n" -lt 100 ] || return 1
+  done
+  printf '%s\n' "$candidate"
+}
+
+write_latest_result() {
+  result_dir="$1"
+  rc="$2"
+  timed_out="$3"
+  rel_result="${RESULTS_DIR_NAME}/$(basename "$result_dir")"
+
+  {
+    printf 'plumOS V90S USB command result\n'
+    printf 'time=%s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)"
+    printf 'exit_code=%s\n' "$rc"
+    printf 'timed_out=%s\n' "$timed_out"
+    printf 'result_dir=%s\n' "$rel_result"
+    printf 'command=%s/command.sh\n' "$rel_result"
+    printf 'stdout=%s/stdout.txt\n' "$rel_result"
+    printf 'stderr=%s/stderr.txt\n' "$rel_result"
+  } > "${MOUNT_DIR}/RESULT-LATEST.txt" 2>/dev/null || true
+}
+
+run_command_with_timeout() {
+  cmd_copy="$1"
+  stdout_file="$2"
+  stderr_file="$3"
+  timeout_marker="${RUN_DIR}/usb-command-timeout.$$"
+
+  case "$COMMAND_TIMEOUT_SECONDS" in
+    ''|*[!0-9]*)
+      COMMAND_TIMEOUT_SECONDS=120
+      ;;
+  esac
+
+  if command -v timeout >/dev/null 2>&1 && [ "$COMMAND_TIMEOUT_SECONDS" -gt 0 ]; then
+    (
+      cd "$PLUMOS_ROOT" 2>/dev/null || cd /
+      export HOME=/root
+      export PLUMOS_ROOT PLUMOS_SDCARD_ROOT PATH
+      timeout -k 2 "$COMMAND_TIMEOUT_SECONDS" /bin/sh "$cmd_copy"
+    ) > "$stdout_file" 2> "$stderr_file"
+    rc="$?"
+    timed_out=0
+    case "$rc" in
+      124|137|143)
+        timed_out=1
+        rc=124
+        ;;
+    esac
+    printf '%s %s\n' "$rc" "$timed_out"
+    return 0
+  fi
+
+  rm -f "$timeout_marker" 2>/dev/null || true
+  (
+    cd "$PLUMOS_ROOT" 2>/dev/null || cd /
+    export HOME=/root
+    export PLUMOS_ROOT PLUMOS_SDCARD_ROOT PATH
+    /bin/sh "$cmd_copy"
+  ) > "$stdout_file" 2> "$stderr_file" &
+  cmd_pid="$!"
+
+  watcher_pid=
+  if [ "$COMMAND_TIMEOUT_SECONDS" -gt 0 ]; then
+    (
+      sleep "$COMMAND_TIMEOUT_SECONDS"
+      if kill -0 "$cmd_pid" 2>/dev/null; then
+        printf '1\n' > "$timeout_marker" 2>/dev/null || true
+        kill "$cmd_pid" 2>/dev/null || true
+        sleep 2
+        kill -9 "$cmd_pid" 2>/dev/null || true
+      fi
+    ) &
+    watcher_pid="$!"
+  fi
+
+  wait "$cmd_pid" 2>/dev/null
+  rc="$?"
+  if [ -n "$watcher_pid" ]; then
+    kill "$watcher_pid" 2>/dev/null || true
+  fi
+
+  timed_out=0
+  if [ -f "$timeout_marker" ]; then
+    timed_out=1
+    rc=124
+    rm -f "$timeout_marker" 2>/dev/null || true
+  fi
+  printf '%s %s\n' "$rc" "$timed_out"
+}
+
+process_commands() {
+  if gadget_bound; then
+    log "command_refused reason=gadget_bound"
+    return 1
+  fi
+  mount_image || return 1
+  prepare_transfer_tree
+
+  command_dir="${MOUNT_DIR}/${COMMAND_DIR_NAME}"
+  run_script="${command_dir}/run.sh"
+  allow_file="${command_dir}/ALLOW_EXECUTE"
+  if [ ! -e "$run_script" ] && [ ! -e "$allow_file" ]; then
+    return 0
+  fi
+  if [ ! -e "$allow_file" ]; then
+    log "command_pending_without_allow script=${run_script}"
+    return 0
+  fi
+  if [ ! -f "$run_script" ]; then
+    log "command_allow_without_script"
+    return 1
+  fi
+  if [ -L "$run_script" ]; then
+    log "command_refused reason=symlink script=${run_script}"
+    return 1
+  fi
+
+  result_dir="$(make_result_dir)" || return 1
+  processed_dir="${MOUNT_DIR}/${PROCESSED_DIR_NAME}/$(basename "$result_dir")"
+  mkdir -p "$processed_dir" "$RUN_DIR" 2>/dev/null || true
+  cmd_copy="${RUN_DIR}/usb-command-$(basename "$result_dir").sh"
+
+  cp "$run_script" "${result_dir}/command.sh" >> "$LOG_FILE" 2>&1 || return 1
+  cp "$run_script" "$cmd_copy" >> "$LOG_FILE" 2>&1 || return 1
+  chmod 700 "$cmd_copy" 2>/dev/null || true
+  cp "$run_script" "${processed_dir}/run.sh" >> "$LOG_FILE" 2>&1 || true
+  rm -f "$allow_file" "$run_script" 2>/dev/null || true
+  sync
+
+  {
+    printf 'time=%s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)"
+    printf 'timeout_seconds=%s\n' "$COMMAND_TIMEOUT_SECONDS"
+    printf 'cwd=%s\n' "$PLUMOS_ROOT"
+    printf 'PATH=%s\n' "$PATH"
+    printf 'PLUMOS_ROOT=%s\n' "$PLUMOS_ROOT"
+    printf 'PLUMOS_SDCARD_ROOT=%s\n' "$PLUMOS_SDCARD_ROOT"
+    printf 'uname=%s\n' "$(uname -a 2>/dev/null || true)"
+  } > "${result_dir}/env.txt" 2>/dev/null || true
+
+  log "command_start result=$(basename "$result_dir") timeout=${COMMAND_TIMEOUT_SECONDS}"
+  set -- $(run_command_with_timeout "$cmd_copy" "${result_dir}/stdout.txt" "${result_dir}/stderr.txt")
+  rc="$1"
+  timed_out="$2"
+  printf '%s\n' "$rc" > "${result_dir}/exit_code.txt" 2>/dev/null || true
+  printf '%s\n' "$timed_out" > "${result_dir}/timed_out.txt" 2>/dev/null || true
+  write_latest_result "$result_dir" "$rc" "$timed_out"
+  rm -f "$cmd_copy" 2>/dev/null || true
+  sync
+  log "command_done result=$(basename "$result_dir") rc=${rc} timed_out=${timed_out}"
+  return 0
 }
 
 teardown_gadget() {
@@ -230,6 +448,7 @@ enter_mode() {
     teardown_gadget
     ACTIVE=0
     mount_image || return 1
+    process_commands || true
     log "leave_complete mounted=${MOUNT_DIR}"
     return 0
   fi
@@ -253,6 +472,11 @@ status_mode() {
   printf 'mounted=%s\n' "$( is_mounted && echo 1 || echo 0 )"
   printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
   printf 'udc_state=%s\n' "$(udc_state)"
+  if is_mounted; then
+    printf 'command_script=%s\n' "$( [ -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/run.sh" ] && echo 1 || echo 0 )"
+    printf 'command_armed=%s\n' "$( [ -e "${MOUNT_DIR}/${COMMAND_DIR_NAME}/ALLOW_EXECUTE" ] && echo 1 || echo 0 )"
+    printf 'latest_result=%s\n' "$( [ -f "${MOUNT_DIR}/RESULT-LATEST.txt" ] && echo 1 || echo 0 )"
+  fi
   if [ -d "$GADGET_DIR" ] && [ -r "${GADGET_DIR}/UDC" ]; then
     printf 'udc=%s\n' "$(cat "${GADGET_DIR}/UDC" 2>/dev/null || true)"
   fi
@@ -270,6 +494,9 @@ case "${1:-status}" in
     ;;
   unmount)
     unmount_image
+    ;;
+  process-commands)
+    process_commands
     ;;
   status)
     status_mode

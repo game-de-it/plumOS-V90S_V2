@@ -8,7 +8,8 @@ Reduce dependence on the unstable USB Wi-Fi dongle for development access.
 
 The desired long-term result is command and file transfer over a USB cable. The
 first implemented step is safe USB file transfer through a dedicated mass
-storage image.
+storage image. The second implemented step is a diagnostic command mailbox over
+that same transfer image.
 
 ## Kernel Capability Check
 
@@ -83,6 +84,23 @@ size=64MiB by default
 This avoids mounting the live FAT32 app layer on both V90S and the PC at the
 same time.
 
+The transfer image also carries a diagnostic command mailbox:
+
+```text
+commands/README.TXT
+commands/run.sh.example
+commands/run.sh
+commands/ALLOW_EXECUTE
+results/<timestamp>/
+processed/<timestamp>/
+RESULT-LATEST.txt
+```
+
+The mailbox is deliberately opt-in. V90S executes `commands/run.sh` only when
+`commands/ALLOW_EXECUTE` also exists, and only after the USB drive has been
+ejected/unplugged and the transfer image is remounted on V90S. Results are
+written back to the same transfer image.
+
 Frontend change:
 
 ```text
@@ -94,7 +112,7 @@ Network Settings -> NW Service -> USB Disk Mode
 Deployed binaries:
 
 ```text
-bad0802cdb00181be74b11cadb2a0a97244539cb664eda8aa5eb73e25ecb2e61  /mnt/plumos/bin/plumos-usb-disk-mode
+9ceec3e60233661dffd2762767c4578f5e126dfee1578406fa259fed1d3de89c  /mnt/plumos/bin/plumos-usb-disk-mode
 af9e3727176f01d58d9b39970f35354331fd327b3e59f1624b85c54fd87a9272  /mnt/plumos/bin/plumos-controller-ui-fbdev
 ```
 
@@ -103,6 +121,7 @@ under:
 
 ```text
 /mnt/plumos/backups/usb-disk-mode-20260711/
+/mnt/plumos/backups/usb-command-mailbox-20260711/
 ```
 
 Running frontend after deploy:
@@ -156,9 +175,98 @@ The helper bound `5100000.udc-controller`, timed out because no USB host was
 attached, removed the gadget, and remounted the transfer image. This confirms
 the UI path should not remain stuck forever when started without a cable.
 
+## Command Mailbox Workflow
+
+On the Mac or other PC host, while `PLUMUSB` is visible:
+
+```sh
+mkdir -p commands
+cat > commands/run.sh <<'EOF'
+#!/bin/sh
+date
+uname -a
+id
+ip addr 2>/dev/null || ifconfig -a 2>/dev/null || true
+plumos-network-services status 2>/dev/null || true
+plumos-network-control status 2>/dev/null || true
+df -h
+EOF
+touch commands/ALLOW_EXECUTE
+```
+
+Then eject `PLUMUSB` from the host and unplug the USB cable. V90S remounts the
+transfer image and runs the command. The next USB Disk Mode session should show:
+
+```text
+RESULT-LATEST.txt
+results/<timestamp>/command.sh
+results/<timestamp>/stdout.txt
+results/<timestamp>/stderr.txt
+results/<timestamp>/exit_code.txt
+results/<timestamp>/timed_out.txt
+results/<timestamp>/env.txt
+processed/<timestamp>/run.sh
+```
+
+Default execution environment:
+
+```text
+cwd=/mnt/plumos
+PATH=/mnt/plumos/bin:/mnt/plumos/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin
+timeout=120 seconds
+```
+
+This is not an interactive shell. It is intended for bounded diagnostics and
+log capture when Wi-Fi or SSH is unavailable.
+
+## Live Command Mailbox Smoke Test
+
+Live deployment was updated over SSH while Wi-Fi was still reachable:
+
+```text
+sha256=/mnt/plumos/bin/plumos-usb-disk-mode
+9ceec3e60233661dffd2762767c4578f5e126dfee1578406fa259fed1d3de89c
+```
+
+A short command was placed into the mounted transfer image and processed on the
+V90S:
+
+```text
+commands/run.sh
+commands/ALLOW_EXECUTE
+PLUMOS_USB_COMMAND_TIMEOUT_SECONDS=10 plumos-usb-disk-mode process-commands
+```
+
+Result:
+
+```text
+ELAPSED=1
+exit_code=0
+timed_out=0
+result_dir=results/20260608-211850
+stdout contained:
+USB_MAILBOX_FAST_SMOKE
+Linux (none) 4.9.191 #17 SMP PREEMPT Tue May 13 18:14:09 UTC 2025 aarch64 GNU/Linux
+uid=0(root) gid=0(root) groups=0(root)
+```
+
+Timeout behavior was also tested with `sleep 5` and a one-second command
+timeout:
+
+```text
+exit_code=124
+timed_out=1
+stdout contained:
+USB_MAILBOX_TIMEOUT_SMOKE
+```
+
+After each run, `command_script=0` and `command_armed=0` in `status`, confirming
+that the same command is not re-executed automatically.
+
 ## User Validation Needed
 
-Actual Mac-side USB drive detection still needs physical validation:
+Actual Mac-side USB drive detection and command-mailbox execution still need
+physical validation:
 
 1. Connect V90S to the Mac with a data-capable USB cable.
 2. Open `Network Settings -> NW Service -> USB Disk Mode`.
@@ -172,11 +280,13 @@ Actual Mac-side USB drive detection still needs physical validation:
 ```text
 /mnt/plumos/usb-transfer
 ```
+9. Repeat with a diagnostic `commands/run.sh` and `commands/ALLOW_EXECUTE`.
+10. Re-enter USB Disk Mode and confirm `RESULT-LATEST.txt` plus `results/`.
 
 ## Remaining Work
 
-Command execution over USB is not solved by USB Disk Mode. The practical future
-routes are:
+True interactive command execution over USB is not solved by USB Disk Mode. The
+practical future routes are:
 
 - port an `adbd` userspace daemon and expose ADB through FunctionFS
 - implement a custom FunctionFS/libusb command channel plus a Mac-side CLI
