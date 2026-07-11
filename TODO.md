@@ -238,6 +238,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `/mnt/plumos/config/network/services.conf` in sync.
 - [ ] Physically confirm the FE ADB checkbox can be toggled with V90S controls
   during normal menu navigation.
+- [ ] Investigate ADB host re-enumeration after repeated cable-attached
+  stop/start cycles; V90S can report `udc_state=configured` while macOS sees
+  `plumOS V90S ADB` but `adb devices` stays empty.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

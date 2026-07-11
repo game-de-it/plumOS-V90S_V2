@@ -259,9 +259,18 @@ adb shell id
 uid=0(root) gid=0(root) groups=0(root)
 ```
 
+After a later repeated stop/start cycle with the cable still connected, the V90S
+side again reported `gadget_bound=1` and `udc_state=configured`, and macOS
+IORegistry showed `plumOS V90S ADB`, but `adb devices -l` stayed empty. Treat
+this as a remaining host re-enumeration or ADB handshake stability issue,
+separate from the frontend service registration.
+
 ## Validation Still Needed
 
 - Confirm the physical FE checkbox row can be toggled with the V90S controls
   during normal menu navigation.
+- Investigate repeated ADB stop/start while the USB cable is connected; macOS
+  may still see the USB gadget while the adb host does not list it until a
+  reconnect or another recovery step.
 - Decide whether ADB should remain enabled in development profiles after reboot
   or be treated as an explicit temporary service.
