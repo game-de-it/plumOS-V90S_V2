@@ -20,6 +20,7 @@ RUN apt-get update \
     bison \
     build-essential \
     ca-certificates \
+    clang \
     cmake \
     cpio \
     curl \
@@ -34,9 +35,16 @@ RUN apt-get update \
     genimage \
     gettext \
     git \
+    dpkg-dev \
     iproute2 \
     jq \
+    android-libbase-dev \
+    android-libboringssl-dev \
+    android-libcutils-dev \
+    android-liblog-dev \
+    android-libutils-dev \
     libasound2-dev \
+    libcap-dev \
     libegl-dev \
     libfreetype6-dev \
     libgles-dev \
@@ -44,8 +52,10 @@ RUN apt-get update \
     libpipewire-0.3-dev \
     libpulse-dev \
     libsdl2-dev \
+    libselinux1-dev \
     libtool \
     libudev-dev \
+    libusb-1.0-0-dev \
     lz4 \
     make \
     meson \

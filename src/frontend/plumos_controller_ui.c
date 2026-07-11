@@ -469,9 +469,11 @@ struct device_settings {
   int ftp_service_running;
   int sftp_service_running;
   int samba_service_running;
+  int adb_service_running;
   char ftp_status[128];
   char sftp_status[128];
   char samba_status[128];
+  char adb_status[128];
   char brightness_backend[128];
   char volume_backend[128];
   char wifi_state[64];
@@ -3957,6 +3959,7 @@ static void init_device_settings(struct device_settings *device) {
   copy_string(device->ftp_status, sizeof(device->ftp_status), "Not Installed");
   copy_string(device->sftp_status, sizeof(device->sftp_status), "Not Installed");
   copy_string(device->samba_status, sizeof(device->samba_status), "Not Installed");
+  copy_string(device->adb_status, sizeof(device->adb_status), "Not Installed");
   copy_string(device->brightness_backend, sizeof(device->brightness_backend),
               "runtime backend unknown");
   copy_string(device->volume_backend, sizeof(device->volume_backend),
@@ -3996,6 +3999,9 @@ static void load_device_runtime_status(struct ui_state *ui) {
   read_network_service_status(ui, "samba", device->samba_status,
                               sizeof(device->samba_status),
                               &device->samba_service_running);
+  read_network_service_status(ui, "adb", device->adb_status,
+                              sizeof(device->adb_status),
+                              &device->adb_service_running);
 }
 
 static int load_device_settings(struct ui_state *ui) {
@@ -4923,7 +4929,8 @@ static enum setting_control_type setting_control_type_for_id(const char *id) {
       strcmp(id, "network_ssh_enabled") == 0 ||
       strcmp(id, "network_ftp_enabled") == 0 ||
       strcmp(id, "network_sftp_enabled") == 0 ||
-      strcmp(id, "network_samba_enabled") == 0) {
+      strcmp(id, "network_samba_enabled") == 0 ||
+      strcmp(id, "network_adb_enabled") == 0) {
     return SETTING_CONTROL_CHECKBOX;
   }
   if (setting_choices(id, NULL)) {
@@ -4991,6 +4998,7 @@ static int setting_is_writable(const char *id) {
                 strcmp(id, "network_ftp_enabled") == 0 ||
                 strcmp(id, "network_sftp_enabled") == 0 ||
                 strcmp(id, "network_samba_enabled") == 0 ||
+                strcmp(id, "network_adb_enabled") == 0 ||
                 strcmp(id, "performance_system") == 0 ||
                 strcmp(id, "performance_cpu_policy") == 0);
 }
@@ -5294,6 +5302,8 @@ static void add_network_service_entries(struct ui_state *ui) {
                          device->sftp_service_running);
   add_bool_setting_entry(ui, "network_samba_enabled", "Samba",
                          device->samba_service_running);
+  add_bool_setting_entry(ui, "network_adb_enabled", "ADB",
+                         device->adb_service_running);
   add_setting_entry(ui, "network_usb_disk_mode", "USB Disk Mode",
                     "USB Transfer");
 }
@@ -5328,6 +5338,7 @@ static void add_network_information_entries(struct ui_state *ui) {
   add_setting_entry(ui, "network_ftp_status", "FTP", device->ftp_status);
   add_setting_entry(ui, "network_sftp_status", "SFTP", device->sftp_status);
   add_setting_entry(ui, "network_samba_status", "Samba", device->samba_status);
+  add_setting_entry(ui, "network_adb_status", "ADB", device->adb_status);
 }
 
 static int performance_top_entry_is_real(const struct top_entry *entry) {
@@ -8534,13 +8545,13 @@ static void setting_help_lines(const struct ui_state *ui,
     copy_string(line2, line2_size, "Use Connect Wi-Fi or NW Service instead.");
   } else if (strcmp(id, "network_services") == 0) {
     copy_string(line1, line1_size, "Open network services.");
-    copy_string(line2, line2_size, "SSH, FTP, SFTP, and Samba.");
+    copy_string(line2, line2_size, "SSH, FTP, SFTP, Samba, and ADB.");
   } else if (strcmp(id, "network_usb_disk_mode") == 0) {
     copy_string(line1, line1_size, "Expose the SD card as a USB drive.");
     copy_string(line2, line2_size, "Requires PC eject and USB disconnect to return.");
   } else if (strcmp(id, "network_information") == 0) {
     copy_string(line1, line1_size, "Open read-only network information.");
-    copy_string(line2, line2_size, "Connection, IP, signal, link speed, and SSH.");
+    copy_string(line2, line2_size, "Connection, IP, signal, link speed, SSH, and ADB.");
   } else if (strncmp(id, "network_", 8) == 0) {
     if (strcmp(id, "network_wifi_enabled") == 0) {
       copy_string(line1, line1_size, "Turn the Wi-Fi runtime on or off.");
@@ -8557,11 +8568,17 @@ static void setting_help_lines(const struct ui_state *ui,
     } else if (strcmp(id, "network_samba_enabled") == 0) {
       copy_string(line1, line1_size, "Windows/macOS network drive service.");
       copy_string(line2, line2_size, "Share is SDCARD; ON/OFF persists after reboot.");
+    } else if (strcmp(id, "network_adb_enabled") == 0) {
+      copy_string(line1, line1_size, "ADB over USB cable.");
+      copy_string(line2, line2_size, "No-auth development shell; enable only when needed.");
     } else if (strcmp(id, "network_ftp_status") == 0 ||
                strcmp(id, "network_sftp_status") == 0 ||
                strcmp(id, "network_samba_status") == 0) {
       copy_string(line1, line1_size, "Current file transfer service status.");
       copy_string(line2, line2_size, "All services use /mnt/plumos as the home/share root.");
+    } else if (strcmp(id, "network_adb_status") == 0) {
+      copy_string(line1, line1_size, "Current USB ADB service status.");
+      copy_string(line2, line2_size, "Use a trusted host and normal adb client tools.");
     } else if (strcmp(id, "network_config_source") == 0) {
       copy_string(line1, line1_size, "Read-only Wi-Fi config inventory.");
       copy_string(line2, line2_size, "Credential editing waits for backup and rollback.");
@@ -12131,6 +12148,9 @@ static int handle_setting_control(struct ui_state *ui, enum ui_action action) {
     }
     if (strcmp(id, "network_samba_enabled") == 0) {
       return run_network_service_control(ui, "samba", next);
+    }
+    if (strcmp(id, "network_adb_enabled") == 0) {
+      return run_network_service_control(ui, "adb", next);
     }
     save_setting_bool(ui, id, next);
     return 1;

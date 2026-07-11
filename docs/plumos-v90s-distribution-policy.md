@@ -399,7 +399,7 @@ The build system should be shaped like the MMF workflow:
 - Docker-based cross-build and packaging environment
 - explicit targets for vendor runtime preparation
 - explicit targets for command-line userland tools
-- explicit targets for Wi-Fi/FTP/SFTP/Samba network service payloads
+- explicit targets for Wi-Fi/FTP/SFTP/Samba/ADB network service payloads
 - explicit targets for RetroArch
 - explicit targets for libretro cores
 - explicit targets for standalone emulators
@@ -431,7 +431,7 @@ image              build the Docker toolchain image
 shell              open an interactive toolchain shell
 vendor-runtime     prepare v90s-stockos-r1 from artifacts/
 userland           build BusyBox and command-line tools for the app layer
-network-services   build Wi-Fi/FTP/SFTP/Samba payloads for the app layer
+network-services   build Wi-Fi/FTP/SFTP/Samba/ADB payloads for the app layer
 sdl2-powervr       build the patched SDL2 PowerVR compatibility payload
 retroarch          build RetroArch for the V90S PowerVR fbdev route
 cores              build supported libretro cores
@@ -537,7 +537,7 @@ test ROM or temporary payload only when the profile name makes that explicit.
 - update metadata
 
 The app-layer network service controller owns the user-facing Wi-Fi and SSH
-service state alongside FTP, SFTP, and Samba so the frontend, logs, and
+service state alongside FTP, SFTP, Samba, and ADB so the frontend, logs, and
 troubleshooting view all agree. On V90S the Wi-Fi path must assume an external
 USB dongle rather than internal Wi-Fi, and scan/connect actions must return a
 bounded failure when no dongle or no supported interface is present. The
@@ -555,19 +555,32 @@ PATH=/mnt/plumos/bin:/mnt/plumos/gnu/bin:...
 ```
 
 SFTP may provide an app-layer `sftp-server` payload, but it depends on the same
-SSH service state. FTP, SSH, and Samba stop/restart logic should use PID files
-plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before terminating
-processes.
+SSH service state. FTP, SSH, Samba, and ADB stop/restart logic should use PID
+files plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before
+terminating processes.
 
 USB cable diagnostics are a separate path from Wi-Fi/SSH. With the current
 StockOS-derived kernel, USB Ethernet and USB ACM serial are not available, so
-the supported near-term cable path is USB Disk Mode plus a command mailbox in
-the dedicated `PLUMUSB` transfer image. The mailbox may execute an explicitly
-armed `commands/run.sh` after the PC ejects the drive and the V90S remounts the
-image, then write command output back under `results/`. This does not make
-`/mnt/plumos` itself a shared live USB disk, and it should remain a diagnostic
-route for recovering logs and network state when the USB Wi-Fi dongle is
-unavailable.
+the supported file-transfer cable path is USB Disk Mode plus a command mailbox
+in the dedicated `PLUMUSB` transfer image. The mailbox may execute an
+explicitly armed `commands/run.sh` after the PC ejects the drive and the V90S
+remounts the image, then write command output back under `results/`. This does
+not make `/mnt/plumos` itself a shared live USB disk.
+
+The supported interactive USB command path is standard ADB over the kernel's
+FunctionFS/configfs gadget support. The app layer should ship the `adbd`
+userspace daemon and expose it through:
+
+```text
+/mnt/plumos/bin/plumos-network-services start|stop|status adb
+/mnt/plumos/bin/plumos-adbd start|stop|status
+```
+
+ADB is a development-access service and should default to OFF unless a
+development profile explicitly enables it. The initial V90S daemon is no-auth
+because the StockOS-derived userspace has no Android framework key-management
+stack; the frontend and docs must describe it as a trusted-host-only local USB
+debugging path.
 
 The app-layer output should use a stable tree layout under:
 

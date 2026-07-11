@@ -111,7 +111,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Implement `cores` as the normal libretro-core build target.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
-- [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba app-layer payloads.
+- [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
 - [ ] Implement `picoarch`.
 - [ ] Implement `standalone`.
 - [x] Implement `frontend`.
@@ -210,7 +210,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy supported libretro cores into the app layer.
 - [x] Copy frontend into the app layer.
 - [x] Copy BusyBox and command-line userland into the app layer.
-- [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba network service payloads into the app layer.
+- [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network
   services are reachable from the frontend.
 - [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
@@ -228,10 +228,11 @@ Build plumOS V90S as a V90S-specific distribution:
   diagnostic `commands/run.sh`, creating `commands/ALLOW_EXECUTE`, ejecting
   `PLUMUSB`, unplugging USB, and confirming the result files on the next USB
   Disk Mode session.
-- [ ] Revisit true interactive command execution over USB later. The current
-  StockOS-derived kernel has Mass Storage and FunctionFS, but not USB Ethernet
-  ECM/RNDIS/NCM or ACM serial; future routes are ADB userspace via FunctionFS
-  or a custom FunctionFS/libusb command channel.
+- [x] Add standard ADB over USB FunctionFS/configfs as the intended interactive
+  USB command path.
+- [ ] Physically validate ADB from macOS: enable ADB from the frontend or
+  `plumos-network-services`, confirm `adb devices`, run `adb shell id`, and
+  confirm file transfer with normal `adb push`/`adb pull`.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

@@ -54,8 +54,8 @@ Conclusion:
 
 - Standard USB Ethernet for SSH/SCP is not available with this kernel config.
 - USB serial console through ACM is not available with this kernel config.
-- ADB may be possible in the future through FunctionFS, but no `adbd` userspace
-  daemon is currently present in plumOS or the live rootfs.
+- ADB is possible through FunctionFS if plumOS supplies a compatible `adbd`
+  userspace daemon and configfs control script.
 - USB Mass Storage is available now.
 
 ## Implementation
@@ -286,8 +286,10 @@ physical validation:
 ## Remaining Work
 
 True interactive command execution over USB is not solved by USB Disk Mode. The
-practical future routes are:
+standard path selected for plumOS is ADB userspace over FunctionFS/configfs. USB
+Disk Mode remains the file-transfer and offline diagnostic mailbox path.
 
-- port an `adbd` userspace daemon and expose ADB through FunctionFS
+Alternative routes remain:
+
 - implement a custom FunctionFS/libusb command channel plus a Mac-side CLI
 - use a future kernel/vendor runtime with ECM/RNDIS/NCM or ACM enabled

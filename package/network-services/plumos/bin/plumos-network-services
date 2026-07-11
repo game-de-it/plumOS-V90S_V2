@@ -25,6 +25,7 @@ SSH_START="${PLUMOS_ROOT}/ssh/start-ssh.sh"
 SSH_STOP="${PLUMOS_ROOT}/ssh/stop-ssh.sh"
 SMBD="${PLUMOS_ROOT}/samba/sbin/smbd"
 NMBD="${PLUMOS_ROOT}/samba/sbin/nmbd"
+ADBD_CONTROL="${PLUMOS_ROOT}/bin/plumos-adbd"
 
 mkdir -p "$RUN_DIR" "$LOG_DIR" "$CONFIG_DIR"
 
@@ -87,6 +88,7 @@ config_key() {
     ftp) printf '%s\n' "ftp_enabled" ;;
     sftp) printf '%s\n' "sftp_enabled" ;;
     samba) printf '%s\n' "samba_enabled" ;;
+    adb) printf '%s\n' "adb_enabled" ;;
     *) return 1 ;;
   esac
 }
@@ -262,6 +264,27 @@ status_samba() {
   return 2
 }
 
+status_adb() {
+  if [ ! -x "$ADBD_CONTROL" ]; then
+    print_status adb not_installed "ADB control script not installed"
+    return 1
+  fi
+
+  output="$(PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+    "$ADBD_CONTROL" status 2>/dev/null || true)"
+  state="$(printf '%s\n' "$output" | sed -n 's/^state=//p' | tail -n 1)"
+  summary="$(printf '%s\n' "$output" | sed -n 's/^summary=//p' | tail -n 1)"
+  [ -n "$state" ] || state=stopped
+  [ -n "$summary" ] || summary="ADB stopped"
+
+  print_status adb "$state" "$summary"
+  case "$state" in
+    running) return 0 ;;
+    not_installed) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
 start_ftp() {
   set_service_enabled ftp 1
   if [ ! -x "$TCPSVD" ] || [ ! -x "$FTPD" ]; then
@@ -429,6 +452,30 @@ stop_samba() {
   return 0
 }
 
+start_adb() {
+  set_service_enabled adb 1
+  if [ ! -x "$ADBD_CONTROL" ]; then
+    log "start failed reason=adb_control_missing" adb
+    status_adb
+    return 1
+  fi
+  log "start usb=functionfs" adb
+  PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+    "$ADBD_CONTROL" start >> "$LOG_FILE" 2>&1 || true
+  status_adb
+}
+
+stop_adb() {
+  set_service_enabled adb 0
+  log "stop" adb
+  if [ -x "$ADBD_CONTROL" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+      "$ADBD_CONTROL" stop >> "$LOG_FILE" 2>&1 || true
+  fi
+  status_adb || true
+  return 0
+}
+
 usage() {
   cat <<EOF
 Usage: $0 COMMAND SERVICE
@@ -445,6 +492,7 @@ Services:
   ftp      BusyBox FTP on port ${FTP_PORT}, max ${TRANSFER_MAX_CONNECTIONS}, share ${SHARE_DIR}
   sftp     SFTP server payload; depends on SSH
   samba    SMB share //V90S_IP/SDCARD, max ${TRANSFER_MAX_CONNECTIONS}, backed by ${SHARE_DIR}
+  adb      ADB over USB FunctionFS/configfs
   all
 EOF
 }
@@ -457,18 +505,22 @@ run_one() {
     status:ftp) status_ftp ;;
     status:sftp) status_sftp ;;
     status:samba) status_samba ;;
+    status:adb) status_adb ;;
     start:ssh) start_ssh ;;
     start:ftp) start_ftp ;;
     start:sftp) start_sftp ;;
     start:samba) start_samba ;;
+    start:adb) start_adb ;;
     stop:ssh) stop_ssh ;;
     stop:ftp) stop_ftp ;;
     stop:sftp) stop_sftp ;;
     stop:samba) stop_samba ;;
+    stop:adb) stop_adb ;;
     restart:ssh) stop_ssh >/dev/null 2>&1 || true; start_ssh ;;
     restart:ftp) stop_ftp >/dev/null 2>&1 || true; start_ftp ;;
     restart:sftp) stop_sftp >/dev/null 2>&1 || true; start_sftp ;;
     restart:samba) stop_samba >/dev/null 2>&1 || true; start_samba ;;
+    restart:adb) stop_adb >/dev/null 2>&1 || true; start_adb ;;
     *) usage >&2; return 2 ;;
   esac
 }
@@ -477,7 +529,7 @@ command="${1:-}"
 service="${2:-}"
 if [ "$command" = "start-enabled" ]; then
   rc=0
-  for svc in ssh ftp sftp samba; do
+  for svc in ssh ftp sftp samba adb; do
     if service_enabled "$svc"; then
       run_one start "$svc" || rc=$?
     else
@@ -496,12 +548,12 @@ fi
 case "$service" in
   all)
     rc=0
-    for svc in ssh ftp sftp samba; do
+    for svc in ssh ftp sftp samba adb; do
       run_one "$command" "$svc" || rc=$?
     done
     exit "$rc"
     ;;
-  ssh|ftp|sftp|samba)
+  ssh|ftp|sftp|samba|adb)
     run_one "$command" "$service"
     ;;
   *)

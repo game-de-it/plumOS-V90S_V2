@@ -1,0 +1,313 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
+
+RUN_DIR="${PLUMOS_ROOT}/run"
+LOG_DIR="${PLUMOS_ROOT}/Logs"
+LOG_FILE="${LOG_DIR}/adbd.log"
+ADBD="${PLUMOS_ADBD_BIN:-${PLUMOS_ROOT}/adb/bin/adbd}"
+PID_FILE="${RUN_DIR}/adbd.pid"
+GADGET_NAME="${PLUMOS_ADBD_GADGET_NAME:-plumos_adb}"
+GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
+FUNCTION_NAME="ffs.adb"
+FFS_DIR="${PLUMOS_ADBD_FFS_DIR:-/dev/usb-ffs/adb}"
+UDC="${PLUMOS_ADBD_UDC:-auto}"
+START_TIMEOUT_SECONDS="${PLUMOS_ADBD_START_TIMEOUT_SECONDS:-12}"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
+
+log() {
+  printf '%s service=adb %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+usage() {
+  cat <<'USAGE'
+Usage: plumos-adbd COMMAND
+
+Commands:
+  start     Start AOSP adbd over USB FunctionFS/configfs.
+  stop      Stop adbd and unbind the USB ADB gadget.
+  restart   Stop then start adbd.
+  status    Print ADB service state.
+USAGE
+}
+
+pid_running() {
+  [ -s "$PID_FILE" ] || return 1
+  pid="$(sed -n '1p' "$PID_FILE" 2>/dev/null | tr -d '[:space:]')"
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  cmdline="$(tr '\000' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
+  comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
+  case "${cmdline} ${comm}" in
+    *adbd*) return 0 ;;
+  esac
+  return 1
+}
+
+gadget_bound() {
+  [ -r "${GADGET_DIR}/UDC" ] && [ -n "$(cat "${GADGET_DIR}/UDC" 2>/dev/null)" ]
+}
+
+any_other_gadget_bound() {
+  gadget="$1"
+  for udc_file in /sys/kernel/config/usb_gadget/*/UDC; do
+    [ -e "$udc_file" ] || continue
+    case "$udc_file" in
+      "$gadget"/UDC) continue ;;
+    esac
+    [ -n "$(cat "$udc_file" 2>/dev/null)" ] && return 0
+  done
+  return 1
+}
+
+udc_name() {
+  if [ "$UDC" != auto ]; then
+    printf '%s\n' "$UDC"
+    return 0
+  fi
+  for udc in /sys/class/udc/*; do
+    [ -e "$udc" ] || continue
+    basename "$udc"
+    return 0
+  done
+  return 1
+}
+
+udc_state() {
+  udc="$(udc_name 2>/dev/null || true)"
+  if [ -n "$udc" ] && [ -r "/sys/class/udc/${udc}/state" ]; then
+    cat "/sys/class/udc/${udc}/state" 2>/dev/null || true
+    return 0
+  fi
+  printf '%s\n' unknown
+}
+
+ensure_configfs() {
+  if [ ! -d /sys/kernel/config ]; then
+    log "configfs_missing"
+    return 1
+  fi
+  if [ ! -d /sys/kernel/config/usb_gadget ]; then
+    mount -t configfs none /sys/kernel/config >> "$LOG_FILE" 2>&1 || true
+  fi
+  [ -d /sys/kernel/config/usb_gadget ]
+}
+
+ffs_mounted() {
+  grep -q " ${FFS_DIR} functionfs " /proc/mounts 2>/dev/null
+}
+
+ensure_functionfs_mount() {
+  mkdir -p "$FFS_DIR"
+  if ffs_mounted; then
+    return 0
+  fi
+  mount -t functionfs adb "$FFS_DIR" >> "$LOG_FILE" 2>&1
+}
+
+close_inherited_display_fds() {
+  for fd in 3 4 5 6 7 8 9; do
+    target="$(readlink "/proc/$$/fd/${fd}" 2>/dev/null || true)"
+    case "$target" in
+      /dev/fb0)
+        eval "exec ${fd}<&- ${fd}>&-" 2>/dev/null || true
+        ;;
+    esac
+  done
+}
+
+setup_gadget() {
+  udc="$(udc_name)" || {
+    log "udc_missing"
+    return 1
+  }
+
+  if any_other_gadget_bound "$GADGET_DIR"; then
+    log "start_refused reason=other_gadget_bound"
+    return 1
+  fi
+
+  mkdir -p \
+    "${GADGET_DIR}/strings/0x409" \
+    "${GADGET_DIR}/configs/c.1/strings/0x409" \
+    "${GADGET_DIR}/functions/${FUNCTION_NAME}" || return 1
+
+  printf '0x18d1\n' > "${GADGET_DIR}/idVendor"
+  printf '0x4ee7\n' > "${GADGET_DIR}/idProduct"
+  printf '0x0200\n' > "${GADGET_DIR}/bcdUSB"
+  printf '0x0100\n' > "${GADGET_DIR}/bcdDevice"
+  printf 'plumos-v90s-%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null | cut -c1-8)" \
+    > "${GADGET_DIR}/strings/0x409/serialnumber"
+  printf 'plumOS\n' > "${GADGET_DIR}/strings/0x409/manufacturer"
+  printf 'plumOS V90S ADB\n' > "${GADGET_DIR}/strings/0x409/product"
+  printf 'ADB\n' > "${GADGET_DIR}/configs/c.1/strings/0x409/configuration"
+  printf '120\n' > "${GADGET_DIR}/configs/c.1/MaxPower"
+
+  if [ ! -e "${GADGET_DIR}/configs/c.1/${FUNCTION_NAME}" ]; then
+    ln -s "${GADGET_DIR}/functions/${FUNCTION_NAME}" \
+      "${GADGET_DIR}/configs/c.1/${FUNCTION_NAME}"
+  fi
+  ensure_functionfs_mount || return 1
+}
+
+bind_gadget() {
+  udc="$(udc_name)" || {
+    log "bind_failed reason=udc_missing"
+    return 1
+  }
+  if gadget_bound; then
+    return 0
+  fi
+  if any_other_gadget_bound "$GADGET_DIR"; then
+    log "bind_refused reason=other_gadget_bound"
+    return 1
+  fi
+  printf '%s\n' "$udc" > "${GADGET_DIR}/UDC"
+}
+
+start_adbd_process() {
+  if [ ! -x "$ADBD" ]; then
+    log "start_failed reason=adbd_missing path=${ADBD}"
+    return 1
+  fi
+  if pid_running; then
+    return 0
+  fi
+
+  rm -f "$PID_FILE"
+  (
+    close_inherited_display_fds
+    export ADB_TRACE="${ADB_TRACE:-}"
+    export HOME=/root
+    exec "$ADBD" >> "$LOG_FILE" 2>&1 < /dev/null
+  ) &
+  printf '%s\n' "$!" > "$PID_FILE"
+}
+
+wait_for_ffs_ready() {
+  elapsed=0
+  while [ "$elapsed" -lt "$START_TIMEOUT_SECONDS" ]; do
+    if [ -e "${FFS_DIR}/ep1" ] && [ -e "${FFS_DIR}/ep2" ]; then
+      return 0
+    fi
+    if ! pid_running; then
+      log "adbd_exited_before_ffs_ready"
+      return 1
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  log "ffs_ready_timeout"
+  return 1
+}
+
+unbind_gadget() {
+  if [ -w "${GADGET_DIR}/UDC" ]; then
+    printf '\n' > "${GADGET_DIR}/UDC" 2>/dev/null || true
+  fi
+}
+
+stop_adbd_process() {
+  if pid_running; then
+    pid="$(sed -n '1p' "$PID_FILE" 2>/dev/null | tr -d '[:space:]')"
+    kill "$pid" 2>/dev/null || true
+    sleep 1
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
+    log "stopped pid=${pid}"
+  fi
+  rm -f "$PID_FILE"
+}
+
+teardown_gadget() {
+  unbind_gadget
+  stop_adbd_process
+  if ffs_mounted; then
+    umount "$FFS_DIR" >> "$LOG_FILE" 2>&1 || true
+  fi
+  if [ -d "$GADGET_DIR" ]; then
+    rm -f "${GADGET_DIR}/configs/c.1/${FUNCTION_NAME}" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/functions/${FUNCTION_NAME}" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/configs/c.1/strings/0x409" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/configs/c.1" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/strings/0x409" 2>/dev/null || true
+    rmdir "$GADGET_DIR" 2>/dev/null || true
+  fi
+}
+
+start_mode() {
+  log "start_requested"
+  ensure_configfs || return 1
+  if gadget_bound && pid_running; then
+    status_mode
+    return 0
+  fi
+  teardown_gadget
+  setup_gadget || return 1
+  start_adbd_process || return 1
+  wait_for_ffs_ready || return 1
+  bind_gadget || return 1
+  log "started pid=$(cat "$PID_FILE" 2>/dev/null || true) udc_state=$(udc_state)"
+  status_mode
+}
+
+stop_mode() {
+  log "stop_requested"
+  teardown_gadget
+  status_mode || true
+  return 0
+}
+
+status_mode() {
+  printf 'service=adb\n'
+  printf 'adbd=%s\n' "$ADBD"
+  printf 'pid_file=%s\n' "$PID_FILE"
+  printf 'gadget=%s\n' "$GADGET_DIR"
+  printf 'functionfs=%s\n' "$FFS_DIR"
+  printf 'adbd_installed=%s\n' "$( [ -x "$ADBD" ] && echo 1 || echo 0 )"
+  printf 'running=%s\n' "$( pid_running && echo 1 || echo 0 )"
+  printf 'ffs_mounted=%s\n' "$( ffs_mounted && echo 1 || echo 0 )"
+  printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
+  printf 'udc_state=%s\n' "$(udc_state)"
+  if pid_running && gadget_bound; then
+    printf 'state=running\n'
+    printf 'summary=ADB over USB FunctionFS\n'
+    return 0
+  fi
+  if [ ! -x "$ADBD" ]; then
+    printf 'state=not_installed\n'
+    printf 'summary=adbd binary missing\n'
+    return 1
+  fi
+  printf 'state=stopped\n'
+  printf 'summary=ADB stopped\n'
+  return 2
+}
+
+case "${1:-status}" in
+  start)
+    start_mode
+    ;;
+  stop)
+    stop_mode
+    ;;
+  restart)
+    stop_mode >/dev/null 2>&1 || true
+    start_mode
+    ;;
+  status)
+    status_mode
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'error: unknown command: %s\n' "$1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
