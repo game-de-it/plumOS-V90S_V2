@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -233,6 +233,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Physically validate ADB from macOS: enable ADB from the frontend or
   `plumos-network-services`, confirm `adb devices`, run `adb shell id`, and
   confirm file transfer with normal `adb push`/`adb pull`.
+- [x] Register ADB in the FE NW Service screen and validate the frontend-facing
+  service controller can stop/start ADB while keeping
+  `/mnt/plumos/config/network/services.conf` in sync.
+- [ ] Physically confirm the FE ADB checkbox can be toggled with V90S controls
+  during normal menu navigation.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

@@ -98,6 +98,16 @@ The toggle uses the same `plumos-network-services` path as SSH, FTP, SFTP, and
 Samba, so the UI, service state, logs, and boot-time `start-enabled` behavior
 all agree.
 
+The live device has the updated frontend language resources and the running
+frontend process is the app-layer fbdev binary:
+
+```text
+/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+/mnt/plumos/share/frontend/lang/ja.lang:
+settings.item.network_adb_enabled.name=ADB
+settings.item.network_adb_status.name=ADB
+```
+
 ## Build Validation
 
 Validated locally:
@@ -209,9 +219,49 @@ back to macOS, and both hashes matched:
 586c72c65990100407949e017635f601e325ebd68c421fd999fa2dead199925f
 ```
 
+## Frontend Service Control Validation
+
+The frontend calls the same service controller used below, so this validates the
+ON/OFF backend that the NW Service row uses.
+
+ADB OFF:
+
+```text
+/mnt/plumos/bin/plumos-network-services stop adb
+service=adb
+state=stopped
+summary=ADB stopped
+enabled=0
+
+adb devices -l
+List of devices attached
+```
+
+ADB ON:
+
+```text
+/mnt/plumos/bin/plumos-network-services start adb
+service=adb
+state=running
+summary=ADB over USB FunctionFS
+enabled=1
+
+/mnt/plumos/bin/plumos-adbd status
+running=1
+ffs_mounted=1
+gadget_bound=1
+udc_state=configured
+
+adb devices -l
+plumos-v90s-72fd7cb5   device usb:2-1 transport_id:1
+
+adb shell id
+uid=0(root) gid=0(root) groups=0(root)
+```
+
 ## Validation Still Needed
 
-- Confirm the frontend ADB toggle can start and stop the same service without
-  using SSH.
+- Confirm the physical FE checkbox row can be toggled with the V90S controls
+  during normal menu navigation.
 - Decide whether ADB should remain enabled in development profiles after reboot
   or be treated as an explicit temporary service.
