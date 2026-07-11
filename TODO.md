@@ -230,7 +230,7 @@ Build plumOS V90S as a V90S-specific distribution:
   Disk Mode session.
 - [x] Add standard ADB over USB FunctionFS/configfs as the intended interactive
   USB command path.
-- [ ] Physically validate ADB from macOS: enable ADB from the frontend or
+- [x] Physically validate ADB from macOS: enable ADB from the frontend or
   `plumos-network-services`, confirm `adb devices`, run `adb shell id`, and
   confirm file transfer with normal `adb push`/`adb pull`.
 - [ ] Copy PicoArch/PICO payloads into the app layer.

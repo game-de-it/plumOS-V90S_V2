@@ -167,19 +167,51 @@ FunctionFS endpoints exist:
 /dev/usb-ffs/adb/ep2
 ```
 
-`udc_state=not attached` and macOS `adb devices -l` returned no devices during
-this validation, which means the gadget was ready on the V90S side but not
-physically attached to the Mac as a USB device at that moment.
+`udc_state=not attached` and macOS `adb devices -l` initially returned no
+devices, which meant the gadget was ready on the V90S side but not physically
+attached to the Mac as a USB device at that moment.
+
+## macOS USB Validation
+
+After connecting the V90S to the Mac with a USB cable, macOS detected the ADB
+gadget:
+
+```text
+List of devices attached
+plumos-v90s-72fd7cb5   device usb:2-1 transport_id:1
+```
+
+ADB shell command execution worked:
+
+```text
+uid=0(root) gid=0(root) groups=0(root)
+Linux (none) 4.9.191 #17 SMP PREEMPT Tue May 13 18:14:09 UTC 2025 aarch64 GNU/Linux
+Filesystem                Size      Used Available Use% Mounted on
+/dev/mmcblk0p7         1022.0M    345.3M    676.7M  34% /mnt/plumos
+```
+
+The device-side ADB state moved to configured:
+
+```text
+service=adb
+state=running
+summary=ADB over USB FunctionFS
+gadget_bound=1
+udc_state=configured
+/sys/kernel/config/usb_gadget/plumos_adb/UDC=5100000.udc-controller
+/sys/class/udc/5100000.udc-controller/state=configured
+```
+
+ADB file transfer also worked. A 51-byte test file was pushed to `/tmp`, pulled
+back to macOS, and both hashes matched:
+
+```text
+586c72c65990100407949e017635f601e325ebd68c421fd999fa2dead199925f
+```
 
 ## Validation Still Needed
 
-- Connect V90S to the Mac as a USB device with a data-capable cable, while ADB
-  is enabled.
-- Confirm on macOS:
-
-```text
-adb devices -l
-adb shell id
-adb shell df -h /mnt/plumos
-adb push/pull
-```
+- Confirm the frontend ADB toggle can start and stop the same service without
+  using SSH.
+- Decide whether ADB should remain enabled in development profiles after reboot
+  or be treated as an explicit temporary service.
