@@ -236,6 +236,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Register ADB in the FE NW Service screen and validate the frontend-facing
   service controller can stop/start ADB while keeping
   `/mnt/plumos/config/network/services.conf` in sync.
+- [x] Validate the FE navigation/action path for
+  `START -> Network Settings -> NW Service -> ADB` by running the controller UI
+  script path that presses `A` on the ADB checkbox and confirming `adb devices`
+  disappears on OFF and returns on ON.
 - [ ] Physically confirm the FE ADB checkbox can be toggled with V90S controls
   during normal menu navigation.
 - [ ] Investigate ADB host re-enumeration after repeated cable-attached

@@ -265,9 +265,68 @@ IORegistry showed `plumOS V90S ADB`, but `adb devices -l` stayed empty. Treat
 this as a remaining host re-enumeration or ADB handshake stability issue,
 separate from the frontend service registration.
 
+The FE navigation/action path was then validated with the controller UI script
+runner. This uses the same `handle_action()` path as button input:
+
+```text
+start,down,down,a,down,down,a,down,down,down,down,a
+```
+
+That sequence opens `START -> Network Settings -> NW Service`, selects `ADB`,
+and presses `A` on the checkbox row.
+
+FE toggle OFF:
+
+```text
+PLUMOS_FRONTEND_MODE=manual PLUMOS_RENDERER=text \
+  /mnt/plumos/bin/plumos-controller-ui-fbdev \
+  --renderer text \
+  --script start,down,down,a,down,down,a,down,down,down,down,a \
+  --no-clear
+rc=0
+
+/mnt/plumos/bin/plumos-network-services status adb
+service=adb
+state=stopped
+summary=ADB stopped
+enabled=0
+
+adb devices -l
+List of devices attached
+```
+
+FE toggle ON:
+
+```text
+PLUMOS_FRONTEND_MODE=manual PLUMOS_RENDERER=text \
+  /mnt/plumos/bin/plumos-controller-ui-fbdev \
+  --renderer text \
+  --script start,down,down,a,down,down,a,down,down,down,down,a \
+  --no-clear
+rc=0
+
+/mnt/plumos/bin/plumos-network-services status adb
+service=adb
+state=running
+summary=ADB over USB FunctionFS
+enabled=1
+
+/mnt/plumos/bin/plumos-adbd status
+running=1
+ffs_mounted=1
+gadget_bound=1
+udc_state=configured
+
+adb devices -l
+plumos-v90s-72fd7cb5   device usb:2-1.1 transport_id:2
+
+adb shell id
+uid=0(root) gid=0(root) groups=0(root)
+```
+
 ## Validation Still Needed
 
-- Confirm the physical FE checkbox row can be toggled with the V90S controls
+- Confirm the same FE checkbox row manually with the physical V90S controls
   during normal menu navigation.
 - Investigate repeated ADB stop/start while the USB cable is connected; macOS
   may still see the USB gadget while the adb host does not list it until a
