@@ -13233,7 +13233,7 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
     return;
   }
 
-  if (action == ACTION_X && ui_uses_graphic_mode(ui) &&
+  if (action == ACTION_X &&
       (ui->screen == SCREEN_ROMS || ui->screen == SCREEN_FAVORITES ||
        ui->screen == SCREEN_RECENT)) {
     open_gallery_screen(ui);
@@ -13833,6 +13833,10 @@ static int ui_needs_periodic_refresh(const struct ui_state *ui) {
     return 0;
   }
   if (ui_renderer_fbdev_only(ui)) {
+    if (ui->gallery_transition_active ||
+        (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_GALLERY)) {
+      return 1;
+    }
     return ui->rescue_network || ui->rom_scan_refresh_pid > 0;
   }
   if (ui->rescue_network) {
@@ -13864,6 +13868,10 @@ static int ui_periodic_refresh_interval_ms(const struct ui_state *ui) {
     return 0;
   }
   if (ui_renderer_fbdev_only(ui)) {
+    if (ui->gallery_transition_active ||
+        (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_GALLERY)) {
+      return 16;
+    }
     if (ui->rom_scan_refresh_pid > 0) {
       return 250;
     }

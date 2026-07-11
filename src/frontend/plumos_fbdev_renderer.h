@@ -28,6 +28,20 @@
 #endif
 
 #ifndef PLUMOS_FBDEV_RENDERER_GLYPHS_ONLY
+#ifdef PLUMOS_FBDEV_ENABLE_PNG
+#ifndef PLUMOS_FBDEV_PNG_CACHE_SLOTS
+#define PLUMOS_FBDEV_PNG_CACHE_SLOTS 16
+#endif
+
+struct plumos_fbdev_png_cache_slot {
+  char path[PLUMOS_FBDEV_RENDER_LINE_MAX];
+  unsigned char *pixels;
+  int width;
+  int height;
+  unsigned long last_used;
+};
+#endif
+
 struct plumos_fbdev_renderer {
   int fd;
   unsigned char *mem;
@@ -42,6 +56,10 @@ struct plumos_fbdev_renderer {
   int double_buffer;
   struct fb_var_screeninfo var;
   struct fb_fix_screeninfo fix;
+#ifdef PLUMOS_FBDEV_ENABLE_PNG
+  struct plumos_fbdev_png_cache_slot png_cache[PLUMOS_FBDEV_PNG_CACHE_SLOTS];
+  unsigned long png_cache_tick;
+#endif
 };
 
 static uint32_t plumos_fbdev_scale_channel(uint8_t value, uint32_t length,
@@ -309,46 +327,132 @@ done:
 #pragma GCC diagnostic pop
 #endif
 
-static int plumos_fbdev_draw_png_contain(struct plumos_fbdev_renderer *r,
-                                         const char *path, int x, int y,
-                                         int box_w, int box_h) {
-  unsigned char *pixels = NULL;
+static void plumos_fbdev_png_cache_free_slot(
+    struct plumos_fbdev_png_cache_slot *slot) {
+  if (!slot) {
+    return;
+  }
+  free(slot->pixels);
+  memset(slot, 0, sizeof(*slot));
+}
+
+static void plumos_fbdev_png_cache_clear(struct plumos_fbdev_renderer *r) {
+  size_t i;
+
+  if (!r) {
+    return;
+  }
+  for (i = 0; i < PLUMOS_FBDEV_PNG_CACHE_SLOTS; i++) {
+    plumos_fbdev_png_cache_free_slot(&r->png_cache[i]);
+  }
+  r->png_cache_tick = 0;
+}
+
+static const unsigned char *plumos_fbdev_png_cache_get(
+    struct plumos_fbdev_renderer *r, const char *path, int *width_out,
+    int *height_out) {
+  unsigned char *loaded_pixels = NULL;
+  int loaded_width = 0;
+  int loaded_height = 0;
+  size_t i;
+  size_t victim = 0;
+  unsigned long oldest = 0;
+
+  if (!r || !path || !path[0] || !width_out || !height_out) {
+    return NULL;
+  }
+  *width_out = 0;
+  *height_out = 0;
+  r->png_cache_tick++;
+  if (r->png_cache_tick == 0) {
+    r->png_cache_tick = 1;
+  }
+
+  for (i = 0; i < PLUMOS_FBDEV_PNG_CACHE_SLOTS; i++) {
+    if (r->png_cache[i].pixels && strcmp(r->png_cache[i].path, path) == 0) {
+      r->png_cache[i].last_used = r->png_cache_tick;
+      *width_out = r->png_cache[i].width;
+      *height_out = r->png_cache[i].height;
+      return r->png_cache[i].pixels;
+    }
+  }
+
+  for (i = 0; i < PLUMOS_FBDEV_PNG_CACHE_SLOTS; i++) {
+    if (!r->png_cache[i].pixels) {
+      victim = i;
+      break;
+    }
+    if (i == 0 || r->png_cache[i].last_used < oldest) {
+      oldest = r->png_cache[i].last_used;
+      victim = i;
+    }
+  }
+
+  if (!plumos_fbdev_load_png_rgba(path, &loaded_pixels, &loaded_width,
+                                  &loaded_height) ||
+      loaded_width <= 0 || loaded_height <= 0) {
+    free(loaded_pixels);
+    return NULL;
+  }
+
+  plumos_fbdev_png_cache_free_slot(&r->png_cache[victim]);
+  r->png_cache[victim].pixels = loaded_pixels;
+  r->png_cache[victim].width = loaded_width;
+  r->png_cache[victim].height = loaded_height;
+  r->png_cache[victim].last_used = r->png_cache_tick;
+  snprintf(r->png_cache[victim].path, sizeof(r->png_cache[victim].path),
+           "%s", path);
+  *width_out = loaded_width;
+  *height_out = loaded_height;
+  return loaded_pixels;
+}
+
+static int plumos_fbdev_draw_png_box(struct plumos_fbdev_renderer *r,
+                                     const char *path, int x, int y,
+                                     int box_w, int box_h, int cover) {
+  const unsigned char *pixels = NULL;
   int image_w = 0;
   int image_h = 0;
   int draw_w;
   int draw_h;
   int draw_x;
   int draw_y;
-  int dx;
-  int dy;
+  int start_x;
+  int start_y;
+  int end_x;
+  int end_y;
+  int tx;
+  int ty;
 
   if (!r || !path || !path[0] || box_w <= 0 || box_h <= 0 ||
-      !plumos_fbdev_load_png_rgba(path, &pixels, &image_w, &image_h) ||
+      !(pixels = plumos_fbdev_png_cache_get(r, path, &image_w, &image_h)) ||
       image_w <= 0 || image_h <= 0) {
-    free(pixels);
     return 0;
   }
 
   draw_w = box_w;
   draw_h = (int)((long)image_h * (long)box_w / (long)image_w);
-  if (draw_h > box_h) {
+  if ((!cover && draw_h > box_h) || (cover && draw_h < box_h)) {
     draw_h = box_h;
     draw_w = (int)((long)image_w * (long)box_h / (long)image_h);
   }
   if (draw_w <= 0 || draw_h <= 0) {
-    free(pixels);
     return 0;
   }
   draw_x = x + (box_w - draw_w) / 2;
   draw_y = y + (box_h - draw_h) / 2;
+  start_x = draw_x > x ? draw_x : x;
+  start_y = draw_y > y ? draw_y : y;
+  end_x = draw_x + draw_w < x + box_w ? draw_x + draw_w : x + box_w;
+  end_y = draw_y + draw_h < y + box_h ? draw_y + draw_h : y + box_h;
 
-  for (dy = 0; dy < draw_h; dy++) {
-    int sy = (int)((long)dy * (long)image_h / (long)draw_h);
+  for (ty = start_y; ty < end_y; ty++) {
+    int sy = (int)((long)(ty - draw_y) * (long)image_h / (long)draw_h);
     if (sy >= image_h) {
       sy = image_h - 1;
     }
-    for (dx = 0; dx < draw_w; dx++) {
-      int sx = (int)((long)dx * (long)image_w / (long)draw_w);
+    for (tx = start_x; tx < end_x; tx++) {
+      int sx = (int)((long)(tx - draw_x) * (long)image_w / (long)draw_w);
       const unsigned char *rgba;
       if (sx >= image_w) {
         sx = image_w - 1;
@@ -357,13 +461,24 @@ static int plumos_fbdev_draw_png_contain(struct plumos_fbdev_renderer *r,
       if (rgba[3] < 128) {
         continue;
       }
-      plumos_fbdev_put_pixel(r, draw_x + dx, draw_y + dy,
+      plumos_fbdev_put_pixel(r, tx, ty,
                              plumos_fbdev_pack_color(r, rgba[0], rgba[1], rgba[2]));
     }
   }
 
-  free(pixels);
   return 1;
+}
+
+static int plumos_fbdev_draw_png_contain(struct plumos_fbdev_renderer *r,
+                                         const char *path, int x, int y,
+                                         int box_w, int box_h) {
+  return plumos_fbdev_draw_png_box(r, path, x, y, box_w, box_h, 0);
+}
+
+static int plumos_fbdev_draw_png_cover(struct plumos_fbdev_renderer *r,
+                                       const char *path, int x, int y,
+                                       int box_w, int box_h) {
+  return plumos_fbdev_draw_png_box(r, path, x, y, box_w, box_h, 1);
 }
 #endif
 
@@ -553,6 +668,13 @@ struct plumos_fbdev_entry {
 
 struct plumos_fbdev_motion {
   char top_layout[32];
+  char transition_easing[32];
+};
+
+struct plumos_fbdev_assets {
+  char background[PLUMOS_FBDEV_RENDER_LINE_MAX];
+  char gallery_background[PLUMOS_FBDEV_RENDER_LINE_MAX];
+  char placeholder[PLUMOS_FBDEV_RENDER_LINE_MAX];
 };
 
 static const char *plumos_fbdev_ltrim(const char *s) {
@@ -784,6 +906,8 @@ static void plumos_fbdev_load_motion(struct plumos_fbdev_motion *motion,
   memset(motion, 0, sizeof(*motion));
   plumos_fbdev_copy_text(motion->top_layout, sizeof(motion->top_layout),
                          "tile_grid");
+  plumos_fbdev_copy_text(motion->transition_easing,
+                         sizeof(motion->transition_easing), "ease_out");
   for (i = 0; i < line_count; i++) {
     const char *line = plumos_fbdev_ltrim(lines[i]);
     const char *key;
@@ -807,6 +931,50 @@ static void plumos_fbdev_load_motion(struct plumos_fbdev_motion *motion,
         (strcmp(value_buf, "tile_grid") == 0 ||
          strcmp(value_buf, "tile_strip") == 0)) {
       plumos_fbdev_copy_text(motion->top_layout, sizeof(motion->top_layout),
+                             value_buf);
+    } else if (strcmp(key_buf, "transition_easing") == 0 && value_buf[0]) {
+      plumos_fbdev_copy_text(motion->transition_easing,
+                             sizeof(motion->transition_easing), value_buf);
+    }
+  }
+}
+
+static void plumos_fbdev_load_assets(struct plumos_fbdev_assets *assets,
+                                     char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX],
+                                     size_t line_count) {
+  size_t i;
+
+  if (!assets) {
+    return;
+  }
+  memset(assets, 0, sizeof(*assets));
+  for (i = 0; i < line_count; i++) {
+    const char *line = plumos_fbdev_ltrim(lines[i]);
+    const char *key;
+    const char *value;
+    const char *tab;
+    char key_buf[64];
+    char value_buf[PLUMOS_FBDEV_RENDER_LINE_MAX];
+
+    if (strncmp(line, "graphic_theme_asset\t", 20) != 0) {
+      continue;
+    }
+    key = line + 20;
+    tab = strchr(key, '\t');
+    if (!tab) {
+      continue;
+    }
+    value = tab + 1;
+    plumos_fbdev_copy_range(key_buf, sizeof(key_buf), key, tab);
+    plumos_fbdev_copy_text(value_buf, sizeof(value_buf), value);
+    if (strcmp(key_buf, "background") == 0) {
+      plumos_fbdev_copy_text(assets->background, sizeof(assets->background),
+                             value_buf);
+    } else if (strcmp(key_buf, "gallery_background") == 0) {
+      plumos_fbdev_copy_text(assets->gallery_background,
+                             sizeof(assets->gallery_background), value_buf);
+    } else if (strcmp(key_buf, "placeholder") == 0) {
+      plumos_fbdev_copy_text(assets->placeholder, sizeof(assets->placeholder),
                              value_buf);
     }
   }
@@ -1167,15 +1335,44 @@ static size_t plumos_fbdev_collect_graphic_entries(
   return count;
 }
 
-static const struct plumos_fbdev_entry *plumos_fbdev_selected_entry(
-    const struct plumos_fbdev_entry *entries, size_t count) {
+static size_t plumos_fbdev_collect_graphic_prev_entries(
+    char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
+    struct plumos_fbdev_entry *entries, size_t max_entries) {
   size_t i;
-  for (i = 0; i < count; i++) {
-    if (entries[i].selected) {
-      return &entries[i];
+  size_t count = 0;
+
+  if (!entries || max_entries == 0) {
+    return 0;
+  }
+  for (i = 0; i < line_count && count < max_entries; i++) {
+    const char *line = plumos_fbdev_ltrim(lines[i]);
+    if (plumos_fbdev_parse_graphic_entry(line, "graphic_prev_entry",
+                                         &entries[count])) {
+      count++;
     }
   }
-  return count ? &entries[0] : NULL;
+  return count;
+}
+
+static size_t plumos_fbdev_selected_index(
+    const struct plumos_fbdev_entry *entries, size_t count) {
+  size_t i;
+
+  if (!entries || count == 0) {
+    return 0;
+  }
+  for (i = 0; i < count; i++) {
+    if (entries[i].selected) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+static const struct plumos_fbdev_entry *plumos_fbdev_selected_entry(
+    const struct plumos_fbdev_entry *entries, size_t count) {
+  return entries && count ? &entries[plumos_fbdev_selected_index(entries, count)]
+                          : NULL;
 }
 
 static void plumos_fbdev_draw_status(struct plumos_fbdev_renderer *r,
@@ -1516,6 +1713,419 @@ static int plumos_fbdev_render_roms(struct plumos_fbdev_renderer *r,
   return 1;
 }
 
+struct plumos_fbdev_gallery_slot {
+  int x;
+  int y;
+  int w;
+  int h;
+};
+
+static int plumos_fbdev_min_int(int a, int b) {
+  return a < b ? a : b;
+}
+
+static int plumos_fbdev_lerp_int(int from, int to, double progress) {
+  double value;
+
+  if (progress < 0.0) {
+    progress = 0.0;
+  } else if (progress > 1.0) {
+    progress = 1.0;
+  }
+  value = (double)from + (double)(to - from) * progress;
+  return (int)(value + (value >= 0.0 ? 0.5 : -0.5));
+}
+
+static double plumos_fbdev_ease_progress(double progress, const char *easing) {
+  double t;
+
+  if (progress < 0.0) {
+    progress = 0.0;
+  } else if (progress > 1.0) {
+    progress = 1.0;
+  }
+  if (easing && strcmp(easing, "linear") == 0) {
+    return progress;
+  }
+  if (easing && strcmp(easing, "ease_in") == 0) {
+    return progress * progress * progress;
+  }
+  if (easing && strcmp(easing, "ease_in_out") == 0) {
+    if (progress < 0.5) {
+      return 4.0 * progress * progress * progress;
+    }
+    t = -2.0 * progress + 2.0;
+    return 1.0 - (t * t * t) * 0.5;
+  }
+  t = 1.0 - progress;
+  return 1.0 - t * t * t;
+}
+
+static void plumos_fbdev_gallery_slot(
+    const struct plumos_fbdev_renderer *r, long rel,
+    struct plumos_fbdev_gallery_slot *slot) {
+  int screen_w = r ? (int)r->var.xres : 640;
+  int screen_h = r ? (int)r->var.yres : 480;
+  int center_w = plumos_fbdev_min_int(360, screen_w - 170);
+  int footer_y = screen_h - 84;
+  int center_y = 84;
+  int center_h;
+  int max_center_h;
+  int side_w;
+  int side_h;
+  int center_x;
+  int side_y;
+  int visible_side = 76;
+  int offscreen_gap = 18;
+  int side_step;
+
+  if (!slot) {
+    return;
+  }
+  if (center_w < 180) {
+    center_w = screen_w > 96 ? screen_w - 96 : screen_w;
+  }
+  center_h = center_w * 3 / 4;
+  max_center_h = footer_y - center_y - 24;
+  if (max_center_h < 120) {
+    max_center_h = 120;
+  }
+  if (center_h > max_center_h) {
+    center_h = max_center_h;
+    center_w = center_h * 4 / 3;
+  }
+  side_w = center_w * 2 / 3;
+  side_h = center_h * 2 / 3;
+  center_x = (screen_w - center_w) / 2;
+  side_y = center_y + (center_h - side_h) / 2;
+  if (visible_side > side_w / 2) {
+    visible_side = side_w / 2;
+  }
+  side_step = side_w + offscreen_gap;
+
+  slot->w = rel == 0 ? center_w : side_w;
+  slot->h = rel == 0 ? center_h : side_h;
+  slot->y = rel == 0 ? center_y : side_y;
+  if (rel == 0) {
+    slot->x = center_x;
+  } else if (rel == -1) {
+    slot->x = -side_w + visible_side;
+  } else if (rel == 1) {
+    slot->x = screen_w - visible_side;
+  } else if (rel <= -2) {
+    slot->x = -side_w - offscreen_gap + (int)(rel + 2) * side_step;
+  } else {
+    slot->x = screen_w + offscreen_gap + (int)(rel - 2) * side_step;
+  }
+}
+
+static void plumos_fbdev_draw_gallery_background(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const struct plumos_fbdev_assets *assets) {
+  int row;
+  int w = (int)r->var.xres;
+  int h = (int)r->var.yres;
+  int wall_top = 40;
+  int shelf_y = h - 145;
+  uint32_t mortar = plumos_fbdev_pack_color(r, 38, 20, 11);
+  uint32_t brick = plumos_fbdev_pack_color(r, 33, 18, 10);
+  uint32_t shelf = plumos_fbdev_pack_color(r, 89, 46, 20);
+  uint32_t shelf_shadow = plumos_fbdev_pack_color(r, 43, 20, 9);
+
+#ifdef PLUMOS_FBDEV_ENABLE_PNG
+  if (assets && assets->gallery_background[0] &&
+      plumos_fbdev_draw_png_cover(r, assets->gallery_background, 0, 0, w, h)) {
+    return;
+  }
+  if (assets && assets->background[0] &&
+      plumos_fbdev_draw_png_cover(r, assets->background, 0, 0, w, h)) {
+    return;
+  }
+#else
+  (void)assets;
+#endif
+
+  plumos_fbdev_fill_rect(r, 0, 0, w, h, p->background);
+  for (row = 0; row < 11; row++) {
+    int y = wall_top + row * 27;
+    int offset = (row % 2) ? 38 : 0;
+    int x;
+
+    plumos_fbdev_fill_rect(r, 0, y, w, 2, mortar);
+    for (x = -offset; x < w; x += 76) {
+      plumos_fbdev_fill_rect(r, x, y, 2, 27, brick);
+    }
+  }
+  plumos_fbdev_fill_rect(r, 0, shelf_y, w, 20, shelf);
+  plumos_fbdev_fill_rect(r, 0, shelf_y + 20, w, 26, shelf_shadow);
+  plumos_fbdev_fill_rect(r, 0, shelf_y + 45, w, h - shelf_y - 45,
+                         p->panel_inner);
+}
+
+static void plumos_fbdev_draw_gallery_top_bar(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const char *title) {
+  char time_label[16];
+  char wifi_label[16];
+  char battery_label[24];
+  char right[80];
+  int w = (int)r->var.xres;
+  int h = (int)r->var.yres;
+  int right_width;
+  int title_max_x;
+
+  plumos_fbdev_time_label(time_label, sizeof(time_label));
+  plumos_fbdev_wifi_label(wifi_label, sizeof(wifi_label));
+  plumos_fbdev_battery_label(battery_label, sizeof(battery_label));
+  snprintf(right, sizeof(right), "%s  %s  %s", time_label, wifi_label,
+           battery_label);
+  right_width = plumos_fbdev_text_width(right, 2);
+  title_max_x = w - 28 - right_width;
+  if (title_max_x < 96) {
+    title_max_x = w - 16;
+  }
+
+  plumos_fbdev_fill_rect(r, 0, 0, w, 40, p->panel_inner);
+  plumos_fbdev_fill_rect(r, 0, 40, w, 2, p->panel);
+  plumos_fbdev_fill_rect(r, 0, 0, 5, h, p->accent);
+  plumos_fbdev_draw_text(r, 16, 12,
+                         title && title[0] ? title : "GALLERY", 2,
+                         p->foreground, title_max_x);
+  plumos_fbdev_draw_text(r, w - 14 - right_width, 12, right, 2, p->muted,
+                         w - 12);
+}
+
+static void plumos_fbdev_draw_gallery_card(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const struct plumos_fbdev_assets *assets,
+    const struct plumos_fbdev_entry *entry, int x, int y, int w, int h,
+    int selected) {
+  char badge[8];
+  int scale = selected ? 5 : 4;
+  int initials_width;
+  int thumbnail_drawn = 0;
+  uint32_t outline = selected ? p->accent : p->panel;
+  uint32_t fill = selected ? p->selection_background : p->media_panel;
+
+  if (!entry || w <= 0 || h <= 0) {
+    return;
+  }
+  plumos_fbdev_fill_rect(r, x - 4, y - 4, w + 8, h + 8, outline);
+  plumos_fbdev_fill_rect(r, x, y, w, h, fill);
+#ifdef PLUMOS_FBDEV_ENABLE_PNG
+  if (entry->media[0]) {
+    thumbnail_drawn = plumos_fbdev_draw_png_contain(r, entry->media, x, y, w, h);
+  }
+  if (!thumbnail_drawn && assets && assets->placeholder[0]) {
+    thumbnail_drawn =
+        plumos_fbdev_draw_png_contain(r, assets->placeholder, x, y, w, h);
+  }
+#else
+  (void)assets;
+#endif
+  if (!thumbnail_drawn) {
+    plumos_fbdev_entry_badge(badge, sizeof(badge), entry->title);
+    initials_width = plumos_fbdev_text_width(badge, scale);
+    plumos_fbdev_draw_text(r, x + (w - initials_width) / 2,
+                           y + h * 45 / 100, badge, scale,
+                           selected ? p->selection_foreground : p->foreground,
+                           x + w - 8);
+  }
+}
+
+static void plumos_fbdev_draw_gallery_entries(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const struct plumos_fbdev_assets *assets,
+    const struct plumos_fbdev_entry *entries, size_t entry_count,
+    int x_offset) {
+  size_t selected_index;
+  size_t i;
+  int pass;
+
+  if (!entries || entry_count == 0) {
+    return;
+  }
+  selected_index = plumos_fbdev_selected_index(entries, entry_count);
+  for (pass = 0; pass < 2; pass++) {
+    for (i = 0; i < entry_count; i++) {
+      long rel = (long)i - (long)selected_index;
+      struct plumos_fbdev_gallery_slot slot;
+
+      if (rel < -2 || rel > 2) {
+        continue;
+      }
+      if ((pass == 0 && rel == 0) || (pass == 1 && rel != 0)) {
+        continue;
+      }
+      plumos_fbdev_gallery_slot(r, rel, &slot);
+      plumos_fbdev_draw_gallery_card(r, p, assets, &entries[i],
+                                     slot.x + x_offset, slot.y, slot.w, slot.h,
+                                     rel == 0);
+    }
+  }
+}
+
+static void plumos_fbdev_draw_gallery_transition_entries(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const struct plumos_fbdev_assets *assets,
+    const struct plumos_fbdev_entry *entries, size_t entry_count,
+    const struct plumos_fbdev_entry *prev_entries, size_t prev_entry_count,
+    int transition_direction, double transition_progress) {
+  size_t selected_index;
+  size_t i;
+  int pass;
+
+  (void)entries;
+  (void)entry_count;
+  if (!prev_entries || prev_entry_count == 0) {
+    plumos_fbdev_draw_gallery_entries(r, p, assets, entries, entry_count, 0);
+    return;
+  }
+  if (transition_progress < 0.0) {
+    transition_progress = 0.0;
+  } else if (transition_progress > 1.0) {
+    transition_progress = 1.0;
+  }
+  selected_index = plumos_fbdev_selected_index(prev_entries, prev_entry_count);
+  for (pass = 0; pass < 2; pass++) {
+    for (i = 0; i < prev_entry_count; i++) {
+      long rel = (long)i - (long)selected_index;
+      long target_rel = rel - (transition_direction < 0 ? -1 : 1);
+      int target_selected = target_rel == 0;
+      struct plumos_fbdev_gallery_slot from_slot;
+      struct plumos_fbdev_gallery_slot to_slot;
+      int x;
+      int y;
+      int w;
+      int h;
+
+      if (rel < -2 || rel > 2) {
+        continue;
+      }
+      if ((pass == 0 && target_selected) ||
+          (pass == 1 && !target_selected)) {
+        continue;
+      }
+      plumos_fbdev_gallery_slot(r, rel, &from_slot);
+      plumos_fbdev_gallery_slot(r, target_rel, &to_slot);
+      x = plumos_fbdev_lerp_int(from_slot.x, to_slot.x, transition_progress);
+      y = plumos_fbdev_lerp_int(from_slot.y, to_slot.y, transition_progress);
+      w = plumos_fbdev_lerp_int(from_slot.w, to_slot.w, transition_progress);
+      h = plumos_fbdev_lerp_int(from_slot.h, to_slot.h, transition_progress);
+      plumos_fbdev_draw_gallery_card(r, p, assets, &prev_entries[i], x, y, w, h,
+                                     target_selected);
+    }
+  }
+}
+
+static void plumos_fbdev_draw_gallery_footer(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const struct plumos_fbdev_entry *selected) {
+  int w = (int)r->var.xres;
+  int h = (int)r->var.yres;
+  int footer_y = h - 84;
+  int text_left = 86;
+  int text_right = w - 86;
+  const char *title =
+      selected && selected->title[0] ? selected->title : "NO ENTRY";
+  int title_width = plumos_fbdev_text_width(title, 3);
+  int title_x;
+
+  if (text_right <= text_left) {
+    text_left = 24;
+    text_right = w - 24;
+  }
+  if (title_width > text_right - text_left) {
+    title_x = text_left;
+  } else {
+    title_x = (w - title_width) / 2;
+  }
+  plumos_fbdev_fill_rect(r, 0, footer_y, w, 84, p->panel_inner);
+  plumos_fbdev_fill_rect(r, 0, footer_y, w, 2, p->accent);
+  plumos_fbdev_draw_text(r, title_x, footer_y + 23, title, 3,
+                         p->selection_foreground, text_right);
+  plumos_fbdev_draw_text(r, 24, footer_y + 27, "<", 3, p->muted, w - 24);
+  plumos_fbdev_draw_text(r, w - 42, footer_y + 27, ">", 3, p->muted, w - 16);
+}
+
+static int plumos_fbdev_render_gallery(
+    struct plumos_fbdev_renderer *r,
+    char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
+    const struct plumos_fbdev_palette *p) {
+  struct plumos_fbdev_entry entries[16];
+  struct plumos_fbdev_entry prev_entries[16];
+  struct plumos_fbdev_assets assets;
+  struct plumos_fbdev_motion motion;
+  const struct plumos_fbdev_entry *selected;
+  const char *system_value;
+  const char *transition;
+  const char *transition_progress_text;
+  const char *transition_direction_text;
+  char title[160];
+  size_t entry_count;
+  size_t prev_entry_count;
+  double transition_progress = 1.0;
+  int transition_direction = 1;
+  int slide_active;
+
+  system_value = plumos_fbdev_find_value(lines, line_count, "graphic_system=");
+  if (system_value && system_value[0]) {
+    plumos_fbdev_copy_text(title, sizeof(title), system_value);
+  } else {
+    plumos_fbdev_copy_text(title, sizeof(title), "GALLERY");
+  }
+  plumos_fbdev_load_assets(&assets, lines, line_count);
+  plumos_fbdev_load_motion(&motion, lines, line_count);
+  entry_count = plumos_fbdev_collect_graphic_entries(
+      lines, line_count, entries, sizeof(entries) / sizeof(entries[0]));
+  prev_entry_count = plumos_fbdev_collect_graphic_prev_entries(
+      lines, line_count, prev_entries,
+      sizeof(prev_entries) / sizeof(prev_entries[0]));
+  if (entry_count == 0) {
+    memset(&entries[0], 0, sizeof(entries[0]));
+    entries[0].selected = 1;
+    plumos_fbdev_copy_text(entries[0].title, sizeof(entries[0].title),
+                           "No Entries");
+    entry_count = 1;
+  }
+  selected = plumos_fbdev_selected_entry(entries, entry_count);
+  transition = plumos_fbdev_find_value(lines, line_count, "graphic_transition=");
+  transition_progress_text =
+      plumos_fbdev_find_value(lines, line_count,
+                              "graphic_transition_progress=");
+  transition_direction_text =
+      plumos_fbdev_find_value(lines, line_count,
+                              "graphic_transition_direction=");
+  if (transition_progress_text && transition_progress_text[0]) {
+    transition_progress = strtod(transition_progress_text, NULL);
+  }
+  if (transition_direction_text && transition_direction_text[0]) {
+    transition_direction = (int)strtol(transition_direction_text, NULL, 10);
+  }
+  if (transition_progress < 0.0) {
+    transition_progress = 0.0;
+  } else if (transition_progress > 1.0) {
+    transition_progress = 1.0;
+  }
+  slide_active = transition && strcmp(transition, "slide") == 0 &&
+                 prev_entry_count > 0 && transition_progress < 1.0;
+
+  plumos_fbdev_draw_gallery_background(r, p, &assets);
+  if (slide_active) {
+    transition_progress =
+        plumos_fbdev_ease_progress(transition_progress,
+                                   motion.transition_easing);
+    plumos_fbdev_draw_gallery_transition_entries(
+        r, p, &assets, entries, entry_count, prev_entries, prev_entry_count,
+        transition_direction < 0 ? -1 : 1, transition_progress);
+  } else {
+    plumos_fbdev_draw_gallery_entries(r, p, &assets, entries, entry_count, 0);
+  }
+  plumos_fbdev_draw_gallery_top_bar(r, p, title);
+  plumos_fbdev_draw_gallery_footer(r, p, selected);
+  return 1;
+}
+
 static int plumos_fbdev_is_hidden_line(const char *line) {
   if (!line || !line[0]) {
     return 1;
@@ -1771,10 +2381,11 @@ static int plumos_fbdev_render_lines(struct plumos_fbdev_renderer *r,
     ok = plumos_fbdev_render_top_refresh_running(r, &palette);
   } else if (mode && strcmp(mode, "top") == 0) {
     ok = plumos_fbdev_render_top(r, lines, line_count, &palette);
+  } else if (mode && strcmp(mode, "gallery") == 0) {
+    ok = plumos_fbdev_render_gallery(r, lines, line_count, &palette);
   } else if (mode && (strcmp(mode, "roms") == 0 ||
                       strcmp(mode, "favorites") == 0 ||
-                      strcmp(mode, "recent") == 0 ||
-                      strcmp(mode, "gallery") == 0)) {
+                      strcmp(mode, "recent") == 0)) {
     ok = plumos_fbdev_render_roms(r, lines, line_count, &palette);
   } else {
     ok = plumos_fbdev_render_generic(r, lines, line_count, &palette);
@@ -1794,6 +2405,9 @@ static void plumos_fbdev_renderer_shutdown(struct plumos_fbdev_renderer *r) {
   if (!r) {
     return;
   }
+#ifdef PLUMOS_FBDEV_ENABLE_PNG
+  plumos_fbdev_png_cache_clear(r);
+#endif
   if (r->mem) {
     munmap(r->mem, r->map_size);
     r->mem = NULL;
