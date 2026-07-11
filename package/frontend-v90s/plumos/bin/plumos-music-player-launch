@@ -1,0 +1,166 @@
+#!/bin/sh
+# V90S-safe music player entrypoint for the frontend Apps menu.
+
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:$PATH"
+export PLUMOS_ROOT PLUMOS_SDCARD_ROOT PATH
+
+mode=play-first
+audio_device="${PLUMOS_MUSIC_PLAYER_AUDIO_DEVICE:-hw:0,0}"
+limit="${PLUMOS_MUSIC_PLAYER_LIST_LIMIT:-40}"
+extra_root=""
+speaker_pid=""
+
+case "$limit" in
+  ''|*[!0-9]*|0) limit=40 ;;
+esac
+
+usage() {
+  cat <<'USAGE'
+Usage: plumos-music-player-launch [--play-first|--list|--smoke] [--root PATH]
+
+The V90S Apps music player currently supports WAV playback through ALSA.
+USAGE
+}
+
+cleanup() {
+  if [ -n "$speaker_pid" ]; then
+    kill "$speaker_pid" 2>/dev/null || true
+    wait "$speaker_pid" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM HUP
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --play-first)
+      mode=play-first
+      shift
+      ;;
+    --list)
+      mode=list
+      shift
+      ;;
+    --smoke)
+      mode=smoke
+      shift
+      ;;
+    --root)
+      [ "$#" -ge 2 ] || {
+        usage >&2
+        exit 2
+      }
+      extra_root="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'error: unknown argument: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+music_roots() {
+  [ -n "$extra_root" ] && printf '%s\n' "$extra_root"
+  printf '%s\n' \
+    "$PLUMOS_ROOT/music" \
+    "$PLUMOS_ROOT/MUSIC" \
+    "$PLUMOS_ROOT/roms/music" \
+    "$PLUMOS_ROOT/roms/MUSIC" \
+    "/run/plumos/sd2/music" \
+    "/run/plumos/sd2/MUSIC" \
+    "/run/plumos/sd2/roms/music" \
+    "/run/plumos/sd2/roms/MUSIC"
+}
+
+is_supported_audio() {
+  name="$(printf '%s\n' "${1##*/}" | tr '[:upper:]' '[:lower:]')"
+  case "$name" in
+    *.wav|*.wave) return 0 ;;
+  esac
+  return 1
+}
+
+find_audio_files() {
+  music_roots | while IFS= read -r root; do
+    [ -d "$root" ] || continue
+    find "$root" -type f 2>/dev/null | sort | while IFS= read -r file; do
+      is_supported_audio "$file" || continue
+      printf '%s\n' "$file"
+    done
+  done
+}
+
+print_header() {
+  printf 'plumOS Music Player\n'
+  printf 'root\t%s\n' "$PLUMOS_ROOT"
+  printf 'audio_device\t%s\n' "$audio_device"
+  printf 'mode\t%s\n' "$mode"
+  printf '\n'
+}
+
+list_music() {
+  files="$(find_audio_files | head -n "$limit")"
+  if [ -z "$files" ]; then
+    printf 'status\tno_supported_audio_files\n'
+    printf 'hint\tcopy WAV files to /mnt/plumos/music or SD2 music\n'
+    return 0
+  fi
+  printf '%s\n' "$files" | while IFS= read -r file; do
+    size="$(wc -c < "$file" 2>/dev/null | tr -d ' ' || true)"
+    printf 'audio\t%s\t%s\n' "${size:-0}" "$file"
+  done
+}
+
+play_first() {
+  first="$(find_audio_files | sed -n '1p')"
+  if [ -z "$first" ]; then
+    printf 'status\tno_supported_audio_files\n'
+    printf 'hint\tcopy WAV files to /mnt/plumos/music or SD2 music\n'
+    return 0
+  fi
+  printf 'playing\t%s\n' "$first"
+  if ! command -v aplay >/dev/null 2>&1; then
+    printf 'status\taplay_missing\n'
+    return 127
+  fi
+  aplay -D "$audio_device" "$first"
+}
+
+smoke_audio() {
+  printf 'smoke\talsa_sine\n'
+  if command -v speaker-test >/dev/null 2>&1; then
+    speaker-test -D "$audio_device" -t sine -f 440 -l 1 >/tmp/plumos-music-player-smoke.log 2>&1 &
+    speaker_pid=$!
+    sleep "${PLUMOS_MUSIC_PLAYER_SMOKE_SECONDS:-2}"
+    kill "$speaker_pid" 2>/dev/null || true
+    wait "$speaker_pid" 2>/dev/null || true
+    speaker_pid=""
+    sed -n '1,20p' /tmp/plumos-music-player-smoke.log 2>/dev/null || true
+    printf 'status\tsmoke_finished\n'
+    return 0
+  fi
+  printf 'status\tspeaker_test_missing\n'
+  return 127
+}
+
+print_header
+case "$mode" in
+  list)
+    list_music
+    ;;
+  smoke)
+    smoke_audio
+    ;;
+  play-first)
+    play_first
+    ;;
+esac

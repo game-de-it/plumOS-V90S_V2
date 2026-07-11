@@ -197,6 +197,7 @@ mkdir -p \
     "$out_dir/state/frontend" \
     "$out_dir/themes" \
     "$out_dir/media" \
+    "$out_dir/music" \
     "$out_dir/roms" \
     "$out_dir/bios" \
     "$out_dir/Saves" \

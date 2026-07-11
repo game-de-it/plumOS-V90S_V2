@@ -19,19 +19,20 @@
       "menu": "apps"
     },
     {
+      "id": "music_player",
+      "display_name": "Music Player",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-music-player-launch",
+      "show_results": true,
+      "visible": true,
+      "menu": "apps"
+    },
+    {
       "id": "retroarch",
       "display_name": "RetroArch",
       "kind": "emulator",
       "launch_profile": "shell:/mnt/plumos/bin/plumos-retroarch-menu-launch",
       "visible": true,
-      "menu": "apps"
-    },
-    {
-      "id": "music_player",
-      "display_name": "Music Player",
-      "kind": "tool",
-      "launch_profile": "shell:/mnt/plumos/bin/plumos-music-player-launch",
-      "visible": false,
       "menu": "apps"
     },
     {

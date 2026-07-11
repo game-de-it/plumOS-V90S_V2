@@ -198,6 +198,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `state/`
   - `themes/`
   - `media/`
+  - `music/`
   - `roms/`
   - `bios/`
   - `Saves/`
@@ -214,6 +215,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Add the V90S-adapted MMF thumbnail scraper as
   `/mnt/plumos/bin/plumos-thumbnail-scraper`, using `/mnt/plumos/roms` and
   `/mnt/plumos/media/<system>/images`.
+- [x] Add a V90S-safe Music Player Apps entry backed by ALSA `aplay` for WAV
+  playback and `speaker-test` for live audio smoke validation.
 - [x] Copy BusyBox and command-line userland into the app layer.
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
 - [x] Add the MMF-compatible default `config/system/settings.json` so frontend
@@ -270,8 +273,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Copy standalone emulators into the app layer.
 - [ ] Port a real V90S file-manager payload to replace the current safe file
   overview app once NextCommander or a stock-compatible equivalent is validated.
-- [ ] Port and validate a V90S native Music Player before making
-  `music_player` visible in Apps.
+- [ ] Port a fuller native V90S Music Player UI after the lightweight ALSA/WAV
+  Apps entry is validated.
 - [x] Copy plumOS-owned private libraries into the app layer.
 - [x] Avoid symlink-dependent library layouts on FAT32.
 - [x] Generate app-layer `manifest.json`.
