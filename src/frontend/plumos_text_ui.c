@@ -2629,6 +2629,10 @@ static int load_recent(const char *path, struct recent_state *state) {
   if (!json) {
     return 0;
   }
+  if (json_size == 0) {
+    free(json);
+    return 1;
+  }
   if (!json_find_array(json, json + json_size, "recents", &array_start, &array_end)) {
     free(json);
     return 0;
