@@ -179,6 +179,7 @@ assemble_base() {
   cp -a "${PACKAGE_DIR}/." "$PLUMOS_DIR/"
   chmod 0755 "${BIN_DIR}/plumos-network-services"
   chmod 0755 "${BIN_DIR}/plumos-network-control"
+  chmod 0755 "${BIN_DIR}/plumos-usb-disk-mode"
   chmod 0755 "${PLUMOS_DIR}/ssh/start-ssh.sh" "${PLUMOS_DIR}/ssh/stop-ssh.sh"
   : > "$MANIFEST"
   {
@@ -348,6 +349,11 @@ Services:
     \\V90S_IP\SDCARD with:
       username: plumos
       password: plumos
+  USB Disk Mode:
+    Exposes a dedicated transfer image as a USB mass-storage drive. It does not
+    expose /mnt/plumos itself, so the live FAT32 app layer is not mounted by the
+    PC and V90S at the same time. Eject the USB drive on the PC, then unplug
+    the USB cable; plumOS mounts the transfer image at /mnt/plumos/usb-transfer.
 
 Persistent service state:
   /mnt/plumos/config/network/services.conf
@@ -367,6 +373,9 @@ Runtime control:
   /mnt/plumos/bin/plumos-network-services start samba
   /mnt/plumos/bin/plumos-network-services stop samba
   /mnt/plumos/bin/plumos-network-services start-enabled
+  /mnt/plumos/bin/plumos-usb-disk-mode status
+  /mnt/plumos/bin/plumos-usb-disk-mode enter
+  /mnt/plumos/bin/plumos-usb-disk-mode leave
 EOF
 
   {

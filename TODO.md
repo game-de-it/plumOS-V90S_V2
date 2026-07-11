@@ -215,6 +215,15 @@ Build plumOS V90S as a V90S-specific distribution:
   services are reachable from the frontend.
 - [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
   Mac client.
+- [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi
+  dongles. It exposes a dedicated transfer image, not `/mnt/plumos` itself.
+- [ ] Physically validate USB Disk Mode from macOS with a data-capable USB
+  cable and confirm the `PLUMUSB` drive appears, can be ejected, and remounts
+  on V90S at `/mnt/plumos/usb-transfer`.
+- [ ] Investigate command execution over USB. The current StockOS-derived
+  kernel has Mass Storage and FunctionFS, but not USB Ethernet
+  ECM/RNDIS/NCM or ACM serial; likely routes are ADB userspace via FunctionFS
+  or a custom FunctionFS/libusb command channel.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [x] Copy plumOS-owned private libraries into the app layer.

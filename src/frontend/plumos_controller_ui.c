@@ -5294,6 +5294,8 @@ static void add_network_service_entries(struct ui_state *ui) {
                          device->sftp_service_running);
   add_bool_setting_entry(ui, "network_samba_enabled", "Samba",
                          device->samba_service_running);
+  add_setting_entry(ui, "network_usb_disk_mode", "USB Disk Mode",
+                    "USB Transfer");
 }
 
 static void add_network_information_entries(struct ui_state *ui) {

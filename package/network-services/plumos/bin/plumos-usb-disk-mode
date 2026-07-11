@@ -1,0 +1,285 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
+
+STATE_DIR="${PLUMOS_USB_DISK_STATE_DIR:-${PLUMOS_ROOT}/state/usb-disk}"
+RUN_DIR="${PLUMOS_USB_DISK_RUN_DIR:-${PLUMOS_ROOT}/run/usb-disk}"
+LOG_DIR="${PLUMOS_ROOT}/Logs"
+LOG_FILE="${LOG_DIR}/usb-disk-mode.log"
+IMAGE="${PLUMOS_USB_DISK_IMAGE:-${STATE_DIR}/plumos-usb-transfer.img}"
+MOUNT_DIR="${PLUMOS_USB_DISK_MOUNT:-${PLUMOS_ROOT}/usb-transfer}"
+IMAGE_SIZE_MB="${PLUMOS_USB_DISK_SIZE_MB:-64}"
+CONNECT_TIMEOUT_SECONDS="${PLUMOS_USB_DISK_CONNECT_TIMEOUT_SECONDS:-45}"
+GADGET_NAME="${PLUMOS_USB_DISK_GADGET_NAME:-plumos_usb_disk}"
+GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
+FUNCTION_NAME="mass_storage.usb0"
+ACTIVE=0
+
+mkdir -p "$STATE_DIR" "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
+
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+cleanup_on_signal() {
+  if [ "$ACTIVE" -eq 1 ]; then
+    log "signal_cleanup"
+    teardown_gadget
+    mount_image || true
+  fi
+  exit 130
+}
+
+trap cleanup_on_signal INT TERM HUP
+
+usage() {
+  cat <<'USAGE'
+Usage: plumos-usb-disk-mode COMMAND
+
+Commands:
+  enter     Export a dedicated plumOS USB transfer image as a USB drive.
+  leave     Unexport the USB drive and mount the transfer image on V90S.
+  mount     Mount the transfer image on V90S without exporting it.
+  unmount   Unmount the transfer image from V90S.
+  status    Print USB disk mode state.
+
+The exported disk is a separate image file, not /mnt/plumos itself. This avoids
+sharing the live FAT32 app layer with the PC and V90S at the same time.
+USAGE
+}
+
+is_mounted() {
+  grep -q " ${MOUNT_DIR} " /proc/mounts 2>/dev/null
+}
+
+gadget_bound() {
+  [ -r "${GADGET_DIR}/UDC" ] && [ -n "$(cat "${GADGET_DIR}/UDC" 2>/dev/null)" ]
+}
+
+udc_name() {
+  if [ "${PLUMOS_USB_UDC:-auto}" != auto ]; then
+    printf '%s\n' "$PLUMOS_USB_UDC"
+    return 0
+  fi
+  for udc in /sys/class/udc/*; do
+    [ -e "$udc" ] || continue
+    basename "$udc"
+    return 0
+  done
+  return 1
+}
+
+udc_state() {
+  udc="$(udc_name 2>/dev/null || true)"
+  if [ -n "$udc" ] && [ -r "/sys/class/udc/${udc}/state" ]; then
+    cat "/sys/class/udc/${udc}/state" 2>/dev/null || true
+    return 0
+  fi
+  printf '%s\n' unknown
+}
+
+ensure_configfs() {
+  if [ ! -d /sys/kernel/config ]; then
+    log "configfs_missing"
+    return 1
+  fi
+  if [ ! -d /sys/kernel/config/usb_gadget ]; then
+    mount -t configfs none /sys/kernel/config >> "$LOG_FILE" 2>&1 || true
+  fi
+  [ -d /sys/kernel/config/usb_gadget ]
+}
+
+ensure_image() {
+  if [ -s "$IMAGE" ]; then
+    return 0
+  fi
+
+  rm -f "$IMAGE"
+  log "creating_image path=${IMAGE} size_mb=${IMAGE_SIZE_MB}"
+  dd if=/dev/zero of="$IMAGE" bs=1M count="$IMAGE_SIZE_MB" >> "$LOG_FILE" 2>&1 || return 1
+
+  if command -v mkfs.vfat >/dev/null 2>&1; then
+    mkfs.vfat -n PLUMUSB "$IMAGE" >> "$LOG_FILE" 2>&1 || return 1
+  elif command -v mkfs.fat >/dev/null 2>&1; then
+    mkfs.fat -n PLUMUSB "$IMAGE" >> "$LOG_FILE" 2>&1 || return 1
+  else
+    log "mkfs_fat_missing"
+    return 1
+  fi
+}
+
+unmount_image() {
+  if is_mounted; then
+    sync
+    umount "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || return 1
+  fi
+}
+
+mount_image() {
+  ensure_image || return 1
+  if gadget_bound; then
+    log "mount_refused reason=gadget_bound"
+    return 1
+  fi
+  mkdir -p "$MOUNT_DIR"
+  if is_mounted; then
+    return 0
+  fi
+  if command -v fsck.fat >/dev/null 2>&1; then
+    fsck.fat -a "$IMAGE" >> "$LOG_FILE" 2>&1 || true
+  fi
+  mount -t vfat -o loop,rw,utf8 "$IMAGE" "$MOUNT_DIR" >> "$LOG_FILE" 2>&1
+}
+
+teardown_gadget() {
+  if [ -d "$GADGET_DIR" ]; then
+    if [ -w "${GADGET_DIR}/UDC" ]; then
+      printf '\n' > "${GADGET_DIR}/UDC" 2>/dev/null || true
+    fi
+    rm -f "${GADGET_DIR}/configs/c.1/${FUNCTION_NAME}" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/functions/${FUNCTION_NAME}" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/configs/c.1/strings/0x409" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/configs/c.1" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/strings/0x409" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/functions" 2>/dev/null || true
+    rmdir "${GADGET_DIR}/configs" 2>/dev/null || true
+    rmdir "$GADGET_DIR" 2>/dev/null || true
+  fi
+}
+
+setup_gadget() {
+  udc="$(udc_name)" || {
+    log "udc_missing"
+    return 1
+  }
+
+  teardown_gadget
+  mkdir -p \
+    "${GADGET_DIR}/strings/0x409" \
+    "${GADGET_DIR}/configs/c.1/strings/0x409" \
+    "${GADGET_DIR}/functions/${FUNCTION_NAME}" || return 1
+
+  printf '0x1d6b\n' > "${GADGET_DIR}/idVendor"
+  printf '0x0104\n' > "${GADGET_DIR}/idProduct"
+  printf '0x0200\n' > "${GADGET_DIR}/bcdUSB"
+  printf '0x0100\n' > "${GADGET_DIR}/bcdDevice"
+  printf 'plumos-v90s-%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null | cut -c1-8)" \
+    > "${GADGET_DIR}/strings/0x409/serialnumber"
+  printf 'plumOS\n' > "${GADGET_DIR}/strings/0x409/manufacturer"
+  printf 'plumOS V90S USB Transfer\n' > "${GADGET_DIR}/strings/0x409/product"
+  printf 'USB Transfer\n' > "${GADGET_DIR}/configs/c.1/strings/0x409/configuration"
+  printf '120\n' > "${GADGET_DIR}/configs/c.1/MaxPower"
+
+  printf '1\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/removable"
+  printf '0\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/ro"
+  printf '0\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/cdrom"
+  printf '1\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/nofua" 2>/dev/null || true
+  printf 'plumOS USB Transfer\n' \
+    > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/inquiry_string" 2>/dev/null || true
+  printf '%s\n' "$IMAGE" > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/file"
+  ln -s "${GADGET_DIR}/functions/${FUNCTION_NAME}" "${GADGET_DIR}/configs/c.1/${FUNCTION_NAME}"
+  printf '%s\n' "$udc" > "${GADGET_DIR}/UDC"
+}
+
+wait_for_disconnect() {
+  deadline=0
+  connected=0
+  if [ "$CONNECT_TIMEOUT_SECONDS" -gt 0 ] 2>/dev/null; then
+    deadline=$(( $(date +%s 2>/dev/null || echo 0) + CONNECT_TIMEOUT_SECONDS ))
+  fi
+
+  while :; do
+    state="$(udc_state)"
+    case "$state" in
+      configured|addressed|powered)
+        connected=1
+        ;;
+      "not attached"|"")
+        if [ "$connected" -eq 1 ]; then
+          return 0
+        fi
+        ;;
+    esac
+
+    if [ "$connected" -eq 0 ] && [ "$deadline" -gt 0 ]; then
+      now="$(date +%s 2>/dev/null || echo 0)"
+      if [ "$now" -ge "$deadline" ]; then
+        log "connect_timeout state=${state}"
+        return 1
+      fi
+    fi
+    sleep 1
+  done
+}
+
+enter_mode() {
+  log "enter_requested image=${IMAGE}"
+  ensure_configfs || return 1
+  ensure_image || return 1
+  unmount_image || return 1
+  setup_gadget || return 1
+  ACTIVE=1
+  log "gadget_bound udc=$(cat "${GADGET_DIR}/UDC" 2>/dev/null || true) state=$(udc_state)"
+
+  if wait_for_disconnect; then
+    log "disconnect_detected"
+    teardown_gadget
+    ACTIVE=0
+    mount_image || return 1
+    log "leave_complete mounted=${MOUNT_DIR}"
+    return 0
+  fi
+
+  teardown_gadget
+  ACTIVE=0
+  mount_image || true
+  return 1
+}
+
+leave_mode() {
+  log "leave_requested"
+  teardown_gadget
+  mount_image
+}
+
+status_mode() {
+  printf 'image=%s\n' "$IMAGE"
+  printf 'mount_dir=%s\n' "$MOUNT_DIR"
+  printf 'image_exists=%s\n' "$( [ -s "$IMAGE" ] && echo 1 || echo 0 )"
+  printf 'mounted=%s\n' "$( is_mounted && echo 1 || echo 0 )"
+  printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
+  printf 'udc_state=%s\n' "$(udc_state)"
+  if [ -d "$GADGET_DIR" ] && [ -r "${GADGET_DIR}/UDC" ]; then
+    printf 'udc=%s\n' "$(cat "${GADGET_DIR}/UDC" 2>/dev/null || true)"
+  fi
+}
+
+case "${1:-status}" in
+  enter)
+    enter_mode
+    ;;
+  leave)
+    leave_mode
+    ;;
+  mount)
+    mount_image
+    ;;
+  unmount)
+    unmount_image
+    ;;
+  status)
+    status_mode
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'error: unknown command: %s\n' "$1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
