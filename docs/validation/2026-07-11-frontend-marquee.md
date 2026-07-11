@@ -20,6 +20,9 @@ scroll horizontally instead of being permanently clipped.
 - Fixed the fbdev ROM-list periodic refresh interval to
   `UI_GRAPHIC_SCROLL_REFRESH_MS` so marquee updates are actually redrawn without
   a zero-millisecond busy refresh loop.
+- Fixed the fbdev-only periodic refresh gate so graphic ROM-list screens request
+  periodic redraws just like gallery screens. Without this, gallery footer
+  marquee moved but ROM-list marquee stayed frozen on the real device.
 
 The timing follows MMF:
 
@@ -73,13 +76,13 @@ ssh root@192.0.2.120
 Deployed binary:
 
 ```text
-2084f71b1a67cebec53c301f5c122b64a87aba5c52bc66db9e73f63b0e8ca98e  /mnt/plumos/bin/plumos-controller-ui-fbdev
+3a11a74d6aff05be7b78691c79d991bbd7167f82994e50f294a4eca24066ed6f  /mnt/plumos/bin/plumos-controller-ui-fbdev
 ```
 
 Running frontend after deploy:
 
 ```text
-pid=2235
+pid=2342
 ```
 
 Live notes:
@@ -88,6 +91,16 @@ Live notes:
   `/mnt/plumos/bin/plumos-frontend-stop stop`, and the binary was moved into
   `/mnt/plumos/bin/`.
 - The frontend was restarted through `/mnt/plumos/bin/plumos-frontend-launch`.
+- User-side testing found that gallery-mode text scrolled but ROM-list text did
+  not. Root cause was `ui_needs_periodic_refresh()` returning early in the
+  fbdev-only branch before checking `ui_is_rom_list_screen(ui)`.
+- After the refresh-gate fix, the updated binary was deployed with the hash
+  above and confirmed running as:
+
+```text
+/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+```
+
 - SSH stdin injection was not reliable for leaving the live UI on a long ROM
   entry while waiting for the marquee phase, so the live proof is limited to
   deployed binary hash plus running FE state. User-side validation should hold

@@ -13867,6 +13867,9 @@ static int ui_needs_periodic_refresh(const struct ui_state *ui) {
         (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_GALLERY)) {
       return 1;
     }
+    if (ui_uses_graphic_mode(ui) && ui_is_rom_list_screen(ui)) {
+      return 1;
+    }
     return ui->rescue_network || ui->rom_scan_refresh_pid > 0;
   }
   if (ui->rescue_network) {
