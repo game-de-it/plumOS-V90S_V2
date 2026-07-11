@@ -19,6 +19,11 @@
 #include <png.h>
 #endif
 
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#endif
+
 #ifndef PLUMOS_FBDEV_RENDER_LINE_MAX
 #define PLUMOS_FBDEV_RENDER_LINE_MAX 512
 #endif
@@ -28,6 +33,36 @@
 #endif
 
 #ifndef PLUMOS_FBDEV_RENDERER_GLYPHS_ONLY
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+#ifndef PLUMOS_FBDEV_FT_ADVANCE_CACHE_SIZE
+#define PLUMOS_FBDEV_FT_ADVANCE_CACHE_SIZE 512
+#endif
+#ifndef PLUMOS_FBDEV_FT_GLYPH_CACHE_SIZE
+#define PLUMOS_FBDEV_FT_GLYPH_CACHE_SIZE 256
+#endif
+
+struct plumos_fbdev_ft_advance_cache_entry {
+  unsigned int codepoint;
+  int scale;
+  int advance;
+  int valid;
+};
+
+struct plumos_fbdev_ft_glyph_cache_entry {
+  unsigned int codepoint;
+  int scale;
+  int face_slot;
+  int pixel_size;
+  int bitmap_left;
+  int bitmap_top;
+  int width;
+  int rows;
+  unsigned char *alpha;
+  unsigned long used_at;
+  int valid;
+};
+#endif
+
 #ifdef PLUMOS_FBDEV_ENABLE_PNG
 #ifndef PLUMOS_FBDEV_PNG_CACHE_SLOTS
 #define PLUMOS_FBDEV_PNG_CACHE_SLOTS 16
@@ -59,6 +94,20 @@ struct plumos_fbdev_renderer {
 #ifdef PLUMOS_FBDEV_ENABLE_PNG
   struct plumos_fbdev_png_cache_slot png_cache[PLUMOS_FBDEV_PNG_CACHE_SLOTS];
   unsigned long png_cache_tick;
+#endif
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+  FT_Library ft_library;
+  FT_Face ft_face;
+  FT_Face ft_fallback_face;
+  int ft_ready;
+  int ft_pixel_size;
+  int ft_fallback_ready;
+  int ft_fallback_pixel_size;
+  struct plumos_fbdev_ft_advance_cache_entry
+      ft_advance_cache[PLUMOS_FBDEV_FT_ADVANCE_CACHE_SIZE];
+  struct plumos_fbdev_ft_glyph_cache_entry
+      ft_glyph_cache[PLUMOS_FBDEV_FT_GLYPH_CACHE_SIZE];
+  unsigned long ft_glyph_cache_tick;
 #endif
 };
 
@@ -632,17 +681,692 @@ static void plumos_fbdev_draw_char(struct plumos_fbdev_renderer *r, int x, int y
   }
 }
 
+static void plumos_fbdev_draw_char_clipped(struct plumos_fbdev_renderer *r,
+                                           int x, int y, char c, int scale,
+                                           int min_x, int max_x,
+                                           uint32_t color) {
+  const uint8_t *g = plumos_fbdev_glyph_for(c);
+  int row;
+  int col;
+  int yy;
+  int xx;
+
+  if (scale <= 0 || max_x <= min_x) {
+    return;
+  }
+  for (row = 0; row < 7; row++) {
+    for (col = 0; col < 5; col++) {
+      if (!(g[row] & (1U << (4 - col)))) {
+        continue;
+      }
+      for (yy = 0; yy < scale; yy++) {
+        for (xx = 0; xx < scale; xx++) {
+          int draw_x = x + col * scale + xx;
+          int draw_y = y + row * scale + yy;
+          if (draw_x >= min_x && draw_x < max_x) {
+            plumos_fbdev_put_pixel(r, draw_x, draw_y, color);
+          }
+        }
+      }
+    }
+  }
+}
+
+static const char *plumos_fbdev_utf8_next(const char *s,
+                                          unsigned int *codepoint) {
+  const unsigned char *p = (const unsigned char *)s;
+  unsigned int cp;
+
+  if (!p || !*p) {
+    if (codepoint) {
+      *codepoint = 0;
+    }
+    return s;
+  }
+  if (p[0] < 0x80) {
+    if (codepoint) {
+      *codepoint = p[0];
+    }
+    return s + 1;
+  }
+  if ((p[0] & 0xe0) == 0xc0 && (p[1] & 0xc0) == 0x80) {
+    cp = ((unsigned int)(p[0] & 0x1f) << 6) |
+         (unsigned int)(p[1] & 0x3f);
+    if (cp >= 0x80) {
+      if (codepoint) {
+        *codepoint = cp;
+      }
+      return s + 2;
+    }
+  } else if ((p[0] & 0xf0) == 0xe0 && (p[1] & 0xc0) == 0x80 &&
+             (p[2] & 0xc0) == 0x80) {
+    cp = ((unsigned int)(p[0] & 0x0f) << 12) |
+         ((unsigned int)(p[1] & 0x3f) << 6) |
+         (unsigned int)(p[2] & 0x3f);
+    if (cp >= 0x800 && !(cp >= 0xd800 && cp <= 0xdfff)) {
+      if (codepoint) {
+        *codepoint = cp;
+      }
+      return s + 3;
+    }
+  } else if ((p[0] & 0xf8) == 0xf0 && (p[1] & 0xc0) == 0x80 &&
+             (p[2] & 0xc0) == 0x80 && (p[3] & 0xc0) == 0x80) {
+    cp = ((unsigned int)(p[0] & 0x07) << 18) |
+         ((unsigned int)(p[1] & 0x3f) << 12) |
+         ((unsigned int)(p[2] & 0x3f) << 6) |
+         (unsigned int)(p[3] & 0x3f);
+    if (cp >= 0x10000 && cp <= 0x10ffff) {
+      if (codepoint) {
+        *codepoint = cp;
+      }
+      return s + 4;
+    }
+  }
+  if (codepoint) {
+    *codepoint = '?';
+  }
+  return s + 1;
+}
+
+static int plumos_fbdev_utf8_append_codepoint(char *out, size_t out_size,
+                                              size_t *pos,
+                                              unsigned int codepoint) {
+  if (!out || !pos || *pos >= out_size) {
+    return 0;
+  }
+  if (codepoint <= 0x7f) {
+    if (*pos + 1 >= out_size) {
+      return 0;
+    }
+    out[(*pos)++] = (char)codepoint;
+  } else if (codepoint <= 0x7ff) {
+    if (*pos + 2 >= out_size) {
+      return 0;
+    }
+    out[(*pos)++] = (char)(0xc0 | (codepoint >> 6));
+    out[(*pos)++] = (char)(0x80 | (codepoint & 0x3f));
+  } else if (codepoint <= 0xffff) {
+    if (*pos + 3 >= out_size) {
+      return 0;
+    }
+    out[(*pos)++] = (char)(0xe0 | (codepoint >> 12));
+    out[(*pos)++] = (char)(0x80 | ((codepoint >> 6) & 0x3f));
+    out[(*pos)++] = (char)(0x80 | (codepoint & 0x3f));
+  } else if (codepoint <= 0x10ffff) {
+    if (*pos + 4 >= out_size) {
+      return 0;
+    }
+    out[(*pos)++] = (char)(0xf0 | (codepoint >> 18));
+    out[(*pos)++] = (char)(0x80 | ((codepoint >> 12) & 0x3f));
+    out[(*pos)++] = (char)(0x80 | ((codepoint >> 6) & 0x3f));
+    out[(*pos)++] = (char)(0x80 | (codepoint & 0x3f));
+  } else {
+    return 0;
+  }
+  out[*pos] = '\0';
+  return 1;
+}
+
+static unsigned int plumos_fbdev_compose_kana_mark(unsigned int base,
+                                                   unsigned int mark) {
+  if (mark == 0x3099) {
+    switch (base) {
+    case 0x3046:
+      return 0x3094;
+    case 0x30A6:
+      return 0x30F4;
+    case 0x30EF:
+      return 0x30F7;
+    case 0x30F0:
+      return 0x30F8;
+    case 0x30F1:
+      return 0x30F9;
+    case 0x30F2:
+      return 0x30FA;
+    default:
+      break;
+    }
+    if ((base >= 0x304B && base <= 0x3069 &&
+         (base == 0x304B || base == 0x304D || base == 0x304F ||
+          base == 0x3051 || base == 0x3053 || base == 0x3055 ||
+          base == 0x3057 || base == 0x3059 || base == 0x305B ||
+          base == 0x305D || base == 0x305F || base == 0x3061 ||
+          base == 0x3064 || base == 0x3066 || base == 0x3068)) ||
+        (base >= 0x30AB && base <= 0x30C8 &&
+         (base == 0x30AB || base == 0x30AD || base == 0x30AF ||
+          base == 0x30B1 || base == 0x30B3 || base == 0x30B5 ||
+          base == 0x30B7 || base == 0x30B9 || base == 0x30BB ||
+          base == 0x30BD || base == 0x30BF || base == 0x30C1 ||
+          base == 0x30C4 || base == 0x30C6 || base == 0x30C8))) {
+      return base + 1;
+    }
+    if ((base >= 0x306F && base <= 0x307B &&
+         (base == 0x306F || base == 0x3072 || base == 0x3075 ||
+          base == 0x3078 || base == 0x307B)) ||
+        (base >= 0x30CF && base <= 0x30DB &&
+         (base == 0x30CF || base == 0x30D2 || base == 0x30D5 ||
+          base == 0x30D8 || base == 0x30DB))) {
+      return base + 1;
+    }
+  } else if (mark == 0x309A) {
+    if ((base >= 0x306F && base <= 0x307B &&
+         (base == 0x306F || base == 0x3072 || base == 0x3075 ||
+          base == 0x3078 || base == 0x307B)) ||
+        (base >= 0x30CF && base <= 0x30DB &&
+         (base == 0x30CF || base == 0x30D2 || base == 0x30D5 ||
+          base == 0x30D8 || base == 0x30DB))) {
+      return base + 2;
+    }
+  }
+  return 0;
+}
+
+static void plumos_fbdev_normalize_kana_marks(const char *in, char *out,
+                                              size_t out_size) {
+  const char *p;
+  size_t n = 0;
+
+  if (!out || out_size == 0) {
+    return;
+  }
+  out[0] = '\0';
+  if (!in) {
+    return;
+  }
+  p = in;
+  while (*p) {
+    unsigned int cp;
+    unsigned int next_cp = 0;
+    unsigned int composed = 0;
+    const char *next = plumos_fbdev_utf8_next(p, &cp);
+    const char *after_next = next;
+
+    if (*next) {
+      after_next = plumos_fbdev_utf8_next(next, &next_cp);
+      composed = plumos_fbdev_compose_kana_mark(cp, next_cp);
+    }
+    if (composed) {
+      if (!plumos_fbdev_utf8_append_codepoint(out, out_size, &n, composed)) {
+        break;
+      }
+      p = after_next;
+    } else {
+      if (!plumos_fbdev_utf8_append_codepoint(out, out_size, &n, cp)) {
+        break;
+      }
+      p = next;
+    }
+  }
+}
+
+static int plumos_fbdev_unicode_is_combining(unsigned int codepoint) {
+  return (codepoint >= 0x0300 && codepoint <= 0x036f) ||
+         (codepoint >= 0x1ab0 && codepoint <= 0x1aff) ||
+         (codepoint >= 0x1dc0 && codepoint <= 0x1dff) ||
+         (codepoint >= 0x20d0 && codepoint <= 0x20ff) ||
+         (codepoint >= 0xfe20 && codepoint <= 0xfe2f);
+}
+
+static int plumos_fbdev_unicode_is_wide(unsigned int codepoint) {
+  return (codepoint >= 0x1100 && codepoint <= 0x115f) ||
+         (codepoint >= 0x2329 && codepoint <= 0x232a) ||
+         (codepoint >= 0x2e80 && codepoint <= 0xa4cf) ||
+         (codepoint >= 0xac00 && codepoint <= 0xd7a3) ||
+         (codepoint >= 0xf900 && codepoint <= 0xfaff) ||
+         (codepoint >= 0xfe10 && codepoint <= 0xfe19) ||
+         (codepoint >= 0xfe30 && codepoint <= 0xfe6f) ||
+         (codepoint >= 0xff00 && codepoint <= 0xff60) ||
+         (codepoint >= 0xffe0 && codepoint <= 0xffe6) ||
+         (codepoint >= 0x1f200 && codepoint <= 0x1f251) ||
+         (codepoint >= 0x20000 && codepoint <= 0x3fffd);
+}
+
+static int plumos_fbdev_utf8_cell_width(unsigned int codepoint) {
+  if (plumos_fbdev_unicode_is_combining(codepoint)) {
+    return 0;
+  }
+  return plumos_fbdev_unicode_is_wide(codepoint) ? 2 : 1;
+}
+
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+static int plumos_fbdev_renderer_init_freetype(
+    struct plumos_fbdev_renderer *r, char *error, size_t error_size) {
+  FT_Error ft_error;
+
+  if (!r) {
+    return 0;
+  }
+  if (r->ft_library) {
+    return 1;
+  }
+  ft_error = FT_Init_FreeType(&r->ft_library);
+  if (ft_error) {
+    snprintf(error, error_size, "FT_Init_FreeType failed: %d", (int)ft_error);
+    return 0;
+  }
+  return 1;
+}
+
+static void plumos_fbdev_ft_glyph_cache_clear(struct plumos_fbdev_renderer *r) {
+  size_t i;
+
+  if (!r) {
+    return;
+  }
+  for (i = 0; i < PLUMOS_FBDEV_FT_GLYPH_CACHE_SIZE; i++) {
+    free(r->ft_glyph_cache[i].alpha);
+    r->ft_glyph_cache[i].alpha = NULL;
+    r->ft_glyph_cache[i].valid = 0;
+    r->ft_glyph_cache[i].used_at = 0;
+  }
+  r->ft_glyph_cache_tick = 0;
+}
+
+static int plumos_fbdev_renderer_load_font(struct plumos_fbdev_renderer *r,
+                                           const char *font_path,
+                                           char *error,
+                                           size_t error_size) {
+  FT_Error ft_error;
+
+  if (!r || !font_path || !font_path[0]) {
+    snprintf(error, error_size, "font path is empty");
+    return 0;
+  }
+  if (!plumos_fbdev_renderer_init_freetype(r, error, error_size)) {
+    return 0;
+  }
+  if (r->ft_face) {
+    FT_Done_Face(r->ft_face);
+    r->ft_face = NULL;
+    r->ft_ready = 0;
+  }
+  ft_error = FT_New_Face(r->ft_library, font_path, 0, &r->ft_face);
+  if (ft_error) {
+    snprintf(error, error_size, "FT_New_Face failed: %d", (int)ft_error);
+    return 0;
+  }
+  r->ft_ready = 1;
+  r->ft_pixel_size = 0;
+  memset(r->ft_advance_cache, 0, sizeof(r->ft_advance_cache));
+  plumos_fbdev_ft_glyph_cache_clear(r);
+  return 1;
+}
+
+static int plumos_fbdev_renderer_load_fallback_font(
+    struct plumos_fbdev_renderer *r, const char *font_path, char *error,
+    size_t error_size) {
+  FT_Error ft_error;
+
+  if (!r || !font_path || !font_path[0]) {
+    snprintf(error, error_size, "fallback font path is empty");
+    return 0;
+  }
+  if (!plumos_fbdev_renderer_init_freetype(r, error, error_size)) {
+    return 0;
+  }
+  if (r->ft_fallback_face) {
+    FT_Done_Face(r->ft_fallback_face);
+    r->ft_fallback_face = NULL;
+    r->ft_fallback_ready = 0;
+  }
+  ft_error = FT_New_Face(r->ft_library, font_path, 0, &r->ft_fallback_face);
+  if (ft_error) {
+    snprintf(error, error_size, "FT_New_Face fallback failed: %d",
+             (int)ft_error);
+    return 0;
+  }
+  r->ft_fallback_ready = 1;
+  r->ft_fallback_pixel_size = 0;
+  memset(r->ft_advance_cache, 0, sizeof(r->ft_advance_cache));
+  plumos_fbdev_ft_glyph_cache_clear(r);
+  return 1;
+}
+
+static int plumos_fbdev_ft_set_face_size(FT_Face face, int *pixel_size_state,
+                                         int scale) {
+  int pixel_size;
+
+  if (!face || !pixel_size_state) {
+    return 0;
+  }
+  pixel_size = scale > 0 ? 9 * scale : 9;
+  if (pixel_size < 12) {
+    pixel_size = 12;
+  }
+  if (*pixel_size_state == pixel_size) {
+    return 1;
+  }
+  if (FT_Set_Pixel_Sizes(face, 0, (FT_UInt)pixel_size) != 0) {
+    return 0;
+  }
+  *pixel_size_state = pixel_size;
+  return 1;
+}
+
+static FT_Face plumos_fbdev_ft_select_face(struct plumos_fbdev_renderer *r,
+                                           unsigned int codepoint,
+                                           int **pixel_size_state) {
+  if (pixel_size_state) {
+    *pixel_size_state = NULL;
+  }
+  if (!r) {
+    return NULL;
+  }
+  if (r->ft_ready && r->ft_face &&
+      FT_Get_Char_Index(r->ft_face, (FT_ULong)codepoint) != 0) {
+    if (pixel_size_state) {
+      *pixel_size_state = &r->ft_pixel_size;
+    }
+    return r->ft_face;
+  }
+  if (r->ft_fallback_ready && r->ft_fallback_face &&
+      FT_Get_Char_Index(r->ft_fallback_face, (FT_ULong)codepoint) != 0) {
+    if (pixel_size_state) {
+      *pixel_size_state = &r->ft_fallback_pixel_size;
+    }
+    return r->ft_fallback_face;
+  }
+  return NULL;
+}
+
+static int plumos_fbdev_ft_advance(struct plumos_fbdev_renderer *r,
+                                   unsigned int codepoint, int scale) {
+  int fallback;
+  int advance;
+  size_t cache_index;
+  struct plumos_fbdev_ft_advance_cache_entry *cached;
+  FT_Face face;
+  int *pixel_size_state = NULL;
+
+  fallback = 8 * scale;
+  if (fallback < 8) {
+    fallback = 8;
+  }
+  if (!r || !r->ft_ready || !r->ft_face) {
+    return fallback;
+  }
+  cache_index = (((size_t)codepoint * 131u) + (size_t)scale) %
+                PLUMOS_FBDEV_FT_ADVANCE_CACHE_SIZE;
+  cached = &r->ft_advance_cache[cache_index];
+  if (cached->valid && cached->codepoint == codepoint &&
+      cached->scale == scale) {
+    return cached->advance;
+  }
+  face = plumos_fbdev_ft_select_face(r, codepoint, &pixel_size_state);
+  if (!face || !pixel_size_state ||
+      !plumos_fbdev_ft_set_face_size(face, pixel_size_state, scale)) {
+    return fallback;
+  }
+  if (FT_Load_Char(face, (FT_ULong)codepoint, FT_LOAD_DEFAULT) != 0) {
+    advance = fallback;
+  } else {
+    advance = (int)((face->glyph->advance.x + 32) >> 6);
+    if (advance <= 0) {
+      advance = fallback;
+    }
+  }
+  cached->codepoint = codepoint;
+  cached->scale = scale;
+  cached->advance = advance;
+  cached->valid = 1;
+  return advance;
+}
+
+static const struct plumos_fbdev_ft_glyph_cache_entry *
+plumos_fbdev_ft_glyph_cache_get(struct plumos_fbdev_renderer *r,
+                                unsigned int codepoint, int scale) {
+  FT_Face face;
+  FT_GlyphSlot slot;
+  FT_Bitmap *bitmap;
+  int *pixel_size_state = NULL;
+  int face_slot;
+  int pixel_size;
+  size_t i;
+  size_t slot_index = 0;
+  unsigned long oldest = 0;
+  struct plumos_fbdev_ft_glyph_cache_entry *cached;
+
+  face = plumos_fbdev_ft_select_face(r, codepoint, &pixel_size_state);
+  if (!face || !pixel_size_state ||
+      !plumos_fbdev_ft_set_face_size(face, pixel_size_state, scale)) {
+    return NULL;
+  }
+  face_slot = (face == r->ft_fallback_face) ? 1 : 0;
+  for (i = 0; i < PLUMOS_FBDEV_FT_GLYPH_CACHE_SIZE; i++) {
+    cached = &r->ft_glyph_cache[i];
+    if (cached->valid && cached->codepoint == codepoint &&
+        cached->scale == scale && cached->face_slot == face_slot) {
+      cached->used_at = ++r->ft_glyph_cache_tick;
+      return cached;
+    }
+  }
+  if (FT_Load_Char(face, (FT_ULong)codepoint,
+                   FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0) {
+    return NULL;
+  }
+  slot = face->glyph;
+  bitmap = &slot->bitmap;
+  pixel_size = *pixel_size_state > 0 ? *pixel_size_state : 9 * scale;
+
+  for (i = 0; i < PLUMOS_FBDEV_FT_GLYPH_CACHE_SIZE; i++) {
+    cached = &r->ft_glyph_cache[i];
+    if (!cached->valid) {
+      slot_index = i;
+      break;
+    }
+    if (i == 0 || cached->used_at < oldest) {
+      oldest = cached->used_at;
+      slot_index = i;
+    }
+  }
+  cached = &r->ft_glyph_cache[slot_index];
+  free(cached->alpha);
+  memset(cached, 0, sizeof(*cached));
+  cached->codepoint = codepoint;
+  cached->scale = scale;
+  cached->face_slot = face_slot;
+  cached->pixel_size = pixel_size;
+  cached->bitmap_left = slot->bitmap_left;
+  cached->bitmap_top = slot->bitmap_top;
+  cached->width = (int)bitmap->width;
+  cached->rows = (int)bitmap->rows;
+  if (cached->width > 0 && cached->rows > 0) {
+    cached->alpha = (unsigned char *)malloc(
+        (size_t)cached->width * (size_t)cached->rows);
+    if (!cached->alpha) {
+      return NULL;
+    }
+    for (i = 0; i < (size_t)cached->rows; i++) {
+      const unsigned char *row_data;
+      int col;
+      if (bitmap->pitch < 0) {
+        row_data = bitmap->buffer +
+                   ((int)bitmap->rows - 1 - (int)i) * (-bitmap->pitch);
+      } else {
+        row_data = bitmap->buffer + (int)i * bitmap->pitch;
+      }
+      for (col = 0; col < cached->width; col++) {
+        unsigned char value;
+        if (bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
+          value = (row_data[col >> 3] & (0x80u >> (col & 7))) ? 255 : 0;
+        } else {
+          value = row_data[col];
+        }
+        cached->alpha[(size_t)i * (size_t)cached->width + (size_t)col] =
+            value;
+      }
+    }
+  }
+  cached->valid = 1;
+  cached->used_at = ++r->ft_glyph_cache_tick;
+  return cached;
+}
+
+static int plumos_fbdev_draw_freetype_codepoint_clipped(
+    struct plumos_fbdev_renderer *r, unsigned int codepoint, int x, int y,
+    int scale, int min_x, int max_x, uint32_t color) {
+  const struct plumos_fbdev_ft_glyph_cache_entry *glyph;
+  int baseline;
+  int row;
+
+  glyph = plumos_fbdev_ft_glyph_cache_get(r, codepoint, scale);
+  if (!glyph) {
+    return 0;
+  }
+  if (glyph->width <= 0 || glyph->rows <= 0 || !glyph->alpha) {
+    return 1;
+  }
+  baseline = y + glyph->pixel_size - 2;
+  for (row = 0; row < glyph->rows; row++) {
+    const unsigned char *row_data =
+        glyph->alpha + (size_t)row * (size_t)glyph->width;
+    int col;
+    int draw_y = baseline - glyph->bitmap_top + row;
+
+    if (draw_y < 0 || draw_y >= (int)r->var.yres) {
+      continue;
+    }
+    for (col = 0; col < glyph->width; col++) {
+      unsigned char value = row_data[col];
+      int draw_x = x + glyph->bitmap_left + col;
+      if (value >= 80 && draw_x >= min_x && draw_x < max_x) {
+        plumos_fbdev_put_pixel(r, draw_x, draw_y, color);
+      }
+    }
+  }
+  return 1;
+}
+#endif
+
+static int plumos_fbdev_codepoint_advance(struct plumos_fbdev_renderer *r,
+                                          unsigned int codepoint, int scale,
+                                          int prefer_freetype) {
+  int ascii_step = 6 * scale;
+
+  if (ascii_step < 6) {
+    ascii_step = 6;
+  }
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+  if (r && r->ft_ready && r->ft_face && (prefer_freetype || codepoint > 126)) {
+    return plumos_fbdev_ft_advance(r, codepoint, scale);
+  }
+#else
+  (void)r;
+  (void)prefer_freetype;
+#endif
+  if (codepoint > 126) {
+    return ascii_step * plumos_fbdev_utf8_cell_width(codepoint);
+  }
+  return ascii_step;
+}
+
+static int plumos_fbdev_text_width_font(struct plumos_fbdev_renderer *r,
+                                        const char *text, int scale,
+                                        int prefer_freetype) {
+  char normalized[PLUMOS_FBDEV_RENDER_LINE_MAX];
+  const char *p;
+  int width = 0;
+
+  if (!text || scale <= 0) {
+    return 0;
+  }
+  plumos_fbdev_normalize_kana_marks(text, normalized, sizeof(normalized));
+  p = normalized[0] ? normalized : text;
+  while (*p) {
+    unsigned int cp;
+    const char *next = plumos_fbdev_utf8_next(p, &cp);
+    if (cp == '\t') {
+      cp = ' ';
+    }
+    if (cp >= 32) {
+      width += plumos_fbdev_codepoint_advance(r, cp, scale,
+                                              prefer_freetype);
+    }
+    p = next;
+  }
+  return width;
+}
+
+static int plumos_fbdev_text_width_for(struct plumos_fbdev_renderer *r,
+                                       const char *text, int scale) {
+  return plumos_fbdev_text_width_font(r, text, scale, 0);
+}
+
+static void plumos_fbdev_draw_text_clipped(struct plumos_fbdev_renderer *r,
+                                           int x, int y, const char *text,
+                                           int scale, int prefer_freetype,
+                                           int min_x, int max_x,
+                                           uint32_t color) {
+  char normalized[PLUMOS_FBDEV_RENDER_LINE_MAX];
+  const char *p;
+  int pen_x = 0;
+
+  if (!r || !text || scale <= 0 || max_x <= min_x) {
+    return;
+  }
+  if (max_x > (int)r->var.xres - 8) {
+    max_x = (int)r->var.xres - 8;
+  }
+  plumos_fbdev_normalize_kana_marks(text, normalized, sizeof(normalized));
+  p = normalized[0] ? normalized : text;
+  while (*p) {
+    unsigned int cp;
+    int advance;
+    int glyph_x;
+    const char *next = plumos_fbdev_utf8_next(p, &cp);
+
+    if (cp == '\t') {
+      cp = ' ';
+    }
+    if (cp < 32) {
+      p = next;
+      continue;
+    }
+    advance = plumos_fbdev_codepoint_advance(r, cp, scale, prefer_freetype);
+    glyph_x = x + pen_x;
+    if (glyph_x >= max_x) {
+      break;
+    }
+    if (glyph_x + advance > min_x) {
+      if (cp <= 126 && !prefer_freetype) {
+        if (glyph_x >= min_x && glyph_x + 5 * scale <= max_x) {
+          plumos_fbdev_draw_char(r, glyph_x, y, (char)cp, scale, color);
+        } else {
+          plumos_fbdev_draw_char_clipped(r, glyph_x, y, (char)cp, scale,
+                                         min_x, max_x, color);
+        }
+      } else {
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+        if (!plumos_fbdev_draw_freetype_codepoint_clipped(
+                r, cp, glyph_x, y, scale, min_x, max_x, color)) {
+          plumos_fbdev_draw_char_clipped(r, glyph_x, y,
+                                         cp <= 126 ? (char)cp : '?', scale,
+                                         min_x, max_x, color);
+        }
+#else
+        plumos_fbdev_draw_char_clipped(r, glyph_x, y,
+                                       cp <= 126 ? (char)cp : '?', scale,
+                                       min_x, max_x, color);
+#endif
+      }
+    }
+    pen_x += advance;
+    p = next;
+  }
+}
+
+static void plumos_fbdev_draw_text_font(struct plumos_fbdev_renderer *r,
+                                        int x, int y, const char *text,
+                                        int scale, int prefer_freetype,
+                                        uint32_t color, int max_width) {
+  plumos_fbdev_draw_text_clipped(r, x, y, text, scale, prefer_freetype, x,
+                                 max_width, color);
+}
+
 static void plumos_fbdev_draw_text(struct plumos_fbdev_renderer *r, int x, int y,
                                    const char *text, int scale, uint32_t color,
                                    int max_width) {
-  int pen = x;
-  int advance = 6 * scale;
-  const char *p;
-
-  for (p = text; p && *p && pen + advance <= max_width; p++) {
-    plumos_fbdev_draw_char(r, pen, y, *p, scale, color);
-    pen += advance;
-  }
+  plumos_fbdev_draw_text_font(r, x, y, text, scale, 0, color, max_width);
 }
 
 struct plumos_fbdev_palette {
@@ -701,8 +1425,16 @@ static int plumos_fbdev_text_width(const char *text, int scale) {
   if (scale <= 0) {
     scale = 1;
   }
-  for (p = text; p && *p; p++) {
-    width += 6 * scale;
+  for (p = text; p && *p;) {
+    unsigned int cp;
+    const char *next = plumos_fbdev_utf8_next(p, &cp);
+    if (cp == '\t') {
+      cp = ' ';
+    }
+    if (cp >= 32) {
+      width += 6 * scale * plumos_fbdev_utf8_cell_width(cp);
+    }
+    p = next;
   }
   return width;
 }
@@ -983,7 +1715,7 @@ static void plumos_fbdev_load_assets(struct plumos_fbdev_assets *assets,
 static void plumos_fbdev_draw_text_center(struct plumos_fbdev_renderer *r, int x,
                                           int y, int w, const char *text,
                                           int scale, uint32_t color) {
-  int width = plumos_fbdev_text_width(text, scale);
+  int width = plumos_fbdev_text_width_for(r, text, scale);
   int draw_x = x + (w - width) / 2;
   if (draw_x < x) {
     draw_x = x;
@@ -1631,12 +2363,12 @@ static void plumos_fbdev_draw_rom_preview(struct plumos_fbdev_renderer *r,
       plumos_fbdev_draw_text_center(r, media_x, media_y + 58, media_w, badge, 4,
                                     p->foreground);
     }
-    plumos_fbdev_draw_text(r, x + 16, y + 200, entry->title, 2, p->foreground,
-                           x + w - 16);
-    if (entry->detail[0]) {
-      plumos_fbdev_draw_text(r, x + 16, y + 232, entry->detail, 2, p->muted,
-                             x + w - 16);
-    }
+  plumos_fbdev_draw_text_font(r, x + 16, y + 200, entry->title, 2, 1,
+                              p->foreground, x + w - 16);
+  if (entry->detail[0]) {
+      plumos_fbdev_draw_text_font(r, x + 16, y + 232, entry->detail, 2, 1,
+                                  p->muted, x + w - 16);
+  }
   } else {
     plumos_fbdev_draw_text_center(r, media_x, media_y + 58, media_w, "NO ART",
                                   3, p->muted);
@@ -1704,8 +2436,8 @@ static int plumos_fbdev_render_roms(struct plumos_fbdev_renderer *r,
     }
     plumos_fbdev_draw_text(r, list_x, y + 3, entries[i].selected ? ">" : " ",
                            2, fg, name_right_x);
-    plumos_fbdev_draw_text(r, name_x, y, entries[i].title, 2, fg,
-                           name_right_x);
+    plumos_fbdev_draw_text_font(r, name_x, y, entries[i].title, 2, 1, fg,
+                                name_right_x);
   }
 
   plumos_fbdev_draw_rom_preview(r, p, selected, preview_x, preview_y,
@@ -2028,7 +2760,7 @@ static void plumos_fbdev_draw_gallery_footer(
   int text_right = w - 86;
   const char *title =
       selected && selected->title[0] ? selected->title : "NO ENTRY";
-  int title_width = plumos_fbdev_text_width(title, 3);
+  int title_width = plumos_fbdev_text_width_font(r, title, 3, 1);
   int title_x;
 
   if (text_right <= text_left) {
@@ -2042,8 +2774,8 @@ static void plumos_fbdev_draw_gallery_footer(
   }
   plumos_fbdev_fill_rect(r, 0, footer_y, w, 84, p->panel_inner);
   plumos_fbdev_fill_rect(r, 0, footer_y, w, 2, p->accent);
-  plumos_fbdev_draw_text(r, title_x, footer_y + 23, title, 3,
-                         p->selection_foreground, text_right);
+  plumos_fbdev_draw_text_font(r, title_x, footer_y + 23, title, 3, 1,
+                              p->selection_foreground, text_right);
   plumos_fbdev_draw_text(r, 24, footer_y + 27, "<", 3, p->muted, w - 24);
   plumos_fbdev_draw_text(r, w - 42, footer_y + 27, ">", 3, p->muted, w - 16);
 }
@@ -2405,6 +3137,23 @@ static void plumos_fbdev_renderer_shutdown(struct plumos_fbdev_renderer *r) {
   if (!r) {
     return;
   }
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+  plumos_fbdev_ft_glyph_cache_clear(r);
+  if (r->ft_fallback_face) {
+    FT_Done_Face(r->ft_fallback_face);
+    r->ft_fallback_face = NULL;
+    r->ft_fallback_ready = 0;
+  }
+  if (r->ft_face) {
+    FT_Done_Face(r->ft_face);
+    r->ft_face = NULL;
+    r->ft_ready = 0;
+  }
+  if (r->ft_library) {
+    FT_Done_FreeType(r->ft_library);
+    r->ft_library = NULL;
+  }
+#endif
 #ifdef PLUMOS_FBDEV_ENABLE_PNG
   plumos_fbdev_png_cache_clear(r);
 #endif

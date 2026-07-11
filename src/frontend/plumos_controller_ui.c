@@ -9431,8 +9431,34 @@ static int init_ui_renderer(struct ui_state *ui) {
     }
     plumos_fbdev_renderer_set_rotation(&ui->fbdev_renderer, ui->fbdev_rotation);
     plumos_fbdev_renderer_reset_marquee(&ui->fbdev_renderer);
-    ui->renderer_active = 1;
     copy_string(ui->status, sizeof(ui->status), "fbdev renderer ready");
+#ifdef PLUMOS_FBDEV_ENABLE_FREETYPE
+    if (ui->mali_font_path[0]) {
+      render_error[0] = '\0';
+      if (plumos_fbdev_renderer_load_font(&ui->fbdev_renderer,
+                                          ui->mali_font_path, render_error,
+                                          sizeof(render_error))) {
+        snprintf(ui->status, sizeof(ui->status),
+                 "fbdev renderer ready font=%.160s", ui->mali_font_path);
+        if (ui->mali_fallback_font_path[0]) {
+          render_error[0] = '\0';
+          if (!plumos_fbdev_renderer_load_fallback_font(
+                  &ui->fbdev_renderer, ui->mali_fallback_font_path,
+                  render_error, sizeof(render_error))) {
+            snprintf(ui->status, sizeof(ui->status),
+                     "fbdev fallback font failed: %.160s",
+                     render_error[0] ? render_error
+                                     : ui->mali_fallback_font_path);
+          }
+        }
+      } else {
+        snprintf(ui->status, sizeof(ui->status),
+                 "fbdev font failed: %.180s",
+                 render_error[0] ? render_error : ui->mali_font_path);
+      }
+    }
+#endif
+    ui->renderer_active = 1;
     return 1;
 #else
     set_status(ui, "fbdev renderer unavailable in this build");

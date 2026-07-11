@@ -46,6 +46,9 @@ build_fbdev_controller() {
   local out="$BIN_DIR/plumos-controller-ui-fbdev"
   local png_cflags=""
   local png_libs=""
+  local ft_cflags=""
+  local ft_libs=""
+  local ft_define=""
 
   if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libpng; then
     png_cflags="$(pkg-config --cflags libpng)"
@@ -53,17 +56,25 @@ build_fbdev_controller() {
   else
     png_libs="-lpng -lz"
   fi
+  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists freetype2; then
+    ft_cflags="$(pkg-config --cflags freetype2)"
+    ft_libs="$(pkg-config --libs freetype2)"
+    ft_define="-DPLUMOS_FBDEV_ENABLE_FREETYPE=1"
+  fi
 
   # shellcheck disable=SC2086
   "$CC" \
     "${common_cflags[@]}" \
     $png_cflags \
+    $ft_cflags \
     -DPLUMOS_ENABLE_FBDEV_RENDERER=1 \
     -DPLUMOS_FBDEV_ENABLE_PNG=1 \
+    $ft_define \
     "$SRC_DIR/plumos_controller_ui.c" \
     -o "$out" \
     "${ldflags[@]}" \
-    $png_libs
+    $png_libs \
+    $ft_libs
   "$STRIP" "$out" 2>/dev/null || true
   chmod 0755 "$out"
 }
