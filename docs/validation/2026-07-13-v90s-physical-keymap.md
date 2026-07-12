@@ -19,6 +19,7 @@ frontend or RetroArch policy change.
 - Relevant live log directories:
   - `/tmp/plumos-v90s-keymap-1783877896`
   - `/tmp/plumos-v90s-keymap-abdpad-1783878164`
+  - `/tmp/plumos-v90s-combo-keytest-1783878670`
 
 ## Input Devices
 
@@ -57,6 +58,32 @@ normal frontend and app input.
 | Power short press | `/dev/input/event1` | `EV_KEY KEY_POWER(116) value=1`, release `value=0` |
 
 Long-press power behavior was not tested here.
+
+## Combo Behavior
+
+The StockOS-style `Select+Start` combo was tested after the basic keymap
+capture. Pressing Select and Start together produced all three key events:
+
+| Combo | Observed event |
+| --- | --- |
+| Select+Start | `BTN_SELECT(314)`, `BTN_START(315)`, and `BTN_MODE(316)` |
+
+This confirms that the vendor input layer still exposes the StockOS-style
+`Select+Start` as a Function-mode event. It does not suppress the original
+Select and Start events.
+
+The `Select+R2` analog/digital toggle behavior was also tested. The result was:
+
+| Combo | Observed result |
+| --- | --- |
+| Select+R2 | `BTN_SELECT(314)` plus `BTN_TR2(313)` only |
+| D-pad before Select+R2 | `ABS_HAT0X(16)` / `ABS_HAT0Y(17)` |
+| D-pad after Select+R2 | `ABS_HAT0X(16)` / `ABS_HAT0Y(17)` |
+
+No D-pad switch from digital hat events to analog axis events was observed in
+this test. The device reports `capabilities/abs=3001b`, so `adc_gamepad` does
+advertise analog-capable ABS bits, but this tested `Select+R2` sequence did not
+toggle the D-pad output away from `ABS_HAT0X/Y`.
 
 ## Raw Evidence
 
@@ -150,6 +177,48 @@ type=1 code=116 value=0
 type=0 code=0 value=0
 ```
 
+Combo capture from `/dev/input/event4`:
+
+```text
+Select+Start:
+type=1 code=314 value=1
+type=1 code=315 value=1
+type=1 code=316 value=1
+type=0 code=0 value=0
+type=1 code=314 value=0
+type=1 code=315 value=0
+type=1 code=316 value=0
+type=0 code=0 value=0
+
+Select+R2:
+type=1 code=314 value=1
+type=0 code=0 value=0
+type=1 code=313 value=1
+type=0 code=0 value=0
+type=1 code=313 value=0
+type=0 code=0 value=0
+type=1 code=314 value=0
+type=0 code=0 value=0
+
+D-pad after Select+R2:
+type=3 code=17 value=-1
+type=0 code=0 value=0
+type=3 code=17 value=0
+type=0 code=0 value=0
+type=3 code=16 value=-1
+type=0 code=0 value=0
+type=3 code=16 value=0
+type=0 code=0 value=0
+type=3 code=17 value=1
+type=0 code=0 value=0
+type=3 code=17 value=0
+type=0 code=0 value=0
+type=3 code=16 value=1
+type=0 code=0 value=0
+type=3 code=16 value=0
+type=0 code=0 value=0
+```
+
 ## Frontend Notes
 
 The current frontend key decoder already handles:
@@ -164,7 +233,7 @@ Current frontend behavior that should be treated separately from this OS-level
 mapping:
 
 - `BTN_MODE` is currently decoded as `ACTION_START`, so the physical Function
-  button is not independent in the frontend yet.
+  button and the `Select+Start` Function combo are not independent in the
+  frontend yet.
 - `BTN_TL`, `BTN_TR`, `BTN_TL2`, and `BTN_TR2` are visible to the OS, but are
   not assigned to frontend actions yet.
-

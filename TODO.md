@@ -293,6 +293,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Live-capture the V90S physical key evdev mapping for D-pad, ABXY,
   shoulders, select/start/function, volume, and power; record the result in
   `docs/validation/2026-07-13-v90s-physical-keymap.md`.
+- [x] Live-test StockOS-style V90S input combos: `Select+Start` emits
+  `BTN_MODE` in addition to Select/Start, while the tested `Select+R2`
+  sequence did not switch the D-pad away from `ABS_HAT0X/Y`.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.
