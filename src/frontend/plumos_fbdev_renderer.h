@@ -2673,7 +2673,6 @@ static void plumos_fbdev_draw_gallery_top_bar(
   char battery_label[24];
   char right[80];
   int w = (int)r->var.xres;
-  int h = (int)r->var.yres;
   int right_width;
   int title_max_x;
 
@@ -2690,7 +2689,6 @@ static void plumos_fbdev_draw_gallery_top_bar(
 
   plumos_fbdev_fill_rect(r, 0, 0, w, 40, p->panel_inner);
   plumos_fbdev_fill_rect(r, 0, 40, w, 2, p->panel);
-  plumos_fbdev_fill_rect(r, 0, 0, 5, h, p->accent);
   plumos_fbdev_draw_text(r, 16, 12,
                          title && title[0] ? title : "GALLERY", 2,
                          p->foreground, title_max_x);
