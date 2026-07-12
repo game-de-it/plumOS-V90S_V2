@@ -11055,6 +11055,7 @@ static int append_scraping_runner_loop(char *cmd, size_t cmd_size, size_t *pos,
                                        const struct ui_state *ui,
                                        const char *scraper,
                                        const char *path_value,
+                                       const char *image_root,
                                        int fetch_mode,
                                        const char *scraper_kind,
                                        int replace_existing,
@@ -11089,6 +11090,8 @@ static int append_scraping_runner_loop(char *cmd, size_t cmd_size, size_t *pos,
   if (!append_shell_quoted(cmd, cmd_size, pos, ui->sdcard_root) ||
       !append_string(cmd, cmd_size, pos, " PLUMOS_ROOT=") ||
       !append_shell_quoted(cmd, cmd_size, pos, ui->plumos_root) ||
+      !append_string(cmd, cmd_size, pos, " PLUMOS_IMAGE_ROOT=") ||
+      !append_shell_quoted(cmd, cmd_size, pos, image_root) ||
       !append_string(cmd, cmd_size, pos, " PATH=") ||
       !append_shell_quoted(cmd, cmd_size, pos, path_value) ||
       !append_string(cmd, cmd_size, pos, " ") ||
@@ -11172,6 +11175,7 @@ static int run_scraping_action(struct ui_state *ui) {
   char log_dir[PATH_MAX];
   char log_path[PATH_MAX];
   char latest_path[PATH_MAX];
+  char image_root[PATH_MAX];
   char path_value[PATH_MAX * 2];
   char cmd[UI_COMMAND_MAX];
   const char *plan_limit;
@@ -11192,6 +11196,7 @@ static int run_scraping_action(struct ui_state *ui) {
   }
   if (!join_path(scraper, sizeof(scraper), ui->plumos_root,
                  "bin/plumos-thumbnail-scraper") ||
+      !join_path(image_root, sizeof(image_root), ui->sdcard_root, "Images") ||
       !join_path(log_dir, sizeof(log_dir), ui->plumos_root, "logs") ||
       !join_path(log_path, sizeof(log_path), log_dir, "frontend-apps.log") ||
       !join_path(latest_path, sizeof(latest_path), log_dir,
@@ -11244,11 +11249,11 @@ static int run_scraping_action(struct ui_state *ui) {
       !append_string(cmd, sizeof(cmd), &pos, "; app_rc=0; progress_i=0; progress_total=") ||
       !append_size_t(cmd, sizeof(cmd), &pos, target_count) ||
       !append_scraping_runner_loop(cmd, sizeof(cmd), &pos, ui, scraper,
-                                   path_value, 0, kind->scraper_kind,
+                                   path_value, image_root, 0, kind->scraper_kind,
                                    ui->scraping_replace_existing,
                                    plan_limit, NULL, NULL) ||
       !append_scraping_runner_loop(cmd, sizeof(cmd), &pos, ui, scraper,
-                                   path_value, 1, kind->scraper_kind,
+                                   path_value, image_root, 1, kind->scraper_kind,
                                    ui->scraping_replace_existing,
                                    fetch_limit, fetch_timeout, fetch_retry) ||
       !append_string(cmd, sizeof(cmd),
