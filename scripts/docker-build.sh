@@ -25,6 +25,9 @@ Commands:
   quicknes         Compatibility alias for the current QuickNES-only core build.
   userland         Build plumOS BusyBox and command-line tools.
   network-services Build plumOS FTP/SFTP/Samba service package.
+  nextcommander    Build the V90S NextCommander file manager app.
+  file-manager     Alias for nextcommander.
+  music-player     Build the V90S plumOS Music Player app.
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
   app-layer        Assemble the FAT32 plumOS app/update/data layer.
@@ -83,6 +86,8 @@ docker_env=(
     -e PLUMOS_V90S_SSH_AUTHORIZED_KEYS="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
     -e PLUMOS_V90S_SSH_ROOT_PASSWORD="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
     -e PLUMOS_V90S_RETROARCH_START_MODE="${PLUMOS_V90S_RETROARCH_START_MODE:-}"
+    -e NEXTCOMMANDER_REF="${NEXTCOMMANDER_REF:-}"
+    -e MINIAUDIO_REF="${MINIAUDIO_REF:-}"
 )
 if [ -n "${PLUMOS_V90S_STOCKOS_ARTIFACT:-}" ]; then
     docker_env+=(-e PLUMOS_V90S_STOCKOS_ARTIFACT="$PLUMOS_V90S_STOCKOS_ARTIFACT")
@@ -154,6 +159,14 @@ case "$cmd" in
     network-services|net-services)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-network-services.sh "$@"
+        ;;
+    nextcommander|file-manager|filemanager)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-nextcommander.sh "$@"
+        ;;
+    music-player|musicplayer)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-music-player.sh "$@"
         ;;
     sdl2-powervr|sdl2-ge8300)
         ensure_image

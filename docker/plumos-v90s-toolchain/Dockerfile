@@ -44,15 +44,22 @@ RUN apt-get update \
     android-liblog-dev \
     android-libutils-dev \
     libasound2-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
     libcap-dev \
     libegl-dev \
     libfreetype6-dev \
     libgles-dev \
+    libjpeg-dev \
     libpng-dev \
     libpipewire-0.3-dev \
     libpulse-dev \
     libsdl2-dev \
+    libsdl2-image-dev \
+    libsdl2-ttf-dev \
     libselinux1-dev \
+    libswresample-dev \
     libtool \
     libudev-dev \
     libusb-1.0-0-dev \

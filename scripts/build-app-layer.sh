@@ -12,6 +12,8 @@ sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
 frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
 userland_dir="${PLUMOS_V90S_USERLAND_DIR:-output/userland/v90s}"
 network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-services/v90s}"
+nextcommander_dir="${PLUMOS_V90S_NEXTCOMMANDER_DIR:-output/nextcommander/v90s}"
+music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
 strict=0
 
@@ -34,6 +36,9 @@ Options:
   --userland-dir PATH    BusyBox/command tools payload; default output/userland/v90s.
   --network-services-dir PATH
                           FTP/SFTP/Samba payload; default output/network-services/v90s.
+  --nextcommander-dir PATH
+                          NextCommander payload; default output/nextcommander/v90s.
+  --music-player-dir PATH Music Player payload; default output/music-player/v90s.
   --retroarch-config PATH
                           RetroArch defaults template; default configs/retroarch/v90s-powervr-quicknes.cfg.
   --strict               Fail if currently supported payloads are missing.
@@ -84,6 +89,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         --network-services-dir)
             network_services_dir="$2"
+            shift 2
+            ;;
+        --nextcommander-dir)
+            nextcommander_dir="$2"
+            shift 2
+            ;;
+        --music-player-dir)
+            music_player_dir="$2"
             shift 2
             ;;
         --retroarch-config)
@@ -183,6 +196,7 @@ mkdir -p \
     "$out_dir/gnu/bin" \
     "$out_dir/gnu/libexec" \
     "$out_dir/lib/plumos-sdl2-powervr" \
+    "$out_dir/apps" \
     "$out_dir/cores" \
     "$out_dir/frontend" \
     "$out_dir/picoarch" \
@@ -320,6 +334,18 @@ if require_or_note_missing "$frontend_root/bin/plumos-frontend-launch" "frontend
     fi
 fi
 
+nextcommander_root="$nextcommander_dir/plumos"
+if require_or_note_missing "$nextcommander_root/apps/nextcommander/bin/NextCommander" "nextcommander"; then
+    copy_tree "$nextcommander_root" "$out_dir"
+    record_tree "$nextcommander_root" "nextcommander" "$nextcommander_root"
+fi
+
+music_player_root="$music_player_dir/plumos"
+if require_or_note_missing "$music_player_root/apps/music-player/bin/plumos-music-player.bin" "music-player"; then
+    copy_tree "$music_player_root" "$out_dir"
+    record_tree "$music_player_root" "music-player" "$music_player_root"
+fi
+
 generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 {
     printf '{\n'
@@ -329,7 +355,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  "mount_path": "%s",\n' "$(json_escape "$mount_path")"
     printf '  "generated_at": "%s",\n' "$generated_at"
     printf '  "directories": [\n'
-    printf '    "bin", "lib", "cores", "frontend", "picoarch", "standalone",\n'
+    printf '    "bin", "lib", "apps", "cores", "frontend", "picoarch", "standalone",\n'
     printf '    "config", "fonts", "share", "state", "themes", "media",\n'
     printf '    "roms", "bios", "Saves", "States", "Screenshots", "Logs",\n'
     printf '    "updates", "licenses"\n'

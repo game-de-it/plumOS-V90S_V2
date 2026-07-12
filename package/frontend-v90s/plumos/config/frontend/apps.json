@@ -13,7 +13,7 @@
       "id": "file_manager",
       "display_name": "File Manager",
       "kind": "tool",
-      "launch_profile": "shell:/mnt/plumos/bin/plumos-file-manager",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-nextcommander-launch",
       "visible": true,
       "menu": "apps"
     },

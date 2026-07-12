@@ -1,0 +1,177 @@
+diff --git a/Makefile b/Makefile
+index d16a23d..4cb3d3b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -81,6 +81,39 @@ CXXFLAGS += -DAUTOSCALE_DPI=1
+ CXXFLAGS += -DPPU_X=3
+ CXXFLAGS += -DPPU_Y=3
+ CXXFLAGS += -DSCREEN_BPP=32
++
++# POWKIDDY V90S / plumOS
++else ifneq (,$(findstring v90s,$(PLATFORM)))
++SDCARD_ROOT := /mnt/plumos
++NEXTUI_SYSTEM_PATH := $(SDCARD_ROOT)/apps/nextcommander
++
++CXXFLAGS += -O2 -pipe -fomit-frame-pointer
++CXXFLAGS += -DPLUMOS_V90S
++CXXFLAGS += -DPATH_DEFAULT=\"$(SDCARD_ROOT)\"
++CXXFLAGS += -DPATH_DEFAULT_RIGHT=\"$(SDCARD_ROOT)/roms\"
++CXXFLAGS += -DFILE_SYSTEM=\"$(SDCARD_ROOT)\"
++
++# Buttons from the V90S SDL2 joystick path. Keep the same logical mapping as
++# the A30 NextCommander port: A open, B parent, X operation, Y system.
++CXXFLAGS += -DCMDR_KEY_UP=SDLK_UP
++CXXFLAGS += -DCMDR_KEY_RIGHT=SDLK_RIGHT
++CXXFLAGS += -DCMDR_KEY_DOWN=SDLK_DOWN
++CXXFLAGS += -DCMDR_KEY_LEFT=SDLK_LEFT
++CXXFLAGS += -DCMDR_KEY_OPEN=0
++CXXFLAGS += -DCMDR_KEY_PARENT=1
++CXXFLAGS += -DCMDR_KEY_OPERATION=2
++CXXFLAGS += -DCMDR_KEY_SYSTEM=3
++CXXFLAGS += -DCMDR_KEY_PAGEUP=4
++CXXFLAGS += -DCMDR_KEY_PAGEDOWN=5
++CXXFLAGS += -DCMDR_KEY_SELECT=8
++CXXFLAGS += -DCMDR_KEY_TRANSFER=9
++CXXFLAGS += -DCMDR_KEY_MENU=10
++
++CXXFLAGS += -DAUTOSCALE=0
++CXXFLAGS += -DAUTOSCALE_DPI=0
++CXXFLAGS += -DPPU_X=2
++CXXFLAGS += -DPPU_Y=2
++CXXFLAGS += -DSCREEN_BPP=32
+ endif
+ 
+ SDL := SDL2
+@@ -127,7 +160,7 @@ all: $(EXECUTABLE)
+ $(EXECUTABLE): $(addprefix $(OUTDIR)/,$(OBJS))
+ 	$(SUM) "  LINK    $@"
+ 	$(SUM) "  LINK    $(LINKFLAGS)"
+-	$(CMD)$(CXX) $(LINKFLAGS) -o $@ $^
++	$(CMD)$(CXX) -o $@ $^ $(LINKFLAGS)
+ 
+ $(OUTDIR)/%.o: src/%.cpp
+ 	@mkdir -p $(@D)
+diff --git a/src/screen.cpp b/src/screen.cpp
+index 43d31fa..2be9b25 100644
+--- a/src/screen.cpp
++++ b/src/screen.cpp
+@@ -30,6 +30,14 @@ SDL_Surface *SetVideoMode(int width, int height, int bpp, std::uint32_t flags)
+ }
+ #endif
+ 
++#if defined(USE_SDL2) && defined(PLUMOS_V90S)
++SDL_Surface *CreateV90SSurface(int width, int height)
++{
++    return SDL_CreateRGBSurface(0, width, height, SCREEN_BPP,
++        0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
++}
++#endif
++
+ }
+ 
+ int Screen::init()
+@@ -75,17 +83,45 @@ int Screen::init()
+ #endif
+ 
+ #ifdef USE_SDL2
++#ifdef PLUMOS_V90S
++    int window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;
++#else
+     int window_flags = SDL_WINDOW_RESIZABLE;
+     if (cfg.disp_autoscale) window_flags |= SDL_WINDOW_MAXIMIZED;
++#endif
+ 
+     int window_w = screen.actual_w;
+     int window_h = screen.actual_h;
+     window = SDL_CreateWindow("Commander", SDL_WINDOWPOS_UNDEFINED,
+-        SDL_WINDOWPOS_UNDEFINED, window_h, window_h, window_flags);
++        SDL_WINDOWPOS_UNDEFINED, window_w, window_h, window_flags);
+     if (window == nullptr) {
+         SDL_Log("Failed to create window: %s", SDL_GetError());
+         return 1;
+     }
++#ifdef PLUMOS_V90S
++    renderer = SDL_CreateRenderer(window, -1,
++        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
++    if (renderer == nullptr) {
++        SDL_Log("Accelerated renderer failed: %s", SDL_GetError());
++        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
++    }
++    if (renderer == nullptr) {
++        SDL_Log("Failed to create renderer: %s", SDL_GetError());
++        return 1;
++    }
++    SDL_RenderSetLogicalSize(renderer, screen.actual_w, screen.actual_h);
++    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
++        SDL_TEXTUREACCESS_STREAMING, screen.actual_w, screen.actual_h);
++    if (texture == nullptr) {
++        SDL_Log("Failed to create streaming texture: %s", SDL_GetError());
++        return 1;
++    }
++    screen.surface = CreateV90SSurface(screen.actual_w, screen.actual_h);
++    if (screen.surface == nullptr) {
++        SDL_Log("Failed to create software surface: %s", SDL_GetError());
++        return 1;
++    }
++#else
+     if (cfg.disp_autoscale && cfg.disp_autoscale_dpi) {
+         const int disp_index = SDL_GetWindowDisplayIndex(window);
+         if (disp_index != -1) {
+@@ -108,6 +144,7 @@ int Screen::init()
+     SDL_GetWindowSize(window, &window_w, &window_h);
+     setPhysicalResolution(window_w, window_h);
+     screen.surface = SDL_GetWindowSurface(window);
++#endif
+ #else
+     surface = SetVideoMode(screen.actual_w, screen.actual_h, SCREEN_BPP,
+         SDL_SWSURFACE | SDL_RESIZABLE);
+@@ -122,8 +159,14 @@ int Screen::init()
+ int Screen::onResize(int w, int h)
+ {
+ #ifdef USE_SDL2
++#ifdef PLUMOS_V90S
++    (void)w;
++    (void)h;
++    return 0;
++#else
+     this->surface = SDL_GetWindowSurface(this->window);
+     setPhysicalResolution(surface->w, surface->h);
++#endif
+ #else
+ #ifndef MIYOOMINI
+     this->surface = SDL_GetVideoSurface();
+diff --git a/src/screen.h b/src/screen.h
+index 5249165..5c8f159 100644
+--- a/src/screen.h
++++ b/src/screen.h
+@@ -30,14 +30,30 @@ struct Screen
+ 
+ #ifdef USE_SDL2
+     SDL_Window *window;
++#ifdef PLUMOS_V90S
++    SDL_Renderer *renderer;
++    SDL_Texture *texture;
++#endif
+ #endif
+ 
+     void flip() {
+ #ifdef USE_SDL2
++#ifdef PLUMOS_V90S
++        if (renderer && texture && surface) {
++            if (SDL_UpdateTexture(texture, nullptr, surface->pixels,
++                    surface->pitch) <= -1) {
++                SDL_Log("%s", SDL_GetError());
++            }
++            SDL_RenderClear(renderer);
++            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
++            SDL_RenderPresent(renderer);
++        }
++#else
+ 		if (SDL_UpdateWindowSurface(window) <= -1) {
+ 			SDL_Log("%s", SDL_GetError());
+ 		}
+ 		surface = SDL_GetWindowSurface(window);
++#endif
+ #else
+ #ifdef MIYOOMINI
+ 	GFX_Flip(surface);

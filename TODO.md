@@ -212,15 +212,17 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy frontend into the app layer.
 - [x] Port the MMF-style FE Apps menu path to V90S with live-device validated
   `Scraping`, `File Manager`, and `RetroArch` entries.
-- [x] Fix `File Manager` and `Music Player` Apps entries so MMF-style
-  foreground apps launch directly instead of using the result-log screen; add
-  V90S-native fbdev payloads and validate both on real hardware.
+- [x] Keep visible `File Manager` and `Music Player` Apps entries as MMF-style
+  foreground apps rather than result-log tools.
+- [x] Port the A30 NextCommander file-manager build target to V90S and validate
+  a real-hardware smoke launch through the same launcher the FE calls.
+- [x] Port the MMF/A30 `plumos_music_player.c` build target to V90S and
+  validate a real-hardware smoke launch with input and ALSA initialization.
 - [x] Add the V90S-adapted MMF thumbnail scraper as
   `/mnt/plumos/bin/plumos-thumbnail-scraper`, using `/mnt/plumos/roms` and
   `/mnt/plumos/media/<system>/images`.
-- [x] Add a V90S-safe Music Player Apps entry with a foreground fbdev UI,
-  backed by ALSA `aplay` for WAV playback and `speaker-test` for live audio
-  smoke validation.
+- [x] Replace the temporary V90S-safe Music Player Apps entry with the ported
+  MMF/A30 Music Player payload.
 - [x] Copy BusyBox and command-line userland into the app layer.
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
 - [x] Add the MMF-compatible default `config/system/settings.json` so frontend
@@ -275,10 +277,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `plumOS V90S ADB` but `adb devices` stays empty.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
-- [ ] Port a real V90S file-manager payload to replace the current safe file
-  overview app once NextCommander or a stock-compatible equivalent is validated.
-- [ ] Port a fuller native V90S Music Player UI after the lightweight ALSA/WAV
-  Apps entry is validated.
+- [ ] Confirm the V90S NextCommander button mapping on real hardware.
+- [ ] Confirm the V90S Music Player button mapping and ALSA playback on real
+  hardware.
 - [x] Copy plumOS-owned private libraries into the app layer.
 - [x] Avoid symlink-dependent library layouts on FAT32.
 - [x] Generate app-layer `manifest.json`.
