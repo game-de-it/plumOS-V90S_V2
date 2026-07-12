@@ -212,11 +212,15 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy frontend into the app layer.
 - [x] Port the MMF-style FE Apps menu path to V90S with live-device validated
   `Scraping`, `File Manager`, and `RetroArch` entries.
+- [x] Fix `File Manager` and `Music Player` Apps entries so MMF-style
+  foreground apps launch directly instead of using the result-log screen; add
+  V90S-native fbdev payloads and validate both on real hardware.
 - [x] Add the V90S-adapted MMF thumbnail scraper as
   `/mnt/plumos/bin/plumos-thumbnail-scraper`, using `/mnt/plumos/roms` and
   `/mnt/plumos/media/<system>/images`.
-- [x] Add a V90S-safe Music Player Apps entry backed by ALSA `aplay` for WAV
-  playback and `speaker-test` for live audio smoke validation.
+- [x] Add a V90S-safe Music Player Apps entry with a foreground fbdev UI,
+  backed by ALSA `aplay` for WAV playback and `speaker-test` for live audio
+  smoke validation.
 - [x] Copy BusyBox and command-line userland into the app layer.
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
 - [x] Add the MMF-compatible default `config/system/settings.json` so frontend

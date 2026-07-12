@@ -8,7 +8,7 @@ PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
 PATH="$PLUMOS_ROOT/bin:$PLUMOS_ROOT/gnu/bin:$PATH"
 export PLUMOS_ROOT PLUMOS_SDCARD_ROOT PATH
 
-mode=play-first
+mode=ui
 audio_device="${PLUMOS_MUSIC_PLAYER_AUDIO_DEVICE:-hw:0,0}"
 limit="${PLUMOS_MUSIC_PLAYER_LIST_LIMIT:-40}"
 extra_root=""
@@ -20,9 +20,10 @@ esac
 
 usage() {
   cat <<'USAGE'
-Usage: plumos-music-player-launch [--play-first|--list|--smoke] [--root PATH]
+Usage: plumos-music-player-launch [--ui|--play-first|--list|--smoke] [--root PATH]
 
-The V90S Apps music player currently supports WAV playback through ALSA.
+The default --ui mode starts the V90S fbdev Music Player app.
+Diagnostic playback currently supports WAV files through ALSA.
 USAGE
 }
 
@@ -36,6 +37,10 @@ trap cleanup EXIT INT TERM HUP
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --ui)
+      mode=ui
+      shift
+      ;;
     --play-first)
       mode=play-first
       shift
@@ -152,15 +157,20 @@ smoke_audio() {
   return 127
 }
 
-print_header
 case "$mode" in
+  ui)
+    exec "$PLUMOS_ROOT/bin/plumos-music-player-ui"
+    ;;
   list)
+    print_header
     list_music
     ;;
   smoke)
+    print_header
     smoke_audio
     ;;
   play-first)
+    print_header
     play_first
     ;;
 esac

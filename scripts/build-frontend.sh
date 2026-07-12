@@ -9,6 +9,7 @@ STRIP="${STRIP:-strip}"
 BUILD_STATIC="${PLUMOS_V90S_FRONTEND_STATIC:-0}"
 
 SRC_DIR="$ROOT_DIR/src/frontend"
+APP_SRC_DIR="$ROOT_DIR/src/apps"
 OUT_ROOT="$ROOT_DIR/$OUT_DIR"
 PLUMOS_DIR="$OUT_ROOT/plumos"
 BIN_DIR="$PLUMOS_DIR/bin"
@@ -71,6 +72,36 @@ build_fbdev_controller() {
     -DPLUMOS_FBDEV_ENABLE_PNG=1 \
     $ft_define \
     "$SRC_DIR/plumos_controller_ui.c" \
+    -o "$out" \
+    "${ldflags[@]}" \
+    $png_libs \
+    $ft_libs
+  "$STRIP" "$out" 2>/dev/null || true
+  chmod 0755 "$out"
+}
+
+build_fbdev_app() {
+  local out="$1"
+  local png_cflags=""
+  local png_libs=""
+  local ft_cflags=""
+  local ft_libs=""
+  local ft_define=""
+
+  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists freetype2; then
+    ft_cflags="$(pkg-config --cflags freetype2)"
+    ft_libs="$(pkg-config --libs freetype2)"
+    ft_define="-DPLUMOS_FBDEV_ENABLE_FREETYPE=1"
+  fi
+
+  # shellcheck disable=SC2086
+  "$CC" \
+    "${common_cflags[@]}" \
+    $png_cflags \
+    $ft_cflags \
+    -DPLUMOS_ENABLE_FBDEV_RENDERER=1 \
+    $ft_define \
+    "$APP_SRC_DIR/plumos_v90s_apps.c" \
     -o "$out" \
     "${ldflags[@]}" \
     $png_libs \
@@ -381,6 +412,8 @@ build_c_tool "$SRC_DIR/plumos_library_scan.c" "$BIN_DIR/plumos-library-scan"
 build_c_tool "$SRC_DIR/plumos_text_ui.c" "$BIN_DIR/plumos-text-ui"
 build_c_tool "$SRC_DIR/plumos_controller_ui.c" "$BIN_DIR/plumos-controller-ui"
 build_fbdev_controller
+build_fbdev_app "$BIN_DIR/plumos-file-manager"
+build_fbdev_app "$BIN_DIR/plumos-music-player-ui"
 
 install_wrapper plumos-controller-ui-v90s
 install_wrapper plumos-frontend-launch

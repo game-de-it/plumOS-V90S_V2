@@ -14,7 +14,6 @@
       "display_name": "File Manager",
       "kind": "tool",
       "launch_profile": "shell:/mnt/plumos/bin/plumos-file-manager",
-      "show_results": true,
       "visible": true,
       "menu": "apps"
     },
@@ -23,7 +22,6 @@
       "display_name": "Music Player",
       "kind": "tool",
       "launch_profile": "shell:/mnt/plumos/bin/plumos-music-player-launch",
-      "show_results": true,
       "visible": true,
       "menu": "apps"
     },
