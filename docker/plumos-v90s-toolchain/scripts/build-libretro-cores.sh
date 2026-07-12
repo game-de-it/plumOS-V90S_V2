@@ -9,7 +9,7 @@ SRC_ROOT="${PLUMOS_V90S_CORES_SRC:-output/build/libretro-cores/src}"
 CORE_RECIPES="${CORE_RECIPES:-${ROOT_DIR}/docker/plumos-v90s-toolchain/libretro-core-recipes.tsv}"
 CORE_INFO_REPO="${CORE_INFO_REPO:-https://github.com/libretro/libretro-core-info.git}"
 CORE_INFO_REF="${CORE_INFO_REF:-HEAD}"
-PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-v90s}"
+PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-all}"
 FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 2)}"
 CC="${CC:-gcc}"
@@ -28,8 +28,8 @@ Options:
   --out-dir PATH       Output directory; default output/libretro-cores/v90s.
   --src-root PATH      Source/build root; default output/build/libretro-cores/src.
   --recipes PATH       Recipe TSV; default docker/plumos-v90s-toolchain/libretro-core-recipes.tsv.
-  --filter FILTER      v90s, plumos, class-a, class-b, all, or comma-separated core IDs.
-                       Default: v90s.
+  --filter FILTER      all, v90s, plumos, class-a, class-b, or comma-separated core IDs.
+                       Default: all.
   --jobs N             Per-core make jobs; default nproc.
   --fail-on-error 0|1  Fail if any selected core fails; default 1.
   --list               Print selected recipes and exit.
@@ -176,13 +176,42 @@ find_makefile() {
     printf '%s\n' "$hint"
     return 0
   fi
-  for candidate in Makefile.libretro Makefile libretro/Makefile src/libretro/Makefile; do
+  for candidate in Makefile.libretro Makefile libretro/Makefile src/libretro/Makefile CMakeLists.txt; do
     if [ -f "$work/$candidate" ]; then
       printf '%s\n' "$candidate"
       return 0
     fi
   done
   return 1
+}
+
+cmake_target_from_args() {
+  local id="$1"
+  local arg
+
+  for arg in "${args[@]}"; do
+    case "$arg" in
+      target=*)
+        printf '%s\n' "${arg#target=}"
+        return 0
+        ;;
+    esac
+  done
+  printf '%s_libretro\n' "$id"
+}
+
+cmake_args_without_internal_keys() {
+  local arg
+
+  for arg in "${args[@]}"; do
+    case "$arg" in
+      target=*)
+        ;;
+      *)
+        printf '%s\n' "$arg"
+        ;;
+    esac
+  done
 }
 
 copy_core_info() {
@@ -289,17 +318,47 @@ build_one_core() {
   append_manifest "jobs=$JOBS"
 
   read -r -a args <<< "$make_args"
-  if ! (
-    cd "$work"
-    make -f "$makefile" clean >/dev/null 2>&1 || true
-    env CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" \
-      make -f "$makefile" -j"$JOBS" "${args[@]}" GIT_VERSION=-"$(printf '%s' "$commit" | cut -c 1-7)"
-  ) >> "$log" 2>&1; then
-    msg "FAILED build $id"
-    append_manifest "status=failed"
-    append_manifest "reason=build_failed"
-    FAILED_COUNT=$((FAILED_COUNT + 1))
-    return 0
+  if [ "$makefile" = "CMakeLists.txt" ]; then
+    local cmake_build_dir="$src/.plumos-cmake-build"
+    local cmake_target
+    local cmake_args=()
+
+    cmake_target="$(cmake_target_from_args "$id")"
+    while IFS= read -r arg; do
+      [ -n "$arg" ] || continue
+      cmake_args+=("$arg")
+    done <<EOF_CMAKE_ARGS
+$(cmake_args_without_internal_keys)
+EOF_CMAKE_ARGS
+
+    append_manifest "build_system=cmake"
+    append_manifest "cmake_target=$cmake_target"
+    if ! (
+      rm -rf "$cmake_build_dir"
+      env CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" \
+        cmake -S "$work" -B "$cmake_build_dir" -DCMAKE_BUILD_TYPE=Release "${cmake_args[@]}"
+      cmake --build "$cmake_build_dir" --parallel "$JOBS" --target "$cmake_target"
+    ) >> "$log" 2>&1; then
+      msg "FAILED build $id"
+      append_manifest "status=failed"
+      append_manifest "reason=cmake_build_failed"
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      return 0
+    fi
+  else
+    append_manifest "build_system=make"
+    if ! (
+      cd "$work"
+      make -f "$makefile" clean >/dev/null 2>&1 || true
+      env CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" \
+        make -f "$makefile" -j"$JOBS" "${args[@]}" GIT_VERSION=-"$(printf '%s' "$commit" | cut -c 1-7)"
+    ) >> "$log" 2>&1; then
+      msg "FAILED build $id"
+      append_manifest "status=failed"
+      append_manifest "reason=build_failed"
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      return 0
+    fi
   fi
 
   if stage_outputs "$id" "$src"; then

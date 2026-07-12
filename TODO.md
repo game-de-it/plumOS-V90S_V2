@@ -109,6 +109,7 @@ Build plumOS V90S as a V90S-specific distribution:
   partition contract remains StockOS/Batocera-compatible.
 - [x] Keep `knulli-image` as a legacy investigation target only.
 - [x] Implement `cores` as the normal libretro-core build target.
+- [x] Make the normal `cores` target build all current V90S libretro recipes.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
@@ -443,8 +444,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Revisit Buildroot only as a component build reference.
 - [ ] Keep old KNULLI investigation paths available for comparison, but do not
   use them as the distribution identity.
-- [ ] Add more libretro cores after the app-layer split is stable.
-  - [ ] Patch and promote Class B cores such as Picodrive after V90S aarch64
-    build issues are solved.
+- [ ] Add more libretro cores after the current A/B recipe set is validated on
+  real hardware.
 - [ ] Add standalone emulators after the app-layer split is stable.
 - [ ] Add frontend workflows after the app-layer split is stable.

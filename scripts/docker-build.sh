@@ -47,9 +47,9 @@ Environment:
   PLUMOS_V90S_VENDOR_RUNTIME_OUT
                                   Prepared vendor runtime output.
   CORE_RECIPES                  Libretro core recipe TSV inside the container.
-  PLUMOS_CORE_FILTER            Libretro core filter: v90s, class-a,
-                                  class-b, all, or comma-separated core IDs.
-                                  Default: v90s.
+  PLUMOS_CORE_FILTER            Libretro core filter: all, v90s, class-a,
+                                  class-b, or comma-separated core IDs.
+                                  Default: all.
   FAIL_ON_CORE_ERROR            Set to 0 to keep partial libretro core builds.
 
 Porting note:
@@ -92,7 +92,7 @@ docker_env=(
     -e PLUMOS_V90S_SSH_ROOT_PASSWORD="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
     -e PLUMOS_V90S_RETROARCH_START_MODE="${PLUMOS_V90S_RETROARCH_START_MODE:-}"
     -e CORE_RECIPES="${CORE_RECIPES:-/workspace/docker/plumos-v90s-toolchain/libretro-core-recipes.tsv}"
-    -e PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-v90s}"
+    -e PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-all}"
     -e FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"
     -e JOBS="${JOBS:-}"
     -e NEXTCOMMANDER_REF="${NEXTCOMMANDER_REF:-}"

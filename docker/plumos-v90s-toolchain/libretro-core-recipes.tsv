@@ -4,8 +4,10 @@
 #   id|class|repo|ref|subdir|makefile|make_args
 #
 # Classes:
-#   A: default V90S bring-up core set. These are built by `PLUMOS_CORE_FILTER=v90s`.
-#   B: known useful follow-up cores. Build with `PLUMOS_CORE_FILTER=class-b` or `all`.
+#   A: V90S bring-up core set. Build only these with `PLUMOS_CORE_FILTER=v90s`.
+#   B: additional V90S-supported cores.
+#
+# The normal `scripts/docker-build.sh cores` target builds all A/B recipes.
 #
 # V90S runs an aarch64 userspace, so these recipes intentionally use generic
 # `platform=unix` or upstream-supported native targets instead of MMF/A30's
@@ -20,7 +22,7 @@ mednafen_pce_fast|A|https://github.com/libretro/beetle-pce-fast-libretro.git|cc2
 
 nestopia|B|https://github.com/libretro/nestopia.git|a9ee6ca84f04990e209880fe47144e62b14253db|libretro|Makefile|platform=unix
 picodrive|B|https://github.com/libretro/picodrive.git|13ceea4ceb5f1b3a7d56baf67ec55247c1dfd154||Makefile.libretro|platform=unix
-mgba|B|https://github.com/libretro/mgba.git|4f70b313fcf82b043bee232dd5af231a7755e1d8||Makefile.libretro|platform=unix
+mgba|B|https://github.com/libretro/mgba.git|4f70b313fcf82b043bee232dd5af231a7755e1d8||CMakeLists.txt|-DBUILD_LIBRETRO=ON -DDISABLE_FRONTENDS=ON -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_PYTHON=OFF -DBUILD_TEST=OFF -DBUILD_PERF=OFF -DBUILD_SUITE=OFF -DBUILD_CINEMA=OFF -DUSE_FFMPEG=OFF -DUSE_LIBZIP=OFF -DUSE_MINIZIP=OFF -DUSE_PNG=OFF -DUSE_SQLITE3=OFF -DUSE_LUA=OFF target=mgba_libretro
 gpsp|B|https://github.com/libretro/gpsp.git|8da094d7e04a08e5e2b9f916174d962071f91bf0||Makefile|platform=unix
 snes9x|B|https://github.com/libretro/snes9x.git|f6197644e871d05aa20bc443f2e94b647b1e53a9|libretro|Makefile|platform=unix LTO=
 mednafen_supergrafx|B|https://github.com/libretro/beetle-supergrafx-libretro.git|3cfafe8c684a2f4f4532bcf18e25d2f8760ca45d||Makefile|platform=unix
