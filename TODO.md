@@ -290,6 +290,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `plumOS V90S ADB` but `adb devices` stays empty.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
+- [x] Live-capture the V90S physical key evdev mapping for D-pad, ABXY,
+  shoulders, select/start/function, volume, and power; record the result in
+  `docs/validation/2026-07-13-v90s-physical-keymap.md`.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.
