@@ -7,7 +7,7 @@ compat_vendor="${PLUMOS_V90S_VENDOR_RUNTIME_ID:-v90s-stockos-r1}"
 mount_path="${PLUMOS_V90S_APP_LAYER_MOUNT:-/mnt/plumos}"
 retroarch_dir="${PLUMOS_V90S_RETROARCH_DIR:-output/retroarch-powervr}"
 retroarch_bin="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-powervr}"
-cores_dir="${PLUMOS_V90S_CORES_DIR:-output/libretro-quicknes}"
+cores_dir="${PLUMOS_V90S_CORES_DIR:-output/libretro-cores/v90s}"
 sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
 frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
 userland_dir="${PLUMOS_V90S_USERLAND_DIR:-output/userland/v90s}"
@@ -29,7 +29,7 @@ Options:
   --mount-path PATH      On-device mount path; default /mnt/plumos.
   --retroarch-dir PATH   RetroArch payload; default output/retroarch-powervr.
   --retroarch-bin NAME   RetroArch binary name; default retroarch-powervr.
-  --cores-dir PATH       Libretro cores payload; default output/libretro-quicknes.
+  --cores-dir PATH       Libretro cores payload; default output/libretro-cores/v90s.
   --sdl2-powervr-dir PATH
                           SDL2 PowerVR payload; default output/sdl2-powervr.
   --frontend-dir PATH    Frontend payload; default output/frontend/v90s.
@@ -198,6 +198,7 @@ mkdir -p \
     "$out_dir/lib/plumos-sdl2-powervr" \
     "$out_dir/apps" \
     "$out_dir/cores" \
+    "$out_dir/info" \
     "$out_dir/frontend" \
     "$out_dir/picoarch" \
     "$out_dir/standalone" \
@@ -302,7 +303,41 @@ if require_or_note_missing "$retroarch_src" "retroarch"; then
 fi
 
 quicknes_src="$cores_dir/quicknes_libretro.so"
-if require_or_note_missing "$quicknes_src" "quicknes"; then
+cores_stage_dir="$cores_dir/cores"
+info_stage_dir="$cores_dir/info"
+if [ -d "$cores_stage_dir" ]; then
+    core_count=0
+    for core_src in "$cores_stage_dir"/*_libretro.so; do
+        [ -f "$core_src" ] || continue
+        core_name="$(basename "$core_src")"
+        copy_file "$core_src" "$out_dir/cores/$core_name"
+        record_file "cores/$core_name" "libretro-core" "$core_src"
+        core_count=$((core_count + 1))
+    done
+    if [ "$core_count" -eq 0 ]; then
+        printf '%s\n' "libretro-cores" >> "$missing_file"
+        if [ "$strict" -eq 1 ]; then
+            printf 'error: missing libretro cores: %s/*_libretro.so\n' "$cores_stage_dir" >&2
+            exit 1
+        fi
+    fi
+    if [ -d "$info_stage_dir" ]; then
+        for info_src in "$info_stage_dir"/*.info; do
+            [ -f "$info_src" ] || continue
+            info_name="$(basename "$info_src")"
+            copy_file "$info_src" "$out_dir/info/$info_name"
+            record_file "info/$info_name" "libretro-info" "$info_src"
+        done
+    fi
+    if [ -f "$cores_dir/libretro-cores.manifest" ]; then
+        copy_file "$cores_dir/libretro-cores.manifest" "$out_dir/licenses/libretro-cores-manifest.txt"
+        record_file "licenses/libretro-cores-manifest.txt" "libretro-core" "$cores_dir/libretro-cores.manifest"
+    fi
+    if [ -f "$cores_dir/checksums.sha256" ]; then
+        copy_file "$cores_dir/checksums.sha256" "$out_dir/licenses/libretro-cores-checksums.sha256"
+        record_file "licenses/libretro-cores-checksums.sha256" "libretro-core" "$cores_dir/checksums.sha256"
+    fi
+elif require_or_note_missing "$quicknes_src" "quicknes"; then
     copy_file "$quicknes_src" "$out_dir/cores/quicknes_libretro.so"
     record_file "cores/quicknes_libretro.so" "libretro-core" "$quicknes_src"
     if [ -f "$cores_dir/quicknes-manifest.txt" ]; then
@@ -356,7 +391,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  "mount_path": "%s",\n' "$(json_escape "$mount_path")"
     printf '  "generated_at": "%s",\n' "$generated_at"
     printf '  "directories": [\n'
-    printf '    "bin", "lib", "apps", "cores", "frontend", "picoarch", "standalone",\n'
+    printf '    "bin", "lib", "apps", "cores", "info", "frontend", "picoarch", "standalone",\n'
     printf '    "config", "fonts", "share", "state", "themes", "Images", "media",\n'
     printf '    "roms", "bios", "Saves", "States", "Screenshots", "Logs",\n'
     printf '    "updates", "licenses"\n'

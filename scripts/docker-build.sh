@@ -46,6 +46,11 @@ Environment:
   PLUMOS_V90S_STOCKOS_ARTIFACT StockOS extraction input for vendor-runtime.
   PLUMOS_V90S_VENDOR_RUNTIME_OUT
                                   Prepared vendor runtime output.
+  CORE_RECIPES                  Libretro core recipe TSV inside the container.
+  PLUMOS_CORE_FILTER            Libretro core filter: v90s, class-a,
+                                  class-b, all, or comma-separated core IDs.
+                                  Default: v90s.
+  FAIL_ON_CORE_ERROR            Set to 0 to keep partial libretro core builds.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target
@@ -86,6 +91,10 @@ docker_env=(
     -e PLUMOS_V90S_SSH_AUTHORIZED_KEYS="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
     -e PLUMOS_V90S_SSH_ROOT_PASSWORD="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
     -e PLUMOS_V90S_RETROARCH_START_MODE="${PLUMOS_V90S_RETROARCH_START_MODE:-}"
+    -e CORE_RECIPES="${CORE_RECIPES:-/workspace/docker/plumos-v90s-toolchain/libretro-core-recipes.tsv}"
+    -e PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-v90s}"
+    -e FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"
+    -e JOBS="${JOBS:-}"
     -e NEXTCOMMANDER_REF="${NEXTCOMMANDER_REF:-}"
     -e MINIAUDIO_REF="${MINIAUDIO_REF:-}"
 )
@@ -145,7 +154,7 @@ case "$cmd" in
         ;;
     cores|libretro-cores)
         ensure_image
-        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-libretro-quicknes.sh "$@"
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-libretro-cores.sh "$@"
         ;;
     quicknes|libretro-quicknes)
         echo "warning: quicknes is a one-core development alias; use cores for normal core builds" >&2

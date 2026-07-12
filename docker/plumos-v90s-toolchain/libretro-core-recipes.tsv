@@ -1,0 +1,26 @@
+# plumOS V90S libretro core build recipes.
+#
+# Format:
+#   id|class|repo|ref|subdir|makefile|make_args
+#
+# Classes:
+#   A: default V90S bring-up core set. These are built by `PLUMOS_CORE_FILTER=v90s`.
+#   B: known useful follow-up cores. Build with `PLUMOS_CORE_FILTER=class-b` or `all`.
+#
+# V90S runs an aarch64 userspace, so these recipes intentionally use generic
+# `platform=unix` or upstream-supported native targets instead of MMF/A30's
+# armhf / classic_armv7_a7 recipe arguments.
+
+quicknes|A|https://github.com/libretro/QuickNES_Core.git|058d66516ed3f1260b69e5b71cd454eb7e9234a3||Makefile|platform=unix
+fceumm|A|https://github.com/libretro/libretro-fceumm.git|3f23e2b98f883be9c62a3fdb65c015d376dcd135||Makefile.libretro|platform=unix
+gambatte|A|https://github.com/libretro/gambatte-libretro.git|90701d6e5d68d31ead49f92f222c144c44a2645c||Makefile.libretro|platform=unix
+genesis_plus_gx|A|https://github.com/libretro/Genesis-Plus-GX.git|aea7b9d5475ec02427fbb00a9093cae74b87ff8a||Makefile.libretro|platform=unix
+snes9x2005|A|https://github.com/libretro/snes9x2005.git|fd45b0e055bce6cff3acde77414558784e93e7d0||Makefile|platform=unix
+mednafen_pce_fast|A|https://github.com/libretro/beetle-pce-fast-libretro.git|cc248db4d2f47d0f255fbc1a3c651df4beb3d835||Makefile|platform=unix
+
+nestopia|B|https://github.com/libretro/nestopia.git|a9ee6ca84f04990e209880fe47144e62b14253db|libretro|Makefile|platform=unix
+picodrive|B|https://github.com/libretro/picodrive.git|13ceea4ceb5f1b3a7d56baf67ec55247c1dfd154||Makefile.libretro|platform=unix
+mgba|B|https://github.com/libretro/mgba.git|4f70b313fcf82b043bee232dd5af231a7755e1d8||Makefile.libretro|platform=unix
+gpsp|B|https://github.com/libretro/gpsp.git|8da094d7e04a08e5e2b9f916174d962071f91bf0||Makefile|platform=unix
+snes9x|B|https://github.com/libretro/snes9x.git|f6197644e871d05aa20bc443f2e94b647b1e53a9|libretro|Makefile|platform=unix LTO=
+mednafen_supergrafx|B|https://github.com/libretro/beetle-supergrafx-libretro.git|3cfafe8c684a2f4f4532bcf18e25d2f8760ca45d||Makefile|platform=unix

@@ -126,6 +126,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] `network-services` emits
     `output/network-services/v90s/network-services.manifest` and
     `output/network-services/v90s/checksums.sha256`.
+  - [x] `cores` emits `output/libretro-cores/v90s/libretro-cores.manifest`
+    and `output/libretro-cores/v90s/checksums.sha256`.
 
 ## Milestone 3: System Rootfs
 
@@ -187,6 +189,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `gnu/`
   - `lib/`
   - `cores/`
+  - `info/`
   - `frontend/`
   - `picoarch/`
   - `standalone/`
@@ -209,7 +212,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - `updates/`
   - `licenses/`
 - [x] Copy RetroArch into the app layer.
-- [x] Copy supported libretro cores into the app layer.
+- [x] Copy supported libretro cores and libretro `.info` metadata into the app
+  layer.
 - [x] Copy frontend into the app layer.
 - [x] Port the MMF-style FE Apps menu path to V90S with live-device validated
   `Scraping`, `File Manager`, and `RetroArch` entries.
@@ -440,5 +444,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Keep old KNULLI investigation paths available for comparison, but do not
   use them as the distribution identity.
 - [ ] Add more libretro cores after the app-layer split is stable.
+  - [ ] Patch and promote Class B cores such as Picodrive after V90S aarch64
+    build issues are solved.
 - [ ] Add standalone emulators after the app-layer split is stable.
 - [ ] Add frontend workflows after the app-layer split is stable.
