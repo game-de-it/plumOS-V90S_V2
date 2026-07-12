@@ -237,6 +237,9 @@ Build plumOS V90S as a V90S-specific distribution:
   show `POWKIDDY V90S`, plumOS `VERSION`, compatible vendor runtime,
   kernel, PowerVR GPU, display/audio runtime backends, ROM-storage capacity,
   memory, and base OS metadata without stale Miyoo/MMF firmware wording.
+- [x] Live-validate `UI Settings` controls: refresh TOP, UI mode,
+  empty/favorites/recent TOP entries, ROM cursor wrap, boot resume mode,
+  system/ROM sorting, scan-on-enter, and Graphic theme options.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network
   services are reachable from the frontend.
 - [x] Live-validate the FE `Network Settings -> Wi-Fi` checkbox for runtime
