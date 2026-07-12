@@ -61,6 +61,7 @@
 #define MUSIC_OUTPUT_CHANNELS 2
 #define MUSIC_AUDIO_CHUNK_FRAMES 768
 #define MUSIC_LIST_ROWS 7
+#define MUSIC_ABS_AXIS_DEADZONE 512
 #define MUSIC_BOTTOM_PANEL_HEIGHT 154.0f
 #define MUSIC_ART_MAX_BYTES (6u * 1024u * 1024u)
 #define MUSIC_ART_MAX_DIMENSION 2048
@@ -1856,9 +1857,12 @@ static int input_name_matches_a30_gamepad(const char *name) {
 static int input_name_matches_v90s_gamepad(const char *name) {
   return name && (strstr(name, "adc_gamepad") != NULL ||
                   strstr(name, "adc gamepad") != NULL ||
-                  strstr(name, "sunxi-keyboard") != NULL ||
-                  strstr(name, "gpio-keys") != NULL ||
                   strstr(name, "plumOS V90S") != NULL);
+}
+
+static int input_name_matches_v90s_fallback(const char *name) {
+  return name && (strstr(name, "sunxi-keyboard") != NULL ||
+                  strstr(name, "gpio-keys") != NULL);
 }
 
 static int input_device_name_from_event_path(const char *event_path, char *out,
@@ -1895,19 +1899,6 @@ static int find_gamepad_event(char *out, size_t out_size, char *name_out,
     char name[128];
     snprintf(path, sizeof(path), "/sys/class/input/event%d/device/name", i);
     if (read_trimmed_file(path, name, sizeof(name)) &&
-        input_name_matches_mmf_gamepad(name)) {
-      snprintf(out, out_size, "/dev/input/event%d", i);
-      if (name_out && name_out_size > 0) {
-        snprintf(name_out, name_out_size, "%s", name);
-      }
-      return 1;
-    }
-  }
-  for (i = 0; i < 32; i++) {
-    char path[128];
-    char name[128];
-    snprintf(path, sizeof(path), "/sys/class/input/event%d/device/name", i);
-    if (read_trimmed_file(path, name, sizeof(name)) &&
         input_name_matches_v90s_gamepad(name)) {
       snprintf(out, out_size, "/dev/input/event%d", i);
       if (name_out && name_out_size > 0) {
@@ -1922,6 +1913,32 @@ static int find_gamepad_event(char *out, size_t out_size, char *name_out,
     snprintf(path, sizeof(path), "/sys/class/input/event%d/device/name", i);
     if (read_trimmed_file(path, name, sizeof(name)) &&
         input_name_matches_a30_gamepad(name)) {
+      snprintf(out, out_size, "/dev/input/event%d", i);
+      if (name_out && name_out_size > 0) {
+        snprintf(name_out, name_out_size, "%s", name);
+      }
+      return 1;
+    }
+  }
+  for (i = 0; i < 32; i++) {
+    char path[128];
+    char name[128];
+    snprintf(path, sizeof(path), "/sys/class/input/event%d/device/name", i);
+    if (read_trimmed_file(path, name, sizeof(name)) &&
+        input_name_matches_mmf_gamepad(name)) {
+      snprintf(out, out_size, "/dev/input/event%d", i);
+      if (name_out && name_out_size > 0) {
+        snprintf(name_out, name_out_size, "%s", name);
+      }
+      return 1;
+    }
+  }
+  for (i = 0; i < 32; i++) {
+    char path[128];
+    char name[128];
+    snprintf(path, sizeof(path), "/sys/class/input/event%d/device/name", i);
+    if (read_trimmed_file(path, name, sizeof(name)) &&
+        input_name_matches_v90s_fallback(name)) {
       snprintf(out, out_size, "/dev/input/event%d", i);
       if (name_out && name_out_size > 0) {
         snprintf(name_out, name_out_size, "%s", name);
@@ -2096,7 +2113,19 @@ static void process_input_event(struct player_state *state, const struct input_e
       handle_key_press(state, ev->code, ev->value == 2);
     }
   } else if (ev->type == EV_ABS) {
-    if (ev->code == ABS_HAT0Y) {
+    if (ev->code == ABS_Y) {
+      if (ev->value <= -MUSIC_ABS_AXIS_DEADZONE) {
+        select_delta(state, -1);
+      } else if (ev->value >= MUSIC_ABS_AXIS_DEADZONE) {
+        select_delta(state, 1);
+      }
+    } else if (ev->code == ABS_X) {
+      if (ev->value <= -MUSIC_ABS_AXIS_DEADZONE) {
+        request_seek(state, -5);
+      } else if (ev->value >= MUSIC_ABS_AXIS_DEADZONE) {
+        request_seek(state, 5);
+      }
+    } else if (ev->code == ABS_HAT0Y) {
       if (ev->value < 0) {
         select_delta(state, -1);
       } else if (ev->value > 0) {
