@@ -112,14 +112,23 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Make the normal `cores` target build the MMF-compatible plumOS A/B core
   set for V90S.
 - [x] Align V90S libretro recipe IDs, repos, refs, and classes with the MMF
-  recipe inventory:
+  source-built recipe inventory:
   - `A`: 37 recipes
   - `B`: 4 recipes
-  - `O`: 61 recipes
+  - `O`: 61 initial recipes
 - [x] Validate that the V90S A/B output matches MMF's built
   `dist/plumos-libretro-cores` file set: 41 cores and 41 `.info` files.
-- [ ] Validate and triage the MMF/Onion-compatible `O` class recipe set on
-  V90S using `PLUMOS_CORE_FILTER=class-o`.
+- [x] Extend and triage the V90S full catalog against the MMF final package:
+  - V90S recipes: `A`: 37, `B`: 4, `O`: 72, total 113
+  - V90S output: 117 `*_libretro.so`
+  - MMF final package output: 117 `*_libretro.so`
+  - filename comparison: no missing and no extra files
+  - compatibility aliases:
+    `dosbox_pure_0.9.7`, `beetle_saturn`,
+    `km_puae_xtreme_amped`, and `uae4arm`
+- [x] Validate that `PLUMOS_CORE_FILTER=all FAIL_ON_CORE_ERROR=1
+  ./scripts/docker-build.sh cores` completes with zero failed recipes.
+- [ ] Real-device runtime validation for non-baseline libretro cores.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.

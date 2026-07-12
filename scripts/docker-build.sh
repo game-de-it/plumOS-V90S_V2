@@ -51,6 +51,8 @@ Environment:
                                   class-b, or comma-separated core IDs.
                                   Default: plumos.
   FAIL_ON_CORE_ERROR            Set to 0 to keep partial libretro core builds.
+  BUILD_JOB_FALLBACKS           Space- or comma-separated lower -j values to
+                                  retry after an initial per-core build failure.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target
@@ -95,6 +97,7 @@ docker_env=(
     -e PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-plumos}"
     -e FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"
     -e JOBS="${JOBS:-}"
+    -e BUILD_JOB_FALLBACKS="${BUILD_JOB_FALLBACKS:-1}"
     -e NEXTCOMMANDER_REF="${NEXTCOMMANDER_REF:-}"
     -e MINIAUDIO_REF="${MINIAUDIO_REF:-}"
 )

@@ -102,6 +102,7 @@ output/app-layer/v90s/info: 41 *.info
   of stopping interactively.
 - `easyrpg` requires `libfmt-dev` and `libpixman-1-dev` in the V90S Docker
   toolchain image.
-- The `O` class can be selected with `PLUMOS_CORE_FILTER=class-o` and the full
-  catalog with `PLUMOS_CORE_FILTER=all`; those paths still need separate V90S
-  build triage.
+- The `O` class can be selected with `PLUMOS_CORE_FILTER=class-o`, and the full
+  catalog with `PLUMOS_CORE_FILTER=all`.
+- Follow-up: the MMF final package filename set is validated separately in
+  `docs/validation/2026-07-13-v90s-mmf-final-package-core-build.md`.

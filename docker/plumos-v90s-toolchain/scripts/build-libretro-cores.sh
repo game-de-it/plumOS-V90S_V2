@@ -94,11 +94,30 @@ case "$JOBS" in
   ''|*[!0-9]*) JOBS=2 ;;
 esac
 [ "$JOBS" -gt 0 ] || JOBS=1
+BUILD_JOB_FALLBACKS="${BUILD_JOB_FALLBACKS//,/ }"
 for fallback_job in $BUILD_JOB_FALLBACKS; do
   case "$fallback_job" in
     ''|*[!0-9]*) BUILD_JOB_FALLBACKS=1 ;;
   esac
 done
+
+case "$ROOT_DIR" in
+  /*) ;;
+  *) ROOT_DIR="$(pwd)/$ROOT_DIR" ;;
+esac
+case "$OUT_DIR" in
+  /*) ;;
+  *) OUT_DIR="$ROOT_DIR/$OUT_DIR" ;;
+esac
+case "$SRC_ROOT" in
+  /*) ;;
+  *) SRC_ROOT="$ROOT_DIR/$SRC_ROOT" ;;
+esac
+case "$CORE_RECIPES" in
+  /*) ;;
+  *) CORE_RECIPES="$ROOT_DIR/$CORE_RECIPES" ;;
+esac
+cd "$ROOT_DIR"
 
 msg() {
   printf '[libretro-cores] %s\n' "$*" >&2
@@ -122,9 +141,40 @@ core_aliases() {
 }
 
 core_output_aliases() {
+  # Match MMF package filenames when the V90S-safe aarch64 build is provided
+  # by the same upstream family under a different libretro core name.
   case "$1:$2" in
     beetle_saturn:mednafen_saturn_libretro.so)
       printf '%s\n' beetle_saturn_libretro.so
+      ;;
+    dosbox_pure:dosbox_pure_libretro.so)
+      printf '%s\n' dosbox_pure_0.9.7_libretro.so
+      ;;
+    puae:puae_libretro.so)
+      printf '%s\n' km_puae_xtreme_amped_libretro.so
+      ;;
+    puae2021:puae2021_libretro.so)
+      printf '%s\n' uae4arm_libretro.so
+      ;;
+  esac
+}
+
+core_stage_base() {
+  case "$1:$2" in
+    km_duckswanstation_xtreme_amped:swanstation_libretro.so)
+      printf '%s\n' km_duckswanstation_xtreme_amped_libretro.so
+      ;;
+    km_mame2003_xtreme:km_mame2003_xtreme_amped_libretro.so)
+      printf '%s\n' km_mame2003_xtreme_libretro.so
+      ;;
+    km_superbroswar:superbroswar_libretro.so)
+      printf '%s\n' km_superbroswar_libretro.so
+      ;;
+    puae2021:puae_libretro.so)
+      printf '%s\n' puae2021_libretro.so
+      ;;
+    *)
+      printf '%s\n' "$2"
       ;;
   esac
 }
@@ -363,6 +413,15 @@ patch_core_source() {
         fi
       fi
       ;;
+    km_duckswanstation_xtreme_amped)
+      if [ -f "$src/CMakeLists.txt" ]; then
+        sed -i \
+          '/^# Enable LTO\/LTCG on Release builds\./,/^endif()/c\
+# plumOS: disable forced SwanStation IPO/LTO for reproducible handheld feedback builds.' \
+          "$src/CMakeLists.txt"
+        printf '\n[plumOS] patched SwanStation CMake to disable forced IPO/LTO\n' >> "$log"
+      fi
+      ;;
     atari800)
       if [ -f "$patch_dir/atari800-libretro-audio-batch-pacing.patch" ]; then
         perl -0pi -e 's/\r\n/\n/g' "$src/libretro/core-mapper.c" "$src/libretro/libretro-core.c" 2>/dev/null || true
@@ -392,6 +451,16 @@ patch_core_source() {
         else
           printf '\n[plumOS] skipped fake08 content buffer patch: source already patched or layout does not match\n' >> "$log"
         fi
+      fi
+      ;;
+    mame2000)
+      if [ -f "$src/Makefile" ]; then
+        perl -0pi -e 's/ifneq \(\$\(ARM\), 1\)\s*\n\s*IS_X86 = 1\s*\nendif/ifneq ($(ARM), 1)\n   ifneq (,$(filter x86_64 i%86,$(shell uname -m)))\n      IS_X86 = 1\n   endif\nendif/s' "$src/Makefile"
+        printf '\n[plumOS] patched mame2000 unix platform detection for non-x86 aarch64 builds\n' >> "$log"
+      fi
+      if [ -f "$src/src/libretro/osinline.h" ]; then
+        sed -i -E 's/#if[[:space:]]*\\(IS_ARM\\)/#if (IS_ARM) \&\& !defined(__aarch64__)/g' "$src/src/libretro/osinline.h"
+        printf '\n[plumOS] patched mame2000 ARM inline vector multiply guard for aarch64\n' >> "$log"
       fi
       ;;
     mednafen_ngp|beetle_saturn|flycast|mupen64plus_next|parallel_n64|yabasanshiro)
@@ -657,6 +726,7 @@ stage_outputs() {
     case "$base" in
       *_libretro.dll) base="${base%.dll}.so" ;;
     esac
+    base="$(core_stage_base "$id" "$base")"
     stem="${base%.so}"
     cp "$so" "$OUT_DIR/cores/$base"
     "$STRIP" "$OUT_DIR/cores/$base" >/dev/null 2>&1 || true
