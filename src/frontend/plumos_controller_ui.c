@@ -463,10 +463,13 @@ struct device_settings {
   char theme[UI_PATH_MAX];
   char timezone[64];
   char model[64];
+  char plumos_version[64];
+  char vendor_runtime[64];
   char kernel_version[128];
   char sdcard_storage[128];
   char memory_usage[128];
   char firmware_version[128];
+  char gpu_runtime[128];
   char network_status_source[128];
   char network_control_status[128];
   char ssh_status[128];
@@ -2491,8 +2494,7 @@ static void update_device_backend_status(struct device_settings *device) {
   mmf_enhance_available = runtime_mmf_enhance_backend_available();
   if (runtime_v90s_enhance_backend_available()) {
     copy_string(device->brightness_backend, sizeof(device->brightness_backend),
-                lcd_available ? "V90S disp enhance + lcdbl"
-                              : "V90S disp enhance; backlight unavailable");
+                lcd_available ? "disp enhance+lcdbl" : "disp enhance");
   } else if (lcd_available && enhance_available) {
     copy_string(device->brightness_backend, sizeof(device->brightness_backend),
                 "disp attr lcdbl/enhance");
@@ -3123,9 +3125,27 @@ static void format_firmware_version_status(char *out, size_t out_size) {
     return;
   }
   out[0] = '\0';
-  if (read_fw_printenv_value("miyoo_version", version, sizeof(version)) &&
+  if ((read_fw_printenv_value("v90s_version", version, sizeof(version)) ||
+       read_fw_printenv_value("board_version", version, sizeof(version))) &&
       version[0]) {
     copy_string(out, out_size, version);
+    return;
+  }
+  if (read_first_line_file("/etc/batocera-release", version, sizeof(version)) &&
+      version[0]) {
+    copy_string(out, out_size, version);
+    return;
+  }
+  if (read_key_value_file("/etc/os-release", "PRETTY_NAME", version,
+                          sizeof(version)) &&
+      version[0]) {
+    char *trimmed = trim_ascii_ws(version);
+    size_t len = strlen(trimmed);
+    if (len >= 2 && trimmed[0] == '"' && trimmed[len - 1] == '"') {
+      trimmed[len - 1] = '\0';
+      trimmed++;
+    }
+    copy_string(out, out_size, trimmed);
     return;
   }
   text = read_file("/etc/openwrt_release", NULL);
@@ -3140,7 +3160,7 @@ static void format_firmware_version_status(char *out, size_t out_size) {
       version[0]) {
     copy_string(out, out_size, version);
   } else {
-    copy_string(out, out_size, "unknown");
+    copy_string(out, out_size, "StockOS/Batocera");
   }
 }
 
@@ -4149,11 +4169,14 @@ static void init_device_settings(struct device_settings *device) {
   copy_string(device->timezone, sizeof(device->timezone), plumos_default_timezone());
   device_name = getenv("PLUMOS_DEVICE_NAME");
   copy_string(device->model, sizeof(device->model),
-              device_name && device_name[0] ? device_name : "Miyoo Mini Flip");
+              device_name && device_name[0] ? device_name : "POWKIDDY V90S");
+  copy_string(device->plumos_version, sizeof(device->plumos_version), "unknown");
+  copy_string(device->vendor_runtime, sizeof(device->vendor_runtime), "unknown");
   copy_string(device->kernel_version, sizeof(device->kernel_version), "unknown");
   copy_string(device->sdcard_storage, sizeof(device->sdcard_storage), "unavailable");
   copy_string(device->memory_usage, sizeof(device->memory_usage), "unavailable");
   copy_string(device->firmware_version, sizeof(device->firmware_version), "unknown");
+  copy_string(device->gpu_runtime, sizeof(device->gpu_runtime), "PowerVR GE8300");
   copy_string(device->network_status_source, sizeof(device->network_status_source),
               "runtime status missing");
   copy_string(device->network_control_status, sizeof(device->network_control_status),
@@ -4168,6 +4191,27 @@ static void init_device_settings(struct device_settings *device) {
   copy_string(device->volume_backend, sizeof(device->volume_backend),
               "runtime backend unknown");
   copy_string(device->status, sizeof(device->status), "plumOS defaults");
+}
+
+static void load_app_layer_metadata(struct ui_state *ui) {
+  char path[PATH_MAX];
+  char value[64];
+
+  if (!ui) {
+    return;
+  }
+  if (join_path(path, sizeof(path), ui->plumos_root, "VERSION")) {
+    if (read_first_line_file(path, value, sizeof(value)) && value[0]) {
+      copy_string(ui->device.plumos_version, sizeof(ui->device.plumos_version),
+                  value);
+    }
+  }
+  if (join_path(path, sizeof(path), ui->plumos_root, "COMPAT_VENDOR")) {
+    if (read_first_line_file(path, value, sizeof(value)) && value[0]) {
+      copy_string(ui->device.vendor_runtime, sizeof(ui->device.vendor_runtime),
+                  value);
+    }
+  }
 }
 
 static void load_wifi_runtime_status(struct ui_state *ui) {
@@ -4234,6 +4278,7 @@ static int load_device_settings(struct ui_state *ui) {
   const char *json_end;
 
   init_device_settings(&ui->device);
+  load_app_layer_metadata(ui);
   read_first_line_file("/proc/sys/kernel/osrelease", ui->device.kernel_version,
                        sizeof(ui->device.kernel_version));
   format_storage_status(ui->sdcard_root, ui->device.sdcard_storage,
@@ -5551,10 +5596,15 @@ static void add_system_information_entries(struct ui_state *ui) {
   const struct device_settings *device = &ui->device;
 
   add_setting_entry(ui, "system_model", "Device Model", device->model);
-  add_setting_entry(ui, "system_kernel", "Linux Kernel", device->kernel_version);
-  add_setting_entry(ui, "system_sdcard", "SD Card", device->sdcard_storage);
+  add_setting_entry(ui, "system_plumos_version", "plumOS", device->plumos_version);
+  add_setting_entry(ui, "system_vendor_runtime", "Vendor", device->vendor_runtime);
+  add_setting_entry(ui, "system_kernel", "Kernel", device->kernel_version);
+  add_setting_entry(ui, "system_gpu_runtime", "GPU", device->gpu_runtime);
+  add_setting_entry(ui, "system_display_backend", "Display", device->brightness_backend);
+  add_setting_entry(ui, "system_audio_backend", "Audio", device->volume_backend);
+  add_setting_entry(ui, "system_sdcard", "Storage", device->sdcard_storage);
   add_setting_entry(ui, "system_memory", "Memory", device->memory_usage);
-  add_setting_entry(ui, "system_firmware", "Firmware", device->firmware_version);
+  add_setting_entry(ui, "system_firmware", "Base OS", device->firmware_version);
 }
 
 static void add_network_settings_entries(struct ui_state *ui) {
@@ -8943,14 +8993,26 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line1, line1_size, "Frontend language setting.");
       copy_string(line2, line2_size, "Saves language to plumOS config.");
     } else if (strcmp(id, "system_model") == 0 ||
+               strcmp(id, "system_plumos_version") == 0 ||
+               strcmp(id, "system_vendor_runtime") == 0 ||
                strcmp(id, "system_kernel") == 0 ||
+               strcmp(id, "system_gpu_runtime") == 0 ||
+               strcmp(id, "system_display_backend") == 0 ||
+               strcmp(id, "system_audio_backend") == 0 ||
                strcmp(id, "system_sdcard") == 0 ||
                strcmp(id, "system_memory") == 0 ||
                strcmp(id, "system_firmware") == 0) {
       copy_string(line1, line1_size, "Read-only device and runtime information.");
-      if (strcmp(id, "system_firmware") == 0) {
+      if (strcmp(id, "system_plumos_version") == 0) {
+        copy_string(line2, line2_size, "Read from the FAT32 plumOS VERSION file.");
+      } else if (strcmp(id, "system_vendor_runtime") == 0) {
+        copy_string(line2, line2_size, "Compatible StockOS-derived vendor runtime.");
+      } else if (strcmp(id, "system_display_backend") == 0 ||
+                 strcmp(id, "system_audio_backend") == 0) {
+        copy_string(line2, line2_size, "Live runtime backend selected for V90S.");
+      } else if (strcmp(id, "system_firmware") == 0) {
         copy_string(line2, line2_size,
-                    "Read from /etc/fw_printenv miyoo_version when available.");
+                    "Read from StockOS/Batocera or rootfs release metadata.");
       } else {
         copy_string(line2, line2_size, "Used to confirm the active device environment.");
       }
