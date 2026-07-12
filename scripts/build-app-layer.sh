@@ -210,6 +210,7 @@ mkdir -p \
     "$out_dir/samba/sbin" \
     "$out_dir/state/frontend" \
     "$out_dir/themes" \
+    "$out_dir/Images" \
     "$out_dir/media" \
     "$out_dir/music" \
     "$out_dir/roms" \
@@ -356,7 +357,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  "generated_at": "%s",\n' "$generated_at"
     printf '  "directories": [\n'
     printf '    "bin", "lib", "apps", "cores", "frontend", "picoarch", "standalone",\n'
-    printf '    "config", "fonts", "share", "state", "themes", "media",\n'
+    printf '    "config", "fonts", "share", "state", "themes", "Images", "media",\n'
     printf '    "roms", "bios", "Saves", "States", "Screenshots", "Logs",\n'
     printf '    "updates", "licenses"\n'
     printf '  ],\n'

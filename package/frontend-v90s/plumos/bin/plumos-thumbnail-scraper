@@ -12,7 +12,7 @@ export PATH
 
 SYSTEMS_JSON="${PLUMOS_SYSTEMS_JSON:-${PLUMOS_ROOT}/config/frontend/systems.json}"
 SOURCES_TSV="${PLUMOS_SCRAPER_SOURCES:-${PLUMOS_ROOT}/config/frontend/scraper-sources.tsv}"
-IMAGE_ROOT="${PLUMOS_IMAGE_ROOT:-${PLUMOS_ROOT}/media}"
+IMAGE_ROOT="${PLUMOS_IMAGE_ROOT:-${SDCARD_ROOT}/Images}"
 IMAGE_ROOT="${IMAGE_ROOT%/}"
 STATE_DIR="${PLUMOS_THUMBNAIL_STATE_DIR:-${PLUMOS_ROOT}/state/frontend/artwork-scraper}"
 CACHE_DIR="${PLUMOS_THUMBNAIL_CACHE_DIR:-${PLUMOS_ROOT}/cache/frontend/artwork-scraper}"
@@ -58,8 +58,7 @@ Environment:
   PLUMOS_SYSTEMS_JSON            Default: $PLUMOS_ROOT/config/frontend/systems.json
   PLUMOS_SCRAPER_SOURCES         Default: $PLUMOS_ROOT/config/frontend/scraper-sources.tsv
   PLUMOS_ROM_ROOT                Default: $PLUMOS_ROOT/roms
-  PLUMOS_IMAGE_ROOT              Default: $PLUMOS_ROOT/media
-  PLUMOS_THUMBNAIL_LAYOUT        Default: v90s-media-images
+  PLUMOS_IMAGE_ROOT              Default: $PLUMOS_SDCARD_ROOT/Images
   PLUMOS_THUMBNAIL_STATE_DIR     Default: $PLUMOS_ROOT/state/frontend/artwork-scraper
   PLUMOS_THUMBNAIL_CACHE_DIR     Default: $PLUMOS_ROOT/cache/frontend/artwork-scraper
   PLUMOS_THUMBNAIL_PRELOAD_DIR   Default: $PLUMOS_ROOT/share/frontend/artwork-scraper
@@ -329,17 +328,7 @@ thumbnail_lookup_key() {
 
 thumbnail_system_root() {
   thumb_system="$1"
-  case "${PLUMOS_THUMBNAIL_LAYOUT:-v90s-media-images}" in
-    v90s|v90s-media-images|media-images)
-      printf '%s/%s/images\n' "$IMAGE_ROOT" "$thumb_system"
-      ;;
-    flat|mmf|sdcard-images)
-      printf '%s/%s\n' "$IMAGE_ROOT" "$thumb_system"
-      ;;
-    *)
-      printf '%s/%s/images\n' "$IMAGE_ROOT" "$thumb_system"
-      ;;
-  esac
+  printf '%s/%s\n' "$IMAGE_ROOT" "$thumb_system"
 }
 
 thumbnail_lookup_add() {

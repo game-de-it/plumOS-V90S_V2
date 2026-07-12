@@ -10137,16 +10137,57 @@ static void open_system_rom_screen_by_id(struct ui_state *ui, const char *system
 }
 
 static void open_gallery_screen(struct ui_state *ui) {
+  size_t saved_cursor;
+  char selected_relative_path[UI_PATH_MAX] = "";
+  int saved_suppressed;
+  int refreshed_thumbnails = 0;
+  int reload_ok = 1;
+  size_t i;
+
   if (!ui || ui->rom_count == 0) {
     set_status(ui, "no ROM entries for Gallery");
     return;
   }
+
+  saved_cursor = ui->rom_cursor;
+  if (ui->rom_count > 0 && ui->rom_cursor < ui->rom_count) {
+    copy_string(selected_relative_path, sizeof(selected_relative_path),
+                ui->rom_entries[ui->rom_cursor].relative_path);
+  }
+  if (ui->screen == SCREEN_ROMS && ui->current_system_id[0] &&
+      valid_system_id(ui->current_system_id)) {
+    set_status(ui, "loading Gallery artwork");
+    if (run_scanner(ui->plumos_root, ui->sdcard_root, ui->current_system_id, 1)) {
+      refreshed_thumbnails = 1;
+      saved_suppressed = ui->rom_scan_refresh_suppressed;
+      ui->rom_scan_refresh_suppressed = 1;
+      reload_ok = load_rom_entries(ui, ui->current_system_id);
+      ui->rom_scan_refresh_suppressed = saved_suppressed;
+      if (reload_ok && selected_relative_path[0]) {
+        for (i = 0; i < ui->rom_count; i++) {
+          if (strcmp(ui->rom_entries[i].relative_path, selected_relative_path) == 0) {
+            ui->rom_cursor = i;
+            break;
+          }
+        }
+      } else if (reload_ok && ui->rom_count > 0 && saved_cursor < ui->rom_count) {
+        ui->rom_cursor = saved_cursor;
+      }
+    }
+  }
+
   ui->gallery_back_screen = ui->screen;
   ui->screen = SCREEN_GALLERY;
   ui->gallery_transition_active = 0;
   ui->gallery_pending_active = 0;
   ui->gallery_pending_direction = 0;
-  set_status(ui, "Gallery ready");
+  if (!reload_ok) {
+    set_status(ui, "Gallery ready; artwork reload failed");
+  } else if (refreshed_thumbnails) {
+    set_status(ui, "Gallery ready; artwork refreshed");
+  } else {
+    set_status(ui, "Gallery ready");
+  }
   reset_marquee(ui);
 }
 

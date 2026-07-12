@@ -655,6 +655,18 @@ Do not revive a top-level `/mnt/plumos/Roms` fallback for V90S release behavior.
 If a migration helper is needed later, make it explicit and one-shot rather than
 adding another permanent scan root.
 
+Scraped or user-supplied frontend artwork should follow the existing
+plumOS A30/MMF convention so artwork can be shared across devices:
+
+```text
+/mnt/plumos/Images/<system>/<rom-relative-stem>.png
+/mnt/plumos/Images/nes/Super Mario Bros..png
+```
+
+The thumbnail scraper should write to this `Images/<system>` tree by default,
+and the frontend scanner should resolve thumbnails through each system's
+`artwork.lookup` entries in `config/frontend/systems.json`.
+
 Every build target that emits a reusable artifact must emit checksums and a
 manifest. Text manifests are acceptable for intermediate artifacts, but release
 artifacts should have machine-readable JSON metadata.

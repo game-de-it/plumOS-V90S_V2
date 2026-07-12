@@ -197,6 +197,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `share/`
   - `state/`
   - `themes/`
+  - `Images/`
   - `media/`
   - `music/`
   - `roms/`
@@ -220,7 +221,7 @@ Build plumOS V90S as a V90S-specific distribution:
   validate a real-hardware smoke launch with input and ALSA initialization.
 - [x] Add the V90S-adapted MMF thumbnail scraper as
   `/mnt/plumos/bin/plumos-thumbnail-scraper`, using `/mnt/plumos/roms` and
-  `/mnt/plumos/media/<system>/images`.
+  A30/MMF-compatible `/mnt/plumos/Images/<system>`.
 - [x] Replace the temporary V90S-safe Music Player Apps entry with the ported
   MMF/A30 Music Player payload.
 - [x] Copy BusyBox and command-line userland into the app layer.
