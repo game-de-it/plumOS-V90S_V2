@@ -2942,7 +2942,9 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
       strncmp(line, "system=", 7) == 0 ||
       strncmp(line, "target=", 7) == 0 ||
       strncmp(line, "profile=", 8) == 0 ||
+      strncmp(line, "source=", 7) == 0 ||
       strncmp(line, "source:", 7) == 0 ||
+      strncmp(line, "core_settings_screen=", 21) == 0 ||
       strncmp(line, "menu_screen=", 12) == 0 ||
       strncmp(line, "settings_screen=", 16) == 0 ||
       strncmp(line, "scraping_screen=", 16) == 0 ||
@@ -2958,7 +2960,10 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
       strncmp(line, "status:", 7) == 0) {
     return 1;
   }
-  if (strstr(line, "A:") || strstr(line, "LEFT/RIGHT:") || strstr(line, "Q: quit")) {
+  if (strstr(line, "LEFT/RIGHT:") || strstr(line, "Q: quit") ||
+      (strstr(line, "A:") &&
+       (strstr(line, "B:") || strstr(line, "START:") ||
+        strstr(line, "SELECT:") || strstr(line, "POWER:")))) {
     return 1;
   }
   return 0;
@@ -2977,6 +2982,7 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
   int h = (int)r->var.yres;
   int settings_family;
   int settings_page;
+  int core_settings_page;
   int entry_scale;
   int line_height;
   int cursor_x;
@@ -2990,13 +2996,16 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
 
   memset(selected, 0, sizeof(selected));
   plumos_fbdev_screen_title(title, sizeof(title), lines, line_count);
-  settings_page = plumos_fbdev_has_prefixed_line(lines, line_count,
+  core_settings_page = plumos_fbdev_has_prefixed_line(lines, line_count,
+                                                     "core_settings_screen=1");
+  settings_page = core_settings_page ||
+                  plumos_fbdev_has_prefixed_line(lines, line_count,
                                                  "settings_screen=1");
   settings_family = plumos_fbdev_title_is_settings_family(title) ||
                     plumos_fbdev_has_prefixed_line(lines, line_count,
                                                    "menu_screen=1") ||
                     settings_page;
-  entry_scale = 2;
+  entry_scale = core_settings_page ? 3 : 2;
   line_height = entry_scale * 12;
   cursor_x = settings_family ? 12 : 18;
   name_x = cursor_x + (settings_family ? 18 : 24);

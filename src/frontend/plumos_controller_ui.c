@@ -9230,13 +9230,18 @@ static void render_core_select(struct ui_state *ui) {
   const char *footer2 = "TOP saves system; ROM saves ROM override.";
 
   ui_printf(ui, "plumOS controller UI - Core Settings\n");
-  ui_printf(ui, "target=%s", ui->core_target_system_id[0] ? ui->core_target_system_id : "-");
-  if (ui->core_target_relative_path[0]) {
-    ui_printf(ui, " / %s", ui->core_target_relative_path);
-  }
-  ui_printf(ui, "\n");
-  if (ui->core_current_source[0]) {
-    ui_printf(ui, "source=%s\n", ui->core_current_source);
+  ui_printf(ui, "settings_screen=1\n");
+  ui_printf(ui, "core_settings_screen=1\n");
+  if (!ui_renderer_a30_tty_capable(ui)) {
+    ui_printf(ui, "target=%s",
+              ui->core_target_system_id[0] ? ui->core_target_system_id : "-");
+    if (ui->core_target_relative_path[0]) {
+      ui_printf(ui, " / %s", ui->core_target_relative_path);
+    }
+    ui_printf(ui, "\n");
+    if (ui->core_current_source[0]) {
+      ui_printf(ui, "source=%s\n", ui->core_current_source);
+    }
   }
   core_menu_clamp_cursor(ui);
   ui_printf(ui, "entries=%d cursor=%zu\n\n", CORE_MENU_ROW_COUNT,
