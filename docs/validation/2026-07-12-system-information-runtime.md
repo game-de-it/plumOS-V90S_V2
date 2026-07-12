@@ -14,6 +14,9 @@ distribution split instead of inherited Miyoo/MMF firmware assumptions.
   `/mnt/plumos/COMPAT_VENDOR`.
 - The compatible vendor runtime is shown separately from the plumOS version.
 - GPU, display backend, and audio backend are shown as runtime information.
+- Storage is calculated from `/mnt/plumos/roms`, so SD1-only operation reports
+  the app-layer ROM directory capacity while SD2 operation reports the SD2 card
+  mounted behind the ROM directory.
 - The old `miyoo_version` wording was removed from all frontend language files.
 - `Firmware` was renamed to `Base OS` and is read from StockOS/Batocera or
   rootfs release metadata.
@@ -41,9 +44,17 @@ System Settings - INFORMATION
   GPU                      PowerVR GE8300
   Display                  disp enhance
   Audio                    plumOS volume helper
-  Storage                  752/1021 MB (74%)
+  Storage                  32749/119216 MB (27%)
   Memory                   148/977 MB (15%)
   Base OS                  Debian GNU/Linux 12 (bookworm)
+```
+
+The live mount table confirmed that this Storage value came from the SD2 ROM
+card mounted at `/mnt/plumos/roms`, not the 1 GB app-layer partition:
+
+```text
+/dev/mmcblk0p7 /mnt/plumos       1022.0M  752.6M 269.4M 74%
+/dev/mmcblk1p1 /mnt/plumos/roms   116.4G   32.0G  84.4G 27%
 ```
 
 Frontend status after deployment:

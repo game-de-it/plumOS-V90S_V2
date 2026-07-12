@@ -4273,6 +4273,7 @@ static void load_device_runtime_status(struct ui_state *ui) {
 }
 
 static int load_device_settings(struct ui_state *ui) {
+  char rom_storage_path[PATH_MAX];
   char *json;
   size_t json_size;
   const char *json_end;
@@ -4281,8 +4282,14 @@ static int load_device_settings(struct ui_state *ui) {
   load_app_layer_metadata(ui);
   read_first_line_file("/proc/sys/kernel/osrelease", ui->device.kernel_version,
                        sizeof(ui->device.kernel_version));
-  format_storage_status(ui->sdcard_root, ui->device.sdcard_storage,
-                        sizeof(ui->device.sdcard_storage));
+  if (join_path(rom_storage_path, sizeof(rom_storage_path), ui->plumos_root,
+                "roms")) {
+    format_storage_status(rom_storage_path, ui->device.sdcard_storage,
+                          sizeof(ui->device.sdcard_storage));
+  } else {
+    format_storage_status(ui->sdcard_root, ui->device.sdcard_storage,
+                          sizeof(ui->device.sdcard_storage));
+  }
   format_memory_status(ui->device.memory_usage, sizeof(ui->device.memory_usage));
   format_firmware_version_status(ui->device.firmware_version,
                                  sizeof(ui->device.firmware_version));
