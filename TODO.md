@@ -278,8 +278,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [ ] Copy standalone emulators into the app layer.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
-- [ ] Confirm the V90S Music Player button mapping and ALSA playback on real
-  hardware.
+- [x] Confirm the V90S Music Player button mapping on real hardware after the
+  `adc_gamepad` input-device fix.
+- [ ] Confirm the V90S Music Player can play an actual music file with ALSA
+  output on real hardware.
 - [x] Copy plumOS-owned private libraries into the app layer.
 - [x] Avoid symlink-dependent library layouts on FAT32.
 - [x] Generate app-layer `manifest.json`.

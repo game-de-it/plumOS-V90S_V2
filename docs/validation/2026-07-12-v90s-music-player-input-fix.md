@@ -82,5 +82,13 @@ plumos-frontend-stop: pid=24017 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev -
 
 ## Result
 
-The Music Player now opens the V90S controller event device. Physical button
-operation still needs user confirmation from the rendered Music Player screen.
+The Music Player now opens the V90S controller event device.
+
+User confirmation after the live deployment:
+
+```text
+Controller operation is OK.
+```
+
+Music-file playback remains a separate validation item because the smoke-test
+SD did not contain music files.
