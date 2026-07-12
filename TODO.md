@@ -109,7 +109,17 @@ Build plumOS V90S as a V90S-specific distribution:
   partition contract remains StockOS/Batocera-compatible.
 - [x] Keep `knulli-image` as a legacy investigation target only.
 - [x] Implement `cores` as the normal libretro-core build target.
-- [x] Make the normal `cores` target build all current V90S libretro recipes.
+- [x] Make the normal `cores` target build the MMF-compatible plumOS A/B core
+  set for V90S.
+- [x] Align V90S libretro recipe IDs, repos, refs, and classes with the MMF
+  recipe inventory:
+  - `A`: 37 recipes
+  - `B`: 4 recipes
+  - `O`: 61 recipes
+- [x] Validate that the V90S A/B output matches MMF's built
+  `dist/plumos-libretro-cores` file set: 41 cores and 41 `.info` files.
+- [ ] Validate and triage the MMF/Onion-compatible `O` class recipe set on
+  V90S using `PLUMOS_CORE_FILTER=class-o`.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.

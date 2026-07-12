@@ -49,10 +49,12 @@ RUN apt-get update \
     libavutil-dev \
     libcap-dev \
     libegl-dev \
+    libfmt-dev \
     libfreetype6-dev \
     libgles-dev \
     libjpeg-dev \
     libpng-dev \
+    libpixman-1-dev \
     libpipewire-0.3-dev \
     libpulse-dev \
     libsdl2-dev \
