@@ -253,6 +253,11 @@ struct input_event {
 #define MMF_PWM_DUTY_PATH "/sys/class/pwm/pwmchip0/pwm0/duty_cycle"
 #define MMF_MI_DISP0_PATH "/proc/mi_modules/mi_disp/mi_disp0"
 #define MMF_STOCK_SYSTEM_JSON_PATH "/mnt/plumos/system.json"
+#define V90S_ENHANCE_BRIGHT_PATH "/sys/class/disp/disp/attr/enhance_bright"
+#define V90S_ENHANCE_CONTRAST_PATH "/sys/class/disp/disp/attr/enhance_contrast"
+#define V90S_ENHANCE_SATURATION_PATH "/sys/class/disp/disp/attr/enhance_saturation"
+#define V90S_ENHANCE_MODE_PATH "/sys/class/disp/disp/attr/enhance_mode"
+#define V90S_COLOR_TEMPERATURE_PATH "/sys/class/disp/disp/attr/color_temperature"
 
 static int replace_json_key_value_atomic(const char *path, const char *key,
                                          const char *literal);
@@ -1055,6 +1060,11 @@ static int dirname_path(char *out, size_t out_size, const char *path) {
 static int file_exists(const char *path) {
   struct stat st;
   return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static int dir_exists(const char *path) {
+  struct stat st;
+  return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 static int ensure_dir_recursive(const char *path) {
@@ -2355,6 +2365,71 @@ static int runtime_mmf_enhance_backend_available(void) {
   return runtime_device_is_mmf() && access(MMF_MI_DISP0_PATH, W_OK) == 0;
 }
 
+static int runtime_v90s_enhance_bright_available(void) {
+  return access(V90S_ENHANCE_BRIGHT_PATH, W_OK) == 0;
+}
+
+static int runtime_v90s_enhance_contrast_available(void) {
+  return access(V90S_ENHANCE_CONTRAST_PATH, W_OK) == 0;
+}
+
+static int runtime_v90s_enhance_saturation_available(void) {
+  return access(V90S_ENHANCE_SATURATION_PATH, W_OK) == 0;
+}
+
+static int runtime_v90s_color_temperature_available(void) {
+  return access(V90S_COLOR_TEMPERATURE_PATH, W_OK) == 0;
+}
+
+static int runtime_v90s_enhance_backend_available(void) {
+  return runtime_v90s_enhance_bright_available() ||
+         runtime_v90s_enhance_contrast_available() ||
+         runtime_v90s_enhance_saturation_available() ||
+         runtime_v90s_color_temperature_available();
+}
+
+static int system_number_setting_needs_runtime_backend(const char *id) {
+  return id && (strcmp(id, "system_volume") == 0 ||
+                strcmp(id, "system_brightness") == 0 ||
+                strcmp(id, "system_lumination") == 0 ||
+                strcmp(id, "system_contrast") == 0 ||
+                strcmp(id, "system_hue") == 0 ||
+                strcmp(id, "system_saturation") == 0);
+}
+
+static int system_number_setting_runtime_available(const char *id) {
+  if (!id) {
+    return 0;
+  }
+  if (strcmp(id, "system_volume") == 0) {
+    return runtime_volume_backend_available();
+  }
+  if (strcmp(id, "system_brightness") == 0) {
+    return runtime_lcd_backend_available() || runtime_mmf_lcd_backend_available();
+  }
+  if (strcmp(id, "system_lumination") == 0) {
+    return runtime_enhance_backend_available() ||
+           runtime_mmf_enhance_backend_available() ||
+           runtime_v90s_enhance_bright_available();
+  }
+  if (strcmp(id, "system_contrast") == 0) {
+    return runtime_enhance_backend_available() ||
+           runtime_mmf_enhance_backend_available() ||
+           runtime_v90s_enhance_contrast_available();
+  }
+  if (strcmp(id, "system_hue") == 0) {
+    return runtime_enhance_backend_available() ||
+           runtime_mmf_enhance_backend_available() ||
+           runtime_v90s_color_temperature_available();
+  }
+  if (strcmp(id, "system_saturation") == 0) {
+    return runtime_enhance_backend_available() ||
+           runtime_mmf_enhance_backend_available() ||
+           runtime_v90s_enhance_saturation_available();
+  }
+  return 1;
+}
+
 static const char *runtime_mmf_stock_system_json_path(void) {
   const char *path = getenv("PLUMOS_MMF_STOCK_SYSTEM_JSON");
 
@@ -2395,6 +2470,9 @@ static void update_device_backend_status(struct device_settings *device) {
     if (runtime_mmf_volume_backend_available()) {
       copy_string(device->volume_backend, sizeof(device->volume_backend),
                   "MMF MI_AO volume");
+    } else if (run_volume_control_command("status", 0, 0)) {
+      copy_string(device->volume_backend, sizeof(device->volume_backend),
+                  "plumOS volume helper");
     } else {
       copy_string(device->volume_backend, sizeof(device->volume_backend),
                   "ALSA Soft Volume Master");
@@ -2411,7 +2489,11 @@ static void update_device_backend_status(struct device_settings *device) {
   enhance_available = runtime_enhance_backend_available();
   mmf_lcd_available = runtime_mmf_lcd_backend_available();
   mmf_enhance_available = runtime_mmf_enhance_backend_available();
-  if (lcd_available && enhance_available) {
+  if (runtime_v90s_enhance_backend_available()) {
+    copy_string(device->brightness_backend, sizeof(device->brightness_backend),
+                lcd_available ? "V90S disp enhance + lcdbl"
+                              : "V90S disp enhance; backlight unavailable");
+  } else if (lcd_available && enhance_available) {
     copy_string(device->brightness_backend, sizeof(device->brightness_backend),
                 "disp attr lcdbl/enhance");
   } else if (mmf_lcd_available && mmf_enhance_available) {
@@ -2580,6 +2662,85 @@ static int apply_runtime_mmf_display_enhance(const struct device_settings *devic
   return ok;
 }
 
+static long scale_setting_to_runtime_range(long value, long setting_max,
+                                           long runtime_min, long runtime_max) {
+  long span;
+
+  value = clamp_long(value, 0, setting_max);
+  if (setting_max <= 0) {
+    return runtime_min;
+  }
+  span = runtime_max - runtime_min;
+  return runtime_min + (value * span + setting_max / 2) / setting_max;
+}
+
+static int write_runtime_long_file(const char *path, long value) {
+  char text[64];
+
+  snprintf(text, sizeof(text), "%ld\n", value);
+  return write_text_file(path, text);
+}
+
+static int apply_runtime_v90s_display_enhance(const struct device_settings *device,
+                                              const char *id) {
+  int ok = 1;
+  int attempted = 0;
+  int enable_enhance = 0;
+  long value;
+
+  if (!device) {
+    return 0;
+  }
+
+  if (!id || strcmp(id, "system_lumination") == 0) {
+    if (runtime_v90s_enhance_bright_available()) {
+      value = scale_setting_to_runtime(device->lumination, 10, 100);
+      attempted = 1;
+      enable_enhance = 1;
+      ok = write_runtime_long_file(V90S_ENHANCE_BRIGHT_PATH, value) && ok;
+    } else if (id) {
+      ok = 0;
+    }
+  }
+
+  if (!id || strcmp(id, "system_contrast") == 0) {
+    if (runtime_v90s_enhance_contrast_available()) {
+      value = scale_setting_to_runtime(device->contrast, 20, 100);
+      attempted = 1;
+      enable_enhance = 1;
+      ok = write_runtime_long_file(V90S_ENHANCE_CONTRAST_PATH, value) && ok;
+    } else if (id) {
+      ok = 0;
+    }
+  }
+
+  if (!id || strcmp(id, "system_hue") == 0) {
+    if (runtime_v90s_color_temperature_available()) {
+      value = scale_setting_to_runtime_range(device->hue, 20, -150, 150);
+      attempted = 1;
+      ok = write_runtime_long_file(V90S_COLOR_TEMPERATURE_PATH, value) && ok;
+    } else if (id) {
+      ok = 0;
+    }
+  }
+
+  if (!id || strcmp(id, "system_saturation") == 0) {
+    if (runtime_v90s_enhance_saturation_available()) {
+      value = scale_setting_to_runtime(device->saturation, 20, 100);
+      attempted = 1;
+      enable_enhance = 1;
+      ok = write_runtime_long_file(V90S_ENHANCE_SATURATION_PATH, value) && ok;
+    } else if (id) {
+      ok = 0;
+    }
+  }
+
+  if (enable_enhance && access(V90S_ENHANCE_MODE_PATH, W_OK) == 0) {
+    (void)write_text_file(V90S_ENHANCE_MODE_PATH, "1\n");
+  }
+  return attempted && ok;
+}
+
 static void set_device_setting_number(struct device_settings *device,
                                       const char *id, long value) {
   if (!device || !id) {
@@ -2642,7 +2803,7 @@ static int apply_device_runtime_settings(const struct device_settings *device,
     if (!apply_runtime_mmf_brightness(device)) {
       ok = 0;
     }
-  } else if (needs_brightness) {
+  } else if (needs_brightness && id) {
     ok = 0;
   }
   if (needs_enhance && runtime_enhance_backend_available()) {
@@ -2655,7 +2816,12 @@ static int apply_device_runtime_settings(const struct device_settings *device,
     if (!apply_runtime_mmf_display_enhance(device)) {
       ok = 0;
     }
-  } else if (needs_enhance) {
+  } else if (needs_enhance && runtime_v90s_enhance_backend_available()) {
+    attempted = 1;
+    if (!apply_runtime_v90s_display_enhance(device, id)) {
+      ok = 0;
+    }
+  } else if (needs_enhance && id) {
     ok = 0;
   }
 
@@ -5268,19 +5434,44 @@ static void add_system_time_manual_entries(struct ui_state *ui) {
   add_setting_entry(ui, "system_manual_time_apply", "Apply Manual Time", value);
 }
 
+static void format_runtime_number_setting_value(const char *id, long value,
+                                                char *out, size_t out_size) {
+  if (!out || out_size == 0) {
+    return;
+  }
+  if (system_number_setting_needs_runtime_backend(id) &&
+      !system_number_setting_runtime_available(id)) {
+    copy_string(out, out_size, "N/A");
+    return;
+  }
+  snprintf(out, out_size, "%ld", value);
+}
+
 static void add_system_settings_entries(struct ui_state *ui) {
   char value[256];
+  char contrast_value[32];
+  char hue_value[32];
+  char saturation_value[32];
   const struct device_settings *device = &ui->device;
 
-  snprintf(value, sizeof(value), "%ld", device->volume);
+  format_runtime_number_setting_value("system_volume", device->volume, value,
+                                      sizeof(value));
   add_setting_entry(ui, "system_volume", "Volume", value);
 
-  snprintf(value, sizeof(value), "%ld", device->brightness);
+  format_runtime_number_setting_value("system_brightness", device->brightness,
+                                      value, sizeof(value));
   add_setting_entry(ui, "system_brightness", "Brightness", value);
-  snprintf(value, sizeof(value), "%ld", device->lumination);
+  format_runtime_number_setting_value("system_lumination", device->lumination,
+                                      value, sizeof(value));
   add_setting_entry(ui, "system_lumination", "Lumination", value);
-  snprintf(value, sizeof(value), "C=%ld H=%ld S=%ld",
-           device->contrast, device->hue, device->saturation);
+  format_runtime_number_setting_value("system_contrast", device->contrast,
+                                      contrast_value, sizeof(contrast_value));
+  format_runtime_number_setting_value("system_hue", device->hue,
+                                      hue_value, sizeof(hue_value));
+  format_runtime_number_setting_value("system_saturation", device->saturation,
+                                      saturation_value, sizeof(saturation_value));
+  snprintf(value, sizeof(value), "C=%s T=%s S=%s",
+           contrast_value, hue_value, saturation_value);
   add_setting_entry(ui, "system_display_color", "Display Color", value);
 
   add_setting_entry(ui, "system_time_settings", "Time Settings",
@@ -5292,11 +5483,37 @@ static void add_system_settings_entries(struct ui_state *ui) {
 }
 
 static void add_system_factory_reset_entries(struct ui_state *ui) {
-  add_setting_entry(ui, "system_factory_reset_all", "All Emulator Settings",
-                    "RA + PICO + SA");
-  add_setting_entry(ui, "system_factory_reset_ra", "RetroArch Settings", "");
-  add_setting_entry(ui, "system_factory_reset_pico", "PicoArch Settings", "");
-  add_setting_entry(ui, "system_factory_reset_sa", "Standalone Settings", "");
+  char path[PATH_MAX];
+  int has_ra = 0;
+  int has_pico = 0;
+  int has_sa = 0;
+
+  if (join_path(path, sizeof(path), ui->plumos_root, "factory-defaults/ra")) {
+    has_ra = dir_exists(path);
+  }
+  if (join_path(path, sizeof(path), ui->plumos_root, "factory-defaults/pico")) {
+    has_pico = dir_exists(path);
+  }
+  if (join_path(path, sizeof(path), ui->plumos_root, "factory-defaults/sa")) {
+    has_sa = dir_exists(path);
+  }
+  if (has_ra && has_pico && has_sa) {
+    add_setting_entry(ui, "system_factory_reset_all", "All Emulator Settings",
+                      "RA + PICO + SA");
+  }
+  if (has_ra) {
+    add_setting_entry(ui, "system_factory_reset_ra", "RetroArch Settings", "");
+  }
+  if (has_pico) {
+    add_setting_entry(ui, "system_factory_reset_pico", "PicoArch Settings", "");
+  }
+  if (has_sa) {
+    add_setting_entry(ui, "system_factory_reset_sa", "Standalone Settings", "");
+  }
+  if (!has_ra && !has_pico && !has_sa) {
+    add_setting_entry(ui, "system_factory_reset_none", "No Defaults Installed",
+                      "N/A");
+  }
 }
 
 static void add_system_brightness_test_entries(struct ui_state *ui) {
@@ -5319,11 +5536,14 @@ static void add_system_display_color_entries(struct ui_state *ui) {
   char value[256];
   const struct device_settings *device = &ui->device;
 
-  snprintf(value, sizeof(value), "%ld", device->contrast);
+  format_runtime_number_setting_value("system_contrast", device->contrast,
+                                      value, sizeof(value));
   add_setting_entry(ui, "system_contrast", "Contrast", value);
-  snprintf(value, sizeof(value), "%ld", device->hue);
+  format_runtime_number_setting_value("system_hue", device->hue, value,
+                                      sizeof(value));
   add_setting_entry(ui, "system_hue", "Hue", value);
-  snprintf(value, sizeof(value), "%ld", device->saturation);
+  format_runtime_number_setting_value("system_saturation", device->saturation,
+                                      value, sizeof(value));
   add_setting_entry(ui, "system_saturation", "Saturation", value);
 }
 
@@ -8682,16 +8902,16 @@ static void setting_help_lines(const struct ui_state *ui,
   } else if (strncmp(id, "system_", 7) == 0) {
     if (strcmp(id, "system_volume") == 0) {
       copy_string(line1, line1_size, "System-wide volume setting.");
-      copy_string(line2, line2_size, "Applies to ALSA Soft Volume Master.");
+      copy_string(line2, line2_size, "Applies to the validated device mixer backend.");
     } else if (strcmp(id, "system_brightness") == 0) {
       copy_string(line1, line1_size, "Screen brightness setting.");
-      copy_string(line2, line2_size, "LEFT/RIGHT changes 1..20 and applies the runtime backend.");
+      copy_string(line2, line2_size, "Unavailable when the vendor runtime exposes no backlight control.");
     } else if (strcmp(id, "system_lumination") == 0) {
       copy_string(line1, line1_size, "Display lumination setting.");
-      copy_string(line2, line2_size, "Applies to the display backend and saves to plumOS.");
+      copy_string(line2, line2_size, "Applies to V90S display enhance brightness when available.");
     } else if (strcmp(id, "system_display_color") == 0) {
       copy_string(line1, line1_size, "Open display color tuning.");
-      copy_string(line2, line2_size, "Contrast, hue, and saturation are changed inside.");
+      copy_string(line2, line2_size, "Contrast, color temperature, and saturation are changed inside.");
     } else if (strcmp(id, "system_time_settings") == 0) {
       copy_string(line1, line1_size, "Open OS time and timezone settings.");
       copy_string(line2, line2_size, "Timezone is saved in plumOS and applied to /etc/TZ.");
@@ -8714,8 +8934,8 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line1, line1_size, "Display contrast setting.");
       copy_string(line2, line2_size, "Applies to the display backend and saves to plumOS.");
     } else if (strcmp(id, "system_hue") == 0) {
-      copy_string(line1, line1_size, "Display hue setting.");
-      copy_string(line2, line2_size, "Applies to the display backend and saves to plumOS.");
+      copy_string(line1, line1_size, "Display color temperature setting.");
+      copy_string(line2, line2_size, "Uses the V90S color_temperature backend when available.");
     } else if (strcmp(id, "system_saturation") == 0) {
       copy_string(line1, line1_size, "Display saturation setting.");
       copy_string(line2, line2_size, "Applies to the display backend and saves to plumOS.");
@@ -12057,6 +12277,11 @@ static int save_setting_number(struct ui_state *ui, const char *id,
       strcmp(id, "system_manual_time_apply") != 0) {
     return save_manual_time_number(ui, id, direction);
   }
+  if (system_number_setting_needs_runtime_backend(id) &&
+      !system_number_setting_runtime_available(id)) {
+    set_status(ui, "runtime backend unavailable");
+    return 0;
+  }
   value = strtol(display_value ? display_value : "0", NULL, 10);
   if (strcmp(id, "rom_scan_slow_threshold_ms") == 0) {
     step = 100;
@@ -13340,7 +13565,9 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
         return;
       }
       if (is_system_brightness_entry(entry)) {
-        if (brightness_test_tiles_enabled()) {
+        if (!system_number_setting_runtime_available("system_brightness")) {
+          set_status(ui, "Brightness backend unavailable");
+        } else if (brightness_test_tiles_enabled()) {
           open_system_brightness_test_screen(ui);
         } else {
           set_status(ui, "Brightness changes with LEFT/RIGHT");

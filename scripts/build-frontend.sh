@@ -37,7 +37,7 @@ build_c_tool() {
     "$@" \
     "$src" \
     -o "$out" \
-    "${ldflags[@]}"
+    ${ldflags[@]+"${ldflags[@]}"}
   "$STRIP" "$out" 2>/dev/null || true
   chmod 0755 "$out"
 }
@@ -72,7 +72,7 @@ build_fbdev_controller() {
     $ft_define \
     "$SRC_DIR/plumos_controller_ui.c" \
     -o "$out" \
-    "${ldflags[@]}" \
+    ${ldflags[@]+"${ldflags[@]}"} \
     $png_libs \
     $ft_libs
   "$STRIP" "$out" 2>/dev/null || true

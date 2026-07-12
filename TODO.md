@@ -228,6 +228,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Copy Wi-Fi/SSH/FTP/SFTP/Samba/ADB network service payloads into the app layer.
 - [x] Add the MMF-compatible default `config/system/settings.json` so frontend
   system settings such as `wifi_enabled` can persist on V90S.
+- [x] Make START menu `System Settings` use validated V90S runtime backends:
+  volume uses the StockOS ALSA speaker path, display enhance controls back
+  Lumination/Contrast/Color Temp/Saturation, unsupported Brightness shows
+  `N/A` and does not save misleading values, and Factory Reset exposes only
+  installed default sets.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network
   services are reachable from the frontend.
 - [x] Live-validate the FE `Network Settings -> Wi-Fi` checkbox for runtime

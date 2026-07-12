@@ -1,0 +1,94 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+LOG_DIR="${PLUMOS_ROOT}/Logs"
+LOG_FILE="${LOG_DIR}/stock-services.log"
+NTP_PID_FILE="${PLUMOS_NTP_PID_FILE:-/tmp/plumos-ntpd.pid}"
+
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo unknown-time)" "$*" >>"$LOG_FILE" 2>/dev/null || true
+}
+
+cmdline_for_pid() {
+  tr '\000' ' ' <"/proc/$1/cmdline" 2>/dev/null || true
+}
+
+find_ntp_pids() {
+  self="$$"
+  for proc in /proc/[0-9]*; do
+    pid="${proc#/proc/}"
+    case "$pid" in
+      ""|*[!0-9]*)
+        continue
+        ;;
+    esac
+    [ "$pid" = "$self" ] && continue
+    cmd="$(cmdline_for_pid "$pid")"
+    case "$cmd" in
+      *"/usr/sbin/ntpd"*|*" busybox ntpd "*|*" ntpd -n"*|*" ntpd -N"*)
+        printf '%s\n' "$pid"
+        ;;
+    esac
+  done
+}
+
+stop_init_script() {
+  script="$1"
+  if [ -x "$script" ]; then
+    log "init stop ${script}"
+    "$script" stop >/dev/null 2>&1 || true
+  fi
+}
+
+stop_all_ntp() {
+  pids="$(find_ntp_pids | tr '\n' ' ')"
+  log "stop NTP begin pids=${pids:-none}"
+  stop_init_script /etc/init.d/sysntpd
+  stop_init_script /etc/init.d/ntpd
+  if [ -n "$pids" ]; then
+    # shellcheck disable=SC2086
+    kill -TERM $pids 2>/dev/null || true
+    sleep 1
+    # shellcheck disable=SC2086
+    kill -KILL $pids 2>/dev/null || true
+  fi
+  rm -f "$NTP_PID_FILE" 2>/dev/null || true
+  log "stop NTP end"
+}
+
+status() {
+  printf 'ntp_pids='
+  find_ntp_pids | tr '\n' ' '
+  printf '\n'
+}
+
+case "${1:-}" in
+  ntp-stop)
+    stop_all_ntp
+    ;;
+  status)
+    status
+    ;;
+  -h|--help|help)
+    cat <<EOF
+Usage: $0 COMMAND
+
+Commands:
+  ntp-stop  Stop known ntpd instances before manual time changes.
+  status    Print detected NTP process ids.
+EOF
+    ;;
+  *)
+    cat >&2 <<EOF
+Usage: $0 COMMAND
+
+Commands:
+  ntp-stop
+  status
+EOF
+    exit 2
+    ;;
+esac

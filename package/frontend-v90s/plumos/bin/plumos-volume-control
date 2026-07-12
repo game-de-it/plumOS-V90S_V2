@@ -1,0 +1,274 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+SYSTEM_SETTINGS="${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/settings.json}"
+LOG="${PLUMOS_VOLUME_LOG:-/tmp/.plumos_volume_set}"
+RUNTIME_STATE="${PLUMOS_VOLUME_RUNTIME_STATE:-$PLUMOS_ROOT/state/runtime/volume}"
+HEADPHONE_MAX="${PLUMOS_V90S_HEADPHONE_VOLUME_MAX:-7}"
+
+find_cmd() {
+  for path in "$@"; do
+    if [ -x "$path" ]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  done
+  return 1
+}
+
+AMIXER="${PLUMOS_AMIXER:-$(find_cmd /usr/bin/amixer /bin/amixer /sbin/amixer 2>/dev/null || true)}"
+
+usage() {
+  cat <<USAGE
+Usage: plumos-volume-control init|apply [0..20]|up|down|step +/-N|get|status
+       plumos-volume-control runtime-up|runtime-down|runtime-step +/-N|persist-runtime
+
+Controls the V90S StockOS ALSA speaker path through Headphone/HpSpeaker.
+USAGE
+}
+
+normalize_volume() {
+  value="${1:-}"
+  case "$value" in
+    ""|*[!0-9]*) return 1 ;;
+  esac
+  value="$(printf '%s' "$value" | sed 's/^0*//')"
+  [ -n "$value" ] || value=0
+  [ "$value" -gt 20 ] && value=20
+  printf '%s\n' "$value"
+}
+
+valid_signed_int() {
+  value="${1:-}"
+  case "$value" in
+    -*) value="${value#-}" ;;
+  esac
+  case "$value" in
+    ""|*[!0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+read_volume() {
+  value=""
+  if [ -r "$SYSTEM_SETTINGS" ]; then
+    value="$(sed -n 's/.*"volume"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$SYSTEM_SETTINGS" 2>/dev/null | head -n 1)"
+  fi
+  normalize_volume "${value:-14}" || printf '%s\n' 14
+}
+
+read_runtime_volume() {
+  value=""
+  if [ -r "$RUNTIME_STATE" ]; then
+    value="$(sed -n '1s/^\([0-9][0-9]*\).*$/\1/p' "$RUNTIME_STATE" 2>/dev/null | head -n 1)"
+  fi
+  case "$value" in
+    ""|*[!0-9]*) read_volume ;;
+    *) normalize_volume "$value" ;;
+  esac
+}
+
+write_runtime_volume_state() {
+  volume="$(normalize_volume "$1")" || {
+    echo "invalid volume: $1" >"$LOG"
+    return 2
+  }
+  runtime_dir="${RUNTIME_STATE%/*}"
+  [ "$runtime_dir" != "$RUNTIME_STATE" ] && mkdir -p "$runtime_dir" 2>/dev/null || true
+  tmp="$RUNTIME_STATE.tmp.$$"
+  printf '%s\n' "$volume" >"$tmp" || {
+    rm -f "$tmp"
+    echo "cannot write runtime volume state" >"$LOG"
+    return 1
+  }
+  mv "$tmp" "$RUNTIME_STATE" 2>/dev/null || {
+    rm -f "$tmp"
+    echo "cannot replace runtime volume state" >"$LOG"
+    return 1
+  }
+}
+
+clear_runtime_volume_state() {
+  rm -f "$RUNTIME_STATE" 2>/dev/null || true
+}
+
+backend_available() {
+  [ -n "$AMIXER" ] || return 1
+  "$AMIXER" sget Headphone >/dev/null 2>&1 || return 1
+  "$AMIXER" sget HpSpeaker >/dev/null 2>&1 || return 1
+  return 0
+}
+
+scale_headphone() {
+  volume="$1"
+  max="$HEADPHONE_MAX"
+  case "$max" in
+    ""|*[!0-9]*) max=7 ;;
+  esac
+  [ "$max" -gt 7 ] && max=7
+  if [ "$volume" -le 0 ] || [ "$max" -le 0 ]; then
+    printf '%s\n' 0
+    return 0
+  fi
+  if [ "$max" -eq 7 ]; then
+    if [ "$volume" -le 7 ]; then
+      value=1
+    elif [ "$volume" -le 14 ]; then
+      value=2
+    else
+      value=$(( 2 + ((volume - 14) * 5 + 3) / 6 ))
+    fi
+  else
+    value=$(( (volume * max + 10) / 20 ))
+  fi
+  [ "$value" -lt 1 ] && value=1
+  [ "$value" -gt "$max" ] && value="$max"
+  printf '%s\n' "$value"
+}
+
+init_backend() {
+  backend_available || {
+    echo "V90S mixer backend unavailable" >"$LOG"
+    return 1
+  }
+  "$AMIXER" -q sset LINEOUT on >/dev/null 2>&1 || true
+  "$AMIXER" -q sset HpSpeaker on >/dev/null 2>&1 || true
+  return 0
+}
+
+apply_volume() {
+  if [ "$#" -gt 0 ]; then
+    volume="$(normalize_volume "$1")" || {
+      echo "invalid volume: $1" >"$LOG"
+      return 2
+    }
+  else
+    volume="$(read_runtime_volume)"
+  fi
+  init_backend || return 1
+  headphone="$(scale_headphone "$volume")"
+  if [ "$volume" -le 0 ]; then
+    "$AMIXER" -q sset Headphone 0 mute >"$LOG" 2>&1 || return 1
+    "$AMIXER" -q sset HpSpeaker off >>"$LOG" 2>&1 || true
+  else
+    "$AMIXER" -q sset HpSpeaker on >"$LOG" 2>&1 || true
+    "$AMIXER" -q sset LINEOUT on >>"$LOG" 2>&1 || true
+    "$AMIXER" -q sset Headphone "$headphone" unmute >>"$LOG" 2>&1 || return 1
+  fi
+  {
+    printf 'backend=v90s-stock-mixer\n'
+    printf 'volume=%s\n' "$volume"
+    printf 'headphone=%s\n' "$headphone"
+  } >>"$LOG"
+}
+
+write_volume_setting() {
+  volume="$(normalize_volume "$1")" || {
+    echo "invalid volume: $1" >"$LOG"
+    return 2
+  }
+  settings_dir="${SYSTEM_SETTINGS%/*}"
+  [ "$settings_dir" = "$SYSTEM_SETTINGS" ] && settings_dir=.
+  mkdir -p "$settings_dir" 2>/dev/null || return 1
+  tmp="$SYSTEM_SETTINGS.tmp.$$"
+
+  if [ -r "$SYSTEM_SETTINGS" ] && grep -q '"volume"[[:space:]]*:' "$SYSTEM_SETTINGS" 2>/dev/null; then
+    sed 's/"volume"[[:space:]]*:[[:space:]]*[0-9][0-9]*/"volume": '"$volume"'/' \
+      "$SYSTEM_SETTINGS" >"$tmp" || {
+        rm -f "$tmp"
+        return 1
+      }
+  else
+    cat >"$tmp" <<EOF
+{
+  "version": 1,
+  "volume": $volume
+}
+EOF
+  fi
+  mv "$tmp" "$SYSTEM_SETTINGS"
+}
+
+change_volume() {
+  current="$(read_volume)"
+  delta="$1"
+  next=$(( current + delta ))
+  [ "$next" -lt 0 ] && next=0
+  [ "$next" -gt 20 ] && next=20
+  write_volume_setting "$next" || return 1
+  clear_runtime_volume_state
+  apply_volume "$next"
+}
+
+change_runtime_volume() {
+  current="$(read_runtime_volume)"
+  delta="$1"
+  next=$(( current + delta ))
+  [ "$next" -lt 0 ] && next=0
+  [ "$next" -gt 20 ] && next=20
+  write_runtime_volume_state "$next" || return 1
+  apply_volume "$next"
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  init)
+    init_backend
+    ;;
+  apply)
+    shift || true
+    apply_volume "$@"
+    ;;
+  up)
+    change_volume 1
+    ;;
+  down)
+    change_volume -1
+    ;;
+  step)
+    [ "$#" -eq 2 ] && valid_signed_int "$2" || {
+      usage >&2
+      exit 2
+    }
+    change_volume "$2"
+    ;;
+  runtime-up)
+    change_runtime_volume 1
+    ;;
+  runtime-down)
+    change_runtime_volume -1
+    ;;
+  runtime-step)
+    [ "$#" -eq 2 ] && valid_signed_int "$2" || {
+      usage >&2
+      exit 2
+    }
+    change_runtime_volume "$2"
+    ;;
+  persist-runtime)
+    volume="$(read_runtime_volume)"
+    write_volume_setting "$volume" || exit 1
+    clear_runtime_volume_state
+    apply_volume "$volume"
+    ;;
+  get)
+    read_volume
+    ;;
+  status)
+    if backend_available; then
+      printf 'backend=v90s-stock-mixer\n'
+      printf 'volume=%s\n' "$(read_runtime_volume)"
+      exit 0
+    fi
+    printf 'backend=unavailable\n'
+    exit 1
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

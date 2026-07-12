@@ -422,6 +422,17 @@ setup_audio_mixer() {
     amixer_try cset numid=16 on
 }
 
+apply_plumos_volume() {
+    volume_helper="${PLUMOS_ROOT:-/mnt/plumos}/bin/plumos-volume-control"
+    if [ ! -x "$volume_helper" ]; then
+        log "retroarch-launch: plumOS volume helper missing; keeping mixer defaults"
+        return
+    fi
+    log "retroarch-launch: applying plumOS system volume"
+    PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}" "$volume_helper" apply >> "$LAUNCH_LOG" 2>&1 || \
+        log "retroarch-launch: plumOS volume apply failed"
+}
+
 write_config() {
     cfg="$1"
     video_driver="$2"
@@ -572,6 +583,7 @@ append_cmd "sound-devices" sh -c 'cat /proc/asound/cards 2>/dev/null || true; ca
 append_cmd "sound-mixer-before" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
 setup_cpu_performance
 setup_audio_mixer
+apply_plumos_volume
 append_cmd "sound-mixer-after" sh -c 'command -v amixer >/dev/null 2>&1 && amixer -c 0 scontents 2>&1 || true'
 
 resolved_retroarch="$(command -v "$RETROARCH_BIN" 2>/dev/null || true)"
