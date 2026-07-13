@@ -1,0 +1,60 @@
+diff --git a/src/input.cpp b/src/input.cpp
+index 47bd85c..df2ec76 100644
+--- a/src/input.cpp
++++ b/src/input.cpp
+@@ -77,6 +77,27 @@ bool input_init(void)
+   mappings[ESCKEY].jbut       = 11; // -
+ #endif
+ 
++#if defined(PLUMOS_V90S)
++  mappings[LEFTKEY].jhat       = 0;
++  mappings[LEFTKEY].jhat_value = SDL_HAT_LEFT;
++  mappings[RIGHTKEY].jhat       = 0;
++  mappings[RIGHTKEY].jhat_value = SDL_HAT_RIGHT;
++  mappings[UPKEY].jhat       = 0;
++  mappings[UPKEY].jhat_value = SDL_HAT_UP;
++  mappings[DOWNKEY].jhat       = 0;
++  mappings[DOWNKEY].jhat_value = SDL_HAT_DOWN;
++
++  mappings[JUMPKEY].jbut      = 0;  // A
++  mappings[FIREKEY].jbut      = 1;  // B
++  mappings[INVENTORYKEY].jbut = 2;  // X
++  mappings[STRAFEKEY].jbut    = 3;  // Y
++  mappings[PREVWPNKEY].jbut   = 4;  // L
++  mappings[NEXTWPNKEY].jbut   = 5;  // R
++  mappings[MAPSYSTEMKEY].jbut = 8;  // Select
++  mappings[ENTERKEY].jbut     = 9;  // Start
++  mappings[ESCKEY].jbut       = 10; // Function
++#endif
++
+   mappings[F1KEY].key  = SDLK_F1;
+   mappings[F2KEY].key  = SDLK_F2;
+   mappings[F3KEY].key  = SDLK_F3;
+diff --git a/src/settings.cpp b/src/settings.cpp
+index c2330ac..bb4c887 100644
+--- a/src/settings.cpp
++++ b/src/settings.cpp
+@@ -84,6 +84,10 @@ bool settings_load(Settings *setfile)
+ #endif
+     setfile->last_save_slot = 0;
+-    setfile->fullscreen     = false;
++#if defined(PLUMOS_V90S)
++    setfile->fullscreen = true;
++#else
++    setfile->fullscreen = false;
++#endif
+ 
+     setfile->sound_enabled = true;
+     setfile->music_enabled = 1; // both Boss and Regular music
+@@ -100,7 +104,11 @@ bool settings_load(Settings *setfile)
+     setfile->lights = false;
+     setfile->control_scheme = false;
+     memset(setfile->language, 0, 256);
++#if defined(PLUMOS_V90S)
++    strncpy(setfile->language, "japanese", 255);
++#else
+     strncpy(setfile->language, "english", 255);
++#endif
+ 
+     return 1;
+   }

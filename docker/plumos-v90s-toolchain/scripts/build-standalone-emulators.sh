@@ -47,6 +47,10 @@ MUPEN64PLUS_INPUT_REPO=${MUPEN64PLUS_INPUT_REPO:-https://github.com/mupen64plus/
 MUPEN64PLUS_RSP_REPO=${MUPEN64PLUS_RSP_REPO:-https://github.com/mupen64plus/mupen64plus-rsp-hle.git}
 MUPEN64PLUS_VIDEO_REPO=${MUPEN64PLUS_VIDEO_REPO:-https://github.com/mupen64plus/mupen64plus-video-rice.git}
 MUPEN64PLUS_REF=${MUPEN64PLUS_REF:-2.6.0}
+NXENGINE_EVO_REPO=${NXENGINE_EVO_REPO:-https://github.com/nxengine/nxengine-evo.git}
+NXENGINE_EVO_REF=${NXENGINE_EVO_REF:-21d8aaf477092b22eceb849c6430c9ce2194c4f7}
+NXENGINE_EVO_DATA_URL=${NXENGINE_EVO_DATA_URL:-https://github.com/PortsMaster/PortMaster-Releases/releases/download/2023-10-12_1508/Cave.Story-evo.zip}
+NXENGINE_EVO_DATA_MD5=${NXENGINE_EVO_DATA_MD5:-ca5ff2645f99601d6a60fa8707826e28}
 SCUMMVM_ENGINES=${SCUMMVM_ENGINES:-"scumm,agi,agos,sky,sword1,sword2,queen,gob,lure,kyra,sci,cine,drascula,touche,teenagent,tinsel,cruise,parallaction"}
 
 MANIFEST=
@@ -79,13 +83,13 @@ validate_filter() {
   for id in ${requested}; do
     known=0
     case "${id}" in
-      ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus)
+      ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus|nxengine-evo)
         known=1
         ;;
     esac
     if [ "${known}" -ne 1 ]; then
       printf 'error: unknown standalone emulator ID: %s\n' "${id}" >&2
-      printf 'valid IDs: ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus\n' >&2
+      printf 'valid IDs: ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus nxengine-evo\n' >&2
       return 2
     fi
   done
@@ -454,6 +458,51 @@ EOF
   append_manifest "  data=standalone/mupen64plus/share/mupen64plus"
 }
 
+build_nxengine_evo() {
+  local src=$1 build archive extract bin
+  build="${src}/build-v90s"
+  archive="${BUILD_ROOT}/downloads/Cave.Story-evo.zip"
+  extract="${BUILD_ROOT}/nxengine-evo-data"
+
+  if patch --dry-run -d "${src}" -p1 <"${PATCH_DIR}/nxengine-evo-2.6.5-v90s.patch" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${PATCH_DIR}/nxengine-evo-2.6.5-v90s.patch" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${PATCH_DIR}/nxengine-evo-2.6.5-v90s.patch" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  rm -rf "${build}"
+  cmake -S "${src}" -B "${build}" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release -DPORTABLE=ON \
+    -DCMAKE_C_FLAGS="${COMMON_CFLAGS}" \
+    -DCMAKE_CXX_FLAGS="${COMMON_CXXFLAGS} -DPLUMOS_V90S=1" \
+    -DCMAKE_EXE_LINKER_FLAGS="${COMMON_LDFLAGS}" || return 1
+  cmake --build "${build}" --target nx -j"${JOBS}" || return 1
+  bin=$(find_binary "${build}" nxengine-evo) || return 1
+  stage_binary nxengine-evo "${bin}" nxengine-evo || return 1
+
+  mkdir -p "$(dirname "${archive}")"
+  if [ ! -f "${archive}" ] ||
+     ! printf '%s  %s\n' "${NXENGINE_EVO_DATA_MD5}" "${archive}" | md5sum -c - >/dev/null 2>&1; then
+    rm -f "${archive}"
+    curl --fail --location --retry 3 --output "${archive}" "${NXENGINE_EVO_DATA_URL}" || return 1
+  fi
+  printf '%s  %s\n' "${NXENGINE_EVO_DATA_MD5}" "${archive}" | md5sum -c - || return 1
+  rm -rf "${extract}"
+  mkdir -p "${extract}"
+  unzip -q "${archive}" 'nxengine-evo/data/*' 'nxengine-evo/Doukutsu.exe' -d "${extract}" || return 1
+  rm -rf "${OUT_DIR}/standalone/nxengine-evo/data" \
+    "${OUT_DIR}/standalone/nxengine-evo/share/nxengine/data"
+  mkdir -p "${OUT_DIR}/standalone/nxengine-evo/share/nxengine/data"
+  rsync -a "${extract}/nxengine-evo/data/" \
+    "${OUT_DIR}/standalone/nxengine-evo/share/nxengine/data/" || return 1
+  install -m 0644 "${extract}/nxengine-evo/Doukutsu.exe" \
+    "${OUT_DIR}/standalone/nxengine-evo/Doukutsu.exe" || return 1
+  append_manifest "  data=standalone/nxengine-evo/share/nxengine/data"
+  append_manifest "  content=standalone/nxengine-evo/Doukutsu.exe"
+  append_manifest "  content_url=${NXENGINE_EVO_DATA_URL}"
+  append_manifest "  content_md5=${NXENGINE_EVO_DATA_MD5}"
+}
+
 write_launcher() {
   mkdir -p "${OUT_DIR}/bin" "${OUT_DIR}/config/standalone"
   cat >"${OUT_DIR}/bin/plumos-standalone-launch" <<'EOF'
@@ -542,6 +591,12 @@ case "${id}" in
       --gfx mupen64plus-video-rice.so --audio mupen64plus-audio-sdl.so \
       --input mupen64plus-input-sdl.so --rsp mupen64plus-rsp-hle.so "$@"
     ;;
+  nxengine-evo)
+    exe="${EMU_ROOT}/nxengine-evo/bin/nxengine-evo"
+    workdir="${EMU_ROOT}/nxengine-evo"
+    export SDL_RENDER_DRIVER=${SDL_RENDER_DRIVER:-software}
+    set --
+    ;;
   scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
   easyrpg) exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player" ;;
   openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
@@ -626,6 +681,7 @@ build_one dosbox-staging "${DOSBOX_REPO}" "${DOSBOX_REF}" build_dosbox
 build_one pcsx_rearmed "${PCSX_REARMED_REPO}" "${PCSX_REARMED_REF}" build_pcsx_rearmed
 build_one flycast "${FLYCAST_REPO}" "${FLYCAST_REF}" build_flycast
 build_one mupen64plus "${MUPEN64PLUS_UI_REPO}" "${MUPEN64PLUS_REF}" build_mupen64plus
+build_one nxengine-evo "${NXENGINE_EVO_REPO}" "${NXENGINE_EVO_REF}" build_nxengine_evo
 {
   echo 'summary:'
   echo "  built=${BUILT_COUNT}"

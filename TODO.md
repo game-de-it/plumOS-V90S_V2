@@ -142,6 +142,10 @@ Build plumOS V90S as a V90S-specific distribution:
     the only remaining preflight failure is non-libretro Pyxel.
   - [x] Enable Cave Story in the FE and package NxEngine under the normal
     `/mnt/plumos/cores` contract instead of the ROM directory.
+  - [x] Replace the Japanese-incompatible NxEngine libretro default with the
+    pinned NXEngine-evo standalone build, Japanese assets, V90S controls, and
+    working Organya BGM; retain the libretro profile as a manual compatibility
+    choice for translated content only.
   - [x] Run every currently reachable core through the FE on real hardware:
     82 of 86 unique cores remain active; four blockers and all 31 cores lacking
     compatible indexed content are recorded in

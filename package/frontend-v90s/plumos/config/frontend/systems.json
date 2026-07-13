@@ -1737,8 +1737,8 @@
           {"root": "sdcard", "path": "Images/cavestory"}
         ]
       },
-      "launch_profiles": ["retroarch:nxengine"],
-      "default_launch_profile": "retroarch:nxengine",
+      "launch_profiles": ["standalone:nxengine-evo", "retroarch:nxengine"],
+      "default_launch_profile": "standalone:nxengine-evo",
       "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
