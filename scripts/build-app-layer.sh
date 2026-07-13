@@ -15,6 +15,7 @@ network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-service
 nextcommander_dir="${PLUMOS_V90S_NEXTCOMMANDER_DIR:-output/nextcommander/v90s}"
 music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
 standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
+picoarch_dir="${PLUMOS_V90S_PICOARCH_DIR:-output/picoarch/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
 strict=0
 
@@ -41,6 +42,7 @@ Options:
                           NextCommander payload; default output/nextcommander/v90s.
   --music-player-dir PATH Music Player payload; default output/music-player/v90s.
   --standalone-dir PATH  Standalone emulator payload; default output/standalone-emulators/v90s.
+  --picoarch-dir PATH    PicoArch payload; default output/picoarch/v90s.
   --retroarch-config PATH
                           RetroArch defaults template; default configs/retroarch/v90s-powervr-quicknes.cfg.
   --strict               Fail if currently supported payloads are missing.
@@ -103,6 +105,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --standalone-dir)
             standalone_dir="$2"
+            shift 2
+            ;;
+        --picoarch-dir)
+            picoarch_dir="$2"
             shift 2
             ;;
         --retroarch-config)
@@ -427,6 +433,28 @@ if require_or_note_missing "$standalone_dir/bin/plumos-standalone-launch" "stand
     if [ -f "$standalone_dir/standalone-emulators.manifest" ]; then
         copy_file "$standalone_dir/standalone-emulators.manifest" "$out_dir/licenses/standalone-emulators-manifest.txt"
         record_file "licenses/standalone-emulators-manifest.txt" "standalone-emulator" "$standalone_dir/standalone-emulators.manifest"
+    fi
+fi
+
+if require_or_note_missing "$picoarch_dir/bin/plumos-picoarch-launch" "picoarch"; then
+    copy_tree "$picoarch_dir/picoarch" "$out_dir/picoarch"
+    record_mapped_tree "$picoarch_dir/picoarch" "picoarch" "picoarch-runtime" "$picoarch_dir/picoarch"
+    for launcher in plumos-picoarch-launch plumos-picoarch-stop; do
+        copy_exec "$picoarch_dir/bin/$launcher" "$out_dir/bin/$launcher"
+        record_file "bin/$launcher" "picoarch-launcher" "$picoarch_dir/bin/$launcher"
+    done
+    if [ -d "$picoarch_dir/config/standalone" ]; then
+        copy_tree "$picoarch_dir/config/standalone" "$out_dir/config/standalone"
+        record_mapped_tree "$picoarch_dir/config/standalone" "config/standalone" "picoarch-config" "$picoarch_dir/config/standalone"
+    fi
+    if [ -d "$picoarch_dir/licenses" ]; then
+        mkdir -p "$out_dir/licenses/picoarch"
+        copy_tree "$picoarch_dir/licenses" "$out_dir/licenses/picoarch"
+        record_mapped_tree "$picoarch_dir/licenses" "licenses/picoarch" "picoarch-license" "$picoarch_dir/licenses"
+    fi
+    if [ -f "$picoarch_dir/picoarch.manifest" ]; then
+        copy_file "$picoarch_dir/picoarch.manifest" "$out_dir/licenses/picoarch-manifest.txt"
+        record_file "licenses/picoarch-manifest.txt" "picoarch-runtime" "$picoarch_dir/picoarch.manifest"
     fi
 fi
 

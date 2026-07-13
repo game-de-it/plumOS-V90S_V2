@@ -329,20 +329,6 @@ export PLUMOS_V90S_SDL_RENDER_DRIVER="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}
 exec "$PLUMOS_ROOT/bin/v90s-retroarch-launch"
 EOF
       ;;
-    plumos-picoarch-launch)
-      cat > "$path" <<'EOF'
-#!/bin/sh
-set -eu
-
-PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
-mkdir -p "$PLUMOS_ROOT/Logs"
-{
-  echo "plumos-picoarch-launch: V90S PicoArch runtime is not implemented yet"
-  echo "args: $*"
-} >> "$PLUMOS_ROOT/Logs/picoarch-launch.log"
-exit 69
-EOF
-      ;;
     *)
       echo "error: unknown wrapper: $name" >&2
       exit 2
@@ -375,7 +361,6 @@ install_wrapper plumos-frontend-launch
 install_wrapper plumos-frontend-stop
 install_wrapper plumos-retroarch-launch
 install_wrapper plumos-retroarch-menu-launch
-install_wrapper plumos-picoarch-launch
 
 install -m 0755 "$ROOT_DIR/scripts/v90s-retroarch-launch.sh" "$BIN_DIR/v90s-retroarch-launch"
 install -m 0755 "$ROOT_DIR/scripts/v90s-retroarch-stop.sh" "$BIN_DIR/v90s-retroarch-stop"
@@ -390,7 +375,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   printf 'launcher=bin/plumos-frontend-launch\n'
   printf 'frontend_stop=bin/plumos-frontend-stop\n'
   printf 'retroarch_bridge=bin/plumos-retroarch-launch\n'
-  printf 'picoarch_bridge=bin/plumos-picoarch-launch\n'
+  printf 'picoarch_bridge=provided-by-picoarch-target\n'
   printf 'standalone_bridge=provided-by-standalone-target\n'
 } > "$OUT_ROOT/frontend.manifest"
 

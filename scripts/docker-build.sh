@@ -34,7 +34,7 @@ Commands:
   sd-image         Assemble a StockOS/Batocera-compatible V90S SD-card image.
   stockos-image    Transitional alias for sd-image.
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
-  picoarch         Reserved for the V90S PicoArch build path.
+  picoarch         Build the AArch64 V90S PicoArch runtime.
   standalone [ID...] Build all standalone emulators, or only the selected IDs.
   frontend         Build the V90S frontend ported from plumOS-MMF.
   release          Assemble update-only release packages from the app layer.
@@ -249,7 +249,14 @@ case "$cmd" in
             "${docker_run_user[@]}" \
             /workspace/docker/plumos-v90s-toolchain/scripts/build-standalone-emulators.sh "$@"
         ;;
-    picoarch|all)
+    picoarch)
+        ensure_image
+        docker run \
+            -e JOBS="${JOBS:-}" \
+            "${docker_run_user[@]}" \
+            /workspace/docker/plumos-v90s-toolchain/scripts/build-picoarch.sh "$@"
+        ;;
+    all)
         echo "error: $cmd is reserved but not implemented yet for V90S" >&2
         echo "hint: add docker/plumos-v90s-toolchain/scripts/build-$cmd.sh when the runtime contract is pinned" >&2
         exit 3

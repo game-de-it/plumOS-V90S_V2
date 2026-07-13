@@ -131,11 +131,20 @@ This packages `output/app-layer/v90s/` into
 SHA256SUMS. This is intentionally update-only until the final p6/p7 FAT32 app
 layer partition is validated.
 
-Reserved next targets:
+Implemented PicoArch and standalone targets:
 
 ```sh
 ./scripts/docker-build.sh picoarch
 ./scripts/docker-build.sh standalone
+```
+
+`picoarch` builds the pinned AArch64 PicoArch frontend and SDL12 compatibility
+runtime. It deliberately reuses the 64-bit core set under
+`/mnt/plumos/cores` instead of producing or copying a second core set.
+
+Reserved next target:
+
+```sh
 ./scripts/docker-build.sh all
 ```
 
