@@ -24,6 +24,9 @@ AR="${AR:-ar}"
 RANLIB="${RANLIB:-ranlib}"
 STRIP="${STRIP:-strip}"
 READELF="${READELF:-readelf}"
+YABASANSHIRO_CC="${YABASANSHIRO_CC:-clang}"
+YABASANSHIRO_CXX="${YABASANSHIRO_CXX:-clang++}"
+YABASANSHIRO_AS="${YABASANSHIRO_AS:-$YABASANSHIRO_CC -c}"
 
 usage() {
   cat <<'EOF'
@@ -44,6 +47,7 @@ Options:
 Environment:
   PLUMOS_CORE_FILTER   Same as --filter.
   CORE_INFO_REPO/REF   libretro-core-info source used for .info files.
+  YABASANSHIRO_CC/CXX  Compiler override for the pinned 2.10.4 AArch64 core.
 EOF
 }
 
@@ -366,6 +370,21 @@ patch_core_source() {
   local log="$3"
   local patch_dir="$ROOT_DIR/docker/plumos-v90s-toolchain/patches"
   local lua_makefile
+
+  if [ "$id" = "yabasanshiro" ]; then
+    local arm64_gcc12_patch="$patch_dir/yabasanshiro-2.10.4-arm64-gcc12.patch"
+
+    if [ ! -f "$arm64_gcc12_patch" ]; then
+      printf '\n[plumOS] missing required YabaSanshiro 2.10.4 ARM64 register-clobber patch\n' >> "$log"
+      return 1
+    fi
+    if ! patch --dry-run -d "$src" -p1 < "$arm64_gcc12_patch" >/dev/null 2>> "$log"; then
+      printf '\n[plumOS] required YabaSanshiro 2.10.4 ARM64 register-clobber patch does not apply\n' >> "$log"
+      return 1
+    fi
+    patch -d "$src" -p1 < "$arm64_gcc12_patch" >> "$log" 2>&1
+    printf '\n[plumOS] patched YabaSanshiro 2.10.4 ARM64 dynarec register clobber (upstream GCC 12+ fix)\n' >> "$log"
+  fi
 
   case "$id" in
     mgba)
@@ -781,6 +800,9 @@ build_one_core() {
   local commit
   local special_status
   local LAST_SUCCESSFUL_JOBS=""
+  local CC="$CC"
+  local CXX="$CXX"
+  local AS="$AS"
 
   if ! core_selected "$id" "$class"; then
     SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
@@ -794,6 +816,21 @@ build_one_core() {
   append_manifest "repo=$repo"
   append_manifest "ref=$ref"
   append_manifest "log=logs/$id.log"
+
+  if [ "$id" = "yabasanshiro" ]; then
+    CC="$YABASANSHIRO_CC"
+    CXX="$YABASANSHIRO_CXX"
+    AS="$YABASANSHIRO_AS"
+    append_manifest "compiler=$CC"
+    append_manifest "cxx_compiler=$CXX"
+    if ! command -v "$CC" >/dev/null 2>&1 || ! command -v "$CXX" >/dev/null 2>&1; then
+      msg "FAILED $id: required compiler missing ($CC/$CXX)"
+      append_manifest "status=failed"
+      append_manifest "reason=compiler_missing"
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      return 0
+    fi
+  fi
 
   if ! clone_or_update_repo "$id" "$repo" "$ref" "$src" "$log"; then
     msg "FAILED clone $id"

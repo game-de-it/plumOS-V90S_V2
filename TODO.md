@@ -154,6 +154,11 @@ Build plumOS V90S as a V90S-specific distribution:
     82 of 86 unique cores remain active; four blockers and all 31 cores lacking
     compatible indexed content are recorded in
     `docs/validation/2026-07-14-v90s-fe-all-core-runtime.md`.
+  - [x] Pin YabaSanshiro to performance-oriented 2.10.4 commit `8406a5c`,
+    backport its ARM64 register-clobber fix, build this legacy AArch64 release
+    with Clang, and validate sustained PowerVR video plus ALSA playback on the
+    real V90S; see
+    `docs/validation/2026-07-14-v90s-yabasanshiro-2.10.4.md`.
   - [ ] Resolve the four known FE runtime blockers: ChaiLove SDL video,
     FBA 2012/FBA 2012 Neo Geo matching ROM sets, and Mupen64Plus-Next SIGSEGV.
   - [ ] Add compatible test content/system definitions and validate the 31

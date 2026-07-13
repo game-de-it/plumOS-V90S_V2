@@ -126,4 +126,6 @@ vice_xvic|O|https://github.com/libretro/vice-libretro.git|5a18264beed0c498e5fcd7
 virtualjaguar|O|https://github.com/libretro/virtualjaguar-libretro.git|263c979be4ca757c43fb525bd6f0887998e57041||Makefile|platform=unix
 x1|O|https://github.com/libretro/xmil-libretro.git|4cb1e4eaab37321904144d1f1a23b2830268e8df|libretro|Makefile.libretro|platform=unix
 xrick|O|https://github.com/libretro/xrick-libretro.git|7ee449e12062ea8d7ca0c945c3a4b63ca0c04268||Makefile|platform=unix
-yabasanshiro|O|https://github.com/libretro/yabause.git|f448097b69a6037246a08e9dc09eabaa420d7893|yabause/src/libretro|Makefile|platform=arm64 FORCE_GLES=1
+# YabaSanshiro 2.10.4, selected for its established performance characteristics.
+# The build script selects Clang because this release's AArch64 Makefile documents GCC crashes.
+yabasanshiro|O|https://github.com/libretro/yabause.git|8406a5c11d7b6186a44c7fe48f493e6de5f8cb18|yabause/src/libretro|Makefile|platform=arm64 FORCE_GLES=1
