@@ -22,6 +22,12 @@ fail() {
 [ -f "$ROM_PATH" ] || fail "ROM not found: $ROM_PATH"
 
 case "$CORE_ID" in
+  flycast|flycast_xtreme)
+    fail "$CORE_ID requires libretro hardware rendering, which PicoArch does not provide"
+    ;;
+esac
+
+case "$CORE_ID" in
   */*) CORE_PATH="$CORE_ID" ;;
   *)
     CORE_PATH="$PLUMOS_ROOT/picoarch/cores/${CORE_ID}_libretro.so"

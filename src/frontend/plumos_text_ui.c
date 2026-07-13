@@ -1258,6 +1258,10 @@ static int picoarch_core_id_allowed(const char *core_id) {
   if (!core_id || !core_id[0]) {
     return 0;
   }
+  /* Flycast requires libretro interfaces that the V90S PicoArch host lacks. */
+  if (strcmp(core_id, "flycast") == 0 || strcmp(core_id, "flycast_xtreme") == 0) {
+    return 0;
+  }
   /*
    * Frodo needs RetroArch's Mapped Port = 2 path for common C64 joystick-port-2
    * titles. PicoArch does not expose that mapping and is too slow on MMF.

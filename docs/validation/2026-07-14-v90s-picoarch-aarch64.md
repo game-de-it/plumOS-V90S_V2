@@ -75,6 +75,11 @@ Validated facts:
 - configuration, saves, BIOS, logs, and state remain under `/mnt/plumos`;
 - `plumos-picoarch-stop` verifies the exact executable before signalling and
   does not use broad process matching.
+- `flycast` and `flycast_xtreme` both exit with `ERROR: Couldn't load content`
+  when hosted by PicoArch on V90S. They remain available through RetroArch but
+  are excluded from PicoArch launch-profile choices; direct launcher use also
+  reports that PicoArch lacks libretro hardware rendering. No fallback is
+  performed.
 
 The deployed binary SHA-256 after removing duplicate SDL controller
 registration is
