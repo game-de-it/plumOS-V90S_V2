@@ -35,17 +35,18 @@ link is materialized as a regular file so the payload remains valid on FAT32.
 
 ## Frontend Contract
 
-The frontend exposes both standalone profiles and keeps the libretro profiles
-as alternatives:
+The frontend keeps the validated libretro profiles available:
 
 ```text
 n64:       standalone:mupen64plus, retroarch:parallel_n64,
            retroarch:mupen64plus_next
-dreamcast: standalone:flycast, retroarch:flycast
+dreamcast: retroarch:flycast_xtreme, retroarch:flycast
 ```
 
-The standalone profile is the default for both systems. Live FE preflight
-reported `can_execute: yes` for Super Mario 64 and Crazy Taxi.
+Mupen64Plus remains the N64 default. Flycast Xtreme libretro is the Dreamcast
+default. Standalone Flycast remains packaged for direct diagnostics, but is no
+longer exposed by the FE because later gameplay validation found black frames,
+audio stutter, and rendering defects.
 
 ## V90S N64 Controls
 
@@ -70,8 +71,8 @@ Input: N64 Controller #1: Using auto-config with SDL joystick 0 ('adc_gamepad')
 
 ## Live Runtime Evidence
 
-Flycast launched `Crazy Taxi (Japan).chd`, remained active for the observation
-window, and reported:
+Flycast launched `Crazy Taxi (Japan).chd`, remained active for the initial
+observation window, and reported:
 
 ```text
 Monitor refresh rate: 60 Hz (640 x 480)
@@ -80,6 +81,21 @@ SDL: Opened joystick 0 on port 0: 'adc_gamepad'
 ALSA PCM state: RUNNING
 framebuffer sha256: 31ad22614c859ea9f1464829e973b70beb720a4894a8e01e9f18921c87fd6120
 ```
+
+This initial result did not cover enough gameplay. Later tests reached the
+city scene and showed that upstream standalone Flycast 2.6 is not a valid V90S
+runtime:
+
+- the normal PowerVR-reported GLES 3.2 path produces black RGB scanout;
+- forcing the GLES2 texture-backed path makes the image visible;
+- the GLES2 path runs at about 46 FPS, stutters audio, and drops textures;
+- 240p, larger audio buffers, and one level of automatic frame skipping do not
+  materially improve the result;
+- forcing opaque window alpha does not help; black captures already have alpha
+  255, so the failure is in game rendering rather than scanout composition.
+
+The standalone binary is therefore retained only for direct diagnostics and
+must not appear as a normal FE choice.
 
 Mupen64Plus launched `SUPERMARIO64.Z64`, remained active for the observation
 window, and reported:

@@ -246,6 +246,8 @@ clone_or_update_repo() {
 
   (
     cd "$dst"
+    git reset --hard --quiet HEAD
+    git clean -fdx --quiet
     git fetch --tags --quiet origin
     if [ "$ref" = "HEAD" ]; then
       branch="$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF; exit}')"
@@ -256,7 +258,9 @@ clone_or_update_repo() {
         git checkout --quiet HEAD
       fi
     else
-      git checkout --quiet "$ref"
+      git fetch --quiet origin "$ref"
+      git checkout --quiet --detach FETCH_HEAD
+      [ "$(git rev-parse HEAD)" = "$(git rev-parse "$ref^{commit}")" ] || exit 1
     fi
     git submodule update --init --recursive >> "$log" 2>&1 || true
     git clean -fdx --quiet

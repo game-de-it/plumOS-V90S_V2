@@ -199,14 +199,15 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Start Flycast 2.6 with Crazy Taxi through the FE standalone profile;
     verify PowerVR GLES, `adc_gamepad`, nonblank framebuffer output, ALSA PCM,
     and clean PID-targeted TERM shutdown.
-  - [x] Diagnose standalone Flycast 2.6 black frames as repeated PowerVR HWR
-    events on the StockOS vendor driver. Keep it as a manual diagnostic profile,
-    not the Dreamcast default.
+  - [x] Diagnose standalone Flycast 2.6 on the StockOS vendor driver. Forcing
+    its SDL path to GLES2 makes game frames visible, but performance remains
+    about 46 FPS with audio stutter and missing textures. Keep the binary for
+    direct diagnostics, but do not expose it as an FE launch profile.
   - [x] Build and live-test the KNULLI-pinned Flycast Xtreme libretro core on
-    V90S. Crazy Taxi rendered without HWR or ALSA underruns and improved a
-    sampled gameplay scene from 32.87 FPS on standard Flycast to 44.23 FPS.
-    Use Flycast Xtreme, Performance, four online CPUs, and 640x480 as the V90S
-    Dreamcast default.
+    V90S. Fix ref checkout so the output manifest and binary really use commit
+    `603814c9`; Crazy Taxi renders with normal video and audio at about 34 FPS
+    in a heavy gameplay scene. Use Flycast Xtreme, Performance, four online
+    CPUs, and 640x480 as the V90S Dreamcast default.
   - [x] Start Mupen64Plus 2.6.0 with Super Mario 64 through the FE standalone
     profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
     the V90S `adc_gamepad` auto-configuration.

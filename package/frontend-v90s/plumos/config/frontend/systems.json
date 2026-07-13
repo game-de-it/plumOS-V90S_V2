@@ -513,7 +513,7 @@
           {"root": "sdcard", "path": "Images/dreamcast"}
         ]
       },
-      "launch_profiles": ["retroarch:flycast_xtreme", "retroarch:flycast", "standalone:flycast"],
+      "launch_profiles": ["retroarch:flycast_xtreme", "retroarch:flycast"],
       "default_launch_profile": "retroarch:flycast_xtreme",
       "default_cpu_policy": "performance",
       "default_cpu_cores": 4,

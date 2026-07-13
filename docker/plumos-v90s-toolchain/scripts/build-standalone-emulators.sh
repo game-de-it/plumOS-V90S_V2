@@ -107,6 +107,8 @@ clone_repo() {
     if [ "${cached_key}" = "${repo} ${ref}" ] ||
        { [ -n "${expected_commit}" ] && [ "${actual_commit}" = "${expected_commit}" ]; }; then
       printf 'Reusing cached source: %s (%s)\n' "${id}" "${ref}" >>"${log}"
+      git -C "${dst}" reset --hard --quiet "${actual_commit}" || return 1
+      git -C "${dst}" clean -fdx --quiet || return 1
       printf '%s %s\n' "${repo}" "${ref}" >"${dst}/.plumos-source-ref"
       return 0
     fi
