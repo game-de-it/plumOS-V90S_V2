@@ -343,20 +343,6 @@ mkdir -p "$PLUMOS_ROOT/Logs"
 exit 69
 EOF
       ;;
-    plumos-standalone-launch)
-      cat > "$path" <<'EOF'
-#!/bin/sh
-set -eu
-
-PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
-mkdir -p "$PLUMOS_ROOT/Logs"
-{
-  echo "plumos-standalone-launch: V90S standalone runtime is not implemented yet"
-  echo "args: $*"
-} >> "$PLUMOS_ROOT/Logs/standalone-launch.log"
-exit 69
-EOF
-      ;;
     *)
       echo "error: unknown wrapper: $name" >&2
       exit 2
@@ -390,7 +376,6 @@ install_wrapper plumos-frontend-stop
 install_wrapper plumos-retroarch-launch
 install_wrapper plumos-retroarch-menu-launch
 install_wrapper plumos-picoarch-launch
-install_wrapper plumos-standalone-launch
 
 install -m 0755 "$ROOT_DIR/scripts/v90s-retroarch-launch.sh" "$BIN_DIR/v90s-retroarch-launch"
 install -m 0755 "$ROOT_DIR/scripts/v90s-retroarch-stop.sh" "$BIN_DIR/v90s-retroarch-stop"
@@ -406,7 +391,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   printf 'frontend_stop=bin/plumos-frontend-stop\n'
   printf 'retroarch_bridge=bin/plumos-retroarch-launch\n'
   printf 'picoarch_bridge=bin/plumos-picoarch-launch\n'
-  printf 'standalone_bridge=bin/plumos-standalone-launch\n'
+  printf 'standalone_bridge=provided-by-standalone-target\n'
 } > "$OUT_ROOT/frontend.manifest"
 
 find "$PLUMOS_DIR" -type f | sort | while IFS= read -r file; do

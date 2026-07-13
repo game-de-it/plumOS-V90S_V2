@@ -1,0 +1,114 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 910f322..81fb523 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -324,11 +324,13 @@ endif()
+ 
+ if(NOT LIBRETRO AND NOT IOS AND NOT MACOSX)
+ 	find_package(SDL2)
+-	find_package(SDL2_ttf)
++	if (NOT PLUMOS_V90S)
++		find_package(SDL2_ttf)
++	endif()
+ 	find_package(Fontconfig)
+ 
+ 	# TODO: this can be removed once CI supports newer SDL2_ttf
+-	if (NOT SDL2_ttf_FOUND)
++	if (NOT PLUMOS_V90S AND NOT SDL2_ttf_FOUND)
+ 		find_package(PkgConfig)
+ 		if(PkgConfig_FOUND)
+ 			pkg_check_modules(SDL2_ttf_PKGCONFIG IMPORTED_TARGET SDL2_ttf)
+diff --git a/Common/GPU/OpenGL/GLFeatures.cpp b/Common/GPU/OpenGL/GLFeatures.cpp
+index 0c4137c..1635a50 100644
+--- a/Common/GPU/OpenGL/GLFeatures.cpp
++++ b/Common/GPU/OpenGL/GLFeatures.cpp
+@@ -310,6 +310,10 @@ bool CheckGLExtensions() {
+ 			// Otherwise, let's trust GL_MAJOR_VERSION.  Note that Mali is intentionally not banned here.
+ 			if (gl_extensions.ver[0] >= 3) {
+ 				gl_extensions.GLES3 = gl3stubInit();
++				if (!gl_extensions.GLES3) {
++					gl_extensions.ver[0] = 2;
++					gl_extensions.ver[1] = 0;
++				}
+ 			}
+ 		}
+ #else
+@@ -410,6 +414,24 @@ bool CheckGLExtensions() {
+ 		gl_extensions.EXT_disjoint_timer_query = g_set_gl_extensions.count("GL_EXT_disjoint_timer_query") != 0;
+ 		gl_extensions.APPLE_clip_distance = g_set_gl_extensions.count("GL_APPLE_clip_distance") != 0;
+ 
++#if defined(PLUMOS_V90S)
++		// The PowerVR driver advertises EXT_copy_image on Linux.  PPSSPP's
++		// alias loading normally runs only on Android, leaving this pointer null.
++		if (!glCopyImageSubDataOES) {
++			const char *copyImageProc = nullptr;
++			if (gl_extensions.OES_copy_image) {
++				copyImageProc = "glCopyImageSubDataOES";
++			} else if (gl_extensions.NV_copy_image) {
++				copyImageProc = "glCopyImageSubDataNV";
++			} else if (gl_extensions.EXT_copy_image) {
++				copyImageProc = "glCopyImageSubDataEXT";
++			}
++			if (copyImageProc) {
++				glCopyImageSubDataOES = (decltype(glCopyImageSubDataOES))eglGetProcAddress(copyImageProc);
++			}
++		}
++#endif
++
+ #if defined(__ANDROID__)
+ 		// On Android, incredibly, this is not consistently non-zero! It does seem to have the same value though.
+ 		// https://twitter.com/ID_AA_Carmack/status/387383037794603008
+diff --git a/SDL/SDLGLGraphicsContext.cpp b/SDL/SDLGLGraphicsContext.cpp
+index bfa33bd..5d26dac 100644
+--- a/SDL/SDLGLGraphicsContext.cpp
++++ b/SDL/SDLGLGraphicsContext.cpp
+@@ -435,6 +435,16 @@ int SDLGLGraphicsContext::Init(SDL_Window *&window, int x, int y, int w, int h,
+ 	bool success = draw_->CreatePresets();
+ 	_assert_(success);
+ 	renderManager_->SetSwapFunction([&]() {
++#ifdef PLUMOS_V90S
++		// The V90S display layer consumes per-pixel alpha.  PowerVR leaves the
++		// window alpha plane cleared, so preserve RGB and make the scanout opaque.
++		// Avoid glGet* here: querying GL state before every swap serializes the
++		// PowerVR command stream and costs several PSP frames per second.
++		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
++		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
++		glClear(GL_COLOR_BUFFER_BIT);
++		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
++#endif
+ #ifdef USING_EGL
+ 		if (useEGLSwap)
+ 			eglSwapBuffers(g_eglDisplay, g_eglSurface);
+diff --git a/SDL/SDLMain.cpp b/SDL/SDLMain.cpp
+index 6853525..28c2a41 100644
+--- a/SDL/SDLMain.cpp
++++ b/SDL/SDLMain.cpp
+@@ -1572,8 +1572,14 @@ int main(int argc, char *argv[]) {
+ 	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+ 	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+ 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
++#ifdef PLUMOS_V90S
++	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
++	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
++	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
++#else
+ 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+ 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
++#endif
+ 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+ 
+ 	// Force fullscreen if the resolution is too low to run windowed.
+diff --git a/Common/GPU/OpenGL/thin3d_gl.cpp b/Common/GPU/OpenGL/thin3d_gl.cpp
+index 046ab99..d1a2c2f 100644
+--- a/Common/GPU/OpenGL/thin3d_gl.cpp
++++ b/Common/GPU/OpenGL/thin3d_gl.cpp
+@@ -585,6 +585,9 @@ OpenGLContext::OpenGLContext(bool canChangeSwapInterval) : renderManager_(frameT
+ 	caps_.dualSourceBlend = gl_extensions.ARB_blend_func_extended || gl_extensions.EXT_blend_func_extended;
+ 	caps_.anisoSupported = gl_extensions.EXT_texture_filter_anisotropic;
+ 	caps_.framebufferCopySupported = gl_extensions.OES_copy_image || gl_extensions.NV_copy_image || gl_extensions.EXT_copy_image || gl_extensions.ARB_copy_image;
++#if defined(PLUMOS_V90S)
++	caps_.framebufferCopySupported = caps_.framebufferCopySupported && glCopyImageSubDataOES != nullptr;
++#endif
+ 	caps_.framebufferBlitSupported = gl_extensions.NV_framebuffer_blit || gl_extensions.ARB_framebuffer_object || gl_extensions.GLES3;
+ 	caps_.framebufferDepthBlitSupported = caps_.framebufferBlitSupported;
+ 	caps_.framebufferStencilBlitSupported = caps_.framebufferBlitSupported;

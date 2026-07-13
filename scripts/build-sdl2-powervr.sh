@@ -156,9 +156,13 @@ awk '
 )
 
 rm -rf "$out_dir"
-mkdir -p "$out_dir/usr/local/lib/plumos-sdl2-powervr" "$out_dir/usr/local/bin"
+mkdir -p \
+    "$out_dir/usr/local/lib/plumos-sdl2-powervr" \
+    "$out_dir/usr/local/include" \
+    "$out_dir/usr/local/bin"
 cp -a "$work_dir/stage/usr/lib/libSDL2-2.0.so"* "$out_dir/usr/local/lib/plumos-sdl2-powervr/"
 cp -a "$work_dir/stage/usr/lib/libSDL2.so" "$out_dir/usr/local/lib/plumos-sdl2-powervr/"
+cp -a "$work_dir/stage/usr/include/SDL2" "$out_dir/usr/local/include/"
 
 gcc \
     -I"$work_dir/stage/usr/include/SDL2" \

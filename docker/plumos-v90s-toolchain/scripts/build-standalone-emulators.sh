@@ -3,6 +3,7 @@ set -u
 set -o pipefail
 
 ROOT_DIR=${ROOT_DIR:-/workspace}
+PATCH_DIR=${PATCH_DIR:-"${ROOT_DIR}/docker/plumos-v90s-toolchain/patches"}
 BUILD_ROOT=${BUILD_ROOT:-"${ROOT_DIR}/build/standalone-emulators-v90s"}
 OUT_DIR=${OUT_DIR:-"${ROOT_DIR}/output/standalone-emulators/v90s"}
 SRC_ROOT=${SRC_ROOT:-"${BUILD_ROOT}/src"}
@@ -22,6 +23,7 @@ COMMON_LDFLAGS=${COMMON_LDFLAGS:-""}
 
 PPSSPP_REPO=${PPSSPP_REPO:-https://github.com/hrydgard/ppsspp.git}
 PPSSPP_REF=${PPSSPP_REF:-v1.20.4}
+V90S_SDL2_ROOT=${V90S_SDL2_ROOT:-"${ROOT_DIR}/output/sdl2-powervr/usr/local"}
 SCUMMVM_REPO=${SCUMMVM_REPO:-https://github.com/scummvm/scummvm.git}
 SCUMMVM_REF=${SCUMMVM_REF:-v2026.2.0}
 EASYRPG_REPO=${EASYRPG_REPO:-https://github.com/EasyRPG/Player.git}
@@ -36,6 +38,7 @@ SCUMMVM_ENGINES=${SCUMMVM_ENGINES:-"scumm,agi,agos,sky,sword1,sword2,queen,gob,l
 
 MANIFEST=
 LOG_DIR=
+SONAME_MAP=
 BUILT_COUNT=0
 FAILED_COUNT=0
 SKIPPED_COUNT=0
@@ -98,7 +101,7 @@ find_binary() {
 }
 
 copy_runtime_deps() {
-  local elf=$1 dep path real soname real_name
+  local elf=$1 dep path real soname real_name map_line
   while IFS= read -r path; do
     [ -f "${path}" ] || continue
     soname=$(basename "${path}")
@@ -115,8 +118,10 @@ copy_runtime_deps() {
       install -m 0644 "${real}" "${OUT_DIR}/lib/${real_name}"
       copy_runtime_deps "${real}"
     fi
-    if [ "${soname}" != "${real_name}" ] && [ ! -e "${OUT_DIR}/lib/${soname}" ]; then
-      ln -s "${real_name}" "${OUT_DIR}/lib/${soname}"
+    map_line=$(printf '%s\t%s' "${soname}" "${real_name}")
+    if [ "${soname}" != "${real_name}" ] &&
+       ! grep -Fqx "${map_line}" "${SONAME_MAP}"; then
+      printf '%s\t%s\n' "${soname}" "${real_name}" >>"${SONAME_MAP}"
     fi
   done < <(
     ldd "${elf}" 2>/dev/null |
@@ -151,17 +156,31 @@ stage_license() {
 build_ppsspp() {
   local src=$1 build bin
   build="${src}/build-v90s"
+  if [ ! -f "${V90S_SDL2_ROOT}/include/SDL2/SDL.h" ] ||
+     [ ! -f "${V90S_SDL2_ROOT}/lib/plumos-sdl2-powervr/libSDL2.so" ]; then
+    echo "missing V90S SDL2 build under ${V90S_SDL2_ROOT}" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${PATCH_DIR}/ppsspp-1.20.4-v90s-egl-config.patch" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${PATCH_DIR}/ppsspp-1.20.4-v90s-egl-config.patch" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${PATCH_DIR}/ppsspp-1.20.4-v90s-egl-config.patch" >/dev/null 2>&1; then
+    return 1
+  fi
+  rm -rf "${build}"
   cmake -S "${src}" -B "${build}" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS="${COMMON_CFLAGS}" \
-    -DCMAKE_CXX_FLAGS="${COMMON_CXXFLAGS}" \
+    -DCMAKE_C_FLAGS="-I${V90S_SDL2_ROOT}/include/SDL2 -I${V90S_SDL2_ROOT}/include ${COMMON_CFLAGS}" \
+    -DCMAKE_CXX_FLAGS="-I${V90S_SDL2_ROOT}/include/SDL2 -I${V90S_SDL2_ROOT}/include ${COMMON_CXXFLAGS} -DPLUMOS_V90S=1" \
     -DCMAKE_EXE_LINKER_FLAGS="${COMMON_LDFLAGS}" \
     -DARM64=ON -DARMV7=OFF \
-    -DUSING_EGL=ON -DUSING_FBDEV=ON -DUSING_GLES2=ON \
+    -DUSING_EGL=OFF -DUSING_FBDEV=ON -DUSING_GLES2=ON \
+    -DPLUMOS_V90S=ON \
     -DUSING_X11_VULKAN=OFF -DUSE_WAYLAND_WSI=OFF \
     -DUSE_VULKAN_DISPLAY_KHR=OFF -DUSE_FFMPEG=ON \
     -DUSE_SYSTEM_FFMPEG=OFF -DUSE_DISCORD=OFF -DUSE_MINIUPNPC=OFF \
     -DUSE_SYSTEM_LIBSDL2=ON -DUSE_SYSTEM_LIBPNG=ON \
+    -DSDL2_INCLUDE_DIR="${V90S_SDL2_ROOT}/include/SDL2" \
+    -DSDL2_LIBRARY="${V90S_SDL2_ROOT}/lib/plumos-sdl2-powervr/libSDL2.so" \
     -DUSE_SYSTEM_FREETYPE=OFF -DUSE_SYSTEM_LIBCHDR=OFF \
     -DUSE_SYSTEM_LIBZIP=OFF -DUSE_SYSTEM_SNAPPY=OFF -DUSE_SYSTEM_ZSTD=OFF \
     -DHEADLESS=OFF -DUNITTEST=OFF -DATLAS_TOOL=OFF -DUSING_QT_UI=OFF \
@@ -288,12 +307,55 @@ export XDG_CONFIG_HOME="${HOME}/config"
 export XDG_DATA_HOME="${HOME}/data"
 export XDG_CACHE_HOME="${HOME}/cache"
 export PATH="${PLUMOS_ROOT}/bin:${PATH}"
-export LD_LIBRARY_PATH="${PLUMOS_ROOT}/lib/plumos-sdl2-powervr:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+SONAME_MAP="${PLUMOS_ROOT}/config/standalone/soname-links.tsv"
+SONAME_DIR=/tmp/plumos-standalone-lib
+mkdir -p "${SONAME_DIR}"
+find "${SONAME_DIR}" -type l -delete 2>/dev/null || true
+if [ -f "${SONAME_MAP}" ]; then
+  while IFS="$(printf '\t')" read -r soname real_name; do
+    [ -n "${soname}" ] && [ -f "${PLUMOS_ROOT}/lib/${real_name}" ] || continue
+    ln -sf "${PLUMOS_ROOT}/lib/${real_name}" "${SONAME_DIR}/${soname}"
+  done <"${SONAME_MAP}"
+fi
+export LD_LIBRARY_PATH="/usr/lib/powervr:${SONAME_DIR}:${PLUMOS_ROOT}/lib/plumos-sdl2-powervr:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
 export SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-mali}
 export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-alsa}
+export AUDIODEV=${AUDIODEV:-hw:0,0}
 mkdir -p "${HOME}" "${XDG_CONFIG_HOME}" "${XDG_DATA_HOME}" "${XDG_CACHE_HOME}"
+
+cpu_cores=${PLUMOS_STANDALONE_CPU_CORES:-}
+case "${cpu_cores}" in
+  1|2|3|4)
+    cpu_index=1
+    while [ "${cpu_index}" -le 3 ]; do
+      online=0
+      [ "${cpu_index}" -lt "${cpu_cores}" ] && online=1
+      online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
+      [ -w "${online_path}" ] && printf '%s\n' "${online}" >"${online_path}" 2>/dev/null || true
+      cpu_index=$((cpu_index + 1))
+    done
+    ;;
+esac
+
+cpu_policy=${PLUMOS_STANDALONE_CPU_POLICY:-}
+case "${cpu_policy}" in
+  performance|ondemand|powersave)
+    for cpufreq in /sys/devices/system/cpu/cpufreq/policy*; do
+      [ -w "${cpufreq}/scaling_governor" ] || continue
+      printf '%s\n' "${cpu_policy}" >"${cpufreq}/scaling_governor" 2>/dev/null || true
+    done
+    ;;
+esac
+
 case "${id}" in
-  ppsspp) exe="${EMU_ROOT}/ppsspp/bin/PPSSPPSDL" ;;
+  ppsspp)
+    exe="${EMU_ROOT}/ppsspp/bin/PPSSPPSDL"
+    workdir="${EMU_ROOT}/ppsspp"
+    if ! pidof PPSSPPSDL >/dev/null 2>&1; then
+      rm -f /dev/shm/PPSSPP_ID /run/shm/PPSSPP_ID 2>/dev/null || true
+    fi
+    set -- --fullscreen --graphics=gles2.0 "$@"
+    ;;
   scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
   easyrpg) exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player" ;;
   openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
@@ -302,7 +364,7 @@ case "${id}" in
   *) echo "unknown standalone emulator: ${id}" >&2; exit 2 ;;
 esac
 [ -x "${exe}" ] || { echo "missing standalone emulator: ${exe}" >&2; exit 127; }
-cd "$(dirname "${exe}")" || exit 1
+cd "${workdir:-$(dirname "${exe}")}" || exit 1
 exec "${exe}" "$@" >>"${LOG_ROOT}/${id}.log" 2>&1
 EOF
   chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
@@ -348,6 +410,9 @@ rm -rf "${OUT_DIR}"
 mkdir -p "${OUT_DIR}/logs" "${OUT_DIR}/licenses" "${SRC_ROOT}"
 MANIFEST="${OUT_DIR}/standalone-emulators.manifest"
 LOG_DIR="${OUT_DIR}/logs"
+mkdir -p "${OUT_DIR}/config/standalone"
+SONAME_MAP="${OUT_DIR}/config/standalone/soname-links.tsv"
+: >"${SONAME_MAP}"
 {
   echo 'plumOS V90S standalone emulator build'
   echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

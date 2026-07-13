@@ -149,6 +149,17 @@ Build plumOS V90S as a V90S-specific distribution:
   manifest, and checksums into `output/app-layer/v90s`.
 - [ ] Validate each standalone emulator on real V90S hardware, including
   display, audio, controller mapping, save paths, and clean return to the FE.
+  - [x] PPSSPP starts Ridge Racers through the FE standalone profile, displays
+    on the physical LCD after the V90S opaque-alpha fix, and owns the running
+    ALSA PCM stream.
+  - [x] Validate PPSSPP physical controls through car selection and an active
+    Ridge Racers race.
+  - [x] Characterize PPSSPP performance: Ridge Racers is 60/60 in light scenes
+    but about 38/60 in its heavy grandstand scene due to a saturated Cortex-A53
+    main/render thread, not GPU saturation or thermal throttling.
+  - [ ] Validate PPSSPP save/config persistence and clean FE return.
+  - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
+    PCSX-ReARMed on the physical V90S.
 - [x] Implement `frontend`.
 - [x] Implement `app-layer`.
 - [x] Implement `release`.

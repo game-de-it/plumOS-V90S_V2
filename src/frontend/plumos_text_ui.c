@@ -473,7 +473,7 @@ static int parse_cpu_freq_khz(const char *s, long *out) {
 }
 
 static int valid_cpu_cores(long value) {
-  return value == 2;
+  return value >= 1 && value <= 4;
 }
 
 static int parse_cpu_cores(const char *s, long *out) {

@@ -442,6 +442,34 @@
       }
     },
     {
+      "id": "psp",
+      "display_name": "PSP",
+      "short_name": "PSP",
+      "sort_order": 150,
+      "hardware": "portable",
+      "enabled": true,
+      "pinned": false,
+      "directory_aliases": [
+        {"name": "PSP", "source": "miyoo", "priority": 10},
+        {"name": "PPSSPP", "source": "miyoo", "priority": 20},
+        {"name": "psp", "source": "rocknix", "priority": 30}
+      ],
+      "extensions": ["iso", "cso", "pbp"],
+      "artwork": {
+        "lookup": [
+          {"root": "sdcard", "path": "Images/psp"}
+        ]
+      },
+      "launch_profiles": ["standalone:ppsspp"],
+      "default_launch_profile": "standalone:ppsspp",
+      "default_cpu_policy": "performance",
+      "default_cpu_cores": 4,
+      "scraper": {
+        "enabled": false,
+        "reason": "cd_media_crc_expensive"
+      }
+    },
+    {
       "id": "n64",
       "display_name": "N64",
       "short_name": "N64",
@@ -926,8 +954,8 @@
           {"root": "sdcard", "path": "Images/dos"}
         ]
       },
-      "launch_profiles": ["retroarch:dosbox_pure"],
-      "default_launch_profile": "retroarch:dosbox_pure",
+      "launch_profiles": ["standalone:dosbox-staging", "retroarch:dosbox_pure"],
+      "default_launch_profile": "standalone:dosbox-staging",
       "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
