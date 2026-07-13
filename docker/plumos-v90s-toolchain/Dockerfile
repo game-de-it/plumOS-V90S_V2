@@ -44,27 +44,54 @@ RUN apt-get update \
     android-liblog-dev \
     android-libutils-dev \
     libasound2-dev \
+    libbrotli-dev \
+    libbz2-dev \
+    libcurl4-openssl-dev \
     libavcodec-dev \
     libavformat-dev \
     libavutil-dev \
     libcap-dev \
     libegl-dev \
+    libexpat1-dev \
     libfmt-dev \
     libfreetype6-dev \
+    libflac-dev \
+    libharfbuzz-dev \
+    libicu-dev \
+    libinih-dev \
     libgles-dev \
     libjpeg-dev \
+    liblhasa-dev \
+    liblzma-dev \
+    libmad0-dev \
+    libmpg123-dev \
+    libogg-dev \
+    libopus-dev \
+    libopusfile-dev \
     libpng-dev \
     libpixman-1-dev \
     libpipewire-0.3-dev \
     libpulse-dev \
+    libsamplerate0-dev \
+    libreadline-dev \
     libsdl2-dev \
+    libsdl2-gfx-dev \
     libsdl2-image-dev \
+    libsdl2-net-dev \
     libsdl2-ttf-dev \
+    libsdl1.2-dev \
+    libsndfile1-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libspeexdsp-dev \
     libselinux1-dev \
     libswresample-dev \
     libtool \
     libudev-dev \
     libusb-1.0-0-dev \
+    libvorbis-dev \
+    libxmp-dev \
+    libxml2-dev \
     lz4 \
     make \
     meson \

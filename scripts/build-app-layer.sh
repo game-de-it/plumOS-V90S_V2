@@ -14,6 +14,7 @@ userland_dir="${PLUMOS_V90S_USERLAND_DIR:-output/userland/v90s}"
 network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-services/v90s}"
 nextcommander_dir="${PLUMOS_V90S_NEXTCOMMANDER_DIR:-output/nextcommander/v90s}"
 music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
+standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
 strict=0
 
@@ -39,6 +40,7 @@ Options:
   --nextcommander-dir PATH
                           NextCommander payload; default output/nextcommander/v90s.
   --music-player-dir PATH Music Player payload; default output/music-player/v90s.
+  --standalone-dir PATH  Standalone emulator payload; default output/standalone-emulators/v90s.
   --retroarch-config PATH
                           RetroArch defaults template; default configs/retroarch/v90s-powervr-quicknes.cfg.
   --strict               Fail if currently supported payloads are missing.
@@ -97,6 +99,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --music-player-dir)
             music_player_dir="$2"
+            shift 2
+            ;;
+        --standalone-dir)
+            standalone_dir="$2"
             shift 2
             ;;
         --retroarch-config)
@@ -187,6 +193,18 @@ record_tree() {
     find "$src_root" -type f | sort | while IFS= read -r src; do
         rel="${src#"$src_root"/}"
         record_file "$rel" "$component" "$source_root/$rel"
+    done
+}
+
+record_mapped_tree() {
+    src_root="$1"
+    out_prefix="$2"
+    component="$3"
+    source_root="$4"
+
+    find "$src_root" -type f | sort | while IFS= read -r src; do
+        rel="${src#"$src_root"/}"
+        record_file "$out_prefix/$rel" "$component" "$source_root/$rel"
     done
 }
 
@@ -380,6 +398,32 @@ music_player_root="$music_player_dir/plumos"
 if require_or_note_missing "$music_player_root/apps/music-player/bin/plumos-music-player.bin" "music-player"; then
     copy_tree "$music_player_root" "$out_dir"
     record_tree "$music_player_root" "music-player" "$music_player_root"
+fi
+
+if require_or_note_missing "$standalone_dir/bin/plumos-standalone-launch" "standalone-emulators"; then
+    if [ -d "$standalone_dir/standalone" ]; then
+        copy_tree "$standalone_dir/standalone" "$out_dir/standalone"
+        record_mapped_tree "$standalone_dir/standalone" "standalone" "standalone-emulator" "$standalone_dir/standalone"
+    fi
+    copy_exec "$standalone_dir/bin/plumos-standalone-launch" "$out_dir/bin/plumos-standalone-launch"
+    record_file "bin/plumos-standalone-launch" "standalone-launcher" "$standalone_dir/bin/plumos-standalone-launch"
+    if [ -d "$standalone_dir/config/standalone" ]; then
+        copy_tree "$standalone_dir/config/standalone" "$out_dir/config/standalone"
+        record_mapped_tree "$standalone_dir/config/standalone" "config/standalone" "standalone-config" "$standalone_dir/config/standalone"
+    fi
+    if [ -d "$standalone_dir/licenses" ]; then
+        mkdir -p "$out_dir/licenses/standalone"
+        copy_tree "$standalone_dir/licenses" "$out_dir/licenses/standalone"
+        record_mapped_tree "$standalone_dir/licenses" "licenses/standalone" "standalone-license" "$standalone_dir/licenses"
+    fi
+    if [ -d "$standalone_dir/lib" ]; then
+        copy_tree "$standalone_dir/lib" "$out_dir/lib"
+        record_mapped_tree "$standalone_dir/lib" "lib" "standalone-library" "$standalone_dir/lib"
+    fi
+    if [ -f "$standalone_dir/standalone-emulators.manifest" ]; then
+        copy_file "$standalone_dir/standalone-emulators.manifest" "$out_dir/licenses/standalone-emulators-manifest.txt"
+        record_file "licenses/standalone-emulators-manifest.txt" "standalone-emulator" "$standalone_dir/standalone-emulators.manifest"
+    fi
 fi
 
 generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"

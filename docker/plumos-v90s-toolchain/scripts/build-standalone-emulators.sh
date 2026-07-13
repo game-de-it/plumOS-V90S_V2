@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+set -u
+set -o pipefail
+
+ROOT_DIR=${ROOT_DIR:-/workspace}
+BUILD_ROOT=${BUILD_ROOT:-"${ROOT_DIR}/build/standalone-emulators-v90s"}
+OUT_DIR=${OUT_DIR:-"${ROOT_DIR}/output/standalone-emulators/v90s"}
+SRC_ROOT=${SRC_ROOT:-"${BUILD_ROOT}/src"}
+JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
+PLUMOS_STANDALONE_FILTER=${PLUMOS_STANDALONE_FILTER:-all}
+FAIL_ON_STANDALONE_ERROR=${FAIL_ON_STANDALONE_ERROR:-1}
+
+CC=${CC:-gcc}
+CXX=${CXX:-g++}
+AR=${AR:-ar}
+RANLIB=${RANLIB:-ranlib}
+STRIP=${STRIP:-strip}
+READELF=${READELF:-readelf}
+COMMON_CFLAGS=${COMMON_CFLAGS:-"-O2 -pipe -march=armv8-a+crc -mtune=cortex-a53 -fomit-frame-pointer"}
+COMMON_CXXFLAGS=${COMMON_CXXFLAGS:-"${COMMON_CFLAGS}"}
+COMMON_LDFLAGS=${COMMON_LDFLAGS:-""}
+
+PPSSPP_REPO=${PPSSPP_REPO:-https://github.com/hrydgard/ppsspp.git}
+PPSSPP_REF=${PPSSPP_REF:-v1.20.4}
+SCUMMVM_REPO=${SCUMMVM_REPO:-https://github.com/scummvm/scummvm.git}
+SCUMMVM_REF=${SCUMMVM_REF:-v2026.2.0}
+EASYRPG_REPO=${EASYRPG_REPO:-https://github.com/EasyRPG/Player.git}
+EASYRPG_REF=${EASYRPG_REF:-0.8.1.1}
+OPENBOR_REPO=${OPENBOR_REPO:-https://github.com/DCurrent/openbor.git}
+OPENBOR_REF=${OPENBOR_REF:-v6391}
+DOSBOX_REPO=${DOSBOX_REPO:-https://github.com/dosbox-staging/dosbox-staging.git}
+DOSBOX_REF=${DOSBOX_REF:-v0.82.2}
+PCSX_REARMED_REPO=${PCSX_REARMED_REPO:-https://github.com/notaz/pcsx_rearmed.git}
+PCSX_REARMED_REF=${PCSX_REARMED_REF:-r26l}
+SCUMMVM_ENGINES=${SCUMMVM_ENGINES:-"scumm,agi,agos,sky,sword1,sword2,queen,gob,lure,kyra,sci,cine,drascula,touche,teenagent,tinsel,cruise,parallaction"}
+
+MANIFEST=
+LOG_DIR=
+BUILT_COUNT=0
+FAILED_COUNT=0
+SKIPPED_COUNT=0
+
+msg() { printf '[standalone-v90s] %s\n' "$*" >&2; }
+append_manifest() { printf '%s\n' "$*" >>"${MANIFEST}"; }
+
+selected() {
+  local id=$1
+  case "${PLUMOS_STANDALONE_FILTER}" in
+    all|ALL) return 0 ;;
+  esac
+  case ",${PLUMOS_STANDALONE_FILTER}," in
+    *,"${id}",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+clone_repo() {
+  local id=$1 repo=$2 ref=$3 log=$4 dst
+  local actual_commit expected_commit cached_key
+  dst="${SRC_ROOT}/${id}"
+  local ref_args=()
+  if [ -d "${dst}/.git" ]; then
+    actual_commit=$(git -C "${dst}" rev-parse HEAD 2>/dev/null || true)
+    expected_commit=$(git -C "${dst}" rev-parse "${ref}^{commit}" 2>/dev/null || true)
+    cached_key=$(cat "${dst}/.plumos-source-ref" 2>/dev/null || true)
+    if [ "${cached_key}" = "${repo} ${ref}" ] ||
+       { [ -n "${expected_commit}" ] && [ "${actual_commit}" = "${expected_commit}" ]; }; then
+      printf 'Reusing cached source: %s (%s)\n' "${id}" "${ref}" >>"${log}"
+      printf '%s %s\n' "${repo}" "${ref}" >"${dst}/.plumos-source-ref"
+      return 0
+    fi
+  fi
+  rm -rf "${dst}"
+  case "${ref}" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+    *) ref_args=(--branch "${ref}") ;;
+  esac
+  git clone --depth 1 --recurse-submodules --shallow-submodules \
+    "${ref_args[@]}" "${repo}" "${dst}" >>"${log}" 2>&1 || return 1
+  case "${ref}" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
+      git -C "${dst}" fetch --depth 1 origin "${ref}" >>"${log}" 2>&1 || return 1
+      git -C "${dst}" checkout --detach FETCH_HEAD >>"${log}" 2>&1 || return 1
+      git -C "${dst}" submodule update --init --recursive --depth 1 >>"${log}" 2>&1 || return 1
+      ;;
+  esac
+  printf '%s %s\n' "${repo}" "${ref}" >"${dst}/.plumos-source-ref"
+}
+
+find_binary() {
+  local dir=$1 name found
+  shift
+  for name in "$@"; do
+    found=$(find "${dir}" -type f -name "${name}" -perm -111 2>/dev/null | head -n 1)
+    if [ -n "${found}" ]; then printf '%s\n' "${found}"; return 0; fi
+  done
+  return 1
+}
+
+copy_runtime_deps() {
+  local elf=$1 dep path real soname real_name
+  while IFS= read -r path; do
+    [ -f "${path}" ] || continue
+    soname=$(basename "${path}")
+    case "${soname}" in
+      ld-linux-aarch64.so.1|libc.so.6|libm.so.6|libpthread.so.0|libdl.so.2|librt.so.1|\
+      libEGL.so.*|libGLESv2.so.*|libGL.so.*|libMali.so.*|libSDL2-2.0.so.*)
+        continue
+        ;;
+    esac
+    real=$(readlink -f "${path}")
+    real_name=$(basename "${real}")
+    mkdir -p "${OUT_DIR}/lib"
+    if [ ! -f "${OUT_DIR}/lib/${real_name}" ]; then
+      install -m 0644 "${real}" "${OUT_DIR}/lib/${real_name}"
+      copy_runtime_deps "${real}"
+    fi
+    if [ "${soname}" != "${real_name}" ] && [ ! -e "${OUT_DIR}/lib/${soname}" ]; then
+      ln -s "${real_name}" "${OUT_DIR}/lib/${soname}"
+    fi
+  done < <(
+    ldd "${elf}" 2>/dev/null |
+      awk '/=> \/[^ ]+/ {print $3} /^[[:space:]]*\// {print $1}' |
+      sort -u
+  )
+}
+
+stage_binary() {
+  local id=$1 src=$2 name=$3 dst
+  dst="${OUT_DIR}/standalone/${id}/bin/${name}"
+  [ -f "${src}" ] || return 1
+  mkdir -p "$(dirname "${dst}")"
+  install -m 0755 "${src}" "${dst}"
+  "${STRIP}" "${dst}" >/dev/null 2>&1 || true
+  copy_runtime_deps "${dst}"
+  append_manifest "  output=standalone/${id}/bin/${name}"
+  append_manifest "  architecture=$(file -b "${dst}")"
+}
+
+stage_license() {
+  local id=$1 src=$2 file
+  for file in COPYING COPYING.txt LICENSE LICENSE.txt LICENSE.md COPYING.md; do
+    if [ -f "${src}/${file}" ]; then
+      install -m 0644 "${src}/${file}" "${OUT_DIR}/licenses/${id}-${file}"
+      append_manifest "  license=licenses/${id}-${file}"
+      return 0
+    fi
+  done
+}
+
+build_ppsspp() {
+  local src=$1 build bin
+  build="${src}/build-v90s"
+  cmake -S "${src}" -B "${build}" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="${COMMON_CFLAGS}" \
+    -DCMAKE_CXX_FLAGS="${COMMON_CXXFLAGS}" \
+    -DCMAKE_EXE_LINKER_FLAGS="${COMMON_LDFLAGS}" \
+    -DARM64=ON -DARMV7=OFF \
+    -DUSING_EGL=ON -DUSING_FBDEV=ON -DUSING_GLES2=ON \
+    -DUSING_X11_VULKAN=OFF -DUSE_WAYLAND_WSI=OFF \
+    -DUSE_VULKAN_DISPLAY_KHR=OFF -DUSE_FFMPEG=ON \
+    -DUSE_SYSTEM_FFMPEG=OFF -DUSE_DISCORD=OFF -DUSE_MINIUPNPC=OFF \
+    -DUSE_SYSTEM_LIBSDL2=ON -DUSE_SYSTEM_LIBPNG=ON \
+    -DUSE_SYSTEM_FREETYPE=OFF -DUSE_SYSTEM_LIBCHDR=OFF \
+    -DUSE_SYSTEM_LIBZIP=OFF -DUSE_SYSTEM_SNAPPY=OFF -DUSE_SYSTEM_ZSTD=OFF \
+    -DHEADLESS=OFF -DUNITTEST=OFF -DATLAS_TOOL=OFF -DUSING_QT_UI=OFF \
+    -DMOBILE_DEVICE=OFF -DGOLD=OFF || return 1
+  cmake --build "${build}" --target PPSSPPSDL -j"${JOBS}" || return 1
+  bin=$(find_binary "${build}" PPSSPPSDL) || return 1
+  stage_binary ppsspp "${bin}" PPSSPPSDL || return 1
+  rsync -a --delete "${src}/assets/" "${OUT_DIR}/standalone/ppsspp/assets/"
+  append_manifest "  data=standalone/ppsspp/assets"
+}
+
+build_scummvm() {
+  local src=$1 bin data file
+  data="${OUT_DIR}/standalone/scummvm/share/scummvm"
+  (
+    cd "${src}" || exit 1
+    env CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" \
+      CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+      ./configure --backend=sdl --prefix=/mnt/plumos/standalone/scummvm \
+        --enable-release --disable-debug --disable-all-engines \
+        --enable-engine="${SCUMMVM_ENGINES}" --disable-mt32emu --disable-seq-midi \
+        --disable-timidity --disable-lua --disable-nuked-opl --disable-hq-scalers \
+        --disable-taskbar --disable-cloud --disable-system-dialogs \
+        --disable-eventrecorder --disable-tts --opengl-mode=none --disable-tinygl \
+        --disable-fluidsynth --disable-fluidlite --disable-sonivox --disable-gtk \
+        --disable-sndio && make -j"${JOBS}"
+  ) || return 1
+  bin=$(find_binary "${src}" scummvm) || return 1
+  stage_binary scummvm "${bin}" scummvm || return 1
+  mkdir -p "${data}"
+  for file in gui/themes/gui-icons.dat gui/themes/scummclassic.zip gui/themes/scummmodern.zip \
+    gui/themes/scummremastered.zip gui/themes/residualvm.zip gui/themes/shaders.dat \
+    gui/themes/translations.dat dists/engine-data/encoding.dat dists/engine-data/drascula.dat \
+    dists/engine-data/helpdialog.zip dists/engine-data/kyra.dat dists/engine-data/lure.dat \
+    dists/engine-data/queen.tbl dists/engine-data/sky.cpt dists/engine-data/teenagent.dat \
+    backends/vkeybd/packs/vkeybd_default.zip backends/vkeybd/packs/vkeybd_small.zip; do
+    [ ! -f "${src}/${file}" ] || install -m 0644 "${src}/${file}" "${data}/$(basename "${file}")"
+  done
+  append_manifest "  data=standalone/scummvm/share/scummvm"
+}
+
+build_easyrpg() {
+  local src=$1 build bin
+  build="${src}/build-v90s"
+  rm -rf "${build}"
+  cmake -S "${src}" -B "${build}" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="${COMMON_CFLAGS}" \
+    -DCMAKE_CXX_FLAGS="${COMMON_CXXFLAGS}" -DPLAYER_TARGET_PLATFORM=SDL2 \
+    -DPLAYER_AUDIO_BACKEND=SDL2 -DPLAYER_BUILD_EXECUTABLE=ON \
+    -DPLAYER_BUILD_LIBLCF=ON -DPLAYER_BUILD_LIBLCF_BRANCH=0.8.1 \
+    -DLIBLCF_ENABLE_TOOLS=OFF -DLIBLCF_ENABLE_TESTS=OFF \
+    -DLIBLCF_ENABLE_BENCHMARKS=OFF -DPLAYER_WITH_WILDMIDI=OFF \
+    -DPLAYER_WITH_FLUIDSYNTH=OFF -DPLAYER_WITH_FLUIDLITE=OFF \
+    -DPLAYER_WITH_NATIVE_MIDI=OFF || return 1
+  cmake --build "${build}" --target easyrpg-player -j"${JOBS}" || return 1
+  bin=$(find_binary "${build}" easyrpg-player) || return 1
+  stage_binary easyrpg "${bin}" easyrpg-player
+}
+
+build_openbor() {
+  local src=$1 engine bin
+  engine="${src}/engine"
+  bin="${src}/engine/OpenBOR"
+  sed -i 's/-Wall -Werror/-Wall/g' "${engine}/Makefile"
+  (
+    cd "${engine}" || exit 1
+    make clean BUILD_LINUX=1 >/dev/null 2>&1 || true
+    make -j"${JOBS}" BUILD_LINUX=1 BUILD_MMX= BUILD_OPENGL= BUILD_LOADGL= \
+      BUILD_WEBM= NO_STRIP=1 VERSION_NAME=OpenBOR LNXDEV=/usr/bin PREFIX= \
+      GCC_TARGET=aarch64-linux-gnu TARGET_ARCH=aarch64 \
+      ARCHFLAGS="${COMMON_CFLAGS} -fcommon -Isource/webmlib" \
+      LIBRARIES=/usr/lib/aarch64-linux-gnu CC="${CC}"
+  ) || return 1
+  stage_binary openbor "${bin}" OpenBOR
+}
+
+build_dosbox() {
+  local src=$1 build bin resources
+  build="${src}/build-v90s"
+  resources="${OUT_DIR}/standalone/dosbox-staging/resources"
+  rm -rf "${build}"
+  meson setup "${build}" "${src}" --prefix=/mnt/plumos/standalone/dosbox-staging \
+    --buildtype=release -Duse_sdl2_net=false -Duse_opengl=false \
+    -Duse_fluidsynth=false -Duse_mt32emu=false -Duse_slirp=false \
+    -Duse_alsa=true -Duse_xinput2=false -Ddynamic_core=dynrec \
+    -Dper_page_w_or_x=disabled -Dpagesize=4096 -Duse_zlib_ng=false \
+    -Dunit_tests=disabled || return 1
+  meson compile -C "${build}" -j"${JOBS}" || return 1
+  bin=$(find_binary "${build}" dosbox) || return 1
+  stage_binary dosbox-staging "${bin}" dosbox || return 1
+  if [ -d "${build}/resources" ]; then
+    rsync -a --delete "${build}/resources/" "${resources}/"
+    append_manifest "  data=standalone/dosbox-staging/resources"
+  fi
+}
+
+build_pcsx_rearmed() {
+  local src=$1
+  (
+    cd "${src}" || exit 1
+    make clean >/dev/null 2>&1 || true
+    env CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" STRIP="${STRIP}" \
+      CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+      ./configure --platform=generic --gpu=neon --sound-drivers="alsa sdl" \
+        --enable-neon --enable-threads --disable-dynamic --dynarec=ari64 && \
+      make -j"${JOBS}"
+  ) || return 1
+  stage_binary pcsx_rearmed "${src}/pcsx" pcsx
+}
+
+write_launcher() {
+  mkdir -p "${OUT_DIR}/bin" "${OUT_DIR}/config/standalone"
+  cat >"${OUT_DIR}/bin/plumos-standalone-launch" <<'EOF'
+#!/bin/sh
+set -u
+PLUMOS_ROOT=${PLUMOS_ROOT:-/mnt/plumos}
+EMU_ROOT="${PLUMOS_ROOT}/standalone"
+LOG_ROOT="${PLUMOS_ROOT}/Logs/standalone"
+id=${1:-}
+[ "$#" -gt 0 ] && shift
+mkdir -p "${LOG_ROOT}"
+export HOME="${PLUMOS_ROOT}/state/standalone/${id}"
+export XDG_CONFIG_HOME="${HOME}/config"
+export XDG_DATA_HOME="${HOME}/data"
+export XDG_CACHE_HOME="${HOME}/cache"
+export PATH="${PLUMOS_ROOT}/bin:${PATH}"
+export LD_LIBRARY_PATH="${PLUMOS_ROOT}/lib/plumos-sdl2-powervr:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+export SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-mali}
+export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-alsa}
+mkdir -p "${HOME}" "${XDG_CONFIG_HOME}" "${XDG_DATA_HOME}" "${XDG_CACHE_HOME}"
+case "${id}" in
+  ppsspp) exe="${EMU_ROOT}/ppsspp/bin/PPSSPPSDL" ;;
+  scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
+  easyrpg) exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player" ;;
+  openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
+  dosbox-staging) exe="${EMU_ROOT}/dosbox-staging/bin/dosbox" ;;
+  pcsx_rearmed) exe="${EMU_ROOT}/pcsx_rearmed/bin/pcsx" ;;
+  *) echo "unknown standalone emulator: ${id}" >&2; exit 2 ;;
+esac
+[ -x "${exe}" ] || { echo "missing standalone emulator: ${exe}" >&2; exit 127; }
+cd "$(dirname "${exe}")" || exit 1
+exec "${exe}" "$@" >>"${LOG_ROOT}/${id}.log" 2>&1
+EOF
+  chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
+}
+
+build_one() {
+  local id=$1 repo=$2 ref=$3 func=$4 log src commit
+  log="${LOG_DIR}/${id}.log"
+  src="${SRC_ROOT}/${id}"
+  if ! selected "${id}"; then
+    append_manifest "${id}: status=skipped reason=filtered"
+    SKIPPED_COUNT=$((SKIPPED_COUNT + 1)); return 0
+  fi
+  append_manifest "${id}:"
+  append_manifest "  repo=${repo}"
+  append_manifest "  ref=${ref}"
+  : >"${log}"
+  if ! clone_repo "${id}" "${repo}" "${ref}" "${log}"; then
+    append_manifest "  status=failed phase=clone log=logs/${id}.log"
+    FAILED_COUNT=$((FAILED_COUNT + 1)); return 0
+  fi
+  commit=$(git -C "${src}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+  append_manifest "  commit=${commit}"
+  msg "building ${id}"
+  if "${func}" "${src}" >>"${log}" 2>&1; then
+    stage_license "${id}" "${src}"
+    append_manifest "  status=built"
+    BUILT_COUNT=$((BUILT_COUNT + 1)); msg "built ${id}"
+  else
+    append_manifest "  status=failed phase=build log=logs/${id}.log"
+    FAILED_COUNT=$((FAILED_COUNT + 1)); msg "failed ${id}; see ${log}"
+  fi
+}
+
+ROOT_DIR=$(cd "${ROOT_DIR}" && pwd)
+BUILD_ROOT=$(mkdir -p "${BUILD_ROOT}" && cd "${BUILD_ROOT}" && pwd)
+OUT_PARENT=$(dirname "${OUT_DIR}")
+mkdir -p "${OUT_PARENT}"
+OUT_PARENT=$(cd "${OUT_PARENT}" && pwd)
+OUT_DIR="${OUT_PARENT}/$(basename "${OUT_DIR}")"
+SRC_ROOT="${BUILD_ROOT}/src"
+rm -rf "${OUT_DIR}"
+mkdir -p "${OUT_DIR}/logs" "${OUT_DIR}/licenses" "${SRC_ROOT}"
+MANIFEST="${OUT_DIR}/standalone-emulators.manifest"
+LOG_DIR="${OUT_DIR}/logs"
+{
+  echo 'plumOS V90S standalone emulator build'
+  echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo 'architecture=aarch64'
+  echo 'reference=plumOS-MMF final package plus plumOS-A30 PPSSPP'
+  echo "filter=${PLUMOS_STANDALONE_FILTER}"
+  echo "cflags=${COMMON_CFLAGS}"
+} >"${MANIFEST}"
+write_launcher
+build_one ppsspp "${PPSSPP_REPO}" "${PPSSPP_REF}" build_ppsspp
+build_one scummvm "${SCUMMVM_REPO}" "${SCUMMVM_REF}" build_scummvm
+build_one easyrpg "${EASYRPG_REPO}" "${EASYRPG_REF}" build_easyrpg
+build_one openbor "${OPENBOR_REPO}" "${OPENBOR_REF}" build_openbor
+build_one dosbox-staging "${DOSBOX_REPO}" "${DOSBOX_REF}" build_dosbox
+build_one pcsx_rearmed "${PCSX_REARMED_REPO}" "${PCSX_REARMED_REF}" build_pcsx_rearmed
+{
+  echo 'summary:'
+  echo "  built=${BUILT_COUNT}"
+  echo "  failed=${FAILED_COUNT}"
+  echo "  skipped=${SKIPPED_COUNT}"
+} >>"${MANIFEST}"
+(
+  cd "${OUT_DIR}" || exit 1
+  find . -type f ! -name checksums.sha256 -print0 | sort -z | xargs -0 sha256sum >checksums.sha256
+)
+msg "done: built=${BUILT_COUNT} failed=${FAILED_COUNT} skipped=${SKIPPED_COUNT}"
+if [ "${FAILED_COUNT}" -gt 0 ] && [ "${FAIL_ON_STANDALONE_ERROR}" = 1 ]; then exit 1; fi

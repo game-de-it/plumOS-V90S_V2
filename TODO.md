@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -133,7 +133,22 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
 - [ ] Implement `picoarch`.
-- [ ] Implement `standalone`.
+- [x] Implement `standalone` for the MMF final-package emulator set plus
+  V90S PPSSPP:
+  - PPSSPP 1.20.4
+  - ScummVM 2026.2.0
+  - EasyRPG Player 0.8.1.1
+  - OpenBOR v6391
+  - DOSBox Staging 0.82.2
+  - PCSX-ReARMed r26l
+- [x] Build all six standalone executables as native aarch64 binaries with
+  zero failed recipes.
+- [x] Package the recursive non-vendor runtime dependency closure under the
+  FAT32 app layer while preserving the vendor PowerVR EGL/GLES boundary.
+- [x] Integrate standalone executables, data, licenses, launcher, libraries,
+  manifest, and checksums into `output/app-layer/v90s`.
+- [ ] Validate each standalone emulator on real V90S hardware, including
+  display, audio, controller mapping, save paths, and clean return to the FE.
 - [x] Implement `frontend`.
 - [x] Implement `app-layer`.
 - [x] Implement `release`.
@@ -148,6 +163,9 @@ Build plumOS V90S as a V90S-specific distribution:
     `output/network-services/v90s/checksums.sha256`.
   - [x] `cores` emits `output/libretro-cores/v90s/libretro-cores.manifest`
     and `output/libretro-cores/v90s/checksums.sha256`.
+  - [x] `standalone` emits
+    `output/standalone-emulators/v90s/standalone-emulators.manifest` and
+    `output/standalone-emulators/v90s/checksums.sha256`.
 
 ## Milestone 3: System Rootfs
 
