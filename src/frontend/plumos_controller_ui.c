@@ -236,6 +236,8 @@ struct input_event {
 #define UI_WIFI_COMMAND_ROW 6
 #define UI_WIFI_COMMAND_COUNT 5
 #define UI_USB_DISK_START_DELAY_MS 2000
+#define UI_USB_DISK_POLL_INTERVAL_MS 250
+#define UI_USB_DISK_RESULT_FILE "/tmp/plumos-usb-disk-mode.ui.result"
 #define UI_TOP_REFRESH_MIN_VISIBLE_MS 1000
 #define UI_THUMBNAIL_RESULT_WINDOW 11
 #define UI_SCRAPING_FIELD_COUNT 3
@@ -672,6 +674,7 @@ struct ui_state {
   size_t wifi_cursor;
   enum wifi_connect_stage wifi_stage;
   long long usb_disk_start_due_ms;
+  int usb_disk_started;
   long long mmf_brightness_reapply_due_ms;
   int manual_time_initialized;
   long manual_time_year;
@@ -8840,8 +8843,8 @@ static void setting_help_lines(const struct ui_state *ui,
     copy_string(line1, line1_size, "Open network services.");
     copy_string(line2, line2_size, "SSH, FTP, SFTP, Samba, and ADB.");
   } else if (strcmp(id, "network_usb_disk_mode") == 0) {
-    copy_string(line1, line1_size, "Expose the SD card as a USB drive.");
-    copy_string(line2, line2_size, "Requires PC eject and USB disconnect to return.");
+    copy_string(line1, line1_size, "Expose the USB transfer drive.");
+    copy_string(line2, line2_size, "Eject and unplug USB to return; plumOS stays mounted.");
   } else if (strcmp(id, "network_information") == 0) {
     copy_string(line1, line1_size, "Open read-only network information.");
     copy_string(line2, line2_size, "Connection, IP, signal, link speed, SSH, and ADB.");
@@ -9515,10 +9518,10 @@ static void render_usb_disk_confirm(struct ui_state *ui) {
   ui_printf(ui, "entries=4 cursor=1\n");
   ui_printf(ui, "\n");
   ui_printf(ui, ">   1  READY TO ENTER\n");
-  ui_printf(ui, "    2  SD Card: /mnt/plumos\n");
+  ui_printf(ui, "    2  Dedicated transfer drive\n");
   ui_printf(ui, "    3  PC eject is required\n");
   ui_printf(ui, "    4  USB disconnect returns to plumOS\n");
-  ui_printf(ui, "footer1=%s\n", "A exposes the SD card as a USB drive.");
+  ui_printf(ui, "footer1=%s\n", "A exposes a dedicated USB transfer drive.");
   ui_printf(ui, "footer2=%s\n", "Eject on PC, then unplug USB to finish.");
   if (ui->status[0]) {
     ui_printf(ui, "\nstatus: %s\n", ui->status);
@@ -10315,12 +10318,14 @@ static void open_core_select_screen(struct ui_state *ui, const char *system_id,
 static void open_usb_disk_confirm_screen(struct ui_state *ui) {
   ui->screen = SCREEN_USB_DISK_CONFIRM;
   ui->usb_disk_start_due_ms = 0;
+  ui->usb_disk_started = 0;
   set_status(ui, "USB Disk Mode confirmation");
 }
 
 static void open_usb_disk_starting_screen(struct ui_state *ui) {
   ui->screen = SCREEN_USB_DISK_STARTING;
   ui->usb_disk_start_due_ms = current_time_ms() + UI_USB_DISK_START_DELAY_MS;
+  ui->usb_disk_started = 0;
   set_status(ui, "USB Disk Mode starting");
 }
 
@@ -10523,39 +10528,70 @@ static int run_usb_disk_mode(struct ui_state *ui) {
     return 0;
   }
 
+  unlink(UI_USB_DISK_RESULT_FILE);
   cmd[0] = '\0';
-  if (!append_string(cmd, sizeof(cmd), &pos, "cd / && export PLUMOS_SDCARD_ROOT=") ||
+  if (!append_string(cmd, sizeof(cmd), &pos, "(cd / && export PLUMOS_SDCARD_ROOT=") ||
       !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->sdcard_root) ||
       !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_ROOT=") ||
       !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
-      !append_string(cmd, sizeof(cmd), &pos,
-                     " PLUMOS_USB_DISK_MODE_EXPERIMENTAL=1"
-                     " PLUMOS_USB_DISK_MODE_CONFIRM=UNMOUNT_SDCARD; exec ") ||
+      !append_string(cmd, sizeof(cmd), &pos, "; ") ||
       !append_shell_quoted(cmd, sizeof(cmd), &pos, script) ||
       !append_string(cmd, sizeof(cmd), &pos,
-                     " enter >>/tmp/plumos-usb-disk-mode.ui.log 2>&1")) {
+                     " enter >>/tmp/plumos-usb-disk-mode.ui.log 2>&1; "
+                     "printf '%s\\n' \"$?\" > " UI_USB_DISK_RESULT_FILE
+                     ") </dev/null >/dev/null 2>&1 &")) {
     set_status(ui, "USB Disk Mode command too long");
     return 0;
   }
 
   rc = system(cmd);
-  ui->usb_disk_start_due_ms = 0;
   if (rc == -1) {
+    ui->usb_disk_start_due_ms = 0;
+    ui->usb_disk_started = 0;
     open_settings_screen(ui, SETTINGS_CATEGORY_NETWORK_SERVICE);
     select_setting_entry_by_id(ui, "network_usb_disk_mode");
     set_status(ui, "USB Disk Mode system call failed");
     return 0;
   }
   if (WIFEXITED(rc) && WEXITSTATUS(rc) == 0) {
-    open_settings_screen(ui, SETTINGS_CATEGORY_NETWORK_SERVICE);
-    select_setting_entry_by_id(ui, "network_usb_disk_mode");
-    set_status(ui, "USB Disk Mode finished");
+    ui->usb_disk_started = 1;
+    ui->usb_disk_start_due_ms =
+        current_time_ms() + UI_USB_DISK_POLL_INTERVAL_MS;
+    set_status(ui, "USB drive active; eject and unplug to return");
     return 1;
   }
+  ui->usb_disk_start_due_ms = 0;
+  ui->usb_disk_started = 0;
   open_settings_screen(ui, SETTINGS_CATEGORY_NETWORK_SERVICE);
   select_setting_entry_by_id(ui, "network_usb_disk_mode");
   set_status(ui, "USB Disk Mode returned non-zero");
   return 0;
+}
+
+static int poll_usb_disk_mode(struct ui_state *ui) {
+  FILE *f;
+  int rc;
+
+  if (!ui || !ui->usb_disk_started) {
+    return 0;
+  }
+  f = fopen(UI_USB_DISK_RESULT_FILE, "rb");
+  if (!f) {
+    ui->usb_disk_start_due_ms =
+        current_time_ms() + UI_USB_DISK_POLL_INTERVAL_MS;
+    return 0;
+  }
+  rc = 1;
+  (void)fscanf(f, "%d", &rc);
+  fclose(f);
+  unlink(UI_USB_DISK_RESULT_FILE);
+  ui->usb_disk_started = 0;
+  ui->usb_disk_start_due_ms = 0;
+  open_settings_screen(ui, SETTINGS_CATEGORY_NETWORK_SERVICE);
+  select_setting_entry_by_id(ui, "network_usb_disk_mode");
+  set_status(ui, rc == 0 ? "USB Disk Mode finished"
+                         : "USB Disk Mode returned non-zero");
+  return 1;
 }
 
 static int run_network_wifi_control(struct ui_state *ui, int enable) {
@@ -14382,7 +14418,11 @@ static int run_event_loop(struct ui_state *ui, const char *event_path) {
     }
     if (ui->screen == SCREEN_USB_DISK_STARTING && ui->usb_disk_start_due_ms > 0) {
       if (now_ms >= ui->usb_disk_start_due_ms) {
-        run_usb_disk_mode(ui);
+        if (ui->usb_disk_started) {
+          poll_usb_disk_mode(ui);
+        } else {
+          run_usb_disk_mode(ui);
+        }
         render_ui(ui);
         if (ui_needs_periodic_refresh(ui)) {
           next_refresh_ms = current_time_ms() + ui_periodic_refresh_interval_ms(ui);

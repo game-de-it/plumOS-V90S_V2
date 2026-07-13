@@ -21,7 +21,9 @@ PROCESSED_DIR_NAME="${PLUMOS_USB_PROCESSED_DIR_NAME:-processed}"
 GADGET_NAME="${PLUMOS_USB_DISK_GADGET_NAME:-plumos_usb_disk}"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 FUNCTION_NAME="mass_storage.usb0"
+ADB_CONTROL="${PLUMOS_ROOT}/bin/plumos-adbd"
 ACTIVE=0
+ADB_RESTORE=0
 
 mkdir -p "$STATE_DIR" "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
 
@@ -35,6 +37,7 @@ cleanup_on_signal() {
     teardown_gadget
     mount_image || true
   fi
+  restore_adb
   exit 130
 }
 
@@ -369,6 +372,26 @@ teardown_gadget() {
   fi
 }
 
+stop_adb_for_transfer() {
+  [ -x "$ADB_CONTROL" ] || return 0
+  if PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+      "$ADB_CONTROL" status 2>/dev/null | grep -q '^running=1$'; then
+    ADB_RESTORE=1
+    log "adb_pause_requested"
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+      "$ADB_CONTROL" stop >> "$LOG_FILE" 2>&1 || return 1
+  fi
+}
+
+restore_adb() {
+  [ "$ADB_RESTORE" -eq 1 ] || return 0
+  ADB_RESTORE=0
+  [ -x "$ADB_CONTROL" ] || return 0
+  log "adb_restore_requested"
+  PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+    "$ADB_CONTROL" start >> "$LOG_FILE" 2>&1 || true
+}
+
 setup_gadget() {
   udc="$(udc_name)" || {
     log "udc_missing"
@@ -439,7 +462,11 @@ enter_mode() {
   ensure_configfs || return 1
   ensure_image || return 1
   unmount_image || return 1
-  setup_gadget || return 1
+  stop_adb_for_transfer || return 1
+  if ! setup_gadget; then
+    restore_adb
+    return 1
+  fi
   ACTIVE=1
   log "gadget_bound udc=$(cat "${GADGET_DIR}/UDC" 2>/dev/null || true) state=$(udc_state)"
 
@@ -447,6 +474,7 @@ enter_mode() {
     log "disconnect_detected"
     teardown_gadget
     ACTIVE=0
+    restore_adb
     mount_image || return 1
     process_commands || true
     log "leave_complete mounted=${MOUNT_DIR}"
@@ -456,6 +484,7 @@ enter_mode() {
   teardown_gadget
   ACTIVE=0
   mount_image || true
+  restore_adb
   return 1
 }
 

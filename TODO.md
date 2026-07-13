@@ -356,6 +356,12 @@ Build plumOS V90S as a V90S-specific distribution:
   Mac client.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi
   dongles. It exposes a dedicated transfer image, not `/mnt/plumos` itself.
+- [x] Keep the FE responsive while USB Disk Mode waits for host eject and cable
+  disconnect. Run the transfer helper asynchronously, poll its completion
+  result, and restore the NW Service screen when it finishes.
+- [x] Coordinate USB Disk Mode with ADB on the shared V90S USB controller:
+  pause only the validated plumOS ADB gadget before mass-storage binding and
+  restore ADB automatically when USB Disk Mode exits.
 - [x] Add a USB command mailbox to USB Disk Mode so diagnostics can be queued
   as `commands/run.sh` plus `commands/ALLOW_EXECUTE` and results are written
   back to `RESULT-LATEST.txt` and `results/` after V90S remounts the transfer
