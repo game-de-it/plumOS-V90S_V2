@@ -35,7 +35,7 @@ Commands:
   stockos-image    Transitional alias for sd-image.
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
   picoarch         Reserved for the V90S PicoArch build path.
-  standalone       Build MMF-aligned standalone emulators plus PPSSPP for V90S.
+  standalone [ID...] Build all standalone emulators, or only the selected IDs.
   frontend         Build the V90S frontend ported from plumOS-MMF.
   release          Assemble update-only release packages from the app layer.
   all              Reserved for the normal release build chain.
@@ -53,6 +53,8 @@ Environment:
   FAIL_ON_CORE_ERROR            Set to 0 to keep partial libretro core builds.
   BUILD_JOB_FALLBACKS           Space- or comma-separated lower -j values to
                                   retry after an initial per-core build failure.
+  PLUMOS_STANDALONE_FILTER      Standalone emulator filter used when no IDs are
+                                  passed. Default: all.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target

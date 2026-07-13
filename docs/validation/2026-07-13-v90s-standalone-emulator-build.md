@@ -1,6 +1,6 @@
 # V90S Standalone Emulator Build
 
-Date: 2026-07-13
+Date: 2026-07-13; updated 2026-07-14
 
 ## Goal
 
@@ -17,10 +17,10 @@ emulator in this validation.
 JOBS=4 ./scripts/docker-build.sh standalone
 ```
 
-Result:
+Full-build result after the Dreamcast/N64 extension:
 
 ```text
-built=6
+built=8
 failed=0
 skipped=0
 ```
@@ -41,9 +41,21 @@ output/standalone-emulators/v90s/
 | `openbor` | `v6391` | `OpenBOR` |
 | `dosbox-staging` | `v0.82.2` | `dosbox` |
 | `pcsx_rearmed` | `r26l` | `pcsx` |
+| `flycast` | `v2.6` | `flycast` |
+| `mupen64plus` | `2.6.0` | `mupen64plus` |
 
-All six executables were verified with `file` as 64-bit ARM aarch64 ELF
+All eight executables were verified with `file` as 64-bit ARM aarch64 ELF
 executables using `/lib/ld-linux-aarch64.so.1`.
+
+Individual recipes can be rebuilt without removing the other outputs:
+
+```sh
+./scripts/docker-build.sh standalone flycast
+./scripts/docker-build.sh standalone mupen64plus
+```
+
+The Flycast-only check reported `built=1`, `skipped=7`, and preserved all eight
+standalone output directories.
 
 PPSSPP is built with ARM64, fbdev, GLES2, and bundled FFmpeg enabled. Direct
 PPSSPP EGL ownership is disabled because the V90S SDL2 PowerVR driver owns the
@@ -86,7 +98,7 @@ The standalone package is copied into the normal FAT32 app-layer contract:
 /mnt/plumos/lib/
 ```
 
-The generated app layer contains all six standalone directories and is about
+The generated app layer contains all eight standalone directories and is about
 724 MiB total, below the current approximately 1 GiB FAT32 partition target.
 
 The launcher uses:
@@ -112,16 +124,21 @@ Each emulator receives a writable state root under:
 
 The following host-side checks passed:
 
-- standalone manifest summary: six built, zero failed, zero skipped
+- standalone full-build summary: eight built, zero failed, zero skipped
 - all standalone executables are aarch64 ELF files
 - standalone `checksums.sha256` validates all files
 - app-layer `checksums.sha256` validates all files
-- all six executables resolve their dynamic dependencies when checked against
+- all eight executables resolve their dynamic dependencies when checked against
   the app-layer libraries, V90S SDL2 PowerVR, and vendor PowerVR libraries
 - `plumos-standalone-launch` passes shell syntax validation
 
-The app-layer manifest records all six executable paths, and its complete
+The app-layer manifest records all eight executable paths, and its complete
 checksum set also validates successfully.
+
+## Dreamcast And N64 Hardware Validation
+
+The 2026-07-14 live-device results and controller policy are recorded in
+`docs/validation/2026-07-14-v90s-dreamcast-n64-standalone.md`.
 
 ## PPSSPP Hardware Validation
 
@@ -210,5 +227,6 @@ GLES2.
 
 PPSSPP still needs save/config persistence and clean return to the FE. Its
 controller, display, audio, race-start stability, and Ridge Racers performance
-characteristics are validated. The other five standalone emulators still need
-complete real-device display, audio, controller, save, and FE-return passes.
+characteristics are validated. ScummVM, EasyRPG Player, OpenBOR, DOSBox
+Staging, and PCSX-ReARMed still need complete real-device display, audio,
+controller, save, and FE-return passes.

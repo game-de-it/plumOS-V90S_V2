@@ -11,6 +11,10 @@ JOBS=${JOBS:-$(nproc 2>/dev/null || echo 2)}
 PLUMOS_STANDALONE_FILTER=${PLUMOS_STANDALONE_FILTER:-all}
 FAIL_ON_STANDALONE_ERROR=${FAIL_ON_STANDALONE_ERROR:-1}
 
+if [ "$#" -gt 0 ]; then
+  PLUMOS_STANDALONE_FILTER=$(IFS=,; printf '%s' "$*")
+fi
+
 CC=${CC:-gcc}
 CXX=${CXX:-g++}
 AR=${AR:-ar}
@@ -34,6 +38,15 @@ DOSBOX_REPO=${DOSBOX_REPO:-https://github.com/dosbox-staging/dosbox-staging.git}
 DOSBOX_REF=${DOSBOX_REF:-v0.82.2}
 PCSX_REARMED_REPO=${PCSX_REARMED_REPO:-https://github.com/notaz/pcsx_rearmed.git}
 PCSX_REARMED_REF=${PCSX_REARMED_REF:-r26l}
+FLYCAST_REPO=${FLYCAST_REPO:-https://github.com/flyinghead/flycast.git}
+FLYCAST_REF=${FLYCAST_REF:-v2.6}
+MUPEN64PLUS_UI_REPO=${MUPEN64PLUS_UI_REPO:-https://github.com/mupen64plus/mupen64plus-ui-console.git}
+MUPEN64PLUS_CORE_REPO=${MUPEN64PLUS_CORE_REPO:-https://github.com/mupen64plus/mupen64plus-core.git}
+MUPEN64PLUS_AUDIO_REPO=${MUPEN64PLUS_AUDIO_REPO:-https://github.com/mupen64plus/mupen64plus-audio-sdl.git}
+MUPEN64PLUS_INPUT_REPO=${MUPEN64PLUS_INPUT_REPO:-https://github.com/mupen64plus/mupen64plus-input-sdl.git}
+MUPEN64PLUS_RSP_REPO=${MUPEN64PLUS_RSP_REPO:-https://github.com/mupen64plus/mupen64plus-rsp-hle.git}
+MUPEN64PLUS_VIDEO_REPO=${MUPEN64PLUS_VIDEO_REPO:-https://github.com/mupen64plus/mupen64plus-video-rice.git}
+MUPEN64PLUS_REF=${MUPEN64PLUS_REF:-2.6.0}
 SCUMMVM_ENGINES=${SCUMMVM_ENGINES:-"scumm,agi,agos,sky,sword1,sword2,queen,gob,lure,kyra,sci,cine,drascula,touche,teenagent,tinsel,cruise,parallaction"}
 
 MANIFEST=
@@ -55,6 +68,27 @@ selected() {
     *,"${id}",*) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+validate_filter() {
+  local requested id known
+  case "${PLUMOS_STANDALONE_FILTER}" in
+    all|ALL) return 0 ;;
+  esac
+  requested=${PLUMOS_STANDALONE_FILTER//,/ }
+  for id in ${requested}; do
+    known=0
+    case "${id}" in
+      ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus)
+        known=1
+        ;;
+    esac
+    if [ "${known}" -ne 1 ]; then
+      printf 'error: unknown standalone emulator ID: %s\n' "${id}" >&2
+      printf 'valid IDs: ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus\n' >&2
+      return 2
+    fi
+  done
 }
 
 clone_repo() {
@@ -291,6 +325,135 @@ build_pcsx_rearmed() {
   stage_binary pcsx_rearmed "${src}/pcsx" pcsx
 }
 
+build_flycast() {
+  local src=$1 build bin
+  build="${src}/build-v90s"
+  rm -rf "${build}"
+  cmake -S "${src}" -B "${build}" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="${COMMON_CFLAGS}" \
+    -DCMAKE_CXX_FLAGS="${COMMON_CXXFLAGS}" \
+    -DCMAKE_EXE_LINKER_FLAGS="${COMMON_LDFLAGS}" \
+    -DBUILD_TESTING=OFF -DLIBRETRO=OFF \
+    -DUSE_GLES2=ON -DUSE_GLES=OFF -DUSE_OPENGL=ON -DUSE_VULKAN=OFF \
+    -DUSE_HOST_SDL=ON -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_LIBCHDR=OFF \
+    -DUSE_OPENMP=OFF -DUSE_BREAKPAD=OFF -DUSE_LUA=OFF \
+    -DUSE_DISCORD=OFF -DUSE_PULSEAUDIO=OFF -DUSE_LIBAO=OFF \
+    -DUSE_ALSA=ON || return 1
+  cmake --build "${build}" --target flycast -j"${JOBS}" || return 1
+  bin=$(find_binary "${build}" flycast) || return 1
+  stage_binary flycast "${bin}" flycast
+}
+
+clone_mupen64plus_component() {
+  local id=$1 repo=$2 dst=$3 log=$4
+  if [ -d "${dst}/.git" ] &&
+     [ "$(cat "${dst}/.plumos-source-ref" 2>/dev/null || true)" = "${repo} ${MUPEN64PLUS_REF}" ]; then
+    printf 'Reusing cached source: %s (%s)\n' "${id}" "${MUPEN64PLUS_REF}" >>"${log}"
+    return 0
+  fi
+  rm -rf "${dst}"
+  git clone --depth 1 --branch "${MUPEN64PLUS_REF}" "${repo}" "${dst}" >>"${log}" 2>&1 || return 1
+  printf '%s %s\n' "${repo}" "${MUPEN64PLUS_REF}" >"${dst}/.plumos-source-ref"
+}
+
+build_mupen64plus() {
+  local src=$1 stage prefix api component component_src component_repo log elf input_cfg target
+  stage="${src}/stage-v90s"
+  prefix=/mnt/plumos/standalone/mupen64plus
+  api="${src}/components/core/src/api"
+  log="${LOG_DIR}/mupen64plus.log"
+  rm -rf "${stage}"
+  mkdir -p "${src}/components" "${stage}"
+
+  for component in core audio-sdl input-sdl rsp-hle video-rice; do
+    case "${component}" in
+      core) component_repo=${MUPEN64PLUS_CORE_REPO} ;;
+      audio-sdl) component_repo=${MUPEN64PLUS_AUDIO_REPO} ;;
+      input-sdl) component_repo=${MUPEN64PLUS_INPUT_REPO} ;;
+      rsp-hle) component_repo=${MUPEN64PLUS_RSP_REPO} ;;
+      video-rice) component_repo=${MUPEN64PLUS_VIDEO_REPO} ;;
+    esac
+    clone_mupen64plus_component "mupen64plus-${component}" "${component_repo}" \
+      "${src}/components/${component}" "${log}" || return 1
+  done
+
+  component_src="${src}/components/core"
+  make -C "${component_src}/projects/unix" clean >/dev/null 2>&1 || true
+  env CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+    make -C "${component_src}/projects/unix" -j"${JOBS}" \
+      HOST_CPU=aarch64 PIC=1 USE_GLES=1 VULKAN=0 PREFIX="${prefix}" || return 1
+  make -C "${component_src}/projects/unix" install \
+    HOST_CPU=aarch64 PIC=1 USE_GLES=1 VULKAN=0 PREFIX="${prefix}" DESTDIR="${stage}" || return 1
+
+  for component in audio-sdl input-sdl rsp-hle video-rice; do
+    component_src="${src}/components/${component}"
+    make -C "${component_src}/projects/unix" clean >/dev/null 2>&1 || true
+    env CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+      make -C "${component_src}/projects/unix" -j"${JOBS}" \
+        HOST_CPU=aarch64 PIC=1 USE_GLES=1 APIDIR="${api}" PREFIX="${prefix}" || return 1
+    make -C "${component_src}/projects/unix" install \
+      HOST_CPU=aarch64 PIC=1 USE_GLES=1 APIDIR="${api}" PREFIX="${prefix}" \
+      DESTDIR="${stage}" || return 1
+  done
+
+  make -C "${src}/projects/unix" clean >/dev/null 2>&1 || true
+  env CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+    make -C "${src}/projects/unix" -j"${JOBS}" \
+      HOST_CPU=aarch64 PIC=1 APIDIR="${api}" PREFIX="${prefix}" \
+      COREDIR="${prefix}/lib/" PLUGINDIR="${prefix}/lib/mupen64plus" \
+      SHAREDIR="${prefix}/share/mupen64plus" || return 1
+  make -C "${src}/projects/unix" install \
+    HOST_CPU=aarch64 PIC=1 APIDIR="${api}" PREFIX="${prefix}" \
+    COREDIR="${prefix}/lib/" PLUGINDIR="${prefix}/lib/mupen64plus" \
+    SHAREDIR="${prefix}/share/mupen64plus" DESTDIR="${stage}" || return 1
+
+  rsync -a "${stage}${prefix}/" "${OUT_DIR}/standalone/mupen64plus/"
+  input_cfg="${OUT_DIR}/standalone/mupen64plus/share/mupen64plus/InputAutoCfg.ini"
+  if ! grep -Fqx '[adc_gamepad]' "${input_cfg}"; then
+    cat >>"${input_cfg}" <<'EOF'
+
+; POWKIDDY V90S built-in controls
+[adc_gamepad]
+plugged = True
+mouse = False
+AnalogDeadzone = 0,0
+AnalogPeak = 32768,32768
+DPad R = hat(0 Right)
+DPad L = hat(0 Left)
+DPad D = hat(0 Down)
+DPad U = hat(0 Up)
+Start = button(9)
+Z Trig = button(8)
+B Button = button(1)
+A Button = button(0)
+C Button R = button(7)
+C Button L = button(6)
+C Button D = button(2)
+C Button U = button(3)
+R Trig = button(5)
+L Trig = button(4)
+Mempak switch =
+Rumblepak switch =
+X Axis = hat(0 Left Right)
+Y Axis = hat(0 Up Down)
+EOF
+  fi
+  while IFS= read -r elf; do
+    target=$(readlink -f "${elf}") || return 1
+    rm -f "${elf}"
+    cp -a "${target}" "${elf}"
+  done < <(find "${OUT_DIR}/standalone/mupen64plus" -type l)
+  while IFS= read -r elf; do
+    "${STRIP}" "${elf}" >/dev/null 2>&1 || true
+    copy_runtime_deps "${elf}"
+  done < <(find "${OUT_DIR}/standalone/mupen64plus" -type f \
+    \( -perm -111 -o -name '*.so' -o -name '*.so.*' \))
+  append_manifest "  output=standalone/mupen64plus/bin/mupen64plus"
+  append_manifest "  data=standalone/mupen64plus/lib/mupen64plus"
+  append_manifest "  data=standalone/mupen64plus/share/mupen64plus"
+}
+
 write_launcher() {
   mkdir -p "${OUT_DIR}/bin" "${OUT_DIR}/config/standalone"
   cat >"${OUT_DIR}/bin/plumos-standalone-launch" <<'EOF'
@@ -356,6 +519,29 @@ case "${id}" in
     fi
     set -- --fullscreen --graphics=gles2.0 "$@"
     ;;
+  flycast)
+    exe="${EMU_ROOT}/flycast/bin/flycast"
+    data_dir="${XDG_DATA_HOME}/flycast/data"
+    mkdir -p "${data_dir}"
+    for bios in dc_boot.bin dc_flash.bin naomi.zip awbios.zip; do
+      [ -f "${PLUMOS_ROOT}/bios/${bios}" ] || continue
+      [ -f "${data_dir}/${bios}" ] || cp "${PLUMOS_ROOT}/bios/${bios}" "${data_dir}/${bios}"
+    done
+    set -- -config window:fullscreen=yes "$@"
+    ;;
+  mupen64plus)
+    exe="${EMU_ROOT}/mupen64plus/bin/mupen64plus"
+    m64_root="${EMU_ROOT}/mupen64plus"
+    m64_config="${XDG_CONFIG_HOME}/mupen64plus"
+    mkdir -p "${m64_config}" "${PLUMOS_ROOT}/Screenshots"
+    set -- --fullscreen --resolution 640x480 \
+      --corelib "${m64_root}/lib/libmupen64plus.so.2" \
+      --plugindir "${m64_root}/lib/mupen64plus" \
+      --datadir "${m64_root}/share/mupen64plus" \
+      --configdir "${m64_config}" --sshotdir "${PLUMOS_ROOT}/Screenshots" \
+      --gfx mupen64plus-video-rice.so --audio mupen64plus-audio-sdl.so \
+      --input mupen64plus-input-sdl.so --rsp mupen64plus-rsp-hle.so "$@"
+    ;;
   scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
   easyrpg) exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player" ;;
   openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
@@ -400,25 +586,35 @@ build_one() {
 }
 
 ROOT_DIR=$(cd "${ROOT_DIR}" && pwd)
+validate_filter || exit $?
 BUILD_ROOT=$(mkdir -p "${BUILD_ROOT}" && cd "${BUILD_ROOT}" && pwd)
 OUT_PARENT=$(dirname "${OUT_DIR}")
 mkdir -p "${OUT_PARENT}"
 OUT_PARENT=$(cd "${OUT_PARENT}" && pwd)
 OUT_DIR="${OUT_PARENT}/$(basename "${OUT_DIR}")"
 SRC_ROOT="${BUILD_ROOT}/src"
-rm -rf "${OUT_DIR}"
+case "${PLUMOS_STANDALONE_FILTER}" in
+  all|ALL) rm -rf "${OUT_DIR}" ;;
+esac
 mkdir -p "${OUT_DIR}/logs" "${OUT_DIR}/licenses" "${SRC_ROOT}"
 MANIFEST="${OUT_DIR}/standalone-emulators.manifest"
 LOG_DIR="${OUT_DIR}/logs"
 mkdir -p "${OUT_DIR}/config/standalone"
 SONAME_MAP="${OUT_DIR}/config/standalone/soname-links.tsv"
-: >"${SONAME_MAP}"
+case "${PLUMOS_STANDALONE_FILTER}" in
+  all|ALL) : >"${SONAME_MAP}" ;;
+  *) touch "${SONAME_MAP}" ;;
+esac
 {
   echo 'plumOS V90S standalone emulator build'
   echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo 'architecture=aarch64'
   echo 'reference=plumOS-MMF final package plus plumOS-A30 PPSSPP'
   echo "filter=${PLUMOS_STANDALONE_FILTER}"
+  case "${PLUMOS_STANDALONE_FILTER}" in
+    all|ALL) echo 'mode=full' ;;
+    *) echo 'mode=incremental' ;;
+  esac
   echo "cflags=${COMMON_CFLAGS}"
 } >"${MANIFEST}"
 write_launcher
@@ -428,6 +624,8 @@ build_one easyrpg "${EASYRPG_REPO}" "${EASYRPG_REF}" build_easyrpg
 build_one openbor "${OPENBOR_REPO}" "${OPENBOR_REF}" build_openbor
 build_one dosbox-staging "${DOSBOX_REPO}" "${DOSBOX_REF}" build_dosbox
 build_one pcsx_rearmed "${PCSX_REARMED_REPO}" "${PCSX_REARMED_REF}" build_pcsx_rearmed
+build_one flycast "${FLYCAST_REPO}" "${FLYCAST_REF}" build_flycast
+build_one mupen64plus "${MUPEN64PLUS_UI_REPO}" "${MUPEN64PLUS_REF}" build_mupen64plus
 {
   echo 'summary:'
   echo "  built=${BUILT_COUNT}"

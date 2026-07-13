@@ -487,8 +487,8 @@
           {"root": "sdcard", "path": "Images/n64"}
         ]
       },
-      "launch_profiles": ["retroarch:parallel_n64", "retroarch:mupen64plus_next"],
-      "default_launch_profile": "retroarch:parallel_n64",
+      "launch_profiles": ["retroarch:parallel_n64", "standalone:mupen64plus", "retroarch:mupen64plus_next"],
+      "default_launch_profile": "standalone:mupen64plus",
       "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
@@ -513,8 +513,8 @@
           {"root": "sdcard", "path": "Images/dreamcast"}
         ]
       },
-      "launch_profiles": ["retroarch:flycast"],
-      "default_launch_profile": "retroarch:flycast",
+      "launch_profiles": ["retroarch:flycast", "standalone:flycast"],
+      "default_launch_profile": "standalone:flycast",
       "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,

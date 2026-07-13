@@ -155,15 +155,20 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
 - [ ] Implement `picoarch`.
 - [x] Implement `standalone` for the MMF final-package emulator set plus
-  V90S PPSSPP:
+  V90S PPSSPP, Dreamcast, and N64:
   - PPSSPP 1.20.4
   - ScummVM 2026.2.0
   - EasyRPG Player 0.8.1.1
   - OpenBOR v6391
   - DOSBox Staging 0.82.2
   - PCSX-ReARMed r26l
-- [x] Build all six standalone executables as native aarch64 binaries with
+  - Flycast 2.6
+  - Mupen64Plus 2.6.0
+- [x] Build all eight standalone executables as native aarch64 binaries with
   zero failed recipes.
+- [x] Support incremental one-emulator builds such as
+  `scripts/docker-build.sh standalone flycast` without deleting the other
+  standalone outputs.
 - [x] Package the recursive non-vendor runtime dependency closure under the
   FAT32 app layer while preserving the vendor PowerVR EGL/GLES boundary.
 - [x] Integrate standalone executables, data, licenses, launcher, libraries,
@@ -178,6 +183,12 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Characterize PPSSPP performance: Ridge Racers is 60/60 in light scenes
     but about 38/60 in its heavy grandstand scene due to a saturated Cortex-A53
     main/render thread, not GPU saturation or thermal throttling.
+  - [x] Start Flycast 2.6 with Crazy Taxi through the FE standalone profile;
+    verify PowerVR GLES, `adc_gamepad`, nonblank framebuffer output, ALSA PCM,
+    and clean PID-targeted TERM shutdown.
+  - [x] Start Mupen64Plus 2.6.0 with Super Mario 64 through the FE standalone
+    profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
+    the V90S `adc_gamepad` auto-configuration.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.
@@ -373,7 +384,7 @@ Build plumOS V90S as a V90S-specific distribution:
   stop/start cycles; V90S can report `udc_state=configured` while macOS sees
   `plumOS V90S ADB` but `adb devices` stays empty.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
-- [ ] Copy standalone emulators into the app layer.
+- [x] Copy standalone emulators into the app layer.
 - [x] Live-capture the V90S physical key evdev mapping for D-pad, ABXY,
   shoulders, select/start/function, volume, and power; record the result in
   `docs/validation/2026-07-13-v90s-physical-keymap.md`.
@@ -523,5 +534,5 @@ Build plumOS V90S as a V90S-specific distribution:
   use them as the distribution identity.
 - [ ] Add more libretro cores after the current A/B recipe set is validated on
   real hardware.
-- [ ] Add standalone emulators after the app-layer split is stable.
+- [x] Add standalone emulators after the app-layer split is stable.
 - [ ] Add frontend workflows after the app-layer split is stable.
