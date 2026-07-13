@@ -361,6 +361,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Live-validate `UI Settings` controls: refresh TOP, UI mode,
   empty/favorites/recent TOP entries, ROM cursor wrap, boot resume mode,
   system/ROM sorting, scan-on-enter, and Graphic theme options.
+- [x] Align the V90S TOP status contract with MMF: keep the 3x2 system grid,
+  logos, header indicators, selection frame, and left accent, but never draw
+  transient/debug `status:` text along the bottom of TOP.
 - [x] Align the SELECT/Core Settings menu with the MMF-style settings layout
   and validate the V90S framebuffer render on the live device.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network

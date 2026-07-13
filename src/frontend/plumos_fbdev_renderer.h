@@ -2146,24 +2146,6 @@ static const struct plumos_fbdev_entry *plumos_fbdev_selected_entry(
                           : NULL;
 }
 
-static void plumos_fbdev_draw_status(struct plumos_fbdev_renderer *r,
-                                     const struct plumos_fbdev_palette *p,
-                                     char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX],
-                                     size_t line_count) {
-  const char *status = plumos_fbdev_find_value(lines, line_count, "status:");
-  char status_buf[180];
-  int w = (int)r->var.xres;
-  int h = (int)r->var.yres;
-
-  if (!status) {
-    return;
-  }
-  plumos_fbdev_copy_text(status_buf, sizeof(status_buf), status);
-  if (status_buf[0]) {
-    plumos_fbdev_draw_text(r, 24, h - 22, status_buf, 2, p->muted, w - 24);
-  }
-}
-
 static int plumos_fbdev_render_top_refresh_running(
     struct plumos_fbdev_renderer *r,
     const struct plumos_fbdev_palette *p) {
@@ -2370,7 +2352,6 @@ static int plumos_fbdev_render_top(struct plumos_fbdev_renderer *r,
     }
     plumos_fbdev_draw_top_tile(r, p, &entries[i], x, y, tile_size, tile_size);
   }
-  plumos_fbdev_draw_status(r, p, lines, line_count);
   return 1;
 }
 
