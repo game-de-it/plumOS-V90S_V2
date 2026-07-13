@@ -491,8 +491,14 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Write RetroArch launch and runtime logs to the app layer.
 - [ ] Keep future Pulse/PipeWire audio experiments separate from the known-good
   ALSA path unless real-device validation proves a replacement.
-- [ ] Keep future CPU governor or `irqbalance` experiments separate from the
-  known-good video/audio baseline unless validation proves a benefit.
+- [x] Replace fixed/OC CPU-frequency presets with dynamic V90S governors:
+  Interactive (game default), Performance, Ondemand, Schedutil, and
+  Conservative. Restore the full hardware frequency range before applying a
+  governor.
+- [x] Verify that the vendor PowerVR runtime exposes no standard devfreq GPU
+  governor; keep GPU governor controls out of the FE.
+- [ ] Keep future `irqbalance` experiments separate from the known-good
+  video/audio baseline unless validation proves a benefit.
 
 ## Milestone 7: Release Packaging
 

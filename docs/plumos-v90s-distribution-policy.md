@@ -1083,3 +1083,36 @@ The app layer should provide a small helper:
 The normal frontend launch path should call `start` before opening the FE, so
 rebooting with SD2 inserted automatically exposes SD2 ROMs and BIOS files. The
 `status` and `stop` commands are for troubleshooting and safe manual unmounts.
+
+### 2026-07-14: CPU and GPU Performance Policy
+
+Decision:
+
+Use dynamic CPU governors rather than user-selectable fixed frequencies. The
+frontend exposes these V90S-supported choices:
+
+```text
+Interactive   recommended default for games
+Performance   explicit maximum-performance option
+Ondemand      general-purpose compatibility option
+Schedutil     scheduler-driven option
+Conservative  slower-ramping power-conscious option
+```
+
+Every system profile defaults to `interactive`. The frontend itself returns to
+`ondemand` while browsing menus. Before applying a selected game governor, the
+launcher restores `scaling_min_freq` and `scaling_max_freq` to the hardware
+`cpuinfo_min_freq` and `cpuinfo_max_freq` range. This prevents an old fixed-MHz
+override from surviving a governor change.
+
+Do not expose `userspace`, fixed MHz, or OC frequency presets. Do not expose
+`powersave` as a normal FE choice because on this target it behaves as an
+effective minimum-frequency selection rather than a responsive game policy.
+`Performance` remains available for demanding emulators and diagnostics.
+
+The StockOS-derived PowerVR GE8300 runtime does not expose a standard devfreq
+governor under `/sys/class/devfreq`. Its vendor `sunxi_gpu` debug state reports
+DVFS disabled and an active clock around 700 MHz, while runtime PM can still
+suspend the GPU when idle. Therefore plumOS must not present a GPU governor
+setting. Add one only if a stable vendor-supported runtime interface is found
+and validated on the V90S.

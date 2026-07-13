@@ -224,6 +224,7 @@ export PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 system_id=""
 core=""
 rom=""
+cpu_policy=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -239,7 +240,15 @@ while [ "$#" -gt 0 ]; do
       rom="$2"
       shift 2
       ;;
-    --safe-exit|--cpu|--freq|--cores|--audio|--audio-latency|--dosbox-pure-force60fps|--dosbox-pure-cycles)
+    --cpu)
+      cpu_policy="$2"
+      shift 2
+      ;;
+    --freq)
+      echo "plumos-retroarch-launch: fixed CPU frequencies are no longer supported" >&2
+      exit 2
+      ;;
+    --safe-exit|--cores|--audio|--audio-latency|--dosbox-pure-force60fps|--dosbox-pure-cycles)
       shift 2
       ;;
     *)
@@ -260,6 +269,25 @@ mkdir -p \
   "$PLUMOS_ROOT/bios" \
   "$PLUMOS_ROOT/Saves/${system_id:-content}" \
   "$PLUMOS_ROOT/States/${system_id:-content}"
+
+case "$cpu_policy" in
+  interactive|performance|ondemand|schedutil|conservative)
+    for cpufreq in /sys/devices/system/cpu/cpufreq/policy*; do
+      [ -w "$cpufreq/scaling_governor" ] || continue
+      cpu_min="$(cat "$cpufreq/cpuinfo_min_freq" 2>/dev/null || true)"
+      cpu_max="$(cat "$cpufreq/cpuinfo_max_freq" 2>/dev/null || true)"
+      [ -z "$cpu_min" ] || printf '%s\n' "$cpu_min" > "$cpufreq/scaling_min_freq" 2>/dev/null || true
+      [ -z "$cpu_max" ] || printf '%s\n' "$cpu_max" > "$cpufreq/scaling_max_freq" 2>/dev/null || true
+      grep -qw "$cpu_policy" "$cpufreq/scaling_available_governors" 2>/dev/null || continue
+      printf '%s\n' "$cpu_policy" > "$cpufreq/scaling_governor" 2>/dev/null || true
+    done
+    ;;
+  "") ;;
+  *)
+    echo "plumos-retroarch-launch: unsupported CPU governor: $cpu_policy" >&2
+    exit 2
+    ;;
+esac
 
 export PLUMOS_V90S_RETROARCH_BIN="${PLUMOS_V90S_RETROARCH_BIN:-/usr/local/bin/retroarch}"
 export PLUMOS_V90S_CORE="$core"

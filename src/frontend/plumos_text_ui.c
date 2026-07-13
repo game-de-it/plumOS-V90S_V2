@@ -194,17 +194,11 @@ struct cpu_preset {
 };
 
 static const struct cpu_preset CPU_PRESETS[] = {
+    {"Interactive", "interactive", 0},
+    {"Performance", "performance", 0},
     {"Ondemand", "ondemand", 0},
-    {"400 MHz", "fixed", 400000},
-    {"600 MHz", "fixed", 600000},
-    {"800 MHz", "fixed", 800000},
-    {"1000 MHz", "fixed", 1000000},
-    {"1100 MHz", "fixed", 1100000},
-    {"1200 MHz", "fixed", 1200000},
-    {"OC 1300MHz", "fixed", 1300000},
-    {"OC 1400MHz", "fixed", 1400000},
-    {"OC 1500MHz", "fixed", 1500000},
-    {"OC 1600MHz", "fixed", 1600000},
+    {"Schedutil", "schedutil", 0},
+    {"Conservative", "conservative", 0},
 };
 
 static const size_t CPU_PRESET_COUNT = sizeof(CPU_PRESETS) / sizeof(CPU_PRESETS[0]);
@@ -452,24 +446,9 @@ static int valid_launch_profile_id(const char *s) {
 }
 
 static int valid_cpu_policy(const char *s) {
-  return s && (strcmp(s, "ondemand") == 0 || strcmp(s, "performance") == 0 ||
-               strcmp(s, "fixed") == 0);
-}
-
-static int parse_cpu_freq_khz(const char *s, long *out) {
-  char *end = NULL;
-  long value;
-
-  if (!s || !s[0] || !out) {
-    return 0;
-  }
-  errno = 0;
-  value = strtol(s, &end, 10);
-  if (errno != 0 || !end || *end != '\0' || value <= 0) {
-    return 0;
-  }
-  *out = value;
-  return 1;
+  return s && (strcmp(s, "interactive") == 0 || strcmp(s, "performance") == 0 ||
+               strcmp(s, "ondemand") == 0 || strcmp(s, "schedutil") == 0 ||
+               strcmp(s, "conservative") == 0);
 }
 
 static int valid_cpu_cores(long value) {
@@ -1476,19 +1455,10 @@ static int load_core_system_def(const char *path, const char *system_id,
     system.default_cpu_freq_khz =
         json_get_long(obj, obj + strlen(obj), "default_cpu_freq_khz", 0);
     system.default_cpu_cores = json_get_long(obj, obj + strlen(obj), "default_cpu_cores", 0);
-    if (!system.default_cpu_policy[0] && system.default_cpu_freq_khz > 0) {
-      copy_string(system.default_cpu_policy, sizeof(system.default_cpu_policy), "fixed");
-    }
     if (system.default_cpu_policy[0] && !valid_cpu_policy(system.default_cpu_policy)) {
       system.default_cpu_policy[0] = '\0';
-      system.default_cpu_freq_khz = 0;
     }
-    if (strcmp(system.default_cpu_policy, "fixed") == 0 && system.default_cpu_freq_khz <= 0) {
-      system.default_cpu_policy[0] = '\0';
-      system.default_cpu_freq_khz = 0;
-    } else if (strcmp(system.default_cpu_policy, "fixed") != 0) {
-      system.default_cpu_freq_khz = 0;
-    }
+    system.default_cpu_freq_khz = 0;
     if (!valid_cpu_cores(system.default_cpu_cores)) {
       system.default_cpu_cores = system.default_cpu_policy[0] ? 2 : 0;
     }
@@ -1558,12 +1528,7 @@ static int load_core_overrides(const char *path, struct core_override_state *sta
                       sizeof(entry.cpu_policy));
       entry.cpu_freq_khz = json_get_long(obj, obj + strlen(obj), "cpu_freq_khz", 0);
       entry.cpu_cores = json_get_long(obj, obj + strlen(obj), "cpu_cores", 0);
-      if (strcmp(entry.cpu_policy, "fixed") == 0 && entry.cpu_freq_khz <= 0) {
-        entry.cpu_policy[0] = '\0';
-        entry.cpu_freq_khz = 0;
-      } else if (strcmp(entry.cpu_policy, "fixed") != 0) {
-        entry.cpu_freq_khz = 0;
-      }
+      entry.cpu_freq_khz = 0;
       if (!valid_cpu_cores(entry.cpu_cores)) {
         entry.cpu_cores = 0;
       }
@@ -1613,12 +1578,7 @@ static int load_core_overrides(const char *path, struct core_override_state *sta
       entry.cpu_freq_khz = json_get_long(obj, obj + strlen(obj), "cpu_freq_khz", 0);
       entry.cpu_cores = json_get_long(obj, obj + strlen(obj), "cpu_cores", 0);
       entry.audio_latency_ms = json_get_long(obj, obj + strlen(obj), "audio_latency_ms", 0);
-      if (strcmp(entry.cpu_policy, "fixed") == 0 && entry.cpu_freq_khz <= 0) {
-        entry.cpu_policy[0] = '\0';
-        entry.cpu_freq_khz = 0;
-      } else if (strcmp(entry.cpu_policy, "fixed") != 0) {
-        entry.cpu_freq_khz = 0;
-      }
+      entry.cpu_freq_khz = 0;
       if (!valid_cpu_cores(entry.cpu_cores)) {
         entry.cpu_cores = 0;
       }
@@ -1867,11 +1827,7 @@ static int set_system_cpu_override(struct core_override_state *state, const char
   if (!valid_cpu_policy(cpu_policy)) {
     return 0;
   }
-  if (strcmp(cpu_policy, "fixed") != 0) {
-    cpu_freq_khz = 0;
-  } else if (cpu_freq_khz <= 0) {
-    return 0;
-  }
+  (void)cpu_freq_khz;
 
   if (idx >= 0) {
     entry = &state->system_overrides[idx];
@@ -1884,7 +1840,7 @@ static int set_system_cpu_override(struct core_override_state *state, const char
     copy_string(entry->system_id, sizeof(entry->system_id), system_id);
   }
   copy_string(entry->cpu_policy, sizeof(entry->cpu_policy), cpu_policy);
-  entry->cpu_freq_khz = cpu_freq_khz;
+  entry->cpu_freq_khz = 0;
   return 1;
 }
 
@@ -1983,11 +1939,7 @@ static int set_rom_cpu_override(struct core_override_state *state, const char *s
   if (!valid_cpu_policy(cpu_policy)) {
     return 0;
   }
-  if (strcmp(cpu_policy, "fixed") != 0) {
-    cpu_freq_khz = 0;
-  } else if (cpu_freq_khz <= 0) {
-    return 0;
-  }
+  (void)cpu_freq_khz;
 
   if (idx >= 0) {
     entry = &state->rom_overrides[idx];
@@ -2001,7 +1953,7 @@ static int set_rom_cpu_override(struct core_override_state *state, const char *s
     copy_string(entry->relative_path, sizeof(entry->relative_path), relative_path);
   }
   copy_string(entry->cpu_policy, sizeof(entry->cpu_policy), cpu_policy);
-  entry->cpu_freq_khz = cpu_freq_khz;
+  entry->cpu_freq_khz = 0;
   return 1;
 }
 
@@ -2232,13 +2184,8 @@ static int resolve_launch_profile(const struct core_system_def *system,
 }
 
 static int cpu_setting_is_valid(const char *policy, long freq_khz) {
-  if (!valid_cpu_policy(policy)) {
-    return 0;
-  }
-  if (strcmp(policy, "fixed") == 0) {
-    return freq_khz > 0;
-  }
-  return 1;
+  (void)freq_khz;
+  return valid_cpu_policy(policy);
 }
 
 static int copy_cpu_setting(char *policy_out, size_t policy_size, long *freq_out,
@@ -2249,7 +2196,7 @@ static int copy_cpu_setting(char *policy_out, size_t policy_size, long *freq_out
   if (!copy_string(policy_out, policy_size, policy)) {
     return 0;
   }
-  *freq_out = strcmp(policy, "fixed") == 0 ? freq_khz : 0;
+  *freq_out = 0;
   return 1;
 }
 
@@ -2298,19 +2245,22 @@ static int resolve_cpu_setting(const struct core_system_def *system,
 }
 
 static void format_cpu_setting(char *out, size_t out_size, const char *policy, long freq_khz) {
+  (void)freq_khz;
   if (!out || out_size == 0) {
     return;
   }
   if (!policy || !policy[0]) {
     copy_string(out, out_size, "launcher default");
+  } else if (strcmp(policy, "interactive") == 0) {
+    copy_string(out, out_size, "Interactive");
+  } else if (strcmp(policy, "performance") == 0) {
+    copy_string(out, out_size, "Performance");
   } else if (strcmp(policy, "ondemand") == 0) {
     copy_string(out, out_size, "Ondemand");
-  } else if (strcmp(policy, "fixed") == 0) {
-    if (freq_khz > 1200000 && freq_khz % 1000 == 0) {
-      snprintf(out, out_size, "OC %ldMHz", freq_khz / 1000);
-    } else {
-      snprintf(out, out_size, "fixed %ld kHz", freq_khz);
-    }
+  } else if (strcmp(policy, "schedutil") == 0) {
+    copy_string(out, out_size, "Schedutil");
+  } else if (strcmp(policy, "conservative") == 0) {
+    copy_string(out, out_size, "Conservative");
   } else {
     copy_string(out, out_size, policy);
   }
@@ -2318,11 +2268,10 @@ static void format_cpu_setting(char *out, size_t out_size, const char *policy, l
 
 static int cpu_setting_matches(const char *policy, long freq_khz, const char *other_policy,
                                long other_freq_khz) {
+  (void)freq_khz;
+  (void)other_freq_khz;
   if (!policy || !other_policy || strcmp(policy, other_policy) != 0) {
     return 0;
-  }
-  if (strcmp(policy, "fixed") == 0) {
-    return freq_khz == other_freq_khz;
   }
   return 1;
 }
@@ -3000,6 +2949,7 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
                              const struct retroarch_runtime_options *retroarch_options,
                              int auto_state_load) {
   size_t pos = 0;
+  (void)cpu_freq_khz;
 
   memset(plan, 0, sizeof(*plan));
   copy_string(plan->system_id, sizeof(plan->system_id), system_id);
@@ -3009,7 +2959,7 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
   copy_string(plan->launch_profile, sizeof(plan->launch_profile), launch_profile);
   if (cpu_policy && cpu_policy[0]) {
     copy_string(plan->cpu_policy, sizeof(plan->cpu_policy), cpu_policy);
-    plan->cpu_freq_khz = strcmp(cpu_policy, "fixed") == 0 ? cpu_freq_khz : 0;
+    plan->cpu_freq_khz = 0;
   }
   if (valid_cpu_cores(cpu_cores)) {
     plan->cpu_cores = cpu_cores;
@@ -3054,17 +3004,9 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
       return 0;
     }
     if (plan->cpu_policy[0]) {
-      char freq_buf[32];
       if (!append_string(plan->command, sizeof(plan->command), &pos, " --cpu ") ||
           !append_shell_quoted(plan->command, sizeof(plan->command), &pos, plan->cpu_policy)) {
         return 0;
-      }
-      if (strcmp(plan->cpu_policy, "fixed") == 0) {
-        snprintf(freq_buf, sizeof(freq_buf), "%ld", plan->cpu_freq_khz);
-        if (!append_string(plan->command, sizeof(plan->command), &pos, " --freq ") ||
-            !append_shell_quoted(plan->command, sizeof(plan->command), &pos, freq_buf)) {
-          return 0;
-        }
       }
     }
     if (plan->cpu_cores > 0) {
@@ -3117,7 +3059,6 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
   if (strncmp(launch_profile, "pyxel:", 6) == 0) {
     char launcher_dir[PATH_MAX];
     char extension[32];
-    char freq_buf[32];
     char cores_buf[16];
     const char *pyxel_profile = launch_profile + 6;
     const char *launcher_name = "plumos-pyxel-mmf-launch";
@@ -3158,16 +3099,6 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
           !append_string(plan->command, sizeof(plan->command), &pos, " ")) {
         return 0;
       }
-      if (strcmp(plan->cpu_policy, "fixed") == 0) {
-        snprintf(freq_buf, sizeof(freq_buf), "%ld", plan->cpu_freq_khz);
-        if (!append_string(plan->command, sizeof(plan->command), &pos,
-                           "PLUMOS_PYXEL_CPU_FREQ=") ||
-            !append_shell_quoted(plan->command, sizeof(plan->command), &pos,
-                                 freq_buf) ||
-            !append_string(plan->command, sizeof(plan->command), &pos, " ")) {
-          return 0;
-        }
-      }
     }
     if (plan->cpu_cores > 0) {
       snprintf(cores_buf, sizeof(cores_buf), "%ld", plan->cpu_cores);
@@ -3196,7 +3127,6 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
   if (strncmp(launch_profile, "picoarch:", 9) == 0) {
     const char *core_id = launch_profile + 9;
     char launcher_dir[PATH_MAX];
-    char freq_buf[32];
     char cores_buf[16];
     int onion_compat = picoarch_onion_compat_enabled(plumos_root);
 
@@ -3222,16 +3152,6 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
                                plan->cpu_policy) ||
           !append_string(plan->command, sizeof(plan->command), &pos, " ")) {
         return 0;
-      }
-      if (strcmp(plan->cpu_policy, "fixed") == 0) {
-        snprintf(freq_buf, sizeof(freq_buf), "%ld", plan->cpu_freq_khz);
-        if (!append_string(plan->command, sizeof(plan->command), &pos,
-                           "PLUMOS_PICOARCH_CPU_FREQ=") ||
-            !append_shell_quoted(plan->command, sizeof(plan->command), &pos,
-                                 freq_buf) ||
-            !append_string(plan->command, sizeof(plan->command), &pos, " ")) {
-          return 0;
-        }
       }
     }
     if (plan->cpu_cores > 0) {
@@ -3266,7 +3186,6 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
     const char *content_path;
     char launcher_dir[PATH_MAX];
     char standalone_content_path[PATH_MAX];
-    char freq_buf[32];
     char cores_buf[16];
 
     copy_string(plan->kind, sizeof(plan->kind), "standalone");
@@ -3285,16 +3204,6 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
                                plan->cpu_policy) ||
           !append_string(plan->command, sizeof(plan->command), &pos, " ")) {
         return 0;
-      }
-      if (strcmp(plan->cpu_policy, "fixed") == 0) {
-        snprintf(freq_buf, sizeof(freq_buf), "%ld", plan->cpu_freq_khz);
-        if (!append_string(plan->command, sizeof(plan->command), &pos,
-                           "PLUMOS_STANDALONE_CPU_FREQ=") ||
-            !append_shell_quoted(plan->command, sizeof(plan->command), &pos,
-                                 freq_buf) ||
-            !append_string(plan->command, sizeof(plan->command), &pos, " ")) {
-          return 0;
-        }
       }
     }
     if (plan->cpu_cores > 0) {
@@ -3352,11 +3261,7 @@ static void print_launch_plan(const struct launch_plan *plan) {
   printf("path: %s\n", plan->rom_path);
   printf("launch_profile: %s\n", plan->launch_profile);
   if (plan->cpu_policy[0]) {
-    if (strcmp(plan->cpu_policy, "fixed") == 0) {
-      printf("cpu: %s %ld kHz\n", plan->cpu_policy, plan->cpu_freq_khz);
-    } else {
-      printf("cpu: %s\n", plan->cpu_policy);
-    }
+    printf("cpu: %s\n", plan->cpu_policy);
   } else {
     printf("cpu: launcher default\n");
   }
@@ -4228,7 +4133,7 @@ static void print_core_selection(const char *scope, const struct core_system_def
   }
 
   printf("\n");
-  printf("CPU frequency presets\n");
+  printf("CPU governor presets\n");
   printf("%-4s %-22s %-12s %-8s %-8s %-8s %s\n", "No.", "Preset", "Value", "Default",
          "System", "ROM", "Effective");
   printf("%-4s %-22s %-12s %-8s %-8s %-8s %s\n", "---", "------", "-----", "-------",
@@ -4263,9 +4168,9 @@ static void usage(const char *argv0) {
   printf("  %s top [--all] [--refresh] [--limit N]\n", argv0);
   printf("  %s roms SYSTEM [--no-scan] [--limit N]\n", argv0);
   printf("  %s menu start|apps [--limit N]\n", argv0);
-  printf("  %s core system SYSTEM [--set PROFILE] [--cpu ondemand|performance|fixed] [--freq KHZ] [--clear-profile|--clear|--clear-cpu]\n",
+  printf("  %s core system SYSTEM [--set PROFILE] [--cpu interactive|performance|ondemand|schedutil|conservative] [--clear-profile|--clear|--clear-cpu]\n",
          argv0);
-  printf("  %s core rom SYSTEM RELATIVE_PATH [--set PROFILE] [--cpu ondemand|performance|fixed] [--freq KHZ] [--content-suffix '#EXE'] [--audio oss|alsa|alsathread|mmf_ao] [--latency MS] [--dosbox-force60fps true|false] [--dosbox-cycles auto|max|N] [--clear-profile|--clear|--clear-cpu|--clear-content-suffix|--clear-audio|--clear-dosbox] [--no-scan]\n",
+  printf("  %s core rom SYSTEM RELATIVE_PATH [--set PROFILE] [--cpu interactive|performance|ondemand|schedutil|conservative] [--content-suffix '#EXE'] [--audio oss|alsa|alsathread|mmf_ao] [--latency MS] [--dosbox-force60fps true|false] [--dosbox-cycles auto|max|N] [--clear-profile|--clear|--clear-cpu|--clear-content-suffix|--clear-audio|--clear-dosbox] [--no-scan]\n",
          argv0);
   printf("  %s favorites [--limit N]\n", argv0);
   printf("  %s favorite rom SYSTEM RELATIVE_PATH [--toggle|--set|--clear] [--no-scan]\n",
@@ -5178,7 +5083,6 @@ int main(int argc, char **argv) {
     const char *set_audio_driver = NULL;
     const char *set_dosbox_force60fps = NULL;
     const char *set_dosbox_cycles = NULL;
-    long set_cpu_freq_khz = 0;
     long set_cpu_cores = 0;
     long set_audio_latency_ms = 0;
     struct core_system_def system;
@@ -5189,7 +5093,6 @@ int main(int argc, char **argv) {
     int clear_content_suffix = 0;
     int clear_audio = 0;
     int clear_dosbox = 0;
-    int freq_seen = 0;
     int cores_seen = 0;
     int audio_latency_seen = 0;
     int scan = 1;
@@ -5248,15 +5151,8 @@ int main(int argc, char **argv) {
           return 2;
         }
       } else if (strcmp(argv[i], "--freq") == 0 && i + 1 < argc) {
-        if (clear || clear_cpu || freq_seen) {
-          fprintf(stderr, "error: use only one CPU frequency action\n");
-          return 2;
-        }
-        if (!parse_cpu_freq_khz(argv[++i], &set_cpu_freq_khz)) {
-          fprintf(stderr, "error: invalid CPU frequency: %s\n", argv[i]);
-          return 2;
-        }
-        freq_seen = 1;
+        fprintf(stderr, "error: fixed CPU frequencies are no longer supported\n");
+        return 2;
       } else if (strcmp(argv[i], "--cores") == 0 && i + 1 < argc) {
         if (clear || clear_cpu || cores_seen) {
           fprintf(stderr, "error: use only one CPU core action\n");
@@ -5336,7 +5232,7 @@ int main(int argc, char **argv) {
         }
         clear_dosbox = 1;
       } else if (strcmp(argv[i], "--clear") == 0) {
-        if (clear || set_profile || set_cpu_policy || clear_cpu || freq_seen || cores_seen ||
+        if (clear || set_profile || set_cpu_policy || clear_cpu || cores_seen ||
             clear_profile || set_content_suffix || clear_content_suffix || set_audio_driver ||
             audio_latency_seen || clear_audio || set_dosbox_force60fps ||
             set_dosbox_cycles || clear_dosbox) {
@@ -5351,7 +5247,7 @@ int main(int argc, char **argv) {
         }
         clear_profile = 1;
       } else if (strcmp(argv[i], "--clear-cpu") == 0) {
-        if (clear || set_cpu_policy || clear_cpu || freq_seen || cores_seen) {
+        if (clear || set_cpu_policy || clear_cpu || cores_seen) {
           fprintf(stderr, "error: use only one CPU action\n");
           return 2;
         }
@@ -5378,19 +5274,6 @@ int main(int argc, char **argv) {
       fprintf(stderr, "error: launch profile is not listed for %s: %s\n", system_id,
               set_profile);
       return 2;
-    }
-    if (freq_seen && !set_cpu_policy) {
-      set_cpu_policy = "fixed";
-    }
-    if (set_cpu_policy) {
-      if (strcmp(set_cpu_policy, "fixed") == 0 && !freq_seen) {
-        fprintf(stderr, "error: --cpu fixed requires --freq KHZ\n");
-        return 2;
-      }
-      if (strcmp(set_cpu_policy, "fixed") != 0 && freq_seen) {
-        fprintf(stderr, "error: --freq can be used only with --cpu fixed\n");
-        return 2;
-      }
     }
     if (!rom_relative_path &&
         (set_content_suffix || clear_content_suffix || set_audio_driver ||
@@ -5458,9 +5341,9 @@ int main(int argc, char **argv) {
       if (ok && set_cpu_policy) {
         ok = rom_relative_path
                  ? set_rom_cpu_override(&state, system_id, rom_relative_path, set_cpu_policy,
-                                        set_cpu_freq_khz)
+                                        0)
                  : set_system_cpu_override(&state, system_id, set_cpu_policy,
-                                           set_cpu_freq_khz);
+                                           0);
       }
       if (ok && cores_seen) {
         ok = rom_relative_path

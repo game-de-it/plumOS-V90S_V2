@@ -551,9 +551,14 @@ esac
 
 cpu_policy=${PLUMOS_STANDALONE_CPU_POLICY:-}
 case "${cpu_policy}" in
-  performance|ondemand|powersave)
+  interactive|performance|ondemand|schedutil|conservative)
     for cpufreq in /sys/devices/system/cpu/cpufreq/policy*; do
       [ -w "${cpufreq}/scaling_governor" ] || continue
+      cpu_min=$(cat "${cpufreq}/cpuinfo_min_freq" 2>/dev/null || true)
+      cpu_max=$(cat "${cpufreq}/cpuinfo_max_freq" 2>/dev/null || true)
+      [ -z "${cpu_min}" ] || printf '%s\n' "${cpu_min}" >"${cpufreq}/scaling_min_freq" 2>/dev/null || true
+      [ -z "${cpu_max}" ] || printf '%s\n' "${cpu_max}" >"${cpufreq}/scaling_max_freq" 2>/dev/null || true
+      grep -qw "${cpu_policy}" "${cpufreq}/scaling_available_governors" 2>/dev/null || continue
       printf '%s\n' "${cpu_policy}" >"${cpufreq}/scaling_governor" 2>/dev/null || true
     done
     ;;

@@ -832,17 +832,11 @@ static const struct power_entry POWER_ENTRIES[] = {
 static const size_t POWER_ENTRY_COUNT = sizeof(POWER_ENTRIES) / sizeof(POWER_ENTRIES[0]);
 
 static const struct performance_cpu_preset PERFORMANCE_CPU_PRESETS[] = {
+    {"Interactive", "interactive", 0},
+    {"Performance", "performance", 0},
     {"Ondemand", "ondemand", 0},
-    {"400 MHz", "fixed", 400000},
-    {"600 MHz", "fixed", 600000},
-    {"800 MHz", "fixed", 800000},
-    {"1000 MHz", "fixed", 1000000},
-    {"1100 MHz", "fixed", 1100000},
-    {"1200 MHz", "fixed", 1200000},
-    {"OC 1300MHz", "fixed", 1300000},
-    {"OC 1400MHz", "fixed", 1400000},
-    {"OC 1500MHz", "fixed", 1500000},
-    {"OC 1600MHz", "fixed", 1600000},
+    {"Schedutil", "schedutil", 0},
+    {"Conservative", "conservative", 0},
 };
 
 static const size_t PERFORMANCE_CPU_PRESET_COUNT =
@@ -1904,7 +1898,6 @@ static void save_cpu_policy_snapshot(struct cpu_policy_snapshot *snapshot) {
 }
 
 static int apply_scraping_cpu_policy(struct cpu_policy_snapshot *snapshot) {
-  const char *freq = "1200000";
   char path[PATH_MAX];
   int cpu;
 
@@ -1916,10 +1909,16 @@ static int apply_scraping_cpu_policy(struct cpu_policy_snapshot *snapshot) {
     cpu_online_path(path, sizeof(path), cpu);
     write_text_file_line(path, "1");
   }
-  write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq", freq);
-  write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq", freq);
-  write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "userspace");
-  write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed", freq);
+  if (snapshot->cpuinfo_min_freq[0]) {
+    write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
+                         snapshot->cpuinfo_min_freq);
+  }
+  if (snapshot->cpuinfo_max_freq[0]) {
+    write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+                         snapshot->cpuinfo_max_freq);
+  }
+  write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+                       "interactive");
   return snapshot->saved;
 }
 
@@ -2853,31 +2852,15 @@ static int run_scheduled_mmf_brightness_reapply(struct ui_state *ui,
   return 1;
 }
 
-static long frontend_cpu_baseline_khz(void) {
-  const char *env = getenv("PLUMOS_CPU_BASELINE_KHZ");
-  char *endptr = NULL;
-  long parsed;
-
-  if (!env || !env[0]) {
-    return 800000;
-  }
-  errno = 0;
-  parsed = strtol(env, &endptr, 10);
-  if (errno != 0 || endptr == env || *endptr != '\0' ||
-      parsed < 400000 || parsed > 1200000) {
-    return 800000;
-  }
-  return parsed;
-}
-
 static const char *frontend_cpu_baseline_governor(void) {
   const char *env = getenv("PLUMOS_CPU_BASELINE_GOVERNOR");
 
   if (!env || !env[0]) {
     return "ondemand";
   }
-  if (strcmp(env, "ondemand") == 0 || strcmp(env, "powersave") == 0 ||
-      strcmp(env, "performance") == 0 || strcmp(env, "userspace") == 0) {
+  if (strcmp(env, "interactive") == 0 || strcmp(env, "performance") == 0 ||
+      strcmp(env, "ondemand") == 0 || strcmp(env, "schedutil") == 0 ||
+      strcmp(env, "conservative") == 0) {
     return env;
   }
   return "ondemand";
@@ -2886,7 +2869,6 @@ static const char *frontend_cpu_baseline_governor(void) {
 static void apply_frontend_cpu_default(void) {
   const char *disabled = getenv("PLUMOS_CONTROLLER_CPU_DEFAULT");
   const char *governor = frontend_cpu_baseline_governor();
-  char freq[32];
   char cpuinfo_min[64];
   char cpuinfo_max[64];
 
@@ -2894,8 +2876,6 @@ static void apply_frontend_cpu_default(void) {
                    strcmp(disabled, "false") == 0)) {
     return;
   }
-
-  snprintf(freq, sizeof(freq), "%ld\n", frontend_cpu_baseline_khz());
 
   write_text_file("/sys/devices/system/cpu/cpu1/online", "1\n");
   write_text_file("/sys/devices/system/cpu/cpu2/online", "0\n");
@@ -2905,15 +2885,6 @@ static void apply_frontend_cpu_default(void) {
                        cpuinfo_min, sizeof(cpuinfo_min));
   read_first_line_file("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
                        cpuinfo_max, sizeof(cpuinfo_max));
-
-  if (strcmp(governor, "userspace") == 0) {
-    write_text_file("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq", freq);
-    write_text_file("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq", freq);
-    write_text_file("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
-                    "userspace\n");
-    write_text_file("/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed", freq);
-    return;
-  }
 
   if (cpuinfo_min[0]) {
     write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
@@ -5825,21 +5796,22 @@ static void copy_parenthesized_source(char *out, size_t out_size, const char *so
 
 static void performance_format_cpu_label(char *out, size_t out_size,
                                          const char *policy, long freq_khz) {
+  (void)freq_khz;
   if (!out || out_size == 0) {
     return;
   }
   if (!policy || !policy[0]) {
     copy_string(out, out_size, "launcher default");
+  } else if (strcmp(policy, "interactive") == 0) {
+    copy_string(out, out_size, "Interactive");
+  } else if (strcmp(policy, "performance") == 0) {
+    copy_string(out, out_size, "Performance");
   } else if (strcmp(policy, "ondemand") == 0) {
     copy_string(out, out_size, "Ondemand");
-  } else if (strcmp(policy, "fixed") == 0 && freq_khz > 0) {
-    if (freq_khz > 1200000 && freq_khz % 1000 == 0) {
-      snprintf(out, out_size, "OC %ldMHz", freq_khz / 1000);
-    } else if (freq_khz % 1000 == 0) {
-      snprintf(out, out_size, "%ld MHz", freq_khz / 1000);
-    } else {
-      snprintf(out, out_size, "%ld kHz", freq_khz);
-    }
+  } else if (strcmp(policy, "schedutil") == 0) {
+    copy_string(out, out_size, "Schedutil");
+  } else if (strcmp(policy, "conservative") == 0) {
+    copy_string(out, out_size, "Conservative");
   } else {
     copy_string(out, out_size, policy);
   }
@@ -5847,9 +5819,6 @@ static void performance_format_cpu_label(char *out, size_t out_size,
 
 static int parse_cpu_label_value(const char *label, char *policy,
                                  size_t policy_size, long *freq_khz) {
-  char *endptr = NULL;
-  long value;
-
   if (policy && policy_size > 0) {
     policy[0] = '\0';
   }
@@ -5859,31 +5828,21 @@ static int parse_cpu_label_value(const char *label, char *policy,
   if (!label || !policy || policy_size == 0 || !freq_khz) {
     return 0;
   }
-  if (strncmp(label, "fixed ", 6) == 0) {
-    errno = 0;
-    value = strtol(label + 6, &endptr, 10);
-    if (errno == 0 && endptr && value > 0) {
-      copy_string(policy, policy_size, "fixed");
-      *freq_khz = value;
-      return 1;
-    }
-  } else if (strncmp(label, "OC ", 3) == 0) {
-    errno = 0;
-    value = strtol(label + 3, &endptr, 10);
-    while (endptr && isspace((unsigned char)*endptr)) {
-      endptr++;
-    }
-    if (errno == 0 && endptr && value > 0 &&
-        (strcmp(endptr, "MHz") == 0 || *endptr == '\0')) {
-      copy_string(policy, policy_size, "fixed");
-      *freq_khz = value * 1000L;
-      return 1;
-    }
+  if (strcmp(label, "interactive") == 0 || strcmp(label, "Interactive") == 0) {
+    copy_string(policy, policy_size, "interactive");
+    return 1;
+  } else if (strcmp(label, "performance") == 0 || strcmp(label, "Performance") == 0) {
+    copy_string(policy, policy_size, "performance");
+    return 1;
   } else if (strcmp(label, "ondemand") == 0 || strcmp(label, "Ondemand") == 0) {
     copy_string(policy, policy_size, "ondemand");
     return 1;
-  } else if (strcmp(label, "performance") == 0) {
-    copy_string(policy, policy_size, label);
+  } else if (strcmp(label, "schedutil") == 0 || strcmp(label, "Schedutil") == 0) {
+    copy_string(policy, policy_size, "schedutil");
+    return 1;
+  } else if (strcmp(label, "conservative") == 0 ||
+             strcmp(label, "Conservative") == 0) {
+    copy_string(policy, policy_size, "conservative");
     return 1;
   }
   return 0;
@@ -5891,6 +5850,7 @@ static int parse_cpu_label_value(const char *label, char *policy,
 
 static int performance_cpu_preset_index(const char *policy, long freq_khz) {
   size_t i;
+  (void)freq_khz;
 
   if (!policy || !policy[0]) {
     return 0;
@@ -5898,9 +5858,6 @@ static int performance_cpu_preset_index(const char *policy, long freq_khz) {
   for (i = 0; i < PERFORMANCE_CPU_PRESET_COUNT; i++) {
     const struct performance_cpu_preset *preset = &PERFORMANCE_CPU_PRESETS[i];
     if (strcmp(policy, preset->policy) != 0) {
-      continue;
-    }
-    if (strcmp(policy, "fixed") == 0 && freq_khz != preset->freq_khz) {
       continue;
     }
     return (int)i;
@@ -5986,7 +5943,7 @@ static void add_performance_settings_entries(struct ui_state *ui) {
   load_performance_core_state(ui);
   add_setting_entry(ui, "performance_system", "System",
                     ui->performance_system_name[0] ? ui->performance_system_name : "-");
-  add_setting_entry(ui, "performance_cpu_policy", "CPU freq",
+  add_setting_entry(ui, "performance_cpu_policy", "CPU Governor",
                     ui->performance_cpu_label);
   add_setting_entry(ui, "performance_clear_cpu_override", "Reset to Default", "");
 }
@@ -8944,8 +8901,8 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line1, line1_size, "Choose the system CPU setting to edit.");
       copy_string(line2, line2_size, "Values are saved as plumOS core overrides.");
     } else if (strcmp(id, "performance_cpu_policy") == 0) {
-      copy_string(line1, line1_size, "Set the CPU governor or fixed frequency.");
-      copy_string(line2, line2_size, "MMF presets include Ondemand, fixed MHz, and OC.");
+      copy_string(line1, line1_size, "Select the CPU governor for this system.");
+      copy_string(line2, line2_size, "Interactive is recommended; Performance is available.");
     } else if (strcmp(id, "performance_clear_cpu_override") == 0) {
       copy_string(line1, line1_size, "Reset this system to the plumOS default.");
       copy_string(line2, line2_size, "Default comes from the system profile.");
@@ -9263,14 +9220,14 @@ static void render_core_select(struct ui_state *ui) {
             ui->core_menu_cursor == CORE_MENU_ROW_DEFAULT ? '>' : ' ',
             default_label);
   ui_printf(ui, "    3  ------------------------------\n");
-  ui_printf(ui, "%c   4  CPU freq < %s >\n",
+  ui_printf(ui, "%c   4  CPU governor < %s >\n",
             ui->core_menu_cursor == CORE_MENU_ROW_CPU_FREQ ? '>' : ' ',
             ui->core_cpu_label);
   for (i = 0; i < ui->core_line_count; i++) {
     ui_printf(ui, "%s\n", ui->core_lines[i]);
   }
   if (ui->core_menu_cursor == CORE_MENU_ROW_CPU_FREQ) {
-    footer1 = "CPU governor or fixed frequency for this target.";
+    footer1 = "CPU governor for this target.";
     footer2 = ui->core_cpu_source[0] ? ui->core_cpu_source : "source unavailable";
   } else if (ui->core_menu_cursor == CORE_MENU_ROW_DEFAULT) {
     footer1 = "A removes this target core override.";
@@ -10137,7 +10094,7 @@ static int load_core_select_lines(struct ui_state *ui, const char *system_id,
       in_launch_profiles = 1;
       continue;
     }
-    if (strcmp(line, "CPU frequency presets") == 0) {
+    if (strcmp(line, "CPU governor presets") == 0) {
       in_launch_profiles = 0;
       continue;
     }
@@ -10311,11 +10268,7 @@ static void cycle_core_cpu_policy(struct ui_state *ui, int direction) {
     index = 0;
   }
   preset = &PERFORMANCE_CPU_PRESETS[index];
-  if (strcmp(preset->policy, "fixed") == 0) {
-    snprintf(extra, sizeof(extra), " --cpu fixed --freq %ld", preset->freq_khz);
-  } else {
-    snprintf(extra, sizeof(extra), " --cpu %s", preset->policy);
-  }
+  snprintf(extra, sizeof(extra), " --cpu %s", preset->policy);
   if (!run_core_text_ui_extra(ui, extra)) {
     return;
   }
@@ -10323,10 +10276,10 @@ static void cycle_core_cpu_policy(struct ui_state *ui, int direction) {
                               ui->core_target_relative_path[0]
                                   ? ui->core_target_relative_path
                                   : NULL)) {
-    set_status(ui, "CPU freq saved; reload failed");
+    set_status(ui, "CPU governor saved; reload failed");
     return;
   }
-  snprintf(ui->status, sizeof(ui->status), "CPU freq saved: %.80s",
+  snprintf(ui->status, sizeof(ui->status), "CPU governor saved: %.80s",
            preset->label);
 }
 
@@ -12060,17 +12013,13 @@ static int save_performance_cpu_policy_choice(struct ui_state *ui, int direction
     index = 0;
   }
   preset = &PERFORMANCE_CPU_PRESETS[index];
-  if (strcmp(preset->policy, "fixed") == 0) {
-    snprintf(extra, sizeof(extra), " --cpu fixed --freq %ld", preset->freq_khz);
-  } else {
-    snprintf(extra, sizeof(extra), " --cpu %s", preset->policy);
-  }
+  snprintf(extra, sizeof(extra), " --cpu %s", preset->policy);
   if (!run_performance_text_ui_core_system(ui, extra)) {
     return 0;
   }
   update_settings_entries_after_save(ui);
   settings_start_arrow_blink(ui, direction);
-  snprintf(ui->status, sizeof(ui->status), "saved CPU freq=%s", preset->label);
+  snprintf(ui->status, sizeof(ui->status), "saved CPU governor=%s", preset->label);
   return 1;
 }
 
