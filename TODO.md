@@ -156,8 +156,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Implement `picoarch` as a native AArch64 runtime with SDL12 compatibility,
   V90S fbdev double-buffer presentation, FAT32-owned settings/saves, and shared
   `/mnt/plumos/cores/*_libretro.so` core resolution. QuickNES video and ALSA
-  audio are validated on real hardware; controller confirmation remains a
-  manual device check.
+  audio are validated on real hardware. The V90S evdev controller mapping and
+  Aspect screen-size default are deployed; physical button confirmation remains
+  a manual device check.
 - [x] Implement `standalone` for the MMF final-package emulator set plus
   V90S PPSSPP, Dreamcast, and N64:
   - PPSSPP 1.20.4

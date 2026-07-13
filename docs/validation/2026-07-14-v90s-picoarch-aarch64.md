@@ -31,6 +31,18 @@ port therefore keeps PicoArch's RGB565 logical surface and converts it to the
 effect is `NONE`; upstream's default `SCANLINE` effect was the source of the
 one-line gaps seen during the first test.
 
+The V90S controller is read directly through evdev instead of relying on SDL's
+generic joystick numbering. The platform mapping follows the captured
+`adc_gamepad` contract: `ABS_HAT0X/Y` provide the d-pad, `BTN_SOUTH/EAST` are
+A/B, `BTN_NORTH/WEST` are X/Y, and the remaining shoulder, trigger, Select,
+Start, and Function buttons use their Linux input codes. Function opens the
+PicoArch menu. HAT axes are translated to digital directions both during core
+execution and in PicoArch menus.
+
+The default screen-size setting is `Aspect`. This changes only the initial
+value; settings saved by a user under `/mnt/plumos/state/picoarch/<system>`
+continue to take precedence.
+
 ## Real-device result
 
 The deployed process was:
@@ -48,12 +60,16 @@ Validated facts:
 - the FE resolves `picoarch:quicknes` to the shared core, reports
   `can_execute: yes`, and starts the same formal PicoArch binary;
 - the captured visible 640x480 framebuffer page contains correctly positioned
-  game output while the inactive page is populated separately;
+  4:3 game output while the inactive page is populated separately;
 - the visible route uses vsync-aware double-buffer page switching;
+- the deployed PicoArch opens `/dev/input/event4` through the V90S evdev path
+  in addition to SDL's device handle;
 - ALSA PCM playback reports `state: RUNNING` with PicoArch as owner;
 - configuration, saves, BIOS, logs, and state remain under `/mnt/plumos`;
 - `plumos-picoarch-stop` verifies the exact executable before signalling and
   does not use broad process matching.
 
-Physical controller input and final subjective motion stability remain manual
+The deployed binary SHA-256 is
+`01e5405e06e78c5cdcc61f06608de31a6552db30f819c4646586e1294f7ca3b9`.
+Physical button response and final subjective motion stability remain manual
 device checks.
