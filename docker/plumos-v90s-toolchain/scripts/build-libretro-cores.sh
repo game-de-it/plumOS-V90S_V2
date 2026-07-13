@@ -13,7 +13,7 @@ PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-plumos}"
 FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 2)}"
 BUILD_JOB_FALLBACKS="${BUILD_JOB_FALLBACKS:-1}"
-LIBRETRO_SERIAL_CORES="${LIBRETRO_SERIAL_CORES:-nestopia quicknes gambatte gpsp picodrive mednafen_pce_fast mednafen_supergrafx mednafen_ngp mednafen_lynx handy prosystem gw pokemini mednafen_vb dinothawr mrboom tgbdual beetle_saturn flycast mupen64plus_next parallel_n64 yabasanshiro}"
+LIBRETRO_SERIAL_CORES="${LIBRETRO_SERIAL_CORES:-nestopia quicknes gambatte gpsp picodrive mednafen_pce_fast mednafen_supergrafx mednafen_ngp mednafen_lynx handy prosystem gw pokemini mednafen_vb dinothawr mrboom tgbdual beetle_saturn flycast flycast_xtreme mupen64plus_next parallel_n64 yabasanshiro}"
 COMMON_CFLAGS="${COMMON_CFLAGS:--O3 -pipe -DNDEBUG -fPIC -fomit-frame-pointer}"
 COMMON_CXXFLAGS="${COMMON_CXXFLAGS:-$COMMON_CFLAGS}"
 COMMON_LDFLAGS="${COMMON_LDFLAGS:-}"
@@ -161,6 +161,9 @@ core_output_aliases() {
 
 core_stage_base() {
   case "$1:$2" in
+    flycast_xtreme:flycast_libretro.so)
+      printf '%s\n' flycast_xtreme_libretro.so
+      ;;
     km_duckswanstation_xtreme_amped:swanstation_libretro.so)
       printf '%s\n' km_duckswanstation_xtreme_amped_libretro.so
       ;;
@@ -463,7 +466,7 @@ patch_core_source() {
         printf '\n[plumOS] patched mame2000 ARM inline vector multiply guard for aarch64\n' >> "$log"
       fi
       ;;
-    mednafen_ngp|beetle_saturn|flycast|mupen64plus_next|parallel_n64|yabasanshiro)
+    mednafen_ngp|beetle_saturn|flycast|flycast_xtreme|mupen64plus_next|parallel_n64|yabasanshiro)
       while IFS= read -r lua_makefile; do
         [ -f "$lua_makefile" ] || continue
         sed -i -E \
@@ -696,13 +699,22 @@ copy_core_info() {
   local src="$2"
   local info=""
 
-  if [ -f "$SRC_ROOT/core-info/$base.info" ]; then
+  if [ "$base" = "flycast_xtreme_libretro" ] &&
+     [ -f "$SRC_ROOT/core-info/flycast_libretro.info" ]; then
+    info="$SRC_ROOT/core-info/flycast_libretro.info"
+  elif [ -f "$SRC_ROOT/core-info/$base.info" ]; then
     info="$SRC_ROOT/core-info/$base.info"
   else
     info="$(find "$src" -type f -name "$base.info" | sort | head -n 1 || true)"
   fi
   if [ -n "$info" ] && [ -f "$info" ]; then
     cp "$info" "$OUT_DIR/info/$base.info"
+    if [ "$base" = "flycast_xtreme_libretro" ]; then
+      sed -i \
+        -e 's/^display_name = .*/display_name = "Sega - Dreamcast\/NAOMI (Flycast Xtreme)"/' \
+        -e 's/^corename = .*/corename = "Flycast Xtreme"/' \
+        "$OUT_DIR/info/$base.info"
+    fi
   fi
 }
 

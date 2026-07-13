@@ -126,6 +126,10 @@ Build plumOS V90S as a V90S-specific distribution:
   - compatibility aliases:
     `dosbox_pure_0.9.7`, `beetle_saturn`,
     `km_puae_xtreme_amped`, and `uae4arm`
+  - V90S Dreamcast extension: one additional `flycast_xtreme` recipe/output is
+    kept outside the 117-core MMF parity baseline. The A133-oriented build uses
+    the KNULLI-pinned metallic77 commit and stages it as
+    `flycast_xtreme_libretro.so` without replacing standard Flycast.
 - [x] Validate that `PLUMOS_CORE_FILTER=all FAIL_ON_CORE_ERROR=1
   ./scripts/docker-build.sh cores` completes with zero failed recipes.
 - [ ] Real-device runtime validation for non-baseline libretro cores.
@@ -195,6 +199,14 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Start Flycast 2.6 with Crazy Taxi through the FE standalone profile;
     verify PowerVR GLES, `adc_gamepad`, nonblank framebuffer output, ALSA PCM,
     and clean PID-targeted TERM shutdown.
+  - [x] Diagnose standalone Flycast 2.6 black frames as repeated PowerVR HWR
+    events on the StockOS vendor driver. Keep it as a manual diagnostic profile,
+    not the Dreamcast default.
+  - [x] Build and live-test the KNULLI-pinned Flycast Xtreme libretro core on
+    V90S. Crazy Taxi rendered without HWR or ALSA underruns and improved a
+    sampled gameplay scene from 32.87 FPS on standard Flycast to 44.23 FPS.
+    Use Flycast Xtreme, Performance, four online CPUs, and 640x480 as the V90S
+    Dreamcast default.
   - [x] Start Mupen64Plus 2.6.0 with Super Mario 64 through the FE standalone
     profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
     the V90S `adc_gamepad` auto-configuration.

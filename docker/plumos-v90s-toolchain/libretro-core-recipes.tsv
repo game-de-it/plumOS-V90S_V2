@@ -74,6 +74,7 @@ fbalpha2012_cps3|O|https://github.com/libretro/fbalpha2012_cps3.git|HEAD|svn-cur
 fbalpha2012_neogeo|O|https://github.com/libretro/fbalpha2012_neogeo.git|dc973ec25c6929e3ac47a0aac54fcde75b4b9bd4||Makefile|platform=unix
 freechaf|O|https://github.com/libretro/FreeChaF.git|4d1d5cb83b93728a63f03454e472a23055d9bbfc||Makefile|platform=unix
 flycast|O|https://github.com/libretro/flycast.git|2ff10303554f9ab310bd4a71252d4b2519a6b523||Makefile|platform=arm64_cortex_a53_gles2 HAVE_OPENMP=0 HAVE_LTCG=0 HAVE_GENERIC_JIT=0
+flycast_xtreme|O|https://github.com/metallic77/flycast.git|603814c9f73b773c455d9a497f389d2f93a257fd||Makefile|platform=odroid-n2 FORCE_GLES=1 ARCH=arm64 HAVE_OPENMP=1 HAVE_LTCG=0 HAVE_GENERIC_JIT=0 LDFLAGS=-lrt
 freeintv|O|https://github.com/libretro/FreeIntv.git|9a65ec6e31d48ad0dae1f381c1ec61c897f970cb||Makefile|platform=unix
 frodo|O|https://github.com/libretro/frodo-libretro.git|77d2f2d1572fca4331e5449d7c3e636574e6735c||Makefile|platform=unix
 fuse|O|https://github.com/libretro/fuse-libretro.git|c0262040008a7efba04dd01f8cc7a8f96102f83b||Makefile|platform=unix

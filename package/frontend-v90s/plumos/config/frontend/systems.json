@@ -513,9 +513,10 @@
           {"root": "sdcard", "path": "Images/dreamcast"}
         ]
       },
-      "launch_profiles": ["retroarch:flycast", "standalone:flycast"],
-      "default_launch_profile": "standalone:flycast",
-      "default_cpu_policy": "interactive",
+      "launch_profiles": ["retroarch:flycast_xtreme", "retroarch:flycast", "standalone:flycast"],
+      "default_launch_profile": "retroarch:flycast_xtreme",
+      "default_cpu_policy": "performance",
+      "default_cpu_cores": 4,
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"

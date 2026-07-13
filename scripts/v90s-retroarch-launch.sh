@@ -444,6 +444,7 @@ write_config() {
 
     cat > "$cfg" <<EOF
 config_save_on_exit = "true"
+core_options_path = "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
 libretro_directory = "${PLUMOS_V90S_LIBRETRO_DIR:-/usr/lib/aarch64-linux-gnu/libretro}"
 libretro_info_path = "${PLUMOS_V90S_LIBRETRO_INFO_DIR:-/usr/share/libretro/info}"
 assets_directory = "${PLUMOS_V90S_RETROARCH_ASSETS_DIR:-/usr/share/libretro/assets}"
@@ -543,6 +544,19 @@ ensure_config_save_enabled() {
         sed -i 's/^config_save_on_exit[[:space:]]*=.*/config_save_on_exit = "true"/' "$cfg" 2>/dev/null || true
     else
         printf '\nconfig_save_on_exit = "true"\n' >> "$cfg" 2>/dev/null || true
+    fi
+}
+
+set_config_string() {
+    cfg="$1"
+    key="$2"
+    value="$3"
+    escaped_value="$(printf '%s' "$value" | sed 's/[&|\\]/\\&/g')"
+
+    if grep -q "^${key}[[:space:]]*=" "$cfg" 2>/dev/null; then
+        sed -i "s|^${key}[[:space:]]*=.*|${key} = \"${escaped_value}\"|" "$cfg" 2>/dev/null || true
+    else
+        printf '%s = "%s"\n' "$key" "$value" >> "$cfg" 2>/dev/null || true
     fi
 }
 
@@ -721,6 +735,10 @@ else
     fi
 fi
 ensure_config_save_enabled "$cfg"
+set_config_string "$cfg" core_options_path \
+    "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
+set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
+set_config_string "$cfg" savestate_directory "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
 log "retroarch-launch: config_path=$cfg"
 
 log "retroarch-launch: route video=$video_driver context=$video_context_driver threaded=$video_threaded input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
