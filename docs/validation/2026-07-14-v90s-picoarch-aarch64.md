@@ -39,6 +39,13 @@ Start, and Function buttons use their Linux input codes. Function opens the
 PicoArch menu. HAT axes are translated to digital directions both during core
 execution and in PicoArch menus.
 
+The first evdev deployment also let SDL register `adc_gamepad`. Runtime input
+diagnostics showed both `evdev:adc_gamepad` and `sdl:adc_gamepad` with active
+bindings, which delivered one physical menu action through two devices and
+looked like an excessive key repeat. V90S builds now leave SDL keyboard input
+enabled but skip SDL joystick registration; `adc_gamepad` has one owner through
+evdev. PicoArch's normal 450 ms initial menu-repeat delay is unchanged.
+
 The default screen-size setting is `Aspect`. This changes only the initial
 value; settings saved by a user under `/mnt/plumos/state/picoarch/<system>`
 continue to take precedence.
@@ -69,7 +76,8 @@ Validated facts:
 - `plumos-picoarch-stop` verifies the exact executable before signalling and
   does not use broad process matching.
 
-The deployed binary SHA-256 is
-`01e5405e06e78c5cdcc61f06608de31a6552db30f819c4646586e1294f7ca3b9`.
+The deployed binary SHA-256 after removing duplicate SDL controller
+registration is
+`101976cc0265c571faf55ab41fee1fb6e857d976a2edae0d6b1ec11db95dfdca`.
 Physical button response and final subjective motion stability remain manual
 device checks.

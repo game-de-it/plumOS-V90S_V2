@@ -52,6 +52,9 @@ cp "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch_v90s_fbdev.h" \
 git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-input-aspect.patch"
 
+perl -0pi -e 's/\tjoycount = SDL_NumJoysticks\(\);/\tjoycount = 0; \/\* V90S controller is owned by evdev. \*\// or die "SDL joystick marker missing\n"' \
+  "$SRC/libpicofe/in_sdl.c"
+
 perl -0pi -e 's{// begin miyoo hardware scaling support.*?// end miyoo hardware scaling support}{static void buffer_init(void) {}\nstatic void buffer_quit(void) {}\nstatic void buffer_scale(unsigned w, unsigned h, size_t pitch, const void *src) {\n\tscale(w, h, pitch, src, screen->pixels);\n}}s or die "Miyoo video block marker missing\n";
   s{static SDL_Surface\* screen;}{static SDL_Surface* screen;\nstatic SDL_Surface* display;\n#include "picoarch_v90s_fbdev.h"} or die "screen marker missing\n";
   s{static void \*fb_flip\(void\)\n\{\n\tSDL_Flip\(screen\);\n\treturn screen->pixels;\n\}}{static void *fb_flip(void)\n{\n\tv90s_fb_present(screen);\n\treturn screen->pixels;\n}} or die "flip marker missing\n";
