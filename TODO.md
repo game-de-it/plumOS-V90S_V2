@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -142,6 +142,14 @@ Build plumOS V90S as a V90S-specific distribution:
     the only remaining preflight failure is non-libretro Pyxel.
   - [x] Enable Cave Story in the FE and package NxEngine under the normal
     `/mnt/plumos/cores` contract instead of the ROM directory.
+  - [x] Run every currently reachable core through the FE on real hardware:
+    82 of 86 unique cores remain active; four blockers and all 31 cores lacking
+    compatible indexed content are recorded in
+    `docs/validation/2026-07-14-v90s-fe-all-core-runtime.md`.
+  - [ ] Resolve the four known FE runtime blockers: ChaiLove SDL video,
+    FBA 2012/FBA 2012 Neo Geo matching ROM sets, and Mupen64Plus-Next SIGSEGV.
+  - [ ] Add compatible test content/system definitions and validate the 31
+    currently unreachable packaged cores.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.

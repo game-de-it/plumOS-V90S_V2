@@ -73,7 +73,7 @@ fbalpha2012_cps2|O|https://github.com/libretro/fbalpha2012_cps2.git|33191f1b463b
 fbalpha2012_cps3|O|https://github.com/libretro/fbalpha2012_cps3.git|HEAD|svn-current/trunk|makefile.libretro|platform=unix
 fbalpha2012_neogeo|O|https://github.com/libretro/fbalpha2012_neogeo.git|dc973ec25c6929e3ac47a0aac54fcde75b4b9bd4||Makefile|platform=unix
 freechaf|O|https://github.com/libretro/FreeChaF.git|4d1d5cb83b93728a63f03454e472a23055d9bbfc||Makefile|platform=unix
-flycast|O|https://github.com/libretro/flycast.git|2ff10303554f9ab310bd4a71252d4b2519a6b523||Makefile|platform=unix HAVE_OPENMP=0 HAVE_LTCG=0 HAVE_GENERIC_JIT=0
+flycast|O|https://github.com/libretro/flycast.git|2ff10303554f9ab310bd4a71252d4b2519a6b523||Makefile|platform=arm64_cortex_a53_gles2 HAVE_OPENMP=0 HAVE_LTCG=0 HAVE_GENERIC_JIT=0
 freeintv|O|https://github.com/libretro/FreeIntv.git|9a65ec6e31d48ad0dae1f381c1ec61c897f970cb||Makefile|platform=unix
 frodo|O|https://github.com/libretro/frodo-libretro.git|77d2f2d1572fca4331e5449d7c3e636574e6735c||Makefile|platform=unix
 fuse|O|https://github.com/libretro/fuse-libretro.git|c0262040008a7efba04dd01f8cc7a8f96102f83b||Makefile|platform=unix
@@ -96,7 +96,7 @@ beetle_saturn|O|https://github.com/libretro/beetle-saturn-libretro.git|8d4fc28bd
 mednafen_supafaust|O|https://github.com/libretro/supafaust.git|75c658cce454e58ae04ea252f53a31c60d61548e||Makefile|platform=unix
 meteor|O|https://github.com/libretro/meteor-libretro.git|e533d300d0561564451bde55a2b73119c768453c|libretro|Makefile|platform=unix
 mrboom|O|https://github.com/libretro/mrboom-libretro.git|1bc0933b71051411404cdc092b14ade17efb2027||Makefile|platform=unix
-mupen64plus_next|O|https://github.com/libretro/mupen64plus-libretro-nx.git|98c1b0d877542b01314b3b04272282ba223b65b3||Makefile|platform=unix FORCE_GLES=1 HAVE_LTCG=0
+mupen64plus_next|O|https://github.com/libretro/mupen64plus-libretro-nx.git|98c1b0d877542b01314b3b04272282ba223b65b3||Makefile|platform=arm64_cortex_a53_gles2 HAVE_LTCG=0
 mu|O|https://github.com/libretro/Mu.git|1361da04014d77b8bec13e050a71bf7bf8ce5543|libretroBuildSystem|Makefile|platform=unix
 nekop2|O|https://github.com/libretro/libretro-meowPC98.git|cd389b3490d5048873c40edd949a1b0631e0606d|libretro|Makefile.libretro|platform=unix
 numero|O|https://github.com/nbarkhina/numero.git|19354c9bfe06a3e4fd936961ee8414b040a3d1c6||Makefile|platform=unix
@@ -104,7 +104,7 @@ nxengine|O|https://github.com/libretro/nxengine-libretro.git|aa32afb8df846192003
 puae|O|https://github.com/libretro/libretro-uae.git|0b883572b3d67cdfa2ac4a05d0d22202b641d6d2||Makefile|platform=unix
 puae2021|O|https://github.com/libretro/libretro-uae.git|2.6.1||Makefile|platform=unix
 puzzlescript|O|https://github.com/nwhitehead/pzretro.git|HEAD||Makefile|platform=unix
-parallel_n64|O|https://github.com/libretro/parallel-n64.git|aacf2c24172c865245923609694fcee972960847||Makefile|platform=unix HAVE_LTCG=0
+parallel_n64|O|https://github.com/libretro/parallel-n64.git|aacf2c24172c865245923609694fcee972960847||Makefile|platform=unix FORCE_GLES=1 ARCH=aarch64 HAVE_LTCG=0
 reminiscence|O|https://github.com/libretro/REminiscence.git|c2624c7565bbae441835db80f24902fc40f83dd1||Makefile|platform=unix
 sameduck|O|https://github.com/libretro/sameduck.git|SameDuck-libretro|libretro|Makefile|platform=unix
 snes9x2002|O|https://github.com/libretro/snes9x2002.git|540baad622d9833bba7e0696193cb06f5f02f564||Makefile|platform=unix

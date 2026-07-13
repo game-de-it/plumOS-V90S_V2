@@ -347,6 +347,10 @@ if [ -d "$cores_stage_dir" ]; then
             record_file "info/$info_name" "libretro-info" "$info_src"
         done
     fi
+    if [ -d "$cores_dir/lib" ]; then
+        copy_tree "$cores_dir/lib" "$out_dir/lib"
+        record_mapped_tree "$cores_dir/lib" "lib" "libretro-runtime" "$cores_dir/lib"
+    fi
     if [ -f "$cores_dir/libretro-cores.manifest" ]; then
         copy_file "$cores_dir/libretro-cores.manifest" "$out_dir/licenses/libretro-cores-manifest.txt"
         record_file "licenses/libretro-cores-manifest.txt" "libretro-core" "$cores_dir/libretro-cores.manifest"

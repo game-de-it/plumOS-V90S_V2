@@ -168,7 +168,7 @@
           {"root": "sdcard", "path": "Images/gba"}
         ]
       },
-      "launch_profiles": ["retroarch:gpsp", "retroarch:mgba", "picoarch:gpsp", "picoarch:mgba"],
+      "launch_profiles": ["retroarch:gpsp", "retroarch:mgba", "retroarch:mednafen_gba", "retroarch:meteor", "retroarch:vba_next", "picoarch:gpsp", "picoarch:mgba"],
       "default_launch_profile": "retroarch:gpsp",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -346,7 +346,7 @@
           {"root": "sdcard", "path": "Images/pcengine"}
         ]
       },
-      "launch_profiles": ["retroarch:mednafen_pce_fast", "retroarch:mednafen_supergrafx", "picoarch:mednafen_pce_fast", "picoarch:mednafen_supergrafx"],
+      "launch_profiles": ["retroarch:mednafen_pce_fast", "retroarch:mednafen_pce", "retroarch:mednafen_supergrafx", "picoarch:mednafen_pce_fast", "picoarch:mednafen_supergrafx"],
       "default_launch_profile": "retroarch:mednafen_pce_fast",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -433,7 +433,7 @@
           {"root": "sdcard", "path": "Images/psx"}
         ]
       },
-      "launch_profiles": ["standalone:pcsx_rearmed", "retroarch:pcsx_rearmed"],
+      "launch_profiles": ["standalone:pcsx_rearmed", "retroarch:pcsx_rearmed", "retroarch:km_duckswanstation_xtreme_amped"],
       "default_launch_profile": "standalone:pcsx_rearmed",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -475,7 +475,7 @@
       "short_name": "N64",
       "sort_order": 160,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "N64", "source": "miyoo", "priority": 10},
@@ -487,8 +487,8 @@
           {"root": "sdcard", "path": "Images/n64"}
         ]
       },
-      "launch_profiles": ["retroarch:mupen64plus_next", "retroarch:parallel_n64"],
-      "default_launch_profile": "retroarch:mupen64plus_next",
+      "launch_profiles": ["retroarch:parallel_n64", "retroarch:mupen64plus_next"],
+      "default_launch_profile": "retroarch:parallel_n64",
       "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
@@ -501,7 +501,7 @@
       "short_name": "DC",
       "sort_order": 170,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "DC", "source": "miyoo", "priority": 10},
@@ -527,7 +527,7 @@
       "short_name": "SAT",
       "sort_order": 180,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "SATURN", "source": "miyoo", "priority": 10},
@@ -539,7 +539,7 @@
           {"root": "sdcard", "path": "Images/saturn"}
         ]
       },
-      "launch_profiles": ["retroarch:yabasanshiro", "retroarch:beetle_saturn"],
+      "launch_profiles": ["retroarch:yabasanshiro", "retroarch:beetle_saturn", "retroarch:mednafen_saturn"],
       "default_launch_profile": "retroarch:yabasanshiro",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -793,7 +793,7 @@
           {"root": "sdcard", "path": "Images/arcade"}
         ]
       },
-      "launch_profiles": ["retroarch:mame2003_plus", "retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:mame2000"],
+      "launch_profiles": ["retroarch:mame2003_plus", "retroarch:km_mame2003_xtreme", "retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:mame2000", "retroarch:mba_mini"],
       "default_launch_profile": "retroarch:mame2003_plus",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -928,7 +928,7 @@
           {"root": "sdcard", "path": "Images/cps3"}
         ]
       },
-      "launch_profiles": ["retroarch:fbneo", "retroarch:fbalpha2012"],
+      "launch_profiles": ["retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:fbalpha2012_cps3"],
       "default_launch_profile": "retroarch:fbneo",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -954,7 +954,7 @@
           {"root": "sdcard", "path": "Images/dos"}
         ]
       },
-      "launch_profiles": ["standalone:dosbox-staging", "retroarch:dosbox_pure"],
+      "launch_profiles": ["standalone:dosbox-staging", "retroarch:dosbox_pure", "retroarch:dosbox_pure_0.9.7"],
       "default_launch_profile": "standalone:dosbox-staging",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -981,7 +981,7 @@
           {"root": "sdcard", "path": "Images/easyrpg"}
         ]
       },
-      "launch_profiles": ["standalone:easyrpg"],
+      "launch_profiles": ["standalone:easyrpg", "retroarch:easyrpg"],
       "default_launch_profile": "standalone:easyrpg",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -1008,7 +1008,7 @@
           {"root": "sdcard", "path": "Images/pico8"}
         ]
       },
-      "launch_profiles": ["retroarch:fake08"],
+      "launch_profiles": ["retroarch:fake08", "retroarch:retro8"],
       "default_launch_profile": "retroarch:fake08",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -1035,7 +1035,7 @@
           {"root": "sdcard", "path": "Images/scummvm"}
         ]
       },
-      "launch_profiles": ["standalone:scummvm"],
+      "launch_profiles": ["standalone:scummvm", "retroarch:scummvm"],
       "default_launch_profile": "standalone:scummvm",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -1169,7 +1169,7 @@
           {"root": "sdcard", "path": "Images/pc98"}
         ]
       },
-      "launch_profiles": ["retroarch:np2kai"],
+      "launch_profiles": ["retroarch:np2kai", "retroarch:nekop2"],
       "default_launch_profile": "retroarch:np2kai",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -1514,7 +1514,7 @@
       "short_name": "3DO",
       "sort_order": 500,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "PANASONIC", "source": "onion", "priority": 10},
@@ -1552,7 +1552,7 @@
           {"root": "sdcard", "path": "Images/amiga"}
         ]
       },
-      "launch_profiles": ["retroarch:puae"],
+      "launch_profiles": ["retroarch:puae", "retroarch:puae2021", "retroarch:uae4arm", "retroarch:km_puae_xtreme_amped"],
       "default_launch_profile": "retroarch:puae",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -1578,7 +1578,7 @@
           {"root": "sdcard", "path": "Images/atari5200"}
         ]
       },
-      "launch_profiles": ["retroarch:atari800"],
+      "launch_profiles": ["retroarch:atari800", "retroarch:a5200"],
       "default_launch_profile": "retroarch:atari800",
       "default_cpu_policy": "ondemand",
       "scraper": {
@@ -1994,7 +1994,7 @@
       "short_name": "Jaguar",
       "sort_order": 680,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "JAGUAR", "source": "onion", "priority": 10},
@@ -2075,7 +2075,7 @@
       "short_name": "MicroW8",
       "sort_order": 710,
       "hardware": "engine",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "MICROW8", "source": "plumos", "priority": 10},
@@ -2179,7 +2179,7 @@
       "short_name": "PC-FX",
       "sort_order": 750,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "PCFX", "source": "onion", "priority": 10},
@@ -2364,7 +2364,7 @@
       "short_name": "Uzebox",
       "sort_order": 820,
       "hardware": "console",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "UZEBOX", "source": "plumos", "priority": 10},
@@ -2422,7 +2422,7 @@
         {"name": "VMU", "source": "plumos", "priority": 10},
         {"name": "vmu", "source": "plumos", "priority": 20}
       ],
-      "extensions": ["vms", "dci", "bin"],
+      "extensions": ["vms", "vmi", "dci", "bin"],
       "artwork": {
         "lookup": [
           {"root": "sdcard", "path": "Images/vmu"}

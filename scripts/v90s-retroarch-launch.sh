@@ -613,6 +613,11 @@ if [ -n "$sdl2_runtime_dir" ]; then
     log "retroarch-launch: custom SDL2 PowerVR runtime detected: $sdl2_runtime_dir ($sdl2_runtime_label)"
     append_cmd "custom-sdl2-powervr-files" sh -c 'for d in "${PLUMOS_V90S_SDL2_POWERVR_DIR:-}" /usr/local/lib/plumos-sdl2-powervr /usr/local/lib/plumos-sdl2-mali; do [ -n "$d" ] && [ -d "$d" ] && find "$d" -maxdepth 1 -print 2>/dev/null; done; find /usr/local/bin -maxdepth 1 -name v90s-sdl2-video-probe -print 2>/dev/null || true; for f in /etc/plumos-sdl2-powervr-manifest.txt /etc/plumos-sdl2-mali-manifest.txt; do [ -f "$f" ] && echo "--- $f" && cat "$f"; done'
 fi
+libretro_runtime_dir="${PLUMOS_V90S_LIBRETRO_RUNTIME_DIR:-${PLUMOS_ROOT:-/mnt/plumos}/lib/libretro}"
+if [ -d "$libretro_runtime_dir" ]; then
+    export LD_LIBRARY_PATH="$libretro_runtime_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    log "retroarch-launch: libretro_runtime_dir=$libretro_runtime_dir"
+fi
 if [ -d /usr/lib/powervr ]; then
     if [ -n "$sdl2_runtime_dir" ]; then
         export LD_LIBRARY_PATH="/usr/lib/powervr:$sdl2_runtime_dir:/usr/lib/aarch64-linux-gnu:/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -655,14 +660,18 @@ if [ "$start_mode" = "content" ] && [ ! -f "$core" ]; then
     exit 41
 fi
 
-if [ "$start_mode" = "content" ] && [ ! -f "$rom" ]; then
+if [ "$start_mode" = "content" ] && [ ! -f "$rom" ] && [ ! -d "$rom" ]; then
     log "retroarch-launch: ROM missing: $rom"
     mirror_logs
     exit 42
 fi
 
 if [ "$start_mode" = "content" ]; then
-    append_cmd "rom-sha256" sha256sum "$rom"
+    if [ -f "$rom" ]; then
+        append_cmd "rom-sha256" sha256sum "$rom"
+    else
+        log "retroarch-launch: selected_rom_type=directory"
+    fi
 fi
 
 export HOME=/root

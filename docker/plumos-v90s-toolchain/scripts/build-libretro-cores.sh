@@ -905,7 +905,7 @@ EOF_LIST
 fi
 
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/cores" "$OUT_DIR/info" "$OUT_DIR/logs" "$(dirname "$SRC_ROOT")"
+mkdir -p "$OUT_DIR/cores" "$OUT_DIR/info" "$OUT_DIR/lib/libretro" "$OUT_DIR/logs" "$(dirname "$SRC_ROOT")"
 LOG_DIR="$OUT_DIR/logs"
 LOG_DIR_ABS="$(CDPATH= cd -- "$LOG_DIR" && pwd)"
 MANIFEST="$OUT_DIR/libretro-cores.manifest"
@@ -952,6 +952,24 @@ while IFS='|' read -r id class repo ref subdir makefile make_args; do
 done <<EOF_CORES
 $(core_table)
 EOF_CORES
+
+if [ -f "$OUT_DIR/cores/easyrpg_libretro.so" ]; then
+  fmt_lib="$(ldconfig -p 2>/dev/null | awk '/libfmt\.so\.9 .*aarch64/ {print $NF; exit}')"
+  if [ -z "$fmt_lib" ] || [ ! -f "$fmt_lib" ]; then
+    fmt_lib=/lib/aarch64-linux-gnu/libfmt.so.9
+  fi
+  if [ -f "$fmt_lib" ]; then
+    cp -L "$fmt_lib" "$OUT_DIR/lib/libretro/libfmt.so.9"
+    append_manifest ""
+    append_manifest "[runtime-libfmt]"
+    append_manifest "source=$fmt_lib"
+    append_manifest "output=lib/libretro/libfmt.so.9"
+    append_manifest "status=staged"
+  elif [ "$FAIL_ON_CORE_ERROR" = "1" ]; then
+    printf 'error: EasyRPG runtime dependency is missing: libfmt.so.9\n' >&2
+    exit 1
+  fi
+fi
 
 append_manifest ""
 append_manifest "[summary]"
