@@ -79,19 +79,12 @@ export SDL_NOMOUSE=1
 export AUDIODEV="${PLUMOS_PICOARCH_AUDIODEV:-hw:0,0}"
 export LD_LIBRARY_PATH="/usr/lib/powervr:$PLUMOS_ROOT/lib/plumos-sdl2-powervr:$RUNTIME_LIB_DIR:$PICOARCH_ROOT/lib:$PLUMOS_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-cpu_cores="${PLUMOS_PICOARCH_CPU_CORES:-}"
-case "$cpu_cores" in
-  1|2|3|4)
-    cpu_index=1
-    while [ "$cpu_index" -le 3 ]; do
-      online=0
-      [ "$cpu_index" -lt "$cpu_cores" ] && online=1
-      online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
-      [ -w "$online_path" ] && printf '%s\n' "$online" > "$online_path" 2>/dev/null || true
-      cpu_index=$((cpu_index + 1))
-    done
-    ;;
-esac
+cpu_index=1
+while [ "$cpu_index" -le 3 ]; do
+  online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
+  [ -w "$online_path" ] && printf '1\n' > "$online_path" 2>/dev/null || true
+  cpu_index=$((cpu_index + 1))
+done
 
 cpu_policy="${PLUMOS_PICOARCH_CPU_POLICY:-}"
 case "$cpu_policy" in

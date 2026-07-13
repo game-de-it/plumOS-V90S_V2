@@ -22,6 +22,11 @@ plumOS exposes only dynamic game-oriented choices: Interactive, Performance,
 Ondemand, Schedutil, and Conservative. Fixed MHz, OC presets, userspace, and
 powersave are not part of the FE contract.
 
+CPU count is not a V90S performance setting. CPU0 through CPU3 remain online
+for frontend, scraper, RetroArch, PicoArch, Pyxel, and standalone execution.
+Launchers restore all four CPUs online before applying a governor; no system or
+ROM profile can request a reduced CPU count.
+
 ## Live GPU Interface
 
 `/sys/class/devfreq` is empty on the live V90S. The PowerVR kernel driver is
@@ -41,6 +46,7 @@ standard selectable GPU governor is exposed.
 - Use Interactive as the game default.
 - Keep Performance selectable for demanding emulators and diagnostics.
 - Return the frontend browsing baseline to Ondemand.
+- Keep all four CPU cores online in every plumOS-owned runtime path.
 - Do not add a GPU governor control without a new, stable, real-device-validated
   vendor interface.
 

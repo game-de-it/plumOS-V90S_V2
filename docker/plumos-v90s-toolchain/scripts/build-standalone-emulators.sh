@@ -537,19 +537,12 @@ export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-alsa}
 export AUDIODEV=${AUDIODEV:-hw:0,0}
 mkdir -p "${HOME}" "${XDG_CONFIG_HOME}" "${XDG_DATA_HOME}" "${XDG_CACHE_HOME}"
 
-cpu_cores=${PLUMOS_STANDALONE_CPU_CORES:-}
-case "${cpu_cores}" in
-  1|2|3|4)
-    cpu_index=1
-    while [ "${cpu_index}" -le 3 ]; do
-      online=0
-      [ "${cpu_index}" -lt "${cpu_cores}" ] && online=1
-      online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
-      [ -w "${online_path}" ] && printf '%s\n' "${online}" >"${online_path}" 2>/dev/null || true
-      cpu_index=$((cpu_index + 1))
-    done
-    ;;
-esac
+cpu_index=1
+while [ "${cpu_index}" -le 3 ]; do
+  online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
+  [ -w "${online_path}" ] && printf '1\n' >"${online_path}" 2>/dev/null || true
+  cpu_index=$((cpu_index + 1))
+done
 
 cpu_policy=${PLUMOS_STANDALONE_CPU_POLICY:-}
 case "${cpu_policy}" in

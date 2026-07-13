@@ -225,7 +225,6 @@ system_id=""
 core=""
 rom=""
 cpu_policy=""
-cpu_cores=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -249,10 +248,6 @@ while [ "$#" -gt 0 ]; do
       echo "plumos-retroarch-launch: fixed CPU frequencies are no longer supported" >&2
       exit 2
       ;;
-    --cores)
-      cpu_cores="$2"
-      shift 2
-      ;;
     --safe-exit|--audio|--audio-latency|--dosbox-pure-force60fps|--dosbox-pure-cycles)
       shift 2
       ;;
@@ -268,14 +263,6 @@ if [ -z "$core" ] || [ -z "$rom" ]; then
   exit 2
 fi
 
-case "$cpu_cores" in
-  ""|2|4) ;;
-  *)
-    echo "plumos-retroarch-launch: --cores expects 2 or 4" >&2
-    exit 2
-    ;;
-esac
-
 mkdir -p \
   "$PLUMOS_ROOT/Logs" \
   "$PLUMOS_ROOT/config/retroarch" \
@@ -283,16 +270,12 @@ mkdir -p \
   "$PLUMOS_ROOT/Saves/${system_id:-content}" \
   "$PLUMOS_ROOT/States/${system_id:-content}"
 
-if [ -n "$cpu_cores" ]; then
-  cpu_index=1
-  while [ "$cpu_index" -le 3 ]; do
-    online=0
-    [ "$cpu_index" -lt "$cpu_cores" ] && online=1
-    online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
-    [ -w "$online_path" ] && printf '%s\n' "$online" > "$online_path" 2>/dev/null || true
-    cpu_index=$((cpu_index + 1))
-  done
-fi
+cpu_index=1
+while [ "$cpu_index" -le 3 ]; do
+  online_path="/sys/devices/system/cpu/cpu${cpu_index}/online"
+  [ -w "$online_path" ] && printf '1\n' > "$online_path" 2>/dev/null || true
+  cpu_index=$((cpu_index + 1))
+done
 
 case "$cpu_policy" in
   interactive|performance|ondemand|schedutil|conservative)

@@ -402,8 +402,6 @@ struct cpu_policy_snapshot {
   char setspeed[32];
   char cpuinfo_min_freq[32];
   char cpuinfo_max_freq[32];
-  char cpu_online[4][8];
-  int cpu_online_present[4];
 };
 
 struct power_entry {
@@ -1870,10 +1868,17 @@ static void cpu_online_path(char *out, size_t out_size, int cpu) {
   snprintf(out, out_size, "/sys/devices/system/cpu/cpu%d/online", cpu);
 }
 
-static void save_cpu_policy_snapshot(struct cpu_policy_snapshot *snapshot) {
+static void ensure_all_cpus_online(void) {
   char path[PATH_MAX];
   int cpu;
 
+  for (cpu = 1; cpu <= 3; cpu++) {
+    cpu_online_path(path, sizeof(path), cpu);
+    write_text_file_line(path, "1");
+  }
+}
+
+static void save_cpu_policy_snapshot(struct cpu_policy_snapshot *snapshot) {
   if (!snapshot) {
     return;
   }
@@ -1890,28 +1895,15 @@ static void save_cpu_policy_snapshot(struct cpu_policy_snapshot *snapshot) {
                        snapshot->cpuinfo_min_freq, sizeof(snapshot->cpuinfo_min_freq));
   read_first_line_file("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
                        snapshot->cpuinfo_max_freq, sizeof(snapshot->cpuinfo_max_freq));
-  for (cpu = 1; cpu <= 3; cpu++) {
-    cpu_online_path(path, sizeof(path), cpu);
-    if (read_first_line_file(path, snapshot->cpu_online[cpu],
-                             sizeof(snapshot->cpu_online[cpu]))) {
-      snapshot->cpu_online_present[cpu] = 1;
-    }
-  }
   snapshot->saved = 1;
 }
 
 static int apply_scraping_cpu_policy(struct cpu_policy_snapshot *snapshot) {
-  char path[PATH_MAX];
-  int cpu;
-
   if (!snapshot) {
     return 0;
   }
   save_cpu_policy_snapshot(snapshot);
-  for (cpu = 1; cpu <= 3; cpu++) {
-    cpu_online_path(path, sizeof(path), cpu);
-    write_text_file_line(path, "1");
-  }
+  ensure_all_cpus_online();
   if (snapshot->cpuinfo_min_freq[0]) {
     write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
                          snapshot->cpuinfo_min_freq);
@@ -1926,9 +1918,6 @@ static int apply_scraping_cpu_policy(struct cpu_policy_snapshot *snapshot) {
 }
 
 static void restore_cpu_policy_snapshot(const struct cpu_policy_snapshot *snapshot) {
-  char path[PATH_MAX];
-  int cpu;
-
   if (!snapshot || !snapshot->saved) {
     return;
   }
@@ -1956,13 +1945,7 @@ static void restore_cpu_policy_snapshot(const struct cpu_policy_snapshot *snapsh
     write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed",
                          snapshot->setspeed);
   }
-  for (cpu = 1; cpu <= 3; cpu++) {
-    if (!snapshot->cpu_online_present[cpu]) {
-      continue;
-    }
-    cpu_online_path(path, sizeof(path), cpu);
-    write_text_file_line(path, snapshot->cpu_online[cpu]);
-  }
+  ensure_all_cpus_online();
 }
 
 static int string_contains_line_break(const char *s) {
@@ -2880,9 +2863,7 @@ static void apply_frontend_cpu_default(void) {
     return;
   }
 
-  write_text_file("/sys/devices/system/cpu/cpu1/online", "1\n");
-  write_text_file("/sys/devices/system/cpu/cpu2/online", "0\n");
-  write_text_file("/sys/devices/system/cpu/cpu3/online", "0\n");
+  ensure_all_cpus_online();
 
   read_first_line_file("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq",
                        cpuinfo_min, sizeof(cpuinfo_min));

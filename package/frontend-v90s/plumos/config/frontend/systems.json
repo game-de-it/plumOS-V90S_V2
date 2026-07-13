@@ -463,7 +463,6 @@
       "launch_profiles": ["standalone:ppsspp"],
       "default_launch_profile": "standalone:ppsspp",
       "default_cpu_policy": "interactive",
-      "default_cpu_cores": 4,
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -516,7 +515,6 @@
       "launch_profiles": ["retroarch:flycast_xtreme", "retroarch:flycast"],
       "default_launch_profile": "retroarch:flycast_xtreme",
       "default_cpu_policy": "performance",
-      "default_cpu_cores": 4,
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"

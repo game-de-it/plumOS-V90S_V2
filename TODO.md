@@ -207,8 +207,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Build and live-test the KNULLI-pinned Flycast Xtreme libretro core on
     V90S. Fix ref checkout so the output manifest and binary really use commit
     `603814c9`; Crazy Taxi renders with normal video and audio at about 34 FPS
-    in a heavy gameplay scene. Use Flycast Xtreme, Performance, four online
-    CPUs, and 640x480 as the V90S Dreamcast default.
+    in a heavy gameplay scene. Use Flycast Xtreme, Performance, the global
+    all-four-CPUs-online policy, and 640x480 as the V90S Dreamcast default.
   - [x] Start Mupen64Plus 2.6.0 with Super Mario 64 through the FE standalone
     profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
     the V90S `adc_gamepad` auto-configuration.
@@ -517,6 +517,9 @@ Build plumOS V90S as a V90S-specific distribution:
   governor.
 - [x] Verify that the vendor PowerVR runtime exposes no standard devfreq GPU
   governor; keep GPU governor controls out of the FE.
+- [x] Remove per-system and per-ROM CPU core-count limits. Keep CPU0-CPU3
+  online in the FE, scraper, RetroArch, PicoArch, Pyxel, and standalone paths;
+  retain governor selection as the only CPU performance control.
 - [ ] Keep future `irqbalance` experiments separate from the known-good
   video/audio baseline unless validation proves a benefit.
 

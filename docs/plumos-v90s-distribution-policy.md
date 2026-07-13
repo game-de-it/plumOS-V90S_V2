@@ -1105,6 +1105,15 @@ launcher restores `scaling_min_freq` and `scaling_max_freq` to the hardware
 `cpuinfo_min_freq` and `cpuinfo_max_freq` range. This prevents an old fixed-MHz
 override from surviving a governor change.
 
+All four Cortex-A53 CPUs, CPU0 through CPU3, must remain online while the
+frontend is idle and while RetroArch, PicoArch, Pyxel, standalone emulators,
+and scraper jobs run. V90S has no supported per-system or per-ROM CPU-count
+setting. Frontend configuration and launch plans must not accept or persist a
+CPU core count, and plumOS launchers must never write `0` to
+`/sys/devices/system/cpu/cpu*/online`. Each application launcher should
+defensively bring CPU1 through CPU3 online before applying its selected
+governor so an old runtime state cannot reduce the available CPUs.
+
 Do not expose `userspace`, fixed MHz, or OC frequency presets. Do not expose
 `powersave` as a normal FE choice because on this target it behaves as an
 effective minimum-frequency selection rather than a responsive game policy.
