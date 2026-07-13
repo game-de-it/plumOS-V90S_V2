@@ -30,6 +30,8 @@ menu.status.start_load_failed=cannot load START menu
 menu.status.apps_ready=Apps ready
 menu.status.apps_load_failed=cannot load Apps menu
 menu.status.back_to_start=back to START
+menu.status.start_closed=START menu closed
+menu.status.core_closed=CORE menu closed
 
 app.scraping.name=Scraping
 app.file_manager.name=File Manager

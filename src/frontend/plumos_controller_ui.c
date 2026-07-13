@@ -13117,7 +13117,7 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
   if (ui->screen == SCREEN_CORE_SELECT) {
     if (action == ACTION_B) {
       ui->screen = ui->core_back_screen;
-      set_status(ui, "close CORE");
+      set_status(ui, tr(ui, "menu.status.core_closed", "CORE menu closed"));
       return;
     }
     if (action == ACTION_UP) {
@@ -13468,7 +13468,7 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
         return;
       }
       ui->screen = ui->back_screen;
-      set_status(ui, "close START menu");
+      set_status(ui, tr(ui, "menu.status.start_closed", "START menu closed"));
       return;
     }
     if (action == ACTION_A) {
