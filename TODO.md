@@ -129,6 +129,18 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Validate that `PLUMOS_CORE_FILTER=all FAIL_ON_CORE_ERROR=1
   ./scripts/docker-build.sh cores` completes with zero failed recipes.
 - [ ] Real-device runtime validation for non-baseline libretro cores.
+  - [x] Inventory the refreshed live FE library and run the 2026-07-13 launch
+    matrix for all 57 systems with indexed ROMs; see
+    `docs/validation/2026-07-13-v90s-fe-rom-launch-matrix.md`.
+  - [x] Confirm the live QuickNES core starts NES content through the FE.
+  - [x] Confirm the separately deployed `nxengine_libretro.so` can draw Cave
+    Story by direct diagnostic launch.
+  - [ ] Deploy and hash-check the complete 117-core app-layer output. The
+    tested V90S currently has only QuickNES under `/mnt/plumos/cores`.
+  - [ ] Re-run FE launch validation for the 48 ROM-bearing systems currently
+    blocked by missing live libretro cores.
+  - [ ] Enable Cave Story in the FE and package NxEngine under the normal
+    `/mnt/plumos/cores` contract instead of the ROM directory.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
@@ -160,6 +172,14 @@ Build plumOS V90S as a V90S-specific distribution:
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.
+    - [ ] Fix PCSX-ReARMed SDL startup; the FE route currently exits with no
+      console terminal and no available video device.
+    - [ ] Make ScummVM resolve a ROM directory to a valid detected game target.
+    - [ ] Make EasyRPG start the selected game directory instead of opening its
+      empty player browser.
+    - [ ] Stage or select the chosen OpenBOR PAK in the runtime `Paks` contract.
+  - [ ] Replace or remove the stale `PORTS/tmp/1.sh` entry that writes to the
+    unavailable `/dev/cpuset/foreground/tasks` path.
 - [x] Implement `frontend`.
 - [x] Implement `app-layer`.
 - [x] Implement `release`.
