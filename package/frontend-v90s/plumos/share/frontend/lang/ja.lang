@@ -30,8 +30,6 @@ menu.status.start_load_failed=START メニューを読み込めません
 menu.status.apps_ready=アプリ準備完了
 menu.status.apps_load_failed=アプリメニューを読み込めません
 menu.status.back_to_start=START に戻りました
-menu.status.start_closed=START メニューを閉じました
-menu.status.core_closed=CORE メニューを閉じました
 
 app.scraping.name=スクレイピング
 app.file_manager.name=ファイルマネージャー

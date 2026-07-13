@@ -30,8 +30,6 @@ menu.status.start_load_failed=无法载入 START 菜单
 menu.status.apps_ready=应用已就绪
 menu.status.apps_load_failed=无法载入应用菜单
 menu.status.back_to_start=已返回 START
-menu.status.start_closed=已关闭 START 菜单
-menu.status.core_closed=已关闭 CORE 菜单
 
 app.scraping.name=媒体抓取
 app.file_manager.name=文件管理器

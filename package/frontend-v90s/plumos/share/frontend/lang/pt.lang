@@ -30,8 +30,6 @@ menu.status.start_load_failed=não foi possível carregar START
 menu.status.apps_ready=Aplicativos prontos
 menu.status.apps_load_failed=não foi possível carregar Aplicativos
 menu.status.back_to_start=voltou para START
-menu.status.start_closed=Menu START fechado
-menu.status.core_closed=Menu CORE fechado
 
 app.scraping.name=Scraping
 app.file_manager.name=Gerenciador de arquivos
