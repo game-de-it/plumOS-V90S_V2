@@ -21,6 +21,7 @@ TCPSVD="${PLUMOS_ROOT}/bin/tcpsvd"
 FTPD="${PLUMOS_ROOT}/bin/ftpd"
 SFTP_SERVER="${PLUMOS_ROOT}/ssh/libexec/sftp-server"
 SFTP_SERVER_DISABLED="${PLUMOS_ROOT}/ssh/libexec/sftp-server.disabled"
+SFTP_SERVER_BIN="${PLUMOS_ROOT}/ssh/libexec/sftp-server.bin"
 SSH_START="${PLUMOS_ROOT}/ssh/start-ssh.sh"
 SSH_STOP="${PLUMOS_ROOT}/ssh/stop-ssh.sh"
 SMBD="${PLUMOS_ROOT}/samba/sbin/smbd"
@@ -157,6 +158,17 @@ process_exists_by_name() {
   return 1
 }
 
+sshd_listener_exists() {
+  for proc in /proc/[0-9]*; do
+    [ -r "$proc/cmdline" ] || continue
+    cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+    case "$cmdline" in
+      *sshd*"[listener]"*) return 0 ;;
+    esac
+  done
+  return 1
+}
+
 ftp_pid_file() {
   printf '%s\n' "${RUN_DIR}/plumos-ftp.pid"
 }
@@ -206,12 +218,11 @@ kill_ftp_children() {
 }
 
 status_ssh() {
-  if pid_file_matches "$(ssh_pid_file)" "sshd" ||
-     pid_file_matches "$(ssh_pid_file)" "dropbear"; then
+  if sshd_listener_exists || pid_file_matches "$(ssh_pid_file)" "dropbear"; then
     print_status ssh running "SSH service controlled by plumOS"
     return 0
   fi
-  if process_exists_by_name "sshd" || process_exists_by_name "dropbear"; then
+  if process_exists_by_name "dropbear"; then
     print_status ssh running "SSH running; pid file will be adopted on start"
     return 0
   fi
@@ -237,7 +248,8 @@ status_ftp() {
 }
 
 status_sftp() {
-  if [ ! -f "$SFTP_SERVER" ] && [ ! -f "$SFTP_SERVER_DISABLED" ]; then
+  if { [ ! -f "$SFTP_SERVER" ] && [ ! -f "$SFTP_SERVER_DISABLED" ]; } ||
+     [ ! -x "$SFTP_SERVER_BIN" ]; then
     print_status sftp not_installed "SFTP server not installed"
     return 1
   fi
@@ -245,9 +257,8 @@ status_sftp() {
     print_status sftp stopped "SFTP disabled"
     return 2
   fi
-  if pid_file_matches "$(ssh_pid_file)" "sshd" ||
+  if sshd_listener_exists ||
      pid_file_matches "$(ssh_pid_file)" "dropbear" ||
-     process_exists_by_name "sshd" ||
      process_exists_by_name "dropbear"; then
     print_status sftp running "SFTP server installed; SSH service running"
     return 0
@@ -277,8 +288,24 @@ status_samba() {
     print_status samba running "Samba share SDCARD, max ${TRANSFER_MAX_CONNECTIONS}"
     return 0
   fi
+  if service_enabled samba && ! has_usable_ipv4; then
+    print_status samba waiting_network "Samba enabled; waiting for IPv4"
+    return 2
+  fi
   print_status samba stopped "Samba stopped"
   return 2
+}
+
+has_usable_ipv4() {
+  if command -v ip >/dev/null 2>&1; then
+    ip -4 addr show scope global 2>/dev/null | grep -q '^[[:space:]]*inet '
+    return $?
+  fi
+  if command -v ifconfig >/dev/null 2>&1; then
+    ifconfig 2>/dev/null | grep -E 'inet (addr:)?[1-9][0-9]*\.' | grep -qv '127\.0\.0\.1'
+    return $?
+  fi
+  return 1
 }
 
 status_adb() {
@@ -309,7 +336,7 @@ start_ftp() {
     status_ftp
     return 1
   fi
-  if pid_alive "$(ftp_pid_file)"; then
+  if pid_file_matches "$(ftp_pid_file)" "tcpsvd"; then
     status_ftp
     return 0
   fi
@@ -361,7 +388,7 @@ stop_ssh() {
 start_sftp() {
   set_service_enabled sftp 1
   enable_sftp_server
-  if [ ! -f "$SFTP_SERVER" ]; then
+  if [ ! -f "$SFTP_SERVER" ] || [ ! -x "$SFTP_SERVER_BIN" ]; then
     log "start failed reason=not_installed" sftp
     status_sftp
     return 1
@@ -437,6 +464,11 @@ EOF
    max connections = ${TRANSFER_MAX_CONNECTIONS}
    create mask = 0666
    directory mask = 0777
+
+[IPC$]
+   path = ${SAMBA_RUNTIME_DIR}
+   read only = yes
+   guest ok = no
 EOF
 }
 
@@ -447,8 +479,13 @@ start_samba() {
     status_samba
     return 1
   fi
-  if pid_alive "$(smbd_pid_file)"; then
+  if pid_file_matches "$(smbd_pid_file)" "smbd"; then
     status_samba
+    return 0
+  fi
+  if ! has_usable_ipv4; then
+    log "start deferred reason=no_ipv4" samba
+    status_samba || true
     return 0
   fi
   write_smb_conf

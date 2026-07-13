@@ -21,6 +21,7 @@ DHCP_WAIT_SECONDS="${PLUMOS_DHCP_WAIT_SECONDS:-10}"
 SCAN_WAIT_SECONDS="${PLUMOS_WIFI_SCAN_WAIT_SECONDS:-2}"
 WPA_PID_FILE="${RUN_DIR}/wpa_supplicant.pid"
 ENSURE_WIFI_STAGE_FILE="${RUN_DIR}/ensure-wifi-stage.$$"
+NETWORK_SERVICES="${PLUMOS_ROOT}/bin/plumos-network-services"
 
 ACTION=status
 CONNECT_FILE=
@@ -369,13 +370,18 @@ kill_cmdline_for_iface() {
   done
 }
 
+stop_dhcp_processes() {
+  iface="$1"
+  kill_cmdline_for_iface "$iface" udhcpc
+  kill_cmdline_for_iface "$iface" dhclient
+  sleep 1
+}
+
 stop_wifi_processes() {
   iface="$1"
   kill_pid_if_matches "$WPA_PID_FILE" wpa_supplicant
   kill_cmdline_for_iface "$iface" wpa_supplicant
-  kill_cmdline_for_iface "$iface" udhcpc
-  kill_cmdline_for_iface "$iface" dhclient
-  sleep 1
+  stop_dhcp_processes "$iface"
 }
 
 status_temp="${RUN_DIR}/wpa_status.tmp"
@@ -549,8 +555,23 @@ gateway_ping() {
 
 wifi_runtime_on() {
   iface="$1"
-  [ -n "$(get_iface_ip "$iface" || true)" ] && return 0
+  [ -n "$(get_iface_ip "$iface" || true)" ] || return 1
   wpa_cli -i "$iface" status 2>/dev/null | grep -q '^wpa_state=COMPLETED'
+}
+
+wifi_link_associated() {
+  iface="$1"
+  wpa_cli -i "$iface" status 2>/dev/null | grep -q '^wpa_state=COMPLETED'
+}
+
+start_enabled_network_services() {
+  [ -x "$NETWORK_SERVICES" ] || return 0
+  if PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+      "$NETWORK_SERVICES" start-enabled >> "$LOG_FILE" 2>&1; then
+    log "network services refreshed after IPv4 became available"
+  else
+    log "network services refresh returned nonzero"
+  fi
 }
 
 wifi_on() {
@@ -575,10 +596,30 @@ wifi_on() {
     ip_addr="$(get_iface_ip "$iface" || true)"
     write_runtime_status_current "$iface"
     log "wifi_on preserve existing iface=${iface} ip=${ip_addr:-none}"
+    start_enabled_network_services
     echo "result=connected"
     echo "ip=${ip_addr:-none}"
     return 0
   fi
+
+  if wifi_link_associated "$iface"; then
+    log "wifi_on renew DHCP iface=${iface} reason=associated_without_ipv4"
+    stop_dhcp_processes "$iface"
+    request_dhcp "$iface" || true
+    ip_addr="$(wait_for_ip_seconds "$iface" "$DHCP_WAIT_SECONDS" || true)"
+    write_runtime_status_current "$iface"
+    if [ -z "$ip_addr" ]; then
+      echo "result=failed"
+      echo "stage=dhcp_ip"
+      return 1
+    fi
+    log "wifi_on DHCP renewed iface=${iface} ip=${ip_addr}"
+    start_enabled_network_services
+    echo "result=connected"
+    echo "ip=${ip_addr}"
+    return 0
+  fi
+
   stop_wifi_processes "$iface"
   iface_up "$iface"
   if ! start_wpa_supplicant "$iface" "$conf"; then
@@ -604,6 +645,7 @@ wifi_on() {
   fi
 
   log "wifi_on success iface=${iface} ip=${ip_addr}"
+  start_enabled_network_services
   echo "result=connected"
   echo "ip=${ip_addr}"
   return 0

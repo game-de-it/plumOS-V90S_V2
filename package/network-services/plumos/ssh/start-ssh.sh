@@ -12,6 +12,7 @@ LISTEN="${PLUMOS_SSH_LISTEN:-0.0.0.0}"
 SSHD_BIN="${PLUMOS_SSHD_BIN:-/usr/sbin/sshd}"
 PID_FILE="${RUN_DIR}/sshd.pid"
 LOG_FILE="${LOG_DIR}/sshd.log"
+SSHD_CONFIG="${ETC_DIR}/sshd_config"
 ENV_PATH="${PLUMOS_SSH_PATH:-${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
 
 PATH="$ENV_PATH"
@@ -30,7 +31,7 @@ pid_running() {
   cmdline="$(tr '\000' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
   comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
   case "${cmdline} ${comm}" in
-    *sshd*) return 0 ;;
+    *sshd*"[listener]"*) return 0 ;;
   esac
   return 1
 }
@@ -42,7 +43,7 @@ find_existing_sshd() {
     cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)"
     comm="$(cat "$proc/comm" 2>/dev/null || true)"
     case "${cmdline} ${comm}" in
-      *sshd*listener*|*"sshd -"*|*"/usr/sbin/sshd"*|*" sshd"*)
+      *sshd*"[listener]"*)
         printf '%s\n' "$pid"
         return 0
         ;;
@@ -93,6 +94,23 @@ export PATH
 EOF
 }
 
+install_sshd_config() {
+  source_config=/etc/ssh/sshd_config
+  tmp_config="${SSHD_CONFIG}.tmp"
+
+  if [ -r "$source_config" ]; then
+    sed 's|^[[:space:]]*Subsystem[[:space:]][[:space:]]*sftp[[:space:]].*$|Subsystem sftp /mnt/plumos/ssh/libexec/sftp-server|' \
+      "$source_config" > "$tmp_config"
+  else
+    : > "$tmp_config"
+  fi
+  if ! grep -q '^[[:space:]]*Subsystem[[:space:]][[:space:]]*sftp[[:space:]]' "$tmp_config"; then
+    printf '%s\n' 'Subsystem sftp /mnt/plumos/ssh/libexec/sftp-server' >> "$tmp_config"
+  fi
+  mv "$tmp_config" "$SSHD_CONFIG"
+  chmod 0600 "$SSHD_CONFIG" 2>/dev/null || true
+}
+
 host_key_args() {
   args=""
   found=0
@@ -116,6 +134,7 @@ host_key_args() {
 }
 
 install_login_environment
+install_sshd_config
 
 if [ -s "$PID_FILE" ]; then
   pid="$(sed -n '1p' "$PID_FILE" 2>/dev/null | tr -d '[:space:]')"
@@ -156,7 +175,7 @@ fi
 rm -f "$PID_FILE"
 log "starting sshd listen=${LISTEN} port=${PORT}"
 # shellcheck disable=SC2086
-"$SSHD_BIN" $host_args \
+"$SSHD_BIN" -f "$SSHD_CONFIG" $host_args \
   -E "$LOG_FILE" \
   -o "PidFile=$PID_FILE" \
   -o "ListenAddress=$LISTEN" \

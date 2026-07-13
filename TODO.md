@@ -373,6 +373,12 @@ Build plumOS V90S as a V90S-specific distribution:
   full runtime checks on the `INFORMATION` screen.
 - [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
   Mac client.
+- [x] Make `network-services` self-contained for FTP by bundling BusyBox,
+  `tcpsvd`, and `ftpd`; recover the live V90S from a partial app-layer copy.
+- [x] Recover USB Wi-Fi from `wpa_state=COMPLETED` with no IPv4 by renewing DHCP
+  and restarting enabled services after address acquisition.
+- [x] Route SFTP through the app-layer subsystem, validate SFTP OFF/ON without
+  stopping SSH, and restrict SSH process adoption to the real listener.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi
   dongles. It exposes a dedicated transfer image, not `/mnt/plumos` itself.
 - [x] Keep the FE responsive while USB Disk Mode waits for host eject and cable
@@ -434,6 +440,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Avoid symlink-dependent library layouts on FAT32.
 - [x] Generate app-layer `manifest.json`.
 - [x] Generate app-layer `checksums.sha256`.
+- [x] Mark complete app-layer manifests explicitly and reject partial
+  `missing_optional` app layers during release packaging.
 - [x] Add boot/frontend startup checks for app-layer metadata in the
   development init path.
 - [x] Validate frontend boot on real V90S hardware.

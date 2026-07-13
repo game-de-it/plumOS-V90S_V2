@@ -5,6 +5,8 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
 PACKAGE_DIR="${ROOT_DIR}/package/network-services/plumos"
 SRC_DIR="${ROOT_DIR}/package/network-services/src"
 DIST_DIR="${PLUMOS_V90S_NETWORK_SERVICES_OUT:-${ROOT_DIR}/output/network-services/v90s}"
+USERLAND_DIR="${PLUMOS_V90S_USERLAND_OUT:-${ROOT_DIR}/output/userland/v90s}"
+USERLAND_BIN_DIR="${USERLAND_DIR}/plumos/bin"
 PLUMOS_DIR="${DIST_DIR}/plumos"
 BIN_DIR="${PLUMOS_DIR}/bin"
 LIB_DIR="${PLUMOS_DIR}/lib"
@@ -42,6 +44,7 @@ Builds the plumOS V90S Wi-Fi/FTP/SFTP/Samba/ADB service package into:
 
 Environment:
   PLUMOS_V90S_NETWORK_SERVICES_OUT  Override output directory.
+  PLUMOS_V90S_USERLAND_OUT          BusyBox userland dependency directory.
 EOF
 }
 
@@ -208,6 +211,27 @@ assemble_base() {
   copy_loader
 }
 
+install_ftp_runtime() {
+  local name src
+
+  log "Installing BusyBox FTP runtime"
+  for name in busybox tcpsvd ftpd; do
+    src="${USERLAND_BIN_DIR}/${name}"
+    if [ ! -f "$src" ]; then
+      printf 'error: FTP dependency missing: %s\n' "$src" >&2
+      printf 'hint: run ./scripts/docker-build.sh userland first\n' >&2
+      exit 1
+    fi
+    install -m 0755 "$src" "${BIN_DIR}/${name}"
+  done
+
+  {
+    echo "ftp-runtime: ${USERLAND_BIN_DIR}"
+    sha256sum "${BIN_DIR}/busybox" "${BIN_DIR}/tcpsvd" "${BIN_DIR}/ftpd"
+    echo
+  } >> "$MANIFEST"
+}
+
 install_sftp_server() {
   local src
 
@@ -239,10 +263,10 @@ install_samba_daemon() {
   local src="$2"
   local dst_bin="${SAMBA_SBIN_DIR}/${name}.bin"
   local dst_wrapper="${SAMBA_SBIN_DIR}/${name}"
-  local prelude=""
+  local prelude='SAMBA_RUNTIME_DIR="${PLUMOS_SAMBA_RUNTIME_DIR:-/tmp/plumos-samba}"; export TMPDIR="${SAMBA_RUNTIME_DIR}"; mkdir -p "${SAMBA_RUNTIME_DIR}"; cd "${SAMBA_RUNTIME_DIR}" || exit 1'
 
   if [ -f "$SAMBA_COMPAT" ]; then
-    prelude='export LD_PRELOAD="${PLUMOS_ROOT}/lib/plumos-samba-compat.so${LD_PRELOAD:+:${LD_PRELOAD}}"'
+    prelude="${prelude}; export LD_PRELOAD=\"\${PLUMOS_ROOT}/lib/plumos-samba-compat.so\${LD_PRELOAD:+:\${LD_PRELOAD}}\""
   fi
 
   install -m 0755 "$src" "$dst_bin"
@@ -647,6 +671,7 @@ write_artifact_manifest() {
 }
 
 assemble_base
+install_ftp_runtime
 install_sftp_server
 install_samba
 install_fat_tools

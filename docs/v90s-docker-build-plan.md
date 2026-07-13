@@ -120,6 +120,12 @@ libraries, and the current known-good RetroArch defaults template. SSH logins
 prefer `/mnt/plumos/bin` and then `/mnt/plumos/gnu/bin` in PATH. Files are
 copied without symlinks so the tree can be placed on FAT32.
 
+The `network-services` target builds its BusyBox userland dependency first and
+copies `busybox`, `tcpsvd`, and `ftpd` into the network-services artifact. This
+keeps the FTP runtime atomic with its controller. A strict app-layer manifest
+sets `complete=true`; release packaging rejects manifests with missing optional
+components.
+
 Implemented update-only release target:
 
 ```sh

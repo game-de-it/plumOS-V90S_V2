@@ -459,6 +459,11 @@ if require_or_note_missing "$picoarch_dir/bin/plumos-picoarch-launch" "picoarch"
 fi
 
 generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+if [ -s "$missing_file" ]; then
+    complete=false
+else
+    complete=true
+fi
 {
     printf '{\n'
     printf '  "name": "plumOS V90S app layer",\n'
@@ -466,6 +471,7 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  "compat_vendor": "%s",\n' "$(json_escape "$compat_vendor")"
     printf '  "mount_path": "%s",\n' "$(json_escape "$mount_path")"
     printf '  "generated_at": "%s",\n' "$generated_at"
+    printf '  "complete": %s,\n' "$complete"
     printf '  "directories": [\n'
     printf '    "bin", "lib", "apps", "cores", "info", "frontend", "picoarch", "standalone",\n'
     printf '    "config", "fonts", "share", "state", "themes", "Images", "media",\n'

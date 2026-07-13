@@ -1075,6 +1075,11 @@ AuthorizedKeysFile .ssh/authorized_keys
 PermitUserEnvironment yes
 SetEnv PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos PATH=/mnt/plumos/bin:/mnt/plumos/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EOF
+    if grep -q '^[[:space:]]*Subsystem[[:space:]][[:space:]]*sftp[[:space:]]' "$root/etc/ssh/sshd_config"; then
+        sed -i 's|^[[:space:]]*Subsystem[[:space:]][[:space:]]*sftp[[:space:]].*$|Subsystem sftp /mnt/plumos/ssh/libexec/sftp-server|' "$root/etc/ssh/sshd_config"
+    else
+        printf '%s\n' 'Subsystem sftp /mnt/plumos/ssh/libexec/sftp-server' >> "$root/etc/ssh/sshd_config"
+    fi
 
     if [ -n "$ssh_authorized_keys" ]; then
         install -m 0600 "$ssh_authorized_keys" "$root/root/.ssh/authorized_keys"

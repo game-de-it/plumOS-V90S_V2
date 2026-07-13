@@ -20,7 +20,7 @@ pid_matches_sshd() {
   cmdline="$(tr '\000' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
   comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
   case "${cmdline} ${comm}" in
-    *sshd*) return 0 ;;
+    *sshd*"[listener]"*) return 0 ;;
   esac
   return 1
 }
@@ -32,7 +32,7 @@ find_existing_sshd() {
     cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)"
     comm="$(cat "$proc/comm" 2>/dev/null || true)"
     case "${cmdline} ${comm}" in
-      *sshd*listener*|*"sshd -"*|*"/usr/sbin/sshd"*|*" sshd"*)
+      *sshd*"[listener]"*)
         printf '%s\n' "$pid"
         return 0
         ;;

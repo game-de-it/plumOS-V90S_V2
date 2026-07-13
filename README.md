@@ -89,7 +89,9 @@ Docker build flow です。
 
 `userland` は BusyBox と補助コマンド群を `output/userland/v90s/` に生成します。
 `network-services` は FTP/SFTP/Samba のapp-layer payloadを
-`output/network-services/v90s/` に生成します。SSHも
+`output/network-services/v90s/` に生成します。FTPに必要なBusyBox、`tcpsvd`、
+`ftpd`も同じ成果物へ同梱されるため、service controllerだけが配置される
+不完全な更新にはなりません。SSHも
 `plumos-network-services` の制御対象です。V90Sではsystem rootfs側のOpenSSHを
 app-layerの `ssh/start-ssh.sh` / `ssh/stop-ssh.sh` から起動または採用し、
 SSHログイン時は `/mnt/plumos/bin:/mnt/plumos/gnu/bin` をPATH先頭へ入れます。
@@ -97,7 +99,9 @@ SSHログイン時は `/mnt/plumos/bin:/mnt/plumos/gnu/bin` をPATH先頭へ入�
 `app-layer` は FAT32 にコピーする plumOS 側ツリーを
 `output/app-layer/v90s/` に生成します。現在は RetroArch、QuickNES、frontend、
 BusyBox/command tools、FTP/SFTP/Samba payload、SDL2 PowerVR private libs、
-既知良好RetroArch設定テンプレート、metadata、checksumを含みます。symlinkは
+既知良好RetroArch設定テンプレート、metadata、checksumを含みます。manifestの
+`complete`がfalse、または`missing_optional`が空でないapp-layerからはreleaseを
+生成しません。symlinkは
 使わず、FAT32上で成立する実体ファイルとして配置します。
 
 `release` は `output/app-layer/v90s/` から update-only package を

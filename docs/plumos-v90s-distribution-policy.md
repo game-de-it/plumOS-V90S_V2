@@ -576,6 +576,24 @@ SSH service state. FTP, SSH, Samba, and ADB stop/restart logic should use PID
 files plus `/proc/<pid>/cmdline` or `/proc/<pid>/comm` checks before
 terminating processes.
 
+The `network-services` artifact must be independently deployable for its stated
+service set. In particular, it must include the BusyBox binary and `tcpsvd` /
+`ftpd` wrappers required by FTP rather than assuming a separate userland copy
+already exists on the FAT32 partition. Rebuilding or copying network services
+must not leave an enabled FTP checkbox with a `not_installed` runtime.
+
+An associated USB Wi-Fi link without an IPv4 address is not a connected runtime
+state. `plumos-network-control --wifi on` should renew DHCP in that state and
+rerun idempotent startup for enabled network services after IPv4 becomes
+available. Samba may persist as enabled while no IPv4 exists, but its runtime
+state should report `waiting_network` and start after address acquisition.
+
+The system-rootfs OpenSSH configuration must route the SFTP subsystem through
+`/mnt/plumos/ssh/libexec/sftp-server`. This lets the SFTP checkbox enable or
+disable the app-layer server path without stopping the shared SSH listener.
+SSH process adoption and status checks must recognize an actual `[listener]`
+process, not an authenticated child or a stale PID file.
+
 USB cable diagnostics are a separate path from Wi-Fi/SSH. With the current
 StockOS-derived kernel, USB Ethernet and USB ACM serial are not available, so
 the supported file-transfer cable path is USB Disk Mode plus a command mailbox
@@ -627,10 +645,16 @@ VERSION
 manifest.json
 checksums.sha256
 COMPAT_VENDOR
+complete
 ```
 
 `COMPAT_VENDOR` must be `v90s-stockos-r1` until the vendor runtime is
 intentionally revised.
+
+`complete` is true only when the supported app-layer inputs are all present and
+`missing_optional` is empty. Release packaging must reject partial app-layer
+outputs even when those outputs are useful for an incremental development
+deployment.
 
 User content directories in the V90S FAT32 app layer should follow the
 StockOS/Batocera lowercase convention for content roots:

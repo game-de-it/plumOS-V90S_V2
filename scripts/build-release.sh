@@ -68,6 +68,30 @@ if [ ! -d "$app_layer_dir" ]; then
     printf 'hint: run ./scripts/docker-build.sh app-layer --strict first\n' >&2
     exit 1
 fi
+if [ ! -f "$app_layer_dir/manifest.json" ]; then
+    printf 'error: app-layer manifest missing: %s/manifest.json\n' "$app_layer_dir" >&2
+    printf 'hint: run ./scripts/docker-build.sh app-layer --strict first\n' >&2
+    exit 1
+fi
+if ! python3 - "$app_layer_dir/manifest.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    manifest = json.load(handle)
+missing = manifest.get("missing_optional", [])
+complete = manifest.get("complete", not missing)
+if missing or not complete:
+    print(
+        "error: app-layer is incomplete; missing: " + ", ".join(missing),
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
+then
+    printf 'hint: rebuild every app-layer input, then run app-layer --strict\n' >&2
+    exit 1
+fi
 if [ -z "$version" ]; then
     if [ ! -f "$app_layer_dir/VERSION" ]; then
         printf 'error: --version is required when app-layer VERSION is missing\n' >&2
