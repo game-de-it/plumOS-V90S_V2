@@ -409,6 +409,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Validate that NW Service checkboxes use the persistent `enabled=` state
   while service status reports exact live process state for SSH, FTP, SFTP,
   Samba, and ADB.
+- [x] Fix and live-validate `Network Settings -> INFORMATION`: refresh the USB
+  Wi-Fi runtime status when the screen opens, report `COMPLETED` with an IPv4
+  address as `Connected`, and show compact live/boot state for every network
+  service without blank or clipped values.
 - [x] Validate the FE navigation/action path for
   `START -> Network Settings -> NW Service -> ADB` by running the controller UI
   script path that presses `A` on the ADB checkbox and confirming `adb devices`

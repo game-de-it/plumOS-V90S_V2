@@ -1491,10 +1491,21 @@ static int read_network_service_status(struct ui_state *ui, const char *service,
   if (running_out) {
     *running_out = enabled_seen ? enabled : running;
   }
-  if (summary[0]) {
-    copy_string(status, status_size, summary);
+  if (strcmp(state, "running") == 0) {
+    copy_string(status, status_size,
+                enabled_seen && !enabled ? "Running / Manual"
+                                         : "Running / Auto");
+  } else if (strcmp(state, "waiting_network") == 0) {
+    copy_string(status, status_size, "Waiting for Network");
+  } else if (strcmp(state, "stopped") == 0) {
+    copy_string(status, status_size,
+                enabled_seen && enabled ? "Stopped / Auto" : "Stopped");
+  } else if (strcmp(state, "not_installed") == 0) {
+    copy_string(status, status_size, "Not Installed");
   } else if (state[0]) {
     copy_string(status, status_size, state);
+  } else if (summary[0]) {
+    copy_string(status, status_size, summary);
   } else {
     copy_string(status, status_size, installed ? "Stopped" : "Not Installed");
   }
@@ -4169,9 +4180,35 @@ static void load_app_layer_metadata(struct ui_state *ui) {
   }
 }
 
+static void refresh_wifi_runtime_status(struct ui_state *ui) {
+  char script[PATH_MAX];
+  char cmd[UI_COMMAND_MAX];
+  size_t pos = 0;
+
+  if (!ui ||
+      !join_path(script, sizeof(script), ui->plumos_root,
+                 "bin/plumos-network-control") ||
+      !file_exists(script)) {
+    return;
+  }
+  cmd[0] = '\0';
+  if (!append_string(cmd, sizeof(cmd), &pos, "PLUMOS_SDCARD_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->sdcard_root) ||
+      !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
+      !append_string(cmd, sizeof(cmd), &pos, " ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, script) ||
+      !append_string(cmd, sizeof(cmd), &pos,
+                     " --wifi status >/dev/null 2>&1")) {
+    return;
+  }
+  system(cmd);
+}
+
 static void load_wifi_runtime_status(struct ui_state *ui) {
   struct device_settings *device = &ui->device;
 
+  refresh_wifi_runtime_status(ui);
   device->wifi_runtime_enabled = runtime_wifi_enabled();
   copy_string(device->network_status_source, sizeof(device->network_status_source),
               file_exists(ui->wpa_status_path) ? ui->wpa_status_path : "runtime status missing");
@@ -5602,8 +5639,22 @@ static void add_network_information_entries(struct ui_state *ui) {
   char value[256];
   const struct device_settings *device = &ui->device;
 
+  if (strcmp(device->wifi_state, "COMPLETED") == 0) {
+    copy_string(value, sizeof(value),
+                device->wifi_ip[0] ? "Connected" : "No IP Address");
+  } else if (strcmp(device->wifi_state, "DISCONNECTED") == 0) {
+    copy_string(value, sizeof(value), "Disconnected");
+  } else if (strcmp(device->wifi_state, "NO_USB_WIFI_DONGLE") == 0) {
+    copy_string(value, sizeof(value), "Dongle Missing");
+  } else if (strcmp(device->wifi_state, "NO_WIFI_INTERFACE") == 0) {
+    copy_string(value, sizeof(value), "No Wi-Fi Interface");
+  } else if (device->wifi_state[0]) {
+    copy_string(value, sizeof(value), device->wifi_state);
+  } else {
+    copy_string(value, sizeof(value), "No Runtime Status");
+  }
   add_setting_entry(ui, "network_connection", "Connection",
-                    device->wifi_state[0] ? device->wifi_state : "No Runtime Status");
+                    value);
   add_setting_entry(ui, "network_ip_address", "IP Address",
                     device->wifi_ip[0] ? device->wifi_ip : "-");
   if (device->wifi_rssi[0]) {
