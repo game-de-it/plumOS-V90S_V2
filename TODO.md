@@ -135,11 +135,12 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Confirm the live QuickNES core starts NES content through the FE.
   - [x] Confirm the separately deployed `nxengine_libretro.so` can draw Cave
     Story by direct diagnostic launch.
-  - [ ] Deploy and hash-check the complete 117-core app-layer output. The
-    tested V90S currently has only QuickNES under `/mnt/plumos/cores`.
-  - [ ] Re-run FE launch validation for the 48 ROM-bearing systems currently
-    blocked by missing live libretro cores.
-  - [ ] Enable Cave Story in the FE and package NxEngine under the normal
+  - [x] Deploy and hash-check the complete 117-core app-layer output on the
+    live V90S under `/mnt/plumos/cores`.
+  - [x] Re-run FE launch validation after full deployment. All 48 systems
+    previously blocked by missing live libretro cores now pass FE preflight;
+    the only remaining preflight failure is non-libretro Pyxel.
+  - [x] Enable Cave Story in the FE and package NxEngine under the normal
     `/mnt/plumos/cores` contract instead of the ROM directory.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
@@ -428,7 +429,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Use p7 `rootfs_data` / `PLUMOS` as the current development FAT32
   app/update/data partition.
 - [ ] Validate the chosen p6/p7 FAT32 layout on real hardware.
-- [x] Increase the development FAT32 app-layer capacity to 1024MB so the full
+- [x] Increase the development FAT32 app-layer capacity to 4096MB so the full
   generated app-layer can be included without exceeding the current payload
   size.
 - [ ] Keep an explicit development compatibility mode for the current p6/p7

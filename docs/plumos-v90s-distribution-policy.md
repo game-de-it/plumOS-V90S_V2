@@ -294,7 +294,7 @@ The app layer should be mounted at a stable path such as:
 
 The exact partition used for this FAT32 app layer is still a hardware
 validation item for release images. The current development direction is to use
-p7 `rootfs_data` / `PLUMOS` as a 1GB FAT32 app/update/data partition so the full
+p7 `rootfs_data` / `PLUMOS` as a 4GB FAT32 app/update/data partition so the full
 generated app layer can be carried in a single SD image. The intended release
 direction remains:
 
@@ -313,7 +313,7 @@ not from the early boot-test image. The July 11 live V90S p7 was only about
 55MB, which is enough for a targeted FE/RA/Wi-Fi update but too small for the
 current full app-layer output that includes userland and network-service
 payloads. The StockOS-compatible development assembler now defaults p7 to a
-1024MB FAT32 `PLUMOS` image. If the generated app layer grows past that budget,
+4096MB FAT32 `PLUMOS` image. If the generated app layer grows past that budget,
 increase the partition size deliberately or split optional payloads before
 treating full app-layer metadata as deployable to that partition.
 
@@ -706,7 +706,7 @@ The image assembler should keep p1 through p4 compatible with StockOS until
 there is real-device evidence that they can be changed. p5 should be the
 plumOS system squashfs. One validated p6/p7 partition should become the
 FAT32 app layer. The development assembler currently keeps p6 as the small
-StockOS-compatible `BATOCERA` ext4 partition and formats p7 `PLUMOS` as 1GB
+StockOS-compatible `BATOCERA` ext4 partition and formats p7 `PLUMOS` as 4GB
 FAT32 for app-layer validation. Release builds should not regress to ext4
 `SHARE` as the final app-layer design unless real-device evidence proves that a
 different layout is required.
@@ -960,6 +960,28 @@ Follow-up:
 Build and boot-test a p7 FAT32 image on real V90S hardware, then record whether
 `/mnt/plumos` mounts correctly, the frontend starts from the app layer, and
 logs/configs remain visible from macOS or Windows.
+
+### 2026-07-13: 4GB FAT32 p7 Full Core Deployment
+
+Decision:
+
+Supersede the 1GB development default with a 4096MB FAT32 p7 `PLUMOS`
+partition. Keep p1 through p6 unchanged.
+
+Rationale:
+
+The regenerated complete app layer with the MMF-matched 117-core set occupies
+about 900MB
+before user ROM artwork, saves, logs, and later standalone payload growth. A
+4GB partition keeps routine update and validation work away from the capacity
+limit while remaining quick to assemble and write compared with a full-card
+image.
+
+Validation:
+
+The live 128GB V90S SD card was expanded and reformatted in place. The kernel
+reported a 4GB p7, `/mnt/plumos` mounted read-write, and all app-layer files
+passed `checksums.sha256` after deployment.
 
 ### 2026-07-11: V90S SD1 ROM and BIOS Roots
 

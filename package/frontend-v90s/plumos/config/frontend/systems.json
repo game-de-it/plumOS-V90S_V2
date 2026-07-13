@@ -1725,7 +1725,7 @@
       "short_name": "Cave",
       "sort_order": 580,
       "hardware": "engine",
-      "enabled": false,
+      "enabled": true,
       "pinned": false,
       "directory_aliases": [
         {"name": "CAVESTORY", "source": "plumos", "priority": 10},

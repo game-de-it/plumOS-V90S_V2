@@ -8,7 +8,7 @@ out_dir="output/images"
 image_name="plumos-v90s-stockos-smoke.img"
 volumn_vfat_size="33M"
 batocera_boot_size="33M"
-share_size="1024M"
+share_size="4096M"
 app_layer_dir="${PLUMOS_V90S_APP_LAYER_DIR:-}"
 boot0_img=""
 boot_package_img=""
@@ -35,7 +35,7 @@ Options:
   --volumn-vfat-size N  p1 boot-resource/PLUMBOOT FAT size, default 33M
   --batocera-boot-size N
                         p6 rootfs/BATOCERA ext4 size, default 33M
-  --share-size N        p7 rootfs_data/PLUMOS FAT32 size, default 1024M
+  --share-size N        p7 rootfs_data/PLUMOS FAT32 size, default 4096M
   --app-layer-dir PATH  copy a built plumOS app layer into p7 PLUMOS
   --boot0 PATH          raw Allwinner boot0 image; default vendor runtime if present,
                         otherwise requires --allow-knulli-boot-fallback
