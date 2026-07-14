@@ -170,6 +170,9 @@ Build plumOS V90S as a V90S-specific distribution:
     a null destination from `glMapBufferRange` in GLideN64; Super Mario 64 now
     reaches rendered gameplay with the AArch64 dynarec and exits cleanly. See
     `docs/validation/2026-07-15-v90s-mupen64plus-next-powervr.md`.
+  - [x] Remove PicoArch from every N64 launch choice. N64 now exposes only the
+    validated RetroArch and standalone profiles; the FE no longer synthesizes
+    `picoarch:parallel_n64` or `picoarch:mupen64plus_next` companion profiles.
   - [x] Restrict Saturn FE choices to standalone YabaSanshiro and the validated
     YabaSanshiro libretro core; remove Beetle/Mednafen and suppress the unusable
     PicoArch Saturn companion profile.

@@ -1278,6 +1278,10 @@ static int add_core_profile(struct core_system_def *system, const char *profile)
 }
 
 static int picoarch_companion_core_allowed(const char *system_id, const char *core_id) {
+  /* N64 hardware-render cores are not supported by the V90S PicoArch host. */
+  if (system_id && strcmp(system_id, "n64") == 0) {
+    return 0;
+  }
   /* No Saturn core reaches a usable launch path through PicoArch on V90S. */
   if (system_id && strcmp(system_id, "saturn") == 0) {
     return 0;
