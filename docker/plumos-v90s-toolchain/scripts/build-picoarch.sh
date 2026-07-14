@@ -29,7 +29,7 @@ checkout_source "$SDL12_REPO" "$SDL12_REF" "$SDL12_SRC"
 
 perl -0pi -e 's/scaler_neon\.o/scaler_c.o/ or die "scaler object marker missing\n";
   s/-lpng12/-lpng/ or die "libpng marker missing\n";
-  s/else ifeq \(\$\(platform\), unix\)/else ifeq (\$(platform), v90s)\n\tOBJS += plat_linux.o\n\tCFLAGS += -march=armv8-a+crc -mtune=cortex-a53 -DCONTENT_DIR='"'"'"\/mnt\/plumos\/roms"'"'"'\n\tLDFLAGS += -fPIE\nelse ifeq (\$(platform), unix)/ or die "platform marker missing\n"' "$SRC/Makefile"
+  s/else ifeq \(\$\(platform\), unix\)/else ifeq (\$(platform), v90s)\n\tOBJS += plat_linux.o\n\tCFLAGS += -march=armv8-a+crc -mtune=cortex-a53 -pthread -DCONTENT_DIR='"'"'"\/mnt\/plumos\/roms"'"'"'\n\tLDFLAGS += -fPIE -pthread\nelse ifeq (\$(platform), unix)/ or die "platform marker missing\n"' "$SRC/Makefile"
 
 awk 'BEGIN { n=0 } /^ifeq \(\$\(platform\), trimui\)/ { n++; if (n == 2) exit } { print }' \
   "$SRC/Makefile" > "$SRC/Makefile.v90s"
@@ -51,6 +51,8 @@ cp "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch_v90s_fbdev.h" \
 
 git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-input-aspect.patch"
+git -C "$SRC" apply \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-content-dir.patch"
 
 perl -0pi -e 's/\tjoycount = SDL_NumJoysticks\(\);/\tjoycount = 0; \/\* V90S controller is owned by evdev. \*\// or die "SDL joystick marker missing\n"' \
   "$SRC/libpicofe/in_sdl.c"
@@ -64,6 +66,15 @@ perl -0pi -e 's{// begin miyoo hardware scaling support.*?// end miyoo hardware 
 perl -0pi -e 's{static void get_tag_name\(const char\* in_path, char\* out_tag\) \{.*?\n\}\n\nint main}{static void get_tag_name(const char* in_path, char* out_tag) {\n\tconst char *system = getenv("PLUMOS_PICOARCH_SYSTEM");\n\tif (system && system[0]) {\n\t\tsnprintf(out_tag, MAX_PATH, "%s", system);\n\t\treturn;\n\t}\n\tconst char *slash = strrchr(in_path, '\''/'\'');\n\tsize_t len = slash ? (size_t)(slash - in_path) : strlen(in_path);\n\twhile (len > 0 && in_path[len - 1] == '\''/'\'') len--;\n\tconst char *start = in_path;\n\tfor (size_t i = 0; i < len; i++) if (in_path[i] == '\''/'\'') start = in_path + i + 1;\n\tsnprintf(out_tag, MAX_PATH, "%.*s", (int)(in_path + len - start), start);\n}\n\nint main}s or die "tag function marker missing\n"' "$SRC/main.c"
 
 perl -0pi -e 's{static void set_directories\(const char \*core_name, const char \*tag_name\) \{.*?\n\}\n\n// based on eggs}{static void set_directories(const char *core_name, const char *tag_name) {\n\tconst char *home = getenv("HOME");\n\tconst char *save_root = getenv("PLUMOS_PICOARCH_SAVE_ROOT");\n\tconst char *bios_dir = getenv("PLUMOS_PICOARCH_BIOS_DIR");\n\tif (home) {\n\t\tsnprintf(config_dir, MAX_PATH, "%s/.picoarch-%s-%s/", home, core_name, tag_name);\n\t\tmkdir(config_dir, 0755);\n\t}\n\tif (!save_root || !save_root[0]) save_root = "/mnt/plumos/Saves";\n\tif (!bios_dir || !bios_dir[0]) bios_dir = "/mnt/plumos/bios";\n\tsnprintf(save_dir, MAX_PATH, "%s/%s/", save_root, tag_name);\n\tmkdir(save_root, 0755);\n\tmkdir(save_dir, 0755);\n\tsnprintf(system_dir, MAX_PATH, "%s", bios_dir);\n}\n\n// based on eggs}s or die "directory function marker missing\n"' "$SRC/core.c"
+
+git -C "$SRC" apply \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-pixel-format.patch"
+git -C "$SRC" apply \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-libretro-env.patch"
+git -C "$SRC" apply \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-frame-audio-callback.patch"
+git -C "$SRC" apply --recount \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-async-audio-callback.patch"
 
 make -C "$SRC" platform=v90s MMENU=0 -j"$JOBS" picoarch
 

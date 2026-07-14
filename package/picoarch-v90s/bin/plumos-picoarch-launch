@@ -10,6 +10,7 @@ ROM_PATH="${2:-}"
 PID_FILE="$PLUMOS_ROOT/state/picoarch/runtime.pid"
 LOG_DIR="$PLUMOS_ROOT/Logs/picoarch"
 RUNTIME_LIB_DIR="/tmp/plumos-picoarch-lib"
+LIBRETRO_RUNTIME_DIR="${PLUMOS_PICOARCH_LIBRETRO_RUNTIME_DIR:-$PLUMOS_ROOT/lib/libretro}"
 
 fail() {
   printf 'plumos-picoarch-launch: %s\n' "$*" >&2
@@ -19,7 +20,9 @@ fail() {
 [ -n "$CORE_ID" ] || fail "missing core ID"
 [ -n "$ROM_PATH" ] || fail "missing ROM path"
 [ -x "$PICOARCH_BIN" ] || fail "runtime not found: $PICOARCH_BIN"
-[ -f "$ROM_PATH" ] || fail "ROM not found: $ROM_PATH"
+if [ ! -f "$ROM_PATH" ] && [ ! -d "$ROM_PATH" ]; then
+  fail "content not found: $ROM_PATH"
+fi
 
 case "$CORE_ID" in
   flycast|flycast_xtreme)
@@ -77,7 +80,7 @@ export SDL_RENDER_DRIVER="${PLUMOS_PICOARCH_SDL_RENDER_DRIVER:-software}"
 export SDL12COMPAT_SYNC_TO_VBLANK="${PLUMOS_PICOARCH_SYNC_TO_VBLANK:-1}"
 export SDL_NOMOUSE=1
 export AUDIODEV="${PLUMOS_PICOARCH_AUDIODEV:-hw:0,0}"
-export LD_LIBRARY_PATH="/usr/lib/powervr:$PLUMOS_ROOT/lib/plumos-sdl2-powervr:$RUNTIME_LIB_DIR:$PICOARCH_ROOT/lib:$PLUMOS_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/usr/lib/powervr:$PLUMOS_ROOT/lib/plumos-sdl2-powervr:$LIBRETRO_RUNTIME_DIR:$RUNTIME_LIB_DIR:$PICOARCH_ROOT/lib:$PLUMOS_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 cpu_index=1
 while [ "$cpu_index" -le 3 ]; do
@@ -102,8 +105,14 @@ case "$cpu_policy" in
 esac
 
 log_file="$LOG_DIR/${SYSTEM_ID}-${CORE_ID##*/}.log"
-printf 'system=%s core=%s rom=%s effect=%s\n' \
-  "$SYSTEM_ID" "$CORE_PATH" "$ROM_PATH" "$EFFECT" >> "$log_file"
+if [ -d "$ROM_PATH" ]; then
+  content_type=directory
+else
+  content_type=file
+fi
+printf 'system=%s core=%s content=%s content_type=%s effect=%s libretro_runtime=%s\n' \
+  "$SYSTEM_ID" "$CORE_PATH" "$ROM_PATH" "$content_type" "$EFFECT" \
+  "$LIBRETRO_RUNTIME_DIR" >> "$log_file"
 
 child=''
 cleanup() {

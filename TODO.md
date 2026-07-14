@@ -252,6 +252,11 @@ Build plumOS V90S as a V90S-specific distribution:
     FreeType/HarfBuzz, and SpeexDSP resampling. The physical V90S now plays the
     `TurnedIntoAGirl` MP3 BGM normally; see
     `docs/validation/2026-07-15-v90s-easyrpg-libretro-codecs.md`.
+  - [x] Run EasyRPG through the PicoArch/PICO route. PicoArch now accepts
+    directory content, supplies the libretro frame-time callback, and drives
+    asynchronous core audio independently from the 58.955 Hz LCD loop. The
+    physical V90S displays the game and plays BGM without periodic popping; see
+    `docs/validation/2026-07-15-v90s-picoarch-easyrpg.md`.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Fix the standalone ScummVM directory launch before validation. The
     current generic launcher passes the content directory as a game ID;
