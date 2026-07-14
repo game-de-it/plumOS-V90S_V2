@@ -147,3 +147,42 @@ closed, both `/run/plumos-v90s/*.pid` files had been removed, and the existing
 FE process resumed drawing. No RetroArch stop defect was reproduced. The
 observed stale owner was the standalone runtime; future diagnosis must compare
 `/proc/PID/exe` instead of treating any YabaSanshiro session as RetroArch.
+
+## Standalone Menu And Exit Fix
+
+The first controlled standalone exit attempt exposed two separate issues. The
+user initially tried to open a menu inside the Saturn game rather than the
+RetroArena emulator menu, and the standalone process exited. This was not used
+as evidence for the emulator-menu exit path. It did expose that the original
+launcher used `exec`, so an emulator exit left stale `.pid` and `.exe` records
+under `/run/plumos-standalone`.
+
+The next attempt opened the RetroArena menu with the physical Function button,
+but its controls did not work. RetroArena has separate input paths:
+
+- the V90S JSON/direct mapping already drove Saturn gameplay;
+- menu navigation called `InputConfig`, which only loaded an
+  EmulationStation-style XML file that plumOS does not provide.
+
+The V90S YabaSanshiro patch now gives `adc_gamepad` an explicit menu mapping:
+
+```text
+D-pad hat 0  -> menu up/down/left/right
+button 0     -> confirm
+button 1     -> back
+button 9     -> start
+button 10    -> Function/menu toggle
+```
+
+The common standalone launcher now supervises the emulator as a child instead
+of replacing itself with `exec`. It writes the child PID, waits for the exact
+child, preserves its exit status, and removes the PID/executable records from
+an `EXIT` trap only when they still belong to that child. The targeted stop
+helper continues to validate `/proc/PID/exe` before sending a signal.
+
+Only YabaSanshiro was rebuilt, then the binary and updated launcher were
+deployed over ADB. Device and host SHA-256 values matched. The user confirmed
+that the physical Function button opened the menu and that D-pad, confirm, and
+back controls worked. Exiting from that menu removed YabaSanshiro PID `831`
+and supervisor PID `533`, closed ALSA, removed both ownership records, and
+resumed the same FE PID `6636`.

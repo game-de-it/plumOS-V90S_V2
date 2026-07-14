@@ -222,12 +222,15 @@ Build plumOS V90S as a V90S-specific distribution:
     profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
     the V90S `adc_gamepad` auto-configuration.
   - [ ] Complete standalone YabaSanshiro physical validation. PowerVR GLES,
-    changing game frames, continuous ALSA playback, the built-in controller
-    device, and the standalone FE launch plan are already proven; controller
-    behavior, Function menu, performance, and clean FE return remain. See
+    changing game frames, continuous ALSA playback, gameplay controls,
+    Function menu controls, clean process teardown, and FE return are proven;
+    only a representative gameplay performance measurement remains. See
     `docs/validation/2026-07-14-v90s-yabasanshiro-standalone.md`.
   - [x] Prevent duplicate standalone emulator processes with a PID/executable
     ownership lock and a targeted TERM-to-KILL stop helper.
+  - [x] Map the V90S `adc_gamepad` into the standalone YabaSanshiro menu and
+    supervise standalone child processes so normal or abnormal exits remove
+    their exact PID/executable ownership records.
   - [x] Verify that RetroArch YabaSanshiro performs a normal core unload,
     exits with status 0, removes its PID files, releases ALSA, and returns to
     the existing FE process. The stale process observed before this test was

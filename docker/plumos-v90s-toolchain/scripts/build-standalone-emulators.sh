@@ -694,10 +694,25 @@ if [ -f "${pid_file}" ] && [ -f "${exe_file}" ]; then
     exit 75
   fi
 fi
-printf '%s\n' "$$" >"${pid_file}"
-printf '%s\n' "${exe}" >"${exe_file}"
+rm -f "${pid_file}" "${exe_file}"
+
+child_pid=
+cleanup_pid_records() {
+  recorded_pid=$(cat "${pid_file}" 2>/dev/null || true)
+  if [ -n "${child_pid}" ] && [ "${recorded_pid}" = "${child_pid}" ]; then
+    rm -f "${pid_file}" "${exe_file}"
+  fi
+}
+trap cleanup_pid_records EXIT
+
 cd "${workdir:-$(dirname "${exe}")}" || exit 1
-exec "${exe}" "$@" >>"${LOG_ROOT}/${id}.log" 2>&1
+"${exe}" "$@" >>"${LOG_ROOT}/${id}.log" 2>&1 &
+child_pid=$!
+printf '%s\n' "${child_pid}" >"${pid_file}"
+printf '%s\n' "${exe}" >"${exe_file}"
+wait "${child_pid}"
+rc=$?
+exit "${rc}"
 EOF
   chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
 

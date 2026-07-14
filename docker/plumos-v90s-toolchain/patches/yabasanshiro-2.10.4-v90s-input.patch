@@ -60,3 +60,26 @@ index 12ce1b14e..db2e704e8 100644
      tmp.select_device_ = it->second->getDeviceId();    
      tmp.select_button_ = result.id;
      printf("select_device_ = %d, select_button_ = %d\n", tmp.select_device_, tmp.select_button_ );
+@@ -653,8 +692,20 @@ void InputManager::addJoystickByDeviceIndex(int id)
+   // create the InputConfig
+   mInputConfigs[joyId] = new InputConfig(joyId, SDL_JoystickName(joy), guid);
+-  if(!loadInputConfig(mInputConfigs[joyId]))
++  if( SDL_JoystickName(joy) != NULL &&
++      strcmp(SDL_JoystickName(joy), "adc_gamepad") == 0 )
+   {
+-    cout << "Added unconfigured joystick " << SDL_JoystickName(joy) << " (GUID: " << guid << ", instance ID: " << joyId << ", device index: " << id << ")." << endl;
++    InputConfig * cfg = mInputConfigs[joyId];
++    cfg->mapInput("up", Input(joyId, TYPE_HAT, 0, SDL_HAT_UP, true));
++    cfg->mapInput("down", Input(joyId, TYPE_HAT, 0, SDL_HAT_DOWN, true));
++    cfg->mapInput("left", Input(joyId, TYPE_HAT, 0, SDL_HAT_LEFT, true));
++    cfg->mapInput("right", Input(joyId, TYPE_HAT, 0, SDL_HAT_RIGHT, true));
++    cfg->mapInput("a", Input(joyId, TYPE_BUTTON, 0, 1, true));
++    cfg->mapInput("b", Input(joyId, TYPE_BUTTON, 1, 1, true));
++    cfg->mapInput("start", Input(joyId, TYPE_BUTTON, 9, 1, true));
++    cfg->mapInput("select", Input(joyId, TYPE_BUTTON, 10, 1, true));
++    cout << "Added V90S menu mapping for adc_gamepad (instance ID: " << joyId << ")" << endl;
++  }else if(!loadInputConfig(mInputConfigs[joyId])){
++    cout << "Added unconfigured joystick " << SDL_JoystickName(joy) << " (GUID: " << guid << ", instance ID: " << joyId << ", device index: " << id << ")." << endl;
+   }else{
+     cout << "Added known joystick " << SDL_JoystickName(joy) << " (instance ID: " << joyId << ", device index: " << id << ")"  << endl;
+   }
