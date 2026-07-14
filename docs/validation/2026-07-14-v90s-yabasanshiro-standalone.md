@@ -114,3 +114,36 @@ The deployed launcher was also tested while that process remained active. A
 second launch returned exit code `75` with `standalone emulator already
 running`, the verified live-instance count remained one, and ALSA ownership
 did not change.
+
+## RetroArch Exit Comparison
+
+A separate live test checked whether the libretro YabaSanshiro route was the
+process that failed to stop. Before launch, the previously running process was
+PID `5465` with this executable:
+
+```text
+/mnt/plumos/standalone/yabasanshiro/bin/yabasanshiro
+```
+
+It was therefore the standalone runtime, not RetroArch. It was stopped through
+the exact-PID `plumos-standalone-stop yabasanshiro` helper before starting the
+FE test.
+
+The FE then started `retroarch:yabasanshiro` with RetroArch PID `9857` and
+launcher PID `9439`. RetroArch owned framebuffer/DRM input resources and ALSA
+PCM, while the FE waited for its launch command. The user selected the normal
+RetroArch quit action. The process reached core teardown and exited normally:
+
+```text
+[INFO] [Config] Saved config to "/mnt/plumos/config/retroarch/retroarch-v90s.cfg".
+[INFO] [Core] Unloading game...
+[INFO] [Core] Unloading core...
+[INFO] [Core] Unloading core symbols...
+retroarch-launch: retroarch exited rc=0
+```
+
+Within about four seconds, both RetroArch and its launcher were gone, ALSA was
+closed, both `/run/plumos-v90s/*.pid` files had been removed, and the existing
+FE process resumed drawing. No RetroArch stop defect was reproduced. The
+observed stale owner was the standalone runtime; future diagnosis must compare
+`/proc/PID/exe` instead of treating any YabaSanshiro session as RetroArch.

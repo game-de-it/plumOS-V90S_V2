@@ -228,6 +228,10 @@ Build plumOS V90S as a V90S-specific distribution:
     `docs/validation/2026-07-14-v90s-yabasanshiro-standalone.md`.
   - [x] Prevent duplicate standalone emulator processes with a PID/executable
     ownership lock and a targeted TERM-to-KILL stop helper.
+  - [x] Verify that RetroArch YabaSanshiro performs a normal core unload,
+    exits with status 0, removes its PID files, releases ALSA, and returns to
+    the existing FE process. The stale process observed before this test was
+    the standalone executable, not RetroArch.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.
