@@ -226,7 +226,10 @@ Build plumOS V90S as a V90S-specific distribution:
     all-four-CPUs-online policy, and 640x480 as the V90S Dreamcast default.
   - [x] Start Mupen64Plus 2.6.0 with Super Mario 64 through the FE standalone
     profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
-    the V90S `adc_gamepad` auto-configuration.
+    the V90S `adc_gamepad` auto-configuration. The console UI has no native
+    in-game menu, so a PID/executable-validated Function hotkey now performs a
+    clean Mupen shutdown and returns to the FE; this is validated with Mario
+    Story on hardware.
   - [ ] Complete standalone YabaSanshiro physical validation. PowerVR GLES,
     changing game frames, continuous ALSA playback, gameplay controls,
     Function menu controls, clean process teardown, and FE return are proven;

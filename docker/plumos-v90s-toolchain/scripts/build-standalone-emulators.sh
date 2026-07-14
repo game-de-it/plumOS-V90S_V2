@@ -375,7 +375,7 @@ clone_mupen64plus_component() {
 }
 
 build_mupen64plus() {
-  local src=$1 stage prefix api component component_src component_repo log elf input_cfg target
+  local src=$1 stage prefix api component component_src component_repo log elf input_cfg target hotkey_src hotkey_bin
   stage="${src}/stage-v90s"
   prefix=/mnt/plumos/standalone/mupen64plus
   api="${src}/components/core/src/api"
@@ -426,6 +426,11 @@ build_mupen64plus() {
     SHAREDIR="${prefix}/share/mupen64plus" DESTDIR="${stage}" || return 1
 
   rsync -a "${stage}${prefix}/" "${OUT_DIR}/standalone/mupen64plus/"
+  hotkey_src="${ROOT_DIR}/docker/plumos-v90s-toolchain/standalone/plumos-mupen64plus-hotkey.c"
+  hotkey_bin="${OUT_DIR}/standalone/mupen64plus/bin/plumos-mupen64plus-hotkey"
+  [ -f "${hotkey_src}" ] || return 1
+  "${CC}" ${COMMON_CFLAGS} -Wall -Wextra -Werror \
+    "${hotkey_src}" -o "${hotkey_bin}" || return 1
   input_cfg="${OUT_DIR}/standalone/mupen64plus/share/mupen64plus/InputAutoCfg.ini"
   if ! grep -Fqx '[adc_gamepad]' "${input_cfg}"; then
     cat >>"${input_cfg}" <<'EOF'
@@ -467,6 +472,7 @@ EOF
   done < <(find "${OUT_DIR}/standalone/mupen64plus" -type f \
     \( -perm -111 -o -name '*.so' -o -name '*.so.*' \))
   append_manifest "  output=standalone/mupen64plus/bin/mupen64plus"
+  append_manifest "  helper=standalone/mupen64plus/bin/plumos-mupen64plus-hotkey"
   append_manifest "  data=standalone/mupen64plus/lib/mupen64plus"
   append_manifest "  data=standalone/mupen64plus/share/mupen64plus"
 }
@@ -737,7 +743,13 @@ fi
 rm -f "${pid_file}" "${exe_file}"
 
 child_pid=
+hotkey_pid=
 cleanup_pid_records() {
+  if [ -n "${hotkey_pid}" ]; then
+    kill "${hotkey_pid}" 2>/dev/null || true
+    wait "${hotkey_pid}" 2>/dev/null || true
+    hotkey_pid=
+  fi
   recorded_pid=$(cat "${pid_file}" 2>/dev/null || true)
   if [ -n "${child_pid}" ] && [ "${recorded_pid}" = "${child_pid}" ]; then
     rm -f "${pid_file}" "${exe_file}"
@@ -750,6 +762,13 @@ cd "${workdir:-$(dirname "${exe}")}" || exit 1
 child_pid=$!
 printf '%s\n' "${child_pid}" >"${pid_file}"
 printf '%s\n' "${exe}" >"${exe_file}"
+if [ "${id}" = mupen64plus ]; then
+  hotkey_helper="${EMU_ROOT}/mupen64plus/bin/plumos-mupen64plus-hotkey"
+  if [ -x "${hotkey_helper}" ]; then
+    "${hotkey_helper}" "${child_pid}" "${exe}" >>"${LOG_ROOT}/${id}.log" 2>&1 &
+    hotkey_pid=$!
+  fi
+fi
 wait "${child_pid}"
 rc=$?
 exit "${rc}"

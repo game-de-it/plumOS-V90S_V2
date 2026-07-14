@@ -62,12 +62,22 @@ V90S-specific `InputAutoCfg.ini` entry with this policy:
 | L / R | L / R |
 | Select | Z trigger |
 | Start | Start |
+| Function or Select+Start | exit Mupen64Plus and return to FE |
 
 The live Mupen64Plus log confirmed:
 
 ```text
 Input: N64 Controller #1: Using auto-config with SDL joystick 0 ('adc_gamepad')
 ```
+
+Mupen64Plus uses `mupen64plus-ui-console`. It has keyboard commands, including
+Escape to quit, but it does not provide a native in-game GUI menu. plumOS
+therefore packages a small Mupen-only hotkey helper. It discovers
+`adc_gamepad` by its sysfs name without grabbing the device, monitors
+`BTN_MODE`, and sends `TERM` only after both the managed PID and executable
+path match. The launcher owns the helper lifetime, so it cannot remain active
+after Mupen exits. The vendor `Select+Start` combo also emits `BTN_MODE` and is
+therefore an alternate exit gesture.
 
 ## Live Runtime Evidence
 
@@ -107,6 +117,20 @@ ALSA PCM state: RUNNING
 framebuffer sha256: 6de9e73ad4e8b5afcb1d2764f171af8abaea5226208b0b1a6b6f9366d57ae30c
 ```
 
+A later FE launch used `Mario Story.z64` to validate the full standalone exit
+path. Game controls worked, the physical Function button stopped the exact
+Mupen process, and the core closed the ROM normally:
+
+```text
+mupen64plus-hotkey: monitoring /dev/input/event4 BTN_MODE
+mupen64plus-hotkey: Function pressed; stopping pid=15671
+Core: R4300 emulator finished.
+Core Status: Rom closed.
+```
+
+After exit there was one frontend process, no Mupen or hotkey process, and no
+stale Mupen pidfile. The user confirmed that Function returned to the FE.
+
 Each test stopped only the exact validated emulator PID with `TERM`; both
 processes exited within one second. The frontend was then restored as one
 `plumos-controller-ui-fbdev` process.
@@ -114,6 +138,6 @@ processes exited within one second. The frontend was then restored as one
 ## Remaining Physical Checks
 
 The software paths for display, audio, and controller discovery are live.
-Long-play performance, every physical N64 mapping, save persistence, emulator
-hotkey exit, and visual confirmation of clean return to the FE remain device
-interaction checks rather than automated claims.
+Long-play performance, every physical N64 mapping, and save persistence remain
+device interaction checks rather than automated claims. Function hotkey exit
+and visual return to the FE are now confirmed on hardware.
