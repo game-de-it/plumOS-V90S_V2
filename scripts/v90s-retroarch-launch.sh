@@ -23,6 +23,7 @@ RETROARCH_TIMEOUT_FLAG="$RUN_DIR/retroarch.timeout"
 RETROARCH_PID=
 RETROARCH_WATCHDOG_PID=
 LOG_MIRROR_PID=
+RETROARCH_APPEND_CONFIG=
 
 if [ -r "$ROUTE_CONFIG" ]; then
     . "$ROUTE_CONFIG"
@@ -281,6 +282,10 @@ on_launcher_exit() {
         RETROARCH_WATCHDOG_PID=
     fi
     stop_periodic_log_mirror
+    if [ -n "$RETROARCH_APPEND_CONFIG" ]; then
+        rm -f "$RETROARCH_APPEND_CONFIG" 2>/dev/null || true
+        RETROARCH_APPEND_CONFIG=
+    fi
     cleanup_retroarch_pidfile
     cleanup_launcher_pidfile
 }
@@ -302,12 +307,17 @@ run_retroarch() {
 
     rm -f "$RETROARCH_TIMEOUT_FLAG" 2>/dev/null || true
 
+    set -- "$RETROARCH_BIN" --verbose --config "$cfg"
+    if [ -n "$RETROARCH_APPEND_CONFIG" ]; then
+        set -- "$@" --appendconfig "$RETROARCH_APPEND_CONFIG"
+    fi
+
     case "$start_mode" in
         menu)
-            "$RETROARCH_BIN" --verbose --config "$cfg" --menu >> "$RETROARCH_LOG" 2>&1 &
+            "$@" --menu >> "$RETROARCH_LOG" 2>&1 &
             ;;
         content)
-            "$RETROARCH_BIN" --verbose --config "$cfg" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
+            "$@" -L "$core" "$rom" >> "$RETROARCH_LOG" 2>&1 &
             ;;
         *)
             log "retroarch-launch: unsupported start mode: $start_mode"
@@ -589,6 +599,25 @@ set_config_string_if_unbound() {
     fi
 }
 
+prepare_launch_append_config() {
+    audio_override="${PLUMOS_V90S_AUDIO_DRIVER_OVERRIDE:-}"
+    latency_override="${PLUMOS_V90S_AUDIO_LATENCY_OVERRIDE:-}"
+
+    if [ -z "$audio_override" ] && [ -z "$latency_override" ]; then
+        return 0
+    fi
+
+    RETROARCH_APPEND_CONFIG="$RUN_DIR/retroarch-launch-$$.cfg"
+    : > "$RETROARCH_APPEND_CONFIG" || return 1
+    if [ -n "$audio_override" ]; then
+        printf 'audio_driver = "%s"\n' "$audio_override" >> "$RETROARCH_APPEND_CONFIG"
+    fi
+    if [ -n "$latency_override" ]; then
+        printf 'audio_latency = "%s"\n' "$latency_override" >> "$RETROARCH_APPEND_CONFIG"
+    fi
+    log "retroarch-launch: append_config=$RETROARCH_APPEND_CONFIG audio_override=${audio_override:-none} latency_override=${latency_override:-none}"
+}
+
 ensure_v90s_input_binds() {
     cfg="$1"
 
@@ -854,6 +883,11 @@ set_config_string "$cfg" core_options_path \
     "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
 set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
 set_config_string "$cfg" savestate_directory "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
+if ! prepare_launch_append_config; then
+    log "retroarch-launch: could not create per-launch append config"
+    mirror_logs
+    exit 48
+fi
 log "retroarch-launch: config_path=$cfg"
 
 log "retroarch-launch: route video=$video_driver context=$video_context_driver threaded=$video_threaded input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"

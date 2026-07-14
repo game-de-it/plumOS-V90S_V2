@@ -239,7 +239,18 @@ Build plumOS V90S as a V90S-specific distribution:
     exits with status 0, removes its PID files, releases ALSA, and returns to
     the existing FE process. The stale process observed before this test was
     the standalone executable, not RetroArch.
+  - [x] Fix ScummVM libretro audio on the physical V90S. The core now submits
+    continuous frame-sized audio and preserves the fractional 58.917 Hz clock;
+    the frontend also applies the saved `alsathread`/latency override. The
+    decisive runtime fix is ScummVM's `performance` governor default: with
+    `interactive`, the bursty libretro workload stayed at 600-816 MHz and only
+    reached 42-47 fps; with `performance`, Beneath a Steel Sky holds 58.91 fps
+    with normal 48 kHz audio. See
+    `docs/validation/2026-07-14-v90s-scummvm-libretro-audio.md`.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
+  - [ ] Fix the standalone ScummVM directory launch before validation. The
+    current generic launcher passes the content directory as a game ID;
+    `--auto-detect --path=CONTENT_DIR` launches the same game with normal audio.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.
     - [ ] Fix PCSX-ReARMed SDL startup; the FE route currently exits with no

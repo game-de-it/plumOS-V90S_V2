@@ -393,6 +393,21 @@ patch_core_source() {
     printf '\n[plumOS] patched YabaSanshiro 2.10.4 complete VDP1 framebuffer readback\n' >> "$log"
   fi
 
+  if [ "$id" = "scummvm" ]; then
+    local audio_clock_patch="$patch_dir/scummvm-libretro-audio-clock.patch"
+
+    if [ ! -f "$audio_clock_patch" ]; then
+      printf '\n[plumOS] missing required ScummVM audio-clock patch\n' >> "$log"
+      return 1
+    fi
+    if ! patch --dry-run -d "$src" -p1 < "$audio_clock_patch" >/dev/null 2>> "$log"; then
+      printf '\n[plumOS] required ScummVM audio-clock patch does not apply\n' >> "$log"
+      return 1
+    fi
+    patch -d "$src" -p1 < "$audio_clock_patch" >> "$log" 2>&1
+    printf '\n[plumOS] patched ScummVM libretro continuous audio and fractional refresh clock\n' >> "$log"
+  fi
+
   case "$id" in
     mgba)
       if [ -f "$src/src/core/CMakeLists.txt" ]; then

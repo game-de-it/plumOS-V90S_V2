@@ -1036,7 +1036,7 @@
       },
       "launch_profiles": ["standalone:scummvm", "retroarch:scummvm"],
       "default_launch_profile": "standalone:scummvm",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "performance",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"

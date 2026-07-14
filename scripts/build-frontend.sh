@@ -225,6 +225,8 @@ system_id=""
 core=""
 rom=""
 cpu_policy=""
+audio_driver_override=""
+audio_latency_override=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -248,7 +250,15 @@ while [ "$#" -gt 0 ]; do
       echo "plumos-retroarch-launch: fixed CPU frequencies are no longer supported" >&2
       exit 2
       ;;
-    --safe-exit|--audio|--audio-latency|--dosbox-pure-force60fps|--dosbox-pure-cycles)
+    --audio)
+      audio_driver_override="$2"
+      shift 2
+      ;;
+    --audio-latency)
+      audio_latency_override="$2"
+      shift 2
+      ;;
+    --safe-exit|--dosbox-pure-force60fps|--dosbox-pure-cycles)
       shift 2
       ;;
     *)
@@ -262,6 +272,27 @@ if [ -z "$core" ] || [ -z "$rom" ]; then
   echo "plumos-retroarch-launch: --core and --rom are required" >&2
   exit 2
 fi
+
+case "$audio_driver_override" in
+  ""|oss|alsa|alsathread|mmf_ao) ;;
+  *)
+    echo "plumos-retroarch-launch: unsupported audio driver: $audio_driver_override" >&2
+    exit 2
+    ;;
+esac
+case "$audio_latency_override" in
+  "") ;;
+  *[!0-9]*|0)
+    echo "plumos-retroarch-launch: invalid audio latency: $audio_latency_override" >&2
+    exit 2
+    ;;
+  *)
+    if [ "$audio_latency_override" -gt 1000 ]; then
+      echo "plumos-retroarch-launch: invalid audio latency: $audio_latency_override" >&2
+      exit 2
+    fi
+    ;;
+esac
 
 mkdir -p \
   "$PLUMOS_ROOT/Logs" \
@@ -319,6 +350,10 @@ export PLUMOS_V90S_VIDEO_REFRESH_RATE="${PLUMOS_V90S_VIDEO_REFRESH_RATE:-58.9171
 export PLUMOS_V90S_VRR_RUNLOOP_ENABLE="${PLUMOS_V90S_VRR_RUNLOOP_ENABLE:-true}"
 export PLUMOS_V90S_AUDIO_DRIVER="${PLUMOS_V90S_AUDIO_DRIVER:-alsa}"
 export PLUMOS_V90S_AUDIO_LATENCY="${PLUMOS_V90S_AUDIO_LATENCY:-64}"
+[ -z "$audio_driver_override" ] || \
+  export PLUMOS_V90S_AUDIO_DRIVER_OVERRIDE="$audio_driver_override"
+[ -z "$audio_latency_override" ] || \
+  export PLUMOS_V90S_AUDIO_LATENCY_OVERRIDE="$audio_latency_override"
 export PLUMOS_V90S_INPUT_DRIVER="${PLUMOS_V90S_INPUT_DRIVER:-sdl2}"
 export PLUMOS_V90S_JOYPAD_DRIVER="${PLUMOS_V90S_JOYPAD_DRIVER:-sdl2}"
 export PLUMOS_V90S_SDL_VIDEODRIVER="${PLUMOS_V90S_SDL_VIDEODRIVER:-mali}"
