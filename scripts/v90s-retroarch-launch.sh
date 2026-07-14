@@ -596,33 +596,78 @@ ensure_v90s_input_binds() {
     set_config_string_if_unbound "$cfg" input_player1_b_btn 1
     set_config_string_if_unbound "$cfg" input_player1_x_btn 2
     set_config_string_if_unbound "$cfg" input_player1_y_btn 3
-    set_config_string_if_unbound "$cfg" input_player1_l_btn 4
-    set_config_string_if_unbound "$cfg" input_player1_r_btn 5
-    set_config_string_if_unbound "$cfg" input_player1_l2_btn 6
-    set_config_string_if_unbound "$cfg" input_player1_r2_btn 7
-    set_config_string_if_unbound "$cfg" input_player1_select_btn 8
-    set_config_string_if_unbound "$cfg" input_player1_start_btn 9
-    set_config_string_if_unbound "$cfg" input_player1_up_btn h0up
-    set_config_string_if_unbound "$cfg" input_player1_down_btn h0down
-    set_config_string_if_unbound "$cfg" input_player1_left_btn h0left
-    set_config_string_if_unbound "$cfg" input_player1_right_btn h0right
-    set_config_string_if_unbound "$cfg" input_menu_toggle_btn 10
+    set_config_string_if_unbound "$cfg" input_player1_l_btn 9
+    set_config_string_if_unbound "$cfg" input_player1_r_btn 10
+    set_config_string_if_unbound "$cfg" input_player1_l2_axis +4
+    set_config_string_if_unbound "$cfg" input_player1_r2_axis +5
+    set_config_string_if_unbound "$cfg" input_player1_select_btn 4
+    set_config_string_if_unbound "$cfg" input_player1_start_btn 6
+    set_config_string_if_unbound "$cfg" input_player1_up_btn 11
+    set_config_string_if_unbound "$cfg" input_player1_down_btn 12
+    set_config_string_if_unbound "$cfg" input_player1_left_btn 13
+    set_config_string_if_unbound "$cfg" input_player1_right_btn 14
+    set_config_string_if_unbound "$cfg" input_menu_toggle_btn 5
+}
+
+migrate_v90s_sdl2_logical_binds() {
+    cfg="$1"
+    target_driver="$2"
+    installed_profile="$V90S_AUTOCONFIG_DIR/sdl2/adc_gamepad.cfg"
+    factory_profile="${PLUMOS_ROOT:-/mnt/plumos}/factory-defaults/ra/config/retroarch/autoconfig/sdl2/adc_gamepad.cfg"
+
+    [ "$target_driver" = "sdl2" ] || return 0
+
+    # SDL_GameController uses logical indices. Repair only the previous V90S
+    # raw-index profile so user-defined bindings remain untouched.
+    if grep -Fqx 'input_l_btn = "4"' "$installed_profile" 2>/dev/null &&
+        grep -Fqx 'input_r_btn = "5"' "$installed_profile" 2>/dev/null &&
+        grep -Fqx 'input_start_btn = "9"' "$installed_profile" 2>/dev/null &&
+        grep -Fqx 'input_up_btn = "h0up"' "$installed_profile" 2>/dev/null &&
+        [ -f "$factory_profile" ]; then
+        cp "$factory_profile" "$installed_profile" 2>/dev/null || true
+        log "retroarch-launch: migrated V90S SDL2 autoconfig to logical buttons"
+    fi
+
+    if grep -q '^input_player1_l_btn[[:space:]]*=[[:space:]]*"4"' "$cfg" 2>/dev/null &&
+        grep -q '^input_player1_r_btn[[:space:]]*=[[:space:]]*"5"' "$cfg" 2>/dev/null &&
+        grep -q '^input_player1_select_btn[[:space:]]*=[[:space:]]*"8"' "$cfg" 2>/dev/null &&
+        grep -q '^input_player1_start_btn[[:space:]]*=[[:space:]]*"9"' "$cfg" 2>/dev/null &&
+        grep -q '^input_player1_up_btn[[:space:]]*=[[:space:]]*"h0up"' "$cfg" 2>/dev/null; then
+        set_config_string "$cfg" input_player1_l_btn 9
+        set_config_string "$cfg" input_player1_r_btn 10
+        set_config_string "$cfg" input_player1_l2_btn nul
+        set_config_string "$cfg" input_player1_r2_btn nul
+        set_config_string "$cfg" input_player1_l2_axis +4
+        set_config_string "$cfg" input_player1_r2_axis +5
+        set_config_string "$cfg" input_player1_select_btn 4
+        set_config_string "$cfg" input_player1_start_btn 6
+        set_config_string "$cfg" input_player1_up_btn 11
+        set_config_string "$cfg" input_player1_down_btn 12
+        set_config_string "$cfg" input_player1_left_btn 13
+        set_config_string "$cfg" input_player1_right_btn 14
+        set_config_string "$cfg" input_menu_toggle_btn 5
+        log "retroarch-launch: migrated V90S SDL2 config to logical buttons"
+    fi
 }
 
 migrate_v90s_joypad_driver() {
     cfg="$1"
     target_driver="$2"
     marker_root="${PLUMOS_ROOT:-/mnt/plumos}/state/migrations"
-    marker="$marker_root/retroarch-joypad-udev-v1"
+    legacy_marker="$marker_root/retroarch-joypad-udev-v1"
+    repair_marker="$marker_root/retroarch-joypad-sdl2-v1"
+    current_driver="$(sed -n 's/^input_joypad_driver[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$cfg" 2>/dev/null | tail -n 1)"
 
-    [ "$target_driver" = "udev" ] || return 0
-    [ -e "$marker" ] && return 0
+    [ "$target_driver" = "sdl2" ] || return 0
+    [ -e "$repair_marker" ] && return 0
 
-    set_config_string "$cfg" input_joypad_driver udev
-    if mkdir -p "$marker_root" 2>/dev/null; then
-        printf '%s\n' "migrated input_joypad_driver to udev" > "$marker" 2>/dev/null || true
+    if [ -e "$legacy_marker" ] && [ "$current_driver" = "udev" ]; then
+        set_config_string "$cfg" input_joypad_driver sdl2
+        log "retroarch-launch: repaired legacy V90S joypad migration: udev -> sdl2"
     fi
-    log "retroarch-launch: migrated V90S joypad driver to udev"
+    if mkdir -p "$marker_root" 2>/dev/null; then
+        printf '%s\n' "checked legacy input_joypad_driver migration" > "$repair_marker" 2>/dev/null || true
+    fi
 }
 
 if ! mkdir -p "$RUN_DIR" 2>/dev/null; then
@@ -771,7 +816,7 @@ video_driver="${PLUMOS_V90S_VIDEO_DRIVER:-sdl2}"
 video_context_driver="${PLUMOS_V90S_VIDEO_CONTEXT_DRIVER:-}"
 video_threaded="${PLUMOS_V90S_VIDEO_THREADED:-true}"
 input_driver="${PLUMOS_V90S_INPUT_DRIVER:-sdl2}"
-joypad_driver="${PLUMOS_V90S_JOYPAD_DRIVER:-udev}"
+joypad_driver="${PLUMOS_V90S_JOYPAD_DRIVER:-sdl2}"
 audio_driver="${PLUMOS_V90S_AUDIO_DRIVER:-alsa}"
 sdl_video="${PLUMOS_V90S_SDL_VIDEODRIVER:-mali}"
 sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
@@ -804,6 +849,7 @@ ensure_v90s_autoconfig "$cfg"
 set_config_string "$cfg" joypad_autoconfig_dir "$V90S_AUTOCONFIG_DIR"
 ensure_v90s_input_binds "$cfg"
 migrate_v90s_joypad_driver "$cfg" "$joypad_driver"
+migrate_v90s_sdl2_logical_binds "$cfg" "$joypad_driver"
 set_config_string "$cfg" core_options_path \
     "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
 set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"

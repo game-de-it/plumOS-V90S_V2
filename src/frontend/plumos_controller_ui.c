@@ -14128,7 +14128,7 @@ static void dump_input_events(const char *event_path, int timeout_sec) {
   int fd;
   time_t deadline;
 
-  fd = open(event_path, O_RDONLY | O_NONBLOCK);
+  fd = open(event_path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
   if (fd < 0) {
     fprintf(stderr, "error: cannot open input event device: %s: %s\n", event_path,
             strerror(errno));
@@ -14389,7 +14389,7 @@ static int run_event_loop(struct ui_state *ui, const char *event_path) {
   long long next_refresh_ms = 0;
 
   if (event_path && event_path[0]) {
-    event_fd = open(event_path, O_RDONLY | O_NONBLOCK);
+    event_fd = open(event_path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (event_fd < 0) {
       snprintf(ui->status, sizeof(ui->status), "input open failed: %s", strerror(errno));
     }
@@ -14397,7 +14397,7 @@ static int run_event_loop(struct ui_state *ui, const char *event_path) {
   ui->input_event_fd = event_fd;
   if (ui->power_event_path[0] &&
       (!event_path || !event_path[0] || !same_path(event_path, ui->power_event_path))) {
-    power_fd = open(ui->power_event_path, O_RDONLY | O_NONBLOCK);
+    power_fd = open(ui->power_event_path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (power_fd < 0 && !ui->status[0]) {
       snprintf(ui->status, sizeof(ui->status), "power input open failed: %s", strerror(errno));
     }

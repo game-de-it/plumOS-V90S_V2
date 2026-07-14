@@ -18,9 +18,11 @@ static int parse_input_seconds(int argc, char **argv)
 static int run_input_probe(int seconds)
 {
     SDL_Joystick *joystick = NULL;
+    SDL_GameController *controller = NULL;
     SDL_JoystickGUID guid;
     char guid_text[64];
     Uint32 deadline;
+    int is_game_controller;
 
     if (SDL_NumJoysticks() < 1) {
         printf("sdl2-probe: no joystick available\n");
@@ -35,10 +37,26 @@ static int run_input_probe(int seconds)
 
     guid = SDL_JoystickGetGUID(joystick);
     SDL_JoystickGetGUIDString(guid, guid_text, sizeof(guid_text));
+    is_game_controller = SDL_IsGameController(0);
     printf("sdl2-probe: input name=%s guid=%s axes=%d buttons=%d hats=%d balls=%d\n",
            SDL_JoystickName(joystick), guid_text,
            SDL_JoystickNumAxes(joystick), SDL_JoystickNumButtons(joystick),
            SDL_JoystickNumHats(joystick), SDL_JoystickNumBalls(joystick));
+    printf("sdl2-probe: is_game_controller=%d\n", is_game_controller);
+    if (is_game_controller) {
+        char *mapping;
+
+        controller = SDL_GameControllerOpen(0);
+        if (!controller) {
+            printf("sdl2-probe: SDL_GameControllerOpen failed: %s\n", SDL_GetError());
+        } else {
+            mapping = SDL_GameControllerMapping(controller);
+            printf("sdl2-probe: controller name=%s mapping=%s\n",
+                   SDL_GameControllerName(controller),
+                   mapping ? mapping : "(none)");
+            SDL_free(mapping);
+        }
+    }
     printf("sdl2-probe: input capture=%d seconds\n", seconds);
     fflush(stdout);
 
@@ -62,12 +80,29 @@ static int run_input_probe(int seconds)
                    event.jbutton.button,
                    event.type == SDL_JOYBUTTONDOWN ? 1U : 0U);
             break;
+        case SDL_CONTROLLERAXISMOTION:
+            printf("sdl2-probe: controller axis index=%u name=%s value=%d\n",
+                   event.caxis.axis,
+                   SDL_GameControllerGetStringForAxis(
+                       (SDL_GameControllerAxis)event.caxis.axis),
+                   event.caxis.value);
+            break;
+        case SDL_CONTROLLERBUTTONDOWN:
+        case SDL_CONTROLLERBUTTONUP:
+            printf("sdl2-probe: controller button index=%u name=%s pressed=%u\n",
+                   event.cbutton.button,
+                   SDL_GameControllerGetStringForButton(
+                       (SDL_GameControllerButton)event.cbutton.button),
+                   event.type == SDL_CONTROLLERBUTTONDOWN ? 1U : 0U);
+            break;
         default:
             continue;
         }
         fflush(stdout);
     }
 
+    if (controller)
+        SDL_GameControllerClose(controller);
     SDL_JoystickClose(joystick);
     printf("sdl2-probe: input capture complete\n");
     return 0;
