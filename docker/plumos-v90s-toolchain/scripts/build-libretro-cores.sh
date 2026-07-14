@@ -511,7 +511,39 @@ patch_core_source() {
         printf '\n[plumOS] patched mame2000 ARM inline vector multiply guard for aarch64\n' >> "$log"
       fi
       ;;
-    mednafen_ngp|beetle_saturn|flycast|flycast_xtreme|mupen64plus_next|parallel_n64|yabasanshiro)
+    parallel_n64)
+      if [ -f "$patch_dir/parallel-n64-knulli-a133.patch" ]; then
+        if patch --dry-run -d "$src" -p1 < "$patch_dir/parallel-n64-knulli-a133.patch" >/dev/null 2>> "$log"; then
+          patch -d "$src" -p1 < "$patch_dir/parallel-n64-knulli-a133.patch" >> "$log" 2>&1
+          printf '\n[plumOS] patched Parallel-N64 with the KNULLI A133/H5 AArch64 GLES target\n' >> "$log"
+        else
+          printf '\n[plumOS] required Parallel-N64 A133/H5 patch does not apply\n' >> "$log"
+          return 1
+        fi
+      else
+        printf '\n[plumOS] missing required Parallel-N64 A133/H5 patch\n' >> "$log"
+        return 1
+      fi
+      while IFS= read -r lua_makefile; do
+        [ -f "$lua_makefile" ] || continue
+        sed -i -E \
+          -e 's/[[:space:]]-flto(=[^[:space:]]+)?//g' \
+          -e 's/[[:space:]]-fwhole-program//g' \
+          -e 's/[[:space:]]-fuse-linker-plugin//g' \
+          "$lua_makefile"
+      done <<EOF_PARALLEL_N64_LTO
+$(find "$src" -maxdepth 4 -type f \( \
+  -name 'Makefile' -o \
+  -name 'Makefile.*' -o \
+  -name 'makefile' -o \
+  -name 'makefile.*' -o \
+  -name '*.mk' -o \
+  -name '*.mak' \
+\) -print)
+EOF_PARALLEL_N64_LTO
+      printf '\n[plumOS] patched LTO-sensitive Makefiles for native V90S feedback builds\n' >> "$log"
+      ;;
+    mednafen_ngp|beetle_saturn|flycast|flycast_xtreme|mupen64plus_next|yabasanshiro)
       while IFS= read -r lua_makefile; do
         [ -f "$lua_makefile" ] || continue
         sed -i -E \

@@ -105,7 +105,7 @@ nxengine|O|https://github.com/libretro/nxengine-libretro.git|aa32afb8df846192003
 puae|O|https://github.com/libretro/libretro-uae.git|0b883572b3d67cdfa2ac4a05d0d22202b641d6d2||Makefile|platform=unix
 puae2021|O|https://github.com/libretro/libretro-uae.git|2.6.1||Makefile|platform=unix
 puzzlescript|O|https://github.com/nwhitehead/pzretro.git|HEAD||Makefile|platform=unix
-parallel_n64|O|https://github.com/libretro/parallel-n64.git|aacf2c24172c865245923609694fcee972960847||Makefile|platform=unix FORCE_GLES=1 ARCH=aarch64 HAVE_LTCG=0
+parallel_n64|O|https://github.com/libretro/parallel-n64.git|1b57f9199b1f8a4510f7f89f14afa9cabf9b3bdd||Makefile|platform=h5 FORCE_GLES=1 ARCH=aarch64 WITH_DYNAREC=aarch64 HAVE_LTCG=0
 reminiscence|O|https://github.com/libretro/REminiscence.git|c2624c7565bbae441835db80f24902fc40f83dd1||Makefile|platform=unix
 sameduck|O|https://github.com/libretro/sameduck.git|SameDuck-libretro|libretro|Makefile|platform=unix
 snes9x2002|O|https://github.com/libretro/snes9x2002.git|540baad622d9833bba7e0696193cb06f5f02f564||Makefile|platform=unix

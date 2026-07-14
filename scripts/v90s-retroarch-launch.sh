@@ -599,6 +599,41 @@ set_config_string_if_unbound() {
     fi
 }
 
+set_core_option_if_missing() {
+    options="$1"
+    key="$2"
+    value="$3"
+
+    if ! grep -q "^${key}[[:space:]]*=" "$options" 2>/dev/null; then
+        printf '%s = "%s"\n' "$key" "$value" >> "$options" 2>/dev/null || true
+    fi
+}
+
+ensure_parallel_n64_defaults() {
+    cfg="$1"
+    options="${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
+    remap_dir="$(sed -n 's/^input_remapping_directory[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$cfg" 2>/dev/null | tail -n 1)"
+    if [ -z "$remap_dir" ] || [ "$remap_dir" = "nul" ]; then
+        remap_dir="$(dirname "$cfg")/remaps"
+        set_config_string "$cfg" input_remapping_directory "$remap_dir"
+    fi
+    factory_remap="${PLUMOS_ROOT:-/mnt/plumos}/factory-defaults/ra/config/retroarch/remaps/ParaLLEl N64/ParaLLEl N64.rmp"
+    installed_remap="$remap_dir/ParaLLEl N64/ParaLLEl N64.rmp"
+
+    mkdir -p "$(dirname "$options")" "$remap_dir/ParaLLEl N64" 2>/dev/null || true
+    set_core_option_if_missing "$options" parallel-n64-gfxplugin gliden64
+    set_core_option_if_missing "$options" parallel-n64-rspplugin hle
+    set_core_option_if_missing "$options" parallel-n64-screensize 640x480
+
+    if [ ! -f "$installed_remap" ] && [ -f "$factory_remap" ]; then
+        if cp "$factory_remap" "$installed_remap" 2>/dev/null; then
+            log "retroarch-launch: installed Parallel-N64 controller remap: $installed_remap"
+        else
+            log "retroarch-launch: could not install Parallel-N64 controller remap: $installed_remap"
+        fi
+    fi
+}
+
 prepare_launch_append_config() {
     audio_override="${PLUMOS_V90S_AUDIO_DRIVER_OVERRIDE:-}"
     latency_override="${PLUMOS_V90S_AUDIO_LATENCY_OVERRIDE:-}"
@@ -877,6 +912,7 @@ ensure_config_save_enabled "$cfg"
 ensure_v90s_autoconfig "$cfg"
 set_config_string "$cfg" joypad_autoconfig_dir "$V90S_AUTOCONFIG_DIR"
 ensure_v90s_input_binds "$cfg"
+ensure_parallel_n64_defaults "$cfg"
 migrate_v90s_joypad_driver "$cfg" "$joypad_driver"
 migrate_v90s_sdl2_logical_binds "$cfg" "$joypad_driver"
 set_config_string "$cfg" core_options_path \

@@ -159,6 +159,12 @@ Build plumOS V90S as a V90S-specific distribution:
     with Clang, and validate sustained PowerVR video, ALSA playback, and the
     complete VDP1 framebuffer readback on the real V90S; see
     `docs/validation/2026-07-14-v90s-yabasanshiro-2.10.4.md`.
+  - [x] Replace the black-screen ParaLLEl-N64 build with KNULLI's pinned
+    A133/H5 GLES2 commit, validate Super Mario 64 and AeroGauge video plus
+    audio on hardware, and add an N64-only D-pad-to-left-analog remap. The
+    controller is fully usable; AeroGauge performance remains a separate
+    optimization task. See
+    `docs/validation/2026-07-15-v90s-parallel-n64-knulli-a133.md`.
   - [x] Restrict Saturn FE choices to standalone YabaSanshiro and the validated
     YabaSanshiro libretro core; remove Beetle/Mednafen and suppress the unusable
     PicoArch Saturn companion profile.

@@ -85,12 +85,16 @@ The recipes now use V90S-compatible targets:
 
 - Flycast: `arm64_cortex_a53_gles2`
 - Mupen64Plus-Next: `arm64_cortex_a53_gles2`
-- ParaLLEl-N64: `ARCH=aarch64 FORCE_GLES=1`
+- ParaLLEl-N64: `ARCH=aarch64 FORCE_GLES=1` (initial core-load test only)
 
-Flycast and ParaLLEl-N64 passed after rebuilding. The frontend now defaults N64
-to `parallel_n64`, while keeping `mupen64plus_next` selectable for later work.
-The final host core and app-layer outputs each contain 117 cores and pass their
-SHA-256 manifests.
+Flycast passed after rebuilding. ParaLLEl-N64 passed the initial core-load
+check, but a later visual test found that this build produced audio over a
+black framebuffer. The KNULLI A133/H5 replacement and full video/input result
+are recorded in
+`docs/validation/2026-07-15-v90s-parallel-n64-knulli-a133.md`. The frontend
+defaults N64 to `parallel_n64`, while keeping `mupen64plus_next` selectable for
+later work. The final host core and app-layer outputs each contained 117 cores
+and passed their SHA-256 manifests at the time of this matrix.
 
 ## Final Device State
 
