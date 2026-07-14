@@ -186,3 +186,27 @@ that the physical Function button opened the menu and that D-pad, confirm, and
 back controls worked. Exiting from that menu removed YabaSanshiro PID `831`
 and supervisor PID `533`, closed ALSA, removed both ownership records, and
 resumed the same FE PID `6636`.
+
+## Full VDP1 Address Range Validation
+
+The common VDP1 framebuffer patch described in
+`2026-07-14-v90s-yabasanshiro-2.10.4.md` is applied before the standalone-only
+GL-context ownership patch. This keeps both routes on the same pixel decoding,
+full-height readback, and `0x40000` VDP1 address contract. The standalone patch
+then keeps a coherent mapped frame across SCU DMA reads and returns GL-context
+ownership at DMA completion or VBlank.
+
+The single-emulator rebuild completed with zero failures:
+
+```text
+./scripts/docker-build.sh standalone yabasanshiro
+built=1 failed=0 skipped=9
+sha256=19969852f184c3086b6fda292eeecbf8ed4ae84925c431aa30a794aa9cd8c0bf
+```
+
+The host and atomically deployed device hashes matched. Virtual Hydlide was
+started through the normal FE standalone profile. The captured MAP frame showed
+the map and 3D background through the physical bottom edge, and the user
+confirmed that both MAP and game-menu screens no longer contain the lower black
+band. This also proves the shared correction does not depend on RetroArch's GL
+context path.

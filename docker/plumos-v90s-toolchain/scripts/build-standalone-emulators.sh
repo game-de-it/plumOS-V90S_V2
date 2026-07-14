@@ -508,11 +508,13 @@ build_nxengine_evo() {
 }
 
 build_yabasanshiro() {
-  local src=$1 build bin patch_file standalone_patch input_patch
+  local src=$1 build bin patch_file standalone_patch input_patch framebuffer_readback_patch readback_patch
   build="${src}/yabause/build-v90s-standalone"
   patch_file="${ROOT_DIR}/docker/plumos-v90s-toolchain/patches/yabasanshiro-2.10.4-arm64-gcc12.patch"
   standalone_patch="${PATCH_DIR}/yabasanshiro-2.10.4-v90s-standalone.patch"
   input_patch="${PATCH_DIR}/yabasanshiro-2.10.4-v90s-input.patch"
+  framebuffer_readback_patch="${PATCH_DIR}/yabasanshiro-2.10.4-vdp1-framebuffer-readback.patch"
+  readback_patch="${PATCH_DIR}/yabasanshiro-2.10.4-v90s-vdp1-readback.patch"
 
   if [ ! -f "${V90S_SDL2_ROOT}/include/SDL2/SDL.h" ] ||
      [ ! -f "${V90S_SDL2_ROOT}/lib/plumos-sdl2-powervr/libSDL2.so" ]; then
@@ -535,6 +537,18 @@ build_yabasanshiro() {
     patch -d "${src}" -p1 <"${input_patch}" || return 1
   elif ! patch --dry-run -R -d "${src}" -p1 <"${input_patch}" >/dev/null 2>&1; then
     echo "YabaSanshiro V90S input patch does not apply cleanly" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${framebuffer_readback_patch}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${framebuffer_readback_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${framebuffer_readback_patch}" >/dev/null 2>&1; then
+    echo "YabaSanshiro VDP1 framebuffer-readback patch does not apply cleanly" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${readback_patch}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${readback_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${readback_patch}" >/dev/null 2>&1; then
+    echo "YabaSanshiro V90S VDP1 readback patch does not apply cleanly" >&2
     return 1
   fi
 

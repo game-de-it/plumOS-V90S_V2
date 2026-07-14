@@ -101,3 +101,64 @@ After validation, RetroArch was stopped with the PID-validated stop helper.
 The frontend was restarted once with all CPUs online and the governor restored
 to `ondemand`. The temporary interpreter option was removed, so the deployed
 core uses its intended dynarec default.
+
+## Virtual Hydlide VDP1 Readback Fix
+
+Virtual Hydlide exposed a separate framebuffer-readback defect. Its game menu
+initially hid the 3D background, and after correcting the GL RGBA-to-Saturn
+pixel conversion, both the MAP and game-menu screens still had a black band at
+the bottom.
+
+The physical framebuffer established an exact boundary. The black region began
+at output row 411 in a 640x480 frame. The core renders 320x224, so the boundary
+maps to Saturn scan line 192:
+
+```text
+411 * 224 / 480 = 191.8
+0x30000 / 0x400 bytes per VDP1 line = 192 lines
+```
+
+Pinned YabaSanshiro 2.10.4 sent GPU framebuffer reads through
+`VIDOGLVdp1ReadFrameBuffer()` only while `addr < 0x30000`. Lines 192 through
+223 therefore came from the stale CPU-side buffer and appeared black. The
+hardware framebuffer is `0x40000` bytes, and `Vdp1FrameBufferReadWord()` and
+`Vdp1FrameBufferReadLong()` already mask addresses with `0x3ffff`.
+
+The required build patch is:
+
+```text
+docker/plumos-v90s-toolchain/patches/
+  yabasanshiro-2.10.4-vdp1-framebuffer-readback.patch
+```
+
+It applies the following related corrections:
+
+- route word and long reads across the full `0x40000` VDP1 address range;
+- read and map the complete active GL framebuffer height;
+- use actual render width/height for framebuffer bounds;
+- decode explicit GL RGBA bytes while preserving transparent and indexed
+  Saturn pixel semantics;
+- restore the caller's GL viewport after the readback pass.
+
+The libretro-only rebuild completed with one built core and zero failures:
+
+```text
+output/libretro-cores/v90s-yabasanshiro-vdp1-full-address-range/
+sha256=051fb69c56f2c0487aff5c4e18e6cfc724975438b87bdfa968a0dd8b29caae1a
+```
+
+The host artifact and atomically deployed device core had the same SHA-256.
+The user confirmed on the physical V90S that both the Virtual Hydlide MAP and
+game-menu screens retained the 3D background through the bottom scan line.
+The same common patch was then rebuilt and validated in the standalone route.
+
+Framebuffer evidence is stored outside git under:
+
+```text
+output/validation/v90s-yabasanshiro-vdp1-readback/
+```
+
+`ra-before-full-address-range.png` has SHA-256 `47b483c2...9326ef` and shows
+the old lower band. `sa-after-full-address-range.png` has SHA-256
+`73dd17ac...bfcb26a` and shows the MAP and 3D background reaching the physical
+bottom edge.

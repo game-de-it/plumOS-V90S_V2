@@ -156,8 +156,8 @@ Build plumOS V90S as a V90S-specific distribution:
     `docs/validation/2026-07-14-v90s-fe-all-core-runtime.md`.
   - [x] Pin YabaSanshiro to performance-oriented 2.10.4 commit `8406a5c`,
     backport its ARM64 register-clobber fix, build this legacy AArch64 release
-    with Clang, and validate sustained PowerVR video plus ALSA playback on the
-    real V90S; see
+    with Clang, and validate sustained PowerVR video, ALSA playback, and the
+    complete VDP1 framebuffer readback on the real V90S; see
     `docs/validation/2026-07-14-v90s-yabasanshiro-2.10.4.md`.
   - [x] Restrict Saturn FE choices to standalone YabaSanshiro and the validated
     YabaSanshiro libretro core; remove Beetle/Mednafen and suppress the unusable
@@ -231,6 +231,10 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Map the V90S `adc_gamepad` into the standalone YabaSanshiro menu and
     supervise standalone child processes so normal or abnormal exits remove
     their exact PID/executable ownership records.
+  - [x] Extend YabaSanshiro's GPU VDP1 framebuffer read path from the truncated
+    `0x30000` range to the full `0x40000` hardware range. Virtual Hydlide MAP
+    and game-menu backgrounds now render through the last scan line without a
+    lower black band in both RetroArch and standalone routes.
   - [x] Verify that RetroArch YabaSanshiro performs a normal core unload,
     exits with status 0, removes its PID files, releases ALSA, and returns to
     the existing FE process. The stale process observed before this test was

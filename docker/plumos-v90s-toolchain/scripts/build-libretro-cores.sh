@@ -373,9 +373,10 @@ patch_core_source() {
 
   if [ "$id" = "yabasanshiro" ]; then
     local arm64_gcc12_patch="$patch_dir/yabasanshiro-2.10.4-arm64-gcc12.patch"
+    local vdp1_readback_patch="$patch_dir/yabasanshiro-2.10.4-vdp1-framebuffer-readback.patch"
 
-    if [ ! -f "$arm64_gcc12_patch" ]; then
-      printf '\n[plumOS] missing required YabaSanshiro 2.10.4 ARM64 register-clobber patch\n' >> "$log"
+    if [ ! -f "$arm64_gcc12_patch" ] || [ ! -f "$vdp1_readback_patch" ]; then
+      printf '\n[plumOS] missing required YabaSanshiro 2.10.4 patch\n' >> "$log"
       return 1
     fi
     if ! patch --dry-run -d "$src" -p1 < "$arm64_gcc12_patch" >/dev/null 2>> "$log"; then
@@ -384,6 +385,12 @@ patch_core_source() {
     fi
     patch -d "$src" -p1 < "$arm64_gcc12_patch" >> "$log" 2>&1
     printf '\n[plumOS] patched YabaSanshiro 2.10.4 ARM64 dynarec register clobber (upstream GCC 12+ fix)\n' >> "$log"
+    if ! patch --dry-run -d "$src" -p1 < "$vdp1_readback_patch" >/dev/null 2>> "$log"; then
+      printf '\n[plumOS] required YabaSanshiro 2.10.4 VDP1 framebuffer-readback patch does not apply\n' >> "$log"
+      return 1
+    fi
+    patch -d "$src" -p1 < "$vdp1_readback_patch" >> "$log" 2>&1
+    printf '\n[plumOS] patched YabaSanshiro 2.10.4 complete VDP1 framebuffer readback\n' >> "$log"
   fi
 
   case "$id" in

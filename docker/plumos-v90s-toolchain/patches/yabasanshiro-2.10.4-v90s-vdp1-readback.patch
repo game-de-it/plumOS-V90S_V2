@@ -1,0 +1,179 @@
+diff --git a/yabause/src/sh2core.c b/yabause/src/sh2core.c
+index c8b162adc..d9157ecd4 100644
+--- a/yabause/src/sh2core.c
++++ b/yabause/src/sh2core.c
+@@ -46,6 +46,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
+ #include "debug.h"
+ #include "memory.h"
+ #include "yabause.h"
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++#include "vidogl.h"
++#endif
+ 
+ #if defined(SH2_DYNAREC)
+ #include "sh2_dynarec/sh2_dynarec.h"
+@@ -2095,6 +2098,13 @@ void DMATransfer(u32 *CHCR, u32 *SAR, u32 *DAR, u32 *TCR, u32 *VCRDMA)
+    if (!(*CHCR & 0x2)) { // TE is not set
+       int srcInc;
+       int destInc;
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++      int vdp1_readback_batch = 0;
++      const u32 physical_source = *SAR & 0x1FFFFFFF;
++      if (VIDCore == &VIDOGL && physical_source >= 0x05C80000 && physical_source < 0x05CC0000) {
++         vdp1_readback_batch = VIDOGLVdp1ReadFrameBufferBegin() == 0;
++      }
++#endif
+ 
+       switch(*CHCR & 0x3000) {
+          case 0x0000: srcInc = 0; break;
+@@ -2178,6 +2188,11 @@ void DMATransfer(u32 *CHCR, u32 *SAR, u32 *DAR, u32 *TCR, u32 *VCRDMA)
+          }
+          break;
+       }
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++      if (vdp1_readback_batch) {
++         VIDOGLVdp1ReadFrameBufferEnd();
++      }
++#endif
+       SH2WriteNotify(destInc<0?*DAR:*DAR-i*destInc,i*abs(destInc));
+    }
+ 
+diff --git a/yabause/src/vdp2.c b/yabause/src/vdp2.c
+index 77613222c..1b0ff65aa 100644
+--- a/yabause/src/vdp2.c
++++ b/yabause/src/vdp2.c
+@@ -528,6 +528,12 @@ void vdp2VBlankIN(void) {
+ void Vdp2VBlankIN(void) {
+   FRAMELOG("***** VIN *****");
+ 
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++  if (VIDCore == &VIDOGL) {
++    VIDOGLVdp1ReadFrameBufferEnd();
++  }
++#endif
++
+ #if defined(YAB_ASYNC_RENDERING)
+   if( vdp_proc_running == 0 ){
+     vdp_proc_running = 1;
+@@ -2328,4 +2334,4 @@ int Vdp2GenerateCCode() {
+   fclose(cramfp);
+ 
+   return 0;
+-}
+\ No newline at end of file
++}
+diff --git a/yabause/src/vidogl.h b/yabause/src/vidogl.h
+index 11f77f498..7dad76755 100644
+--- a/yabause/src/vidogl.h
++++ b/yabause/src/vidogl.h
+@@ -48,6 +48,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
+ void VIDOGLVdp2DrawStart(void);
+ void VIDOGLVdp2DrawEnd(void);
+ void VIDOGLVdp2DrawScreens(void);
++int VIDOGLVdp1ReadFrameBufferBegin(void);
++void VIDOGLVdp1ReadFrameBufferEnd(void);
+ 
+ extern VideoInterface_struct VIDOGL;
+ #endif
+diff --git a/yabause/src/ygles.c b/yabause/src/ygles.c
+index 936408c16..c65813b3f 100644
+--- a/yabause/src/ygles.c
++++ b/yabause/src/ygles.c
+@@ -22,6 +22,7 @@
+ #include <math.h>
+ #include "ygl.h"
+ #include "yui.h"
++#include "vdp2.h"
+ #include "vidshared.h"
+ #include "debug.h"
+ #include "frameprofile.h"
+@@ -36,6 +37,7 @@
+ 
+ extern u8 * Vdp1FrameBuffer[];
+ static int rebuild_frame_buffer = 0;
++static int vdp1_readback_batch_active = 0;
+ 
+ static int YglIsNeedFrameBuffer();
+ static int YglCalcTextureQ( float   *pnts,float *q);
+@@ -883,6 +885,34 @@ void VIDOGLVdp1WriteFrameBuffer(u32 type, u32 addr, u32 val ) {
+   if( _Ygl->max_fb_y < y ) _Ygl->max_fb_y = y;
+ }
+ 
++int VIDOGLVdp1ReadFrameBufferBegin(void) {
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++  if (vdp1_readback_batch_active) {
++    return 0;
++  }
++  VdpRevoke();
++  if (YuiUseOGLOnThisThread() < 0) {
++    VdpResume();
++    return -1;
++  }
++  vdp1_readback_batch_active = 1;
++  return 0;
++#else
++  return -1;
++#endif
++}
++
++void VIDOGLVdp1ReadFrameBufferEnd(void) {
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++  if (!vdp1_readback_batch_active) {
++    return;
++  }
++  vdp1_readback_batch_active = 0;
++  YuiRevokeOGLOnThisThread();
++  VdpResume();
++#endif
++}
++
+ void VIDOGLVdp1ReadFrameBuffer(u32 type, u32 addr, void * out) {
+   u32 x = 0;
+   u32 y = 0;
+@@ -928,6 +958,32 @@ void VIDOGLVdp1ReadFrameBuffer(u32 type, u32 addr, void * out) {
+     return;
+   }
+ 
++#if defined(__RETORO_ARENA__) && defined(YAB_ASYNC_RENDERING)
++  /*
++   * Retro Arena releases the SDL GL context on the emulation thread and lets
++   * the asynchronous VDP thread own it. VDP1 framebuffer DMA reads still run
++   * on the emulation thread. Keep one GL readback mapped until the enclosing
++   * DMA completes, or until the next VBlank for direct SH-2 reads, so all CPU
++   * accesses observe one coherent VDP1 frame.
++   */
++  if (!vdp1_readback_batch_active) {
++    if (VIDOGLVdp1ReadFrameBufferBegin() < 0) {
++      switch (type) {
++      case 0:
++        *(u8*)out = T1ReadByte(Vdp1FrameBuffer[_Ygl->drawframe], addr);
++        break;
++      case 1:
++        *(u16*)out = T1ReadWord(Vdp1FrameBuffer[_Ygl->drawframe], addr);
++        break;
++      case 2:
++        *(u32*)out = T1ReadLong(Vdp1FrameBuffer[_Ygl->drawframe], addr);
++        break;
++      }
++      return;
++    }
++  }
++#endif
++
+   if (_Ygl->smallfbo == 0) {
+       GLuint error;
+       YabThreadLock(_Ygl->mutex);
+@@ -1029,7 +1085,12 @@ void VIDOGLVdp1ReadFrameBuffer(u32 type, u32 addr, void * out) {
+     FrameProfileAdd("ReadFrameBuffer end");
+   }
+ 
+-  int index = (_Ygl->rheight-1-Line) * (_Ygl->rwidth * 4) + Pix * 4;
++  int index;
++  if (_Ygl->rwidth >= 640) {
++    index = (_Ygl->rheight-1-Line) * (_Ygl->rwidth * 4) + (Pix << 1) * 4;
++  } else {
++    index = (_Ygl->rheight-1-Line) * (_Ygl->rwidth * 4) + Pix * 4;
++  }
+  
+   // 16bit mode
+   if ((Vdp2Regs->SPCTL & 0xF) < 8) {
