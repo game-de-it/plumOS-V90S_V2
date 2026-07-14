@@ -273,8 +273,17 @@ build_easyrpg() {
     -DCMAKE_CXX_FLAGS="${COMMON_CXXFLAGS}" -DPLAYER_TARGET_PLATFORM=SDL2 \
     -DPLAYER_AUDIO_BACKEND=SDL2 -DPLAYER_BUILD_EXECUTABLE=ON \
     -DPLAYER_BUILD_LIBLCF=ON -DPLAYER_BUILD_LIBLCF_BRANCH=0.8.1 \
+    -DLIBLCF_WITH_ICU=ON -DLIBLCF_WITH_XML=ON \
     -DLIBLCF_ENABLE_TOOLS=OFF -DLIBLCF_ENABLE_TESTS=OFF \
-    -DLIBLCF_ENABLE_BENCHMARKS=OFF -DPLAYER_WITH_WILDMIDI=OFF \
+    -DLIBLCF_ENABLE_BENCHMARKS=OFF \
+    -DPLAYER_ENABLE_TESTS=OFF -DPLAYER_ENABLE_BENCHMARKS=OFF \
+    -DPLAYER_WITH_FREETYPE=ON -DPLAYER_WITH_HARFBUZZ=ON \
+    -DPLAYER_WITH_LHASA=ON -DPLAYER_WITH_MPG123=ON \
+    -DPLAYER_WITH_LIBSNDFILE=ON -DPLAYER_WITH_OGGVORBIS=ON \
+    -DPLAYER_WITH_OPUS=ON -DPLAYER_WITH_XMP=ON \
+    -DPLAYER_WITH_SPEEXDSP=ON -DPLAYER_WITH_SAMPLERATE=ON \
+    -DPLAYER_ENABLE_FMMIDI=ON -DPLAYER_ENABLE_DRWAV=ON \
+    -DPLAYER_WITH_WILDMIDI=OFF \
     -DPLAYER_WITH_FLUIDSYNTH=OFF -DPLAYER_WITH_FLUIDLITE=OFF \
     -DPLAYER_WITH_NATIVE_MIDI=OFF || return 1
   cmake --build "${build}" --target easyrpg-player -j"${JOBS}" || return 1
@@ -688,7 +697,24 @@ case "${id}" in
     done
     ;;
   scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
-  easyrpg) exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player" ;;
+  easyrpg)
+    exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player"
+    project=${1:-}
+    [ -n "${project}" ] || { echo "missing EasyRPG project path" >&2; exit 2; }
+    shift
+    case "${project}" in
+      *.[lL][dD][bB])
+        project_dir=${project%/*}
+        [ "${project_dir}" != "${project}" ] || project_dir=.
+        project=${project_dir}
+        ;;
+    esac
+    if [ ! -d "${project}" ] && [ ! -f "${project}" ]; then
+      echo "missing EasyRPG project: ${project}" >&2
+      exit 2
+    fi
+    set -- --project-path "${project}" "$@"
+    ;;
   openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
   dosbox-staging) exe="${EMU_ROOT}/dosbox-staging/bin/dosbox" ;;
   pcsx_rearmed) exe="${EMU_ROOT}/pcsx_rearmed/bin/pcsx" ;;

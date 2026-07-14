@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -247,6 +247,11 @@ Build plumOS V90S as a V90S-specific distribution:
     reached 42-47 fps; with `performance`, Beneath a Steel Sky holds 58.91 fps
     with normal 48 kHz audio. See
     `docs/validation/2026-07-14-v90s-scummvm-libretro-audio.md`.
+  - [x] Rebuild EasyRPG libretro with its practical compatibility feature set:
+    mpg123 MP3, libsndfile/dr_wav, Vorbis, Opus, XMP, FmMidi, ICU/XML,
+    FreeType/HarfBuzz, and SpeexDSP resampling. The physical V90S now plays the
+    `TurnedIntoAGirl` MP3 BGM normally; see
+    `docs/validation/2026-07-15-v90s-easyrpg-libretro-codecs.md`.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Fix the standalone ScummVM directory launch before validation. The
     current generic launcher passes the content directory as a game ID;
@@ -256,8 +261,13 @@ Build plumOS V90S as a V90S-specific distribution:
     - [ ] Fix PCSX-ReARMed SDL startup; the FE route currently exits with no
       console terminal and no available video device.
     - [ ] Make ScummVM resolve a ROM directory to a valid detected game target.
-    - [ ] Make EasyRPG start the selected game directory instead of opening its
-      empty player browser.
+    - [x] Make standalone EasyRPG pass the selected game directory through
+      `--project-path` instead of opening its empty player browser. The direct
+      corrected launch loads `CookieCutterTurnedIntoGirl`, and the generated
+      launcher is deployed; see
+      `docs/validation/2026-07-15-v90s-easyrpg-standalone-launch.md`.
+    - [ ] Validate standalone EasyRPG controls, audio, exit, and FE return
+      through the normal frontend route.
     - [ ] Stage or select the chosen OpenBOR PAK in the runtime `Paks` contract.
   - [ ] Replace or remove the stale `PORTS/tmp/1.sh` entry that writes to the
     unavailable `/dev/cpuset/foreground/tasks` path.

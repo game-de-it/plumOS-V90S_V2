@@ -571,6 +571,32 @@ cmake_build_command() {
   ) >> "$log" 2>&1
 }
 
+stage_core_runtime_deps() {
+  local elf="$1"
+  local path soname target
+
+  while IFS= read -r path; do
+    [ -f "$path" ] || continue
+    soname="$(basename "$path")"
+    case "$soname" in
+      ld-linux-aarch64.so.1|libc.so.6|libm.so.6|libpthread.so.0|libdl.so.2|librt.so.1|\
+      libEGL.so.*|libGLESv2.so.*|libGL.so.*|libMali.so.*|libSDL2-2.0.so.*)
+        continue
+        ;;
+    esac
+
+    target="$OUT_DIR/lib/libretro/$soname"
+    if [ ! -f "$target" ]; then
+      cp -L "$path" "$target"
+      stage_core_runtime_deps "$target"
+    fi
+  done < <(
+    ldd "$elf" 2>/dev/null |
+      awk '/=> \/[^ ]+/ {print $3} /^[[:space:]]*\// {print $1}' |
+      sort -u
+  )
+}
+
 build_inih_for_easyrpg() {
   local src="$1"
   local log="$2"
@@ -701,25 +727,29 @@ build_special_core() {
         -DPLAYER_BUILD_LIBLCF=ON \
         -DINIH_INCLUDE_DIR="$src/lib/inih" \
         -DINIH_LIBRARY="$src/lib/inih/libinih.a" \
-        -DLIBLCF_WITH_ICU=OFF \
-        -DLIBLCF_WITH_XML=OFF \
+        -DLIBLCF_WITH_ICU=ON \
+        -DLIBLCF_WITH_XML=ON \
         -DLIBLCF_ENABLE_TOOLS=OFF \
         -DLIBLCF_ENABLE_TESTS=OFF \
         -DLIBLCF_ENABLE_BENCHMARKS=OFF \
+        -DPLAYER_ENABLE_TESTS=OFF \
+        -DPLAYER_ENABLE_BENCHMARKS=OFF \
         -DBUILD_SHARED_LIBS=ON \
-        -DPLAYER_WITH_FREETYPE=OFF \
-        -DPLAYER_WITH_HARFBUZZ=OFF \
-        -DPLAYER_WITH_LHASA=OFF \
-        -DPLAYER_WITH_MPG123=OFF \
-        -DPLAYER_WITH_LIBSNDFILE=OFF \
-        -DPLAYER_WITH_OGGVORBIS=OFF \
-        -DPLAYER_WITH_OPUS=OFF \
+        -DPLAYER_WITH_FREETYPE=ON \
+        -DPLAYER_WITH_HARFBUZZ=ON \
+        -DPLAYER_WITH_MPG123=ON \
+        -DPLAYER_WITH_LIBSNDFILE=ON \
+        -DPLAYER_WITH_OGGVORBIS=ON \
+        -DPLAYER_WITH_OPUS=ON \
         -DPLAYER_WITH_WILDMIDI=OFF \
         -DPLAYER_WITH_FLUIDSYNTH=OFF \
         -DPLAYER_WITH_FLUIDLITE=OFF \
-        -DPLAYER_WITH_XMP=OFF \
-        -DPLAYER_WITH_SPEEXDSP=OFF \
-        -DPLAYER_WITH_SAMPLERATE=OFF
+        -DPLAYER_WITH_XMP=ON \
+        -DPLAYER_WITH_NATIVE_MIDI=OFF \
+        -DPLAYER_ENABLE_FMMIDI=ON \
+        -DPLAYER_ENABLE_DRWAV=ON \
+        -DPLAYER_WITH_SPEEXDSP=ON \
+        -DPLAYER_WITH_SAMPLERATE=ON
       ;;
     scummvm)
       run_with_job_retry "$id" "$log" run_scummvm_build "$src" "$log"
@@ -1029,19 +1059,30 @@ $(core_table)
 EOF_CORES
 
 if [ -f "$OUT_DIR/cores/easyrpg_libretro.so" ]; then
-  fmt_lib="$(ldconfig -p 2>/dev/null | awk '/libfmt\.so\.9 .*aarch64/ {print $NF; exit}')"
-  if [ -z "$fmt_lib" ] || [ ! -f "$fmt_lib" ]; then
-    fmt_lib=/lib/aarch64-linux-gnu/libfmt.so.9
-  fi
-  if [ -f "$fmt_lib" ]; then
-    cp -L "$fmt_lib" "$OUT_DIR/lib/libretro/libfmt.so.9"
+  easyrpg_core="$OUT_DIR/cores/easyrpg_libretro.so"
+  if unresolved_deps="$(ldd "$easyrpg_core" 2>/dev/null | awk '/not found/ {print $1}')" &&
+     [ -n "$unresolved_deps" ]; then
+    printf 'error: EasyRPG runtime dependencies are unresolved: %s\n' "$unresolved_deps" >&2
+    if [ "$FAIL_ON_CORE_ERROR" = "1" ]; then
+      exit 1
+    fi
+  else
+    stage_core_runtime_deps "$easyrpg_core"
     append_manifest ""
-    append_manifest "[runtime-libfmt]"
-    append_manifest "source=$fmt_lib"
-    append_manifest "output=lib/libretro/libfmt.so.9"
+    append_manifest "[easyrpg-runtime]"
+    append_manifest "audio=mpg123,sndfile,vorbis,opus,xmp,drwav,fmmidi"
+    append_manifest "text=freetype,harfbuzz,icu"
+    append_manifest "data=xml"
+    append_manifest "resampler=speexdsp,samplerate"
+    append_manifest "native_midi=disabled-libretro-audio-ownership"
+    append_manifest "runtime_dir=lib/libretro"
     append_manifest "status=staged"
-  elif [ "$FAIL_ON_CORE_ERROR" = "1" ]; then
-    printf 'error: EasyRPG runtime dependency is missing: libfmt.so.9\n' >&2
+    while IFS= read -r runtime_lib; do
+      append_manifest "runtime_lib=${runtime_lib#"$OUT_DIR"/}"
+    done < <(find "$OUT_DIR/lib/libretro" -maxdepth 1 -type f | sort)
+  fi
+  if [ ! -f "$OUT_DIR/lib/libretro/libfmt.so.9" ] && [ "$FAIL_ON_CORE_ERROR" = "1" ]; then
+    printf 'error: EasyRPG runtime dependency was not staged: libfmt.so.9\n' >&2
     exit 1
   fi
 fi
