@@ -226,6 +226,8 @@ Build plumOS V90S as a V90S-specific distribution:
     device, and the standalone FE launch plan are already proven; controller
     behavior, Function menu, performance, and clean FE return remain. See
     `docs/validation/2026-07-14-v90s-yabasanshiro-standalone.md`.
+  - [x] Prevent duplicate standalone emulator processes with a PID/executable
+    ownership lock and a targeted TERM-to-KILL stop helper.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.

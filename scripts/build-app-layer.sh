@@ -417,6 +417,10 @@ if require_or_note_missing "$standalone_dir/bin/plumos-standalone-launch" "stand
     fi
     copy_exec "$standalone_dir/bin/plumos-standalone-launch" "$out_dir/bin/plumos-standalone-launch"
     record_file "bin/plumos-standalone-launch" "standalone-launcher" "$standalone_dir/bin/plumos-standalone-launch"
+    if [ -x "$standalone_dir/bin/plumos-standalone-stop" ]; then
+        copy_exec "$standalone_dir/bin/plumos-standalone-stop" "$out_dir/bin/plumos-standalone-stop"
+        record_file "bin/plumos-standalone-stop" "standalone-stop-helper" "$standalone_dir/bin/plumos-standalone-stop"
+    fi
     if [ -d "$standalone_dir/config/standalone" ]; then
         copy_tree "$standalone_dir/config/standalone" "$out_dir/config/standalone"
         record_mapped_tree "$standalone_dir/config/standalone" "config/standalone" "standalone-config" "$standalone_dir/config/standalone"

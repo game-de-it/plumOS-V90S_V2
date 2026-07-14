@@ -89,3 +89,28 @@ PCM stream remained active and owned by the standalone process.
 
 Physical controller behavior, Function-menu operation, gameplay performance,
 and clean return to the FE remain pending user observation.
+
+## Duplicate-Process Fix
+
+The first long-running test eventually stopped producing frames while leaving
+its process and ALSA PCM handle alive. A diagnostic restart then created a
+second YabaSanshiro process, which failed with `ALSA: Device or resource busy`.
+Both framebuffer pages remained static and the physical LCD and speaker were
+black and silent.
+
+The standalone launcher now records the exact PID and executable under
+`/run/plumos-standalone`, refuses a second live instance, and ships
+`plumos-standalone-stop`. The stop helper validates `/proc/PID/exe`, sends
+`SIGTERM`, and escalates only that verified PID to `SIGKILL` after three
+seconds. It never uses a broad process-name match.
+
+After removing the two verified stale processes, Fighting Vipers started as a
+single process. Framebuffer hashes changed across samples, ALSA reported the
+new PID as its sole owner, and no SDL audio initialization error was logged.
+The user then confirmed that the physical device displayed and played the game
+normally.
+
+The deployed launcher was also tested while that process remained active. A
+second launch returned exit code `75` with `standalone emulator already
+running`, the verified live-instance count remained one, and ALSA ownership
+did not change.

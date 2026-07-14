@@ -681,10 +681,68 @@ case "${id}" in
   *) echo "unknown standalone emulator: ${id}" >&2; exit 2 ;;
 esac
 [ -x "${exe}" ] || { echo "missing standalone emulator: ${exe}" >&2; exit 127; }
+PID_ROOT=/run/plumos-standalone
+pid_file="${PID_ROOT}/${id}.pid"
+exe_file="${PID_ROOT}/${id}.exe"
+mkdir -p "${PID_ROOT}"
+if [ -f "${pid_file}" ] && [ -f "${exe_file}" ]; then
+  old_pid=$(cat "${pid_file}" 2>/dev/null || true)
+  old_exe=$(cat "${exe_file}" 2>/dev/null || true)
+  if [ -n "${old_pid}" ] && [ -r "/proc/${old_pid}/exe" ] &&
+     [ "$(readlink "/proc/${old_pid}/exe" 2>/dev/null || true)" = "${old_exe}" ]; then
+    echo "standalone emulator already running: ${id} pid=${old_pid}" >&2
+    exit 75
+  fi
+fi
+printf '%s\n' "$$" >"${pid_file}"
+printf '%s\n' "${exe}" >"${exe_file}"
 cd "${workdir:-$(dirname "${exe}")}" || exit 1
 exec "${exe}" "$@" >>"${LOG_ROOT}/${id}.log" 2>&1
 EOF
   chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
+
+  cat >"${OUT_DIR}/bin/plumos-standalone-stop" <<'EOF'
+#!/bin/sh
+set -u
+PLUMOS_ROOT=${PLUMOS_ROOT:-/mnt/plumos}
+id=${1:-}
+[ -n "${id}" ] || { echo "usage: plumos-standalone-stop EMULATOR_ID" >&2; exit 2; }
+case "${id}" in
+  *[!A-Za-z0-9_.-]*) echo "invalid emulator ID: ${id}" >&2; exit 2 ;;
+esac
+PID_ROOT=/run/plumos-standalone
+pid_file="${PID_ROOT}/${id}.pid"
+exe_file="${PID_ROOT}/${id}.exe"
+pid=$(cat "${pid_file}" 2>/dev/null || true)
+expected_exe=$(cat "${exe_file}" 2>/dev/null || true)
+case "${expected_exe}" in
+  "${PLUMOS_ROOT}/standalone/${id}/"*) ;;
+  *) echo "standalone stop refused: invalid executable record for ${id}" >&2; exit 1 ;;
+esac
+if [ -z "${pid}" ] || [ ! -r "/proc/${pid}/exe" ]; then
+  rm -f "${pid_file}" "${exe_file}"
+  echo "standalone not running: ${id}"
+  exit 0
+fi
+if [ "$(readlink "/proc/${pid}/exe" 2>/dev/null || true)" != "${expected_exe}" ]; then
+  echo "standalone stop refused: pid ${pid} ownership mismatch" >&2
+  exit 1
+fi
+echo "standalone stop: TERM id=${id} pid=${pid}"
+kill -TERM "${pid}"
+tries=0
+while [ "${tries}" -lt 3 ] && [ -r "/proc/${pid}/exe" ]; do
+  sleep 1
+  tries=$((tries + 1))
+done
+if [ -r "/proc/${pid}/exe" ] &&
+   [ "$(readlink "/proc/${pid}/exe" 2>/dev/null || true)" = "${expected_exe}" ]; then
+  echo "standalone stop: KILL id=${id} pid=${pid}"
+  kill -KILL "${pid}"
+fi
+rm -f "${pid_file}" "${exe_file}"
+EOF
+  chmod 0755 "${OUT_DIR}/bin/plumos-standalone-stop"
 
   cat >"${OUT_DIR}/config/standalone/yabasanshiro-keymapv2.json" <<'EOF'
 {
