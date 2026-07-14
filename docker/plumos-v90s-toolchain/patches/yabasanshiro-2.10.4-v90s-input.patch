@@ -1,0 +1,62 @@
+diff --git a/yabause/src/retro_arena/InputManager.cpp b/yabause/src/retro_arena/InputManager.cpp
+index 12ce1b14e..db2e704e8 100644
+--- a/yabause/src/retro_arena/InputManager.cpp
++++ b/yabause/src/retro_arena/InputManager.cpp
+@@ -202,11 +202,47 @@ int setDefalutSettings( void * padbits ){
+     return 0;
+ }
+ 
++static bool mapV90SBuiltInController(){
++  for( int i = 0; i < SDL_NumJoysticks(); i++ ){
++    const char * name = SDL_JoystickNameForIndex(i);
++    if( name == NULL || strcmp(name, "adc_gamepad") != 0 ) continue;
++
++    SDL_Joystick * joy = SDL_JoystickOpen(i);
++    if( joy == NULL ) return false;
++    SDL_JoystickID joyId = SDL_JoystickInstanceID(joy);
++    void * padbits = PerPadAdd(&PORTDATA1);
++    const uint32_t buttonBase = joyId << 18;
++    const uint32_t hatBase = buttonBase | SDL_HAT_VALUE;
++
++    PerSetKey(MAKE_PAD(0, hatBase | (SDL_HAT_UP << 4)), PERPAD_UP, padbits);
++    PerSetKey(MAKE_PAD(0, hatBase | (SDL_HAT_DOWN << 4)), PERPAD_DOWN, padbits);
++    PerSetKey(MAKE_PAD(0, hatBase | (SDL_HAT_LEFT << 4)), PERPAD_LEFT, padbits);
++    PerSetKey(MAKE_PAD(0, hatBase | (SDL_HAT_RIGHT << 4)), PERPAD_RIGHT, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 9), PERPAD_START, padbits);
++
++    // Match KNULLI's Saturn face-button layout on the V90S physical controls.
++    PerSetKey(MAKE_PAD(0, buttonBase | 3), PERPAD_A, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 1), PERPAD_B, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 0), PERPAD_C, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 2), PERPAD_X, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 4), PERPAD_Y, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 5), PERPAD_Z, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 6), PERPAD_LEFT_TRIGGER, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 7), PERPAD_RIGHT_TRIGGER, padbits);
++
++    if (SDL_JoystickGetAttached(joy)) SDL_JoystickClose(joy);
++    return true;
++  }
++  return false;
++}
++
+ int mapKeys( const json & configs ){
+   void * padbits;
+   int user = 0;
+   PerPortReset();
+ 
++  if( mapV90SBuiltInController() ) return 0;
++
+   if( SDL_NumJoysticks() == 0 ){
+ 
+     PADLOG("No joy stic is found force to keyboard\n");
+@@ -626,6 +662,9 @@ void InputManager::init( const std::string & fname )
+     if( result.id == -1 ){
+       it->second->getInputByName("hotkeyenable", &result);
+     }
++    if( result.id == -1 && it->second->getDeviceName() == "adc_gamepad" ){
++      result.id = 10;
++    }
+     tmp.select_device_ = it->second->getDeviceId();    
+     tmp.select_button_ = result.id;
+     printf("select_device_ = %d, select_button_ = %d\n", tmp.select_device_, tmp.select_button_ );

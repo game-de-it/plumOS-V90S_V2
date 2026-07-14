@@ -307,7 +307,7 @@ cat > "$out_dir/config/retroarch/plumos-v90s-retroarch-route" <<'EOF'
 : "${PLUMOS_V90S_VIDEO_REFRESH_RATE:=58.917103}"
 : "${PLUMOS_V90S_VRR_RUNLOOP_ENABLE:=true}"
 : "${PLUMOS_V90S_INPUT_DRIVER:=sdl2}"
-: "${PLUMOS_V90S_JOYPAD_DRIVER:=sdl2}"
+: "${PLUMOS_V90S_JOYPAD_DRIVER:=udev}"
 : "${PLUMOS_V90S_AUDIO_DRIVER:=alsa}"
 : "${PLUMOS_V90S_AUDIO_LATENCY:=64}"
 : "${PLUMOS_V90S_SDL_VIDEODRIVER:=mali}"

@@ -538,9 +538,9 @@
           {"root": "sdcard", "path": "Images/saturn"}
         ]
       },
-      "launch_profiles": ["retroarch:yabasanshiro", "retroarch:beetle_saturn", "retroarch:mednafen_saturn"],
-      "default_launch_profile": "retroarch:yabasanshiro",
-      "default_cpu_policy": "interactive",
+      "launch_profiles": ["standalone:yabasanshiro", "retroarch:yabasanshiro"],
+      "default_launch_profile": "standalone:yabasanshiro",
+      "default_cpu_policy": "performance",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"

@@ -49,6 +49,8 @@ MUPEN64PLUS_VIDEO_REPO=${MUPEN64PLUS_VIDEO_REPO:-https://github.com/mupen64plus/
 MUPEN64PLUS_REF=${MUPEN64PLUS_REF:-2.6.0}
 NXENGINE_EVO_REPO=${NXENGINE_EVO_REPO:-https://github.com/nxengine/nxengine-evo.git}
 NXENGINE_EVO_REF=${NXENGINE_EVO_REF:-21d8aaf477092b22eceb849c6430c9ce2194c4f7}
+YABASANSHIRO_REPO=${YABASANSHIRO_REPO:-https://github.com/libretro/yabause.git}
+YABASANSHIRO_REF=${YABASANSHIRO_REF:-8406a5c11d7b6186a44c7fe48f493e6de5f8cb18}
 NXENGINE_EVO_DATA_URL=${NXENGINE_EVO_DATA_URL:-https://github.com/PortsMaster/PortMaster-Releases/releases/download/2023-10-12_1508/Cave.Story-evo.zip}
 NXENGINE_EVO_DATA_MD5=${NXENGINE_EVO_DATA_MD5:-ca5ff2645f99601d6a60fa8707826e28}
 SCUMMVM_ENGINES=${SCUMMVM_ENGINES:-"scumm,agi,agos,sky,sword1,sword2,queen,gob,lure,kyra,sci,cine,drascula,touche,teenagent,tinsel,cruise,parallaction"}
@@ -83,13 +85,13 @@ validate_filter() {
   for id in ${requested}; do
     known=0
     case "${id}" in
-      ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus|nxengine-evo)
+      ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus|nxengine-evo|yabasanshiro)
         known=1
         ;;
     esac
     if [ "${known}" -ne 1 ]; then
       printf 'error: unknown standalone emulator ID: %s\n' "${id}" >&2
-      printf 'valid IDs: ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus nxengine-evo\n' >&2
+      printf 'valid IDs: ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus nxengine-evo yabasanshiro\n' >&2
       return 2
     fi
   done
@@ -505,6 +507,57 @@ build_nxengine_evo() {
   append_manifest "  content_md5=${NXENGINE_EVO_DATA_MD5}"
 }
 
+build_yabasanshiro() {
+  local src=$1 build bin patch_file standalone_patch input_patch
+  build="${src}/yabause/build-v90s-standalone"
+  patch_file="${ROOT_DIR}/docker/plumos-v90s-toolchain/patches/yabasanshiro-2.10.4-arm64-gcc12.patch"
+  standalone_patch="${PATCH_DIR}/yabasanshiro-2.10.4-v90s-standalone.patch"
+  input_patch="${PATCH_DIR}/yabasanshiro-2.10.4-v90s-input.patch"
+
+  if [ ! -f "${V90S_SDL2_ROOT}/include/SDL2/SDL.h" ] ||
+     [ ! -f "${V90S_SDL2_ROOT}/lib/plumos-sdl2-powervr/libSDL2.so" ]; then
+    echo "missing V90S SDL2 build under ${V90S_SDL2_ROOT}" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${patch_file}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    echo "YabaSanshiro ARM64 patch does not apply cleanly" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${standalone_patch}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${standalone_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${standalone_patch}" >/dev/null 2>&1; then
+    echo "YabaSanshiro V90S standalone patch does not apply cleanly" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${input_patch}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${input_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${input_patch}" >/dev/null 2>&1; then
+    echo "YabaSanshiro V90S input patch does not apply cleanly" >&2
+    return 1
+  fi
+
+  rm -rf "${build}"
+  mkdir -p "${build}/compat/libpng12"
+  ln -s /usr/include/png.h "${build}/compat/libpng12/png.h"
+  cmake -S "${src}/yabause" -B "${build}" -G "Unix Makefiles" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_C_FLAGS="-I${build}/compat -I${V90S_SDL2_ROOT}/include/SDL2 -I${V90S_SDL2_ROOT}/include ${COMMON_CFLAGS} -D__RETORO_ARENA__ -Wno-error" \
+    -DCMAKE_CXX_FLAGS="-I${build}/compat -I${V90S_SDL2_ROOT}/include/SDL2 -I${V90S_SDL2_ROOT}/include ${COMMON_CXXFLAGS} -D__RETORO_ARENA__ -Wno-error" \
+    -DCMAKE_EXE_LINKER_FLAGS="${COMMON_LDFLAGS}" \
+    -DYAB_PORTS=retro_arena -DUSE_EGL=ON -DYAB_FORCE_GLES20=ON \
+    -DYAB_WANT_VULKAN=OFF -DYAB_WANT_ARM7=ON \
+    -DSH2_DYNAREC=OFF -DYAB_WANT_DYNAREC_DEVMIYAX=ON -DYAB_ASYNC_RENDERING=ON \
+    -DSH2_TRACE=OFF \
+    -DSDL2_INCLUDE_DIR="${V90S_SDL2_ROOT}/include/SDL2" \
+    -DSDL2_LIBRARY="${V90S_SDL2_ROOT}/lib/plumos-sdl2-powervr/libSDL2.so" || return 1
+  cmake --build "${build}" --target yabause-retro-arena -j"${JOBS}" || return 1
+  bin=$(find_binary "${build}" yabasanshiro) || return 1
+  stage_binary yabasanshiro "${bin}" yabasanshiro
+}
+
 write_launcher() {
   mkdir -p "${OUT_DIR}/bin" "${OUT_DIR}/config/standalone"
   cat >"${OUT_DIR}/bin/plumos-standalone-launch" <<'EOF'
@@ -597,6 +650,29 @@ case "${id}" in
     export SDL_RENDER_DRIVER=${SDL_RENDER_DRIVER:-software}
     set --
     ;;
+  yabasanshiro)
+    exe="${EMU_ROOT}/yabasanshiro/bin/yabasanshiro"
+    keymap_source="${PLUMOS_ROOT}/config/standalone/yabasanshiro-keymapv2.json"
+    keymap_dir="${HOME}/.yabasanshiro"
+    mkdir -p "${keymap_dir}"
+    if [ ! -f "${keymap_dir}/keymapv2.json" ] && [ -f "${keymap_source}" ]; then
+      cp "${keymap_source}" "${keymap_dir}/keymapv2.json"
+    fi
+    rom=${1:-}
+    [ -n "${rom}" ] || { echo "missing Saturn content path" >&2; exit 2; }
+    shift
+    set -- --iso "${rom}" --resolution_mode 0 --keep_aspect_rate "$@"
+    for bios in \
+      "${PLUMOS_ROOT}/bios/saturn_bios.bin" \
+      "${PLUMOS_ROOT}/bios/sega_101.bin" \
+      "${PLUMOS_ROOT}/bios/mpr-17933.bin" \
+      "${PLUMOS_ROOT}/bios/saturn/mpr-17933.bin"; do
+      if [ -f "${bios}" ]; then
+        set -- --bios "${bios}" "$@"
+        break
+      fi
+    done
+    ;;
   scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
   easyrpg) exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player" ;;
   openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
@@ -609,6 +685,33 @@ cd "${workdir:-$(dirname "${exe}")}" || exit 1
 exec "${exe}" "$@" >>"${LOG_ROOT}/${id}.log" 2>&1
 EOF
   chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
+
+  cat >"${OUT_DIR}/config/standalone/yabasanshiro-keymapv2.json" <<'EOF'
+{
+  "player1": {
+    "DeviceID": 0,
+    "padmode": 0,
+    "deviceGUID": "1900c50a330100009011000000000000",
+    "deviceName": "adc_gamepad"
+  },
+  "0_adc_gamepad_1900c50a330100009011000000000000": {
+    "up": {"type": "hat", "id": 0, "value": 1},
+    "right": {"type": "hat", "id": 0, "value": 2},
+    "down": {"type": "hat", "id": 0, "value": 4},
+    "left": {"type": "hat", "id": 0, "value": 8},
+    "a": {"type": "button", "id": 3, "value": 1},
+    "b": {"type": "button", "id": 1, "value": 1},
+    "c": {"type": "button", "id": 0, "value": 1},
+    "x": {"type": "button", "id": 2, "value": 1},
+    "y": {"type": "button", "id": 4, "value": 1},
+    "z": {"type": "button", "id": 5, "value": 1},
+    "l": {"type": "button", "id": 6, "value": 1},
+    "r": {"type": "button", "id": 7, "value": 1},
+    "select": {"type": "button", "id": 8, "value": 1},
+    "start": {"type": "button", "id": 9, "value": 1}
+  }
+}
+EOF
 }
 
 build_one() {
@@ -682,6 +785,7 @@ build_one pcsx_rearmed "${PCSX_REARMED_REPO}" "${PCSX_REARMED_REF}" build_pcsx_r
 build_one flycast "${FLYCAST_REPO}" "${FLYCAST_REF}" build_flycast
 build_one mupen64plus "${MUPEN64PLUS_UI_REPO}" "${MUPEN64PLUS_REF}" build_mupen64plus
 build_one nxengine-evo "${NXENGINE_EVO_REPO}" "${NXENGINE_EVO_REF}" build_nxengine_evo
+build_one yabasanshiro "${YABASANSHIRO_REPO}" "${YABASANSHIRO_REF}" build_yabasanshiro
 {
   echo 'summary:'
   echo "  built=${BUILT_COUNT}"

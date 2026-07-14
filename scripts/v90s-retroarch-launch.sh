@@ -547,6 +547,24 @@ ensure_config_save_enabled() {
     fi
 }
 
+ensure_v90s_autoconfig() {
+    cfg="$1"
+    V90S_AUTOCONFIG_DIR="$(dirname "$cfg")/autoconfig"
+    for driver in sdl2 udev; do
+        factory_profile="${PLUMOS_ROOT:-/mnt/plumos}/factory-defaults/ra/config/retroarch/autoconfig/$driver/adc_gamepad.cfg"
+        installed_profile="$V90S_AUTOCONFIG_DIR/$driver/adc_gamepad.cfg"
+
+        if [ ! -f "$installed_profile" ] && [ -f "$factory_profile" ]; then
+            if mkdir -p "$(dirname "$installed_profile")" 2>/dev/null &&
+                cp "$factory_profile" "$installed_profile" 2>/dev/null; then
+                log "retroarch-launch: installed V90S controller autoconfig: $installed_profile"
+            else
+                log "retroarch-launch: could not install V90S controller autoconfig: $installed_profile"
+            fi
+        fi
+    done
+}
+
 set_config_string() {
     cfg="$1"
     key="$2"
@@ -558,6 +576,53 @@ set_config_string() {
     else
         printf '%s = "%s"\n' "$key" "$value" >> "$cfg" 2>/dev/null || true
     fi
+}
+
+set_config_string_if_unbound() {
+    cfg="$1"
+    key="$2"
+    value="$3"
+    current="$(sed -n "s/^${key}[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*$/\1/p" "$cfg" 2>/dev/null | tail -n 1)"
+
+    if [ -z "$current" ] || [ "$current" = "nul" ]; then
+        set_config_string "$cfg" "$key" "$value"
+    fi
+}
+
+ensure_v90s_input_binds() {
+    cfg="$1"
+
+    set_config_string_if_unbound "$cfg" input_player1_a_btn 0
+    set_config_string_if_unbound "$cfg" input_player1_b_btn 1
+    set_config_string_if_unbound "$cfg" input_player1_x_btn 2
+    set_config_string_if_unbound "$cfg" input_player1_y_btn 3
+    set_config_string_if_unbound "$cfg" input_player1_l_btn 4
+    set_config_string_if_unbound "$cfg" input_player1_r_btn 5
+    set_config_string_if_unbound "$cfg" input_player1_l2_btn 6
+    set_config_string_if_unbound "$cfg" input_player1_r2_btn 7
+    set_config_string_if_unbound "$cfg" input_player1_select_btn 8
+    set_config_string_if_unbound "$cfg" input_player1_start_btn 9
+    set_config_string_if_unbound "$cfg" input_player1_up_btn h0up
+    set_config_string_if_unbound "$cfg" input_player1_down_btn h0down
+    set_config_string_if_unbound "$cfg" input_player1_left_btn h0left
+    set_config_string_if_unbound "$cfg" input_player1_right_btn h0right
+    set_config_string_if_unbound "$cfg" input_menu_toggle_btn 10
+}
+
+migrate_v90s_joypad_driver() {
+    cfg="$1"
+    target_driver="$2"
+    marker_root="${PLUMOS_ROOT:-/mnt/plumos}/state/migrations"
+    marker="$marker_root/retroarch-joypad-udev-v1"
+
+    [ "$target_driver" = "udev" ] || return 0
+    [ -e "$marker" ] && return 0
+
+    set_config_string "$cfg" input_joypad_driver udev
+    if mkdir -p "$marker_root" 2>/dev/null; then
+        printf '%s\n' "migrated input_joypad_driver to udev" > "$marker" 2>/dev/null || true
+    fi
+    log "retroarch-launch: migrated V90S joypad driver to udev"
 }
 
 if ! mkdir -p "$RUN_DIR" 2>/dev/null; then
@@ -706,7 +771,7 @@ video_driver="${PLUMOS_V90S_VIDEO_DRIVER:-sdl2}"
 video_context_driver="${PLUMOS_V90S_VIDEO_CONTEXT_DRIVER:-}"
 video_threaded="${PLUMOS_V90S_VIDEO_THREADED:-true}"
 input_driver="${PLUMOS_V90S_INPUT_DRIVER:-sdl2}"
-joypad_driver="${PLUMOS_V90S_JOYPAD_DRIVER:-sdl2}"
+joypad_driver="${PLUMOS_V90S_JOYPAD_DRIVER:-udev}"
 audio_driver="${PLUMOS_V90S_AUDIO_DRIVER:-alsa}"
 sdl_video="${PLUMOS_V90S_SDL_VIDEODRIVER:-mali}"
 sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
@@ -735,6 +800,10 @@ else
     fi
 fi
 ensure_config_save_enabled "$cfg"
+ensure_v90s_autoconfig "$cfg"
+set_config_string "$cfg" joypad_autoconfig_dir "$V90S_AUTOCONFIG_DIR"
+ensure_v90s_input_binds "$cfg"
+migrate_v90s_joypad_driver "$cfg" "$joypad_driver"
 set_config_string "$cfg" core_options_path \
     "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
 set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"

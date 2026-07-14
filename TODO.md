@@ -159,6 +159,9 @@ Build plumOS V90S as a V90S-specific distribution:
     with Clang, and validate sustained PowerVR video plus ALSA playback on the
     real V90S; see
     `docs/validation/2026-07-14-v90s-yabasanshiro-2.10.4.md`.
+  - [x] Restrict Saturn FE choices to standalone YabaSanshiro and the validated
+    YabaSanshiro libretro core; remove Beetle/Mednafen and suppress the unusable
+    PicoArch Saturn companion profile.
   - [ ] Resolve the four known FE runtime blockers: ChaiLove SDL video,
     FBA 2012/FBA 2012 Neo Geo matching ROM sets, and Mupen64Plus-Next SIGSEGV.
   - [ ] Add compatible test content/system definitions and validate the 31
@@ -183,6 +186,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - PCSX-ReARMed r26l
   - Flycast 2.6
   - Mupen64Plus 2.6.0
+  - YabaSanshiro 2.10.4 (`8406a5c`)
 - [x] Build all eight standalone executables as native aarch64 binaries with
   zero failed recipes.
 - [x] Support incremental one-emulator builds such as
@@ -217,6 +221,11 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Start Mupen64Plus 2.6.0 with Super Mario 64 through the FE standalone
     profile; verify PowerVR GLES, nonblank framebuffer output, ALSA PCM, and
     the V90S `adc_gamepad` auto-configuration.
+  - [ ] Complete standalone YabaSanshiro physical validation. PowerVR GLES,
+    changing game frames, continuous ALSA playback, the built-in controller
+    device, and the standalone FE launch plan are already proven; controller
+    behavior, Function menu, performance, and clean FE return remain. See
+    `docs/validation/2026-07-14-v90s-yabasanshiro-standalone.md`.
   - [ ] Validate PPSSPP save/config persistence and clean FE return.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.

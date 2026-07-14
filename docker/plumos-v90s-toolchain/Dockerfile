@@ -45,6 +45,10 @@ RUN apt-get update \
     android-libutils-dev \
     libasound2-dev \
     libbrotli-dev \
+    libboost-date-time-dev \
+    libboost-filesystem-dev \
+    libboost-locale-dev \
+    libboost-system-dev \
     libbz2-dev \
     libcurl4-openssl-dev \
     libavcodec-dev \

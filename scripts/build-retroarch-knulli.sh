@@ -177,6 +177,8 @@ if [ "${PLUMOS_V90S_BUILD_IN_CONTAINER:-0}" = "1" ]; then
             --disable-x11 \
             --enable-alsa \
             --disable-pulse \
+            --disable-pipewire \
+            --disable-jack \
             --enable-opengles \
             --enable-opengles3 \
             --enable-opengles3_1 \
@@ -233,6 +235,8 @@ else
                 --disable-x11 \
                 --enable-alsa \
                 --disable-pulse \
+                --disable-pipewire \
+                --disable-jack \
                 --enable-opengles \
                 --enable-opengles3 \
                 --enable-opengles3_1 \

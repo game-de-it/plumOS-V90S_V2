@@ -1278,7 +1278,10 @@ static int add_core_profile(struct core_system_def *system, const char *profile)
 }
 
 static int picoarch_companion_core_allowed(const char *system_id, const char *core_id) {
-  (void)system_id;
+  /* No Saturn core reaches a usable launch path through PicoArch on V90S. */
+  if (system_id && strcmp(system_id, "saturn") == 0) {
+    return 0;
+  }
   return picoarch_core_id_allowed(core_id);
 }
 
