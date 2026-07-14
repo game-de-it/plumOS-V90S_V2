@@ -408,6 +408,21 @@ patch_core_source() {
     printf '\n[plumOS] patched ScummVM libretro continuous audio and fractional refresh clock\n' >> "$log"
   fi
 
+  if [ "$id" = "mupen64plus_next" ]; then
+    local powervr_buffer_patch="$patch_dir/mupen64plus-next-powervr-buffer-storage.patch"
+
+    if [ ! -f "$powervr_buffer_patch" ]; then
+      printf '\n[plumOS] missing required Mupen64Plus-Next PowerVR buffer-storage patch\n' >> "$log"
+      return 1
+    fi
+    if ! patch --dry-run -d "$src" -p1 < "$powervr_buffer_patch" >/dev/null 2>> "$log"; then
+      printf '\n[plumOS] required Mupen64Plus-Next PowerVR buffer-storage patch does not apply\n' >> "$log"
+      return 1
+    fi
+    patch -d "$src" -p1 < "$powervr_buffer_patch" >> "$log" 2>&1
+    printf '\n[plumOS] disabled broken persistent buffer storage on PowerVR for Mupen64Plus-Next\n' >> "$log"
+  fi
+
   case "$id" in
     mgba)
       if [ -f "$src/src/core/CMakeLists.txt" ]; then

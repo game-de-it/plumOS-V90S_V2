@@ -21,8 +21,8 @@ are written below ignored `output/validation/v90s-fe-core-smoke-*` directories.
 - Deployed and hash-checked cores: **117**
 - Cores declared in FE launch profiles: **112**
 - Cores with an FE profile and compatible indexed content: **86**
-- Confirmed running through the FE: **82**
-- Core started but currently blocked: **4**
+- Confirmed running through the FE: **83**
+- Core started but currently blocked: **3**
 - Profile exists, but compatible indexed content is absent: **26**
 - Profile/content definition is absent: **5**
 
@@ -32,7 +32,7 @@ reported as passes.
 
 ## Confirmed Running
 
-The following 82 unique core binaries remained active and exposed a readable
+The following 83 unique core binaries remained active and exposed a readable
 framebuffer after FE launch:
 
 ```text
@@ -42,7 +42,7 @@ gambatte gearboy gearsystem genesis_plus_gx gme gpsp gw hatari
 km_duckswanstation_xtreme_amped km_puae_xtreme_amped lowresnx lutro
 mednafen_gba mednafen_ngp mednafen_pce mednafen_pce_fast mednafen_pcfx
 mednafen_saturn mednafen_supafaust mednafen_supergrafx mednafen_wswan meteor
-mgba nekop2 neocd nestopia np2kai numero nxengine o2em opera parallel_n64
+mgba mupen64plus_next nekop2 neocd nestopia np2kai numero nxengine o2em opera parallel_n64
 pcsx_rearmed picodrive pokemini potator prboom prosystem puae puae2021 quasi88
 quicknes retro8 scummvm snes9x snes9x2002 snes9x2005 snes9x2005_plus
 snes9x2010 squirreljme stella2014 tgbdual theodore tyrquake uae4arm uw8 uzem
@@ -60,7 +60,12 @@ accepts `.vmi` content.
 | `chailove` | runtime incompatible | Core loads, but its statically embedded SDL reports `No available video device`. Rebuild/port its internal SDL video path for V90S. |
 | `fbalpha2012` | content rejected | Core loads, but the available `fatfury1.zip` and Neo Geo BIOS do not match the old FBA 2012 ROM-set CRCs. Test with a matching ROM set. |
 | `fbalpha2012_neogeo` | content rejected | Same FBA 2012 ROM-set mismatch as above. |
-| `mupen64plus_next` | SIGSEGV | Rebuilt for AArch64 Cortex-A53 GLES2. It still exits at R4300 start with both dynarec and cached interpreter, and with GLideN64 or Angrylion selected. `parallel_n64` is the working N64 default. |
+
+Mupen64Plus-Next was removed from this blocker table on 2026-07-15. A core dump
+showed that GLideN64 trusted the PowerVR driver's `GL_EXT_buffer_storage`
+advertisement even though persistent `glMapBufferRange` returned null. The
+required PowerVR patch and real-device result are recorded in
+`docs/validation/2026-07-15-v90s-mupen64plus-next-powervr.md`.
 
 ## No Compatible Indexed Content
 
@@ -92,9 +97,10 @@ check, but a later visual test found that this build produced audio over a
 black framebuffer. The KNULLI A133/H5 replacement and full video/input result
 are recorded in
 `docs/validation/2026-07-15-v90s-parallel-n64-knulli-a133.md`. The frontend
-defaults N64 to `parallel_n64`, while keeping `mupen64plus_next` selectable for
-later work. The final host core and app-layer outputs each contained 117 cores
-and passed their SHA-256 manifests at the time of this matrix.
+defaults N64 to `parallel_n64`, while keeping the now-validated
+`mupen64plus_next` selectable. The final host core and app-layer outputs each
+contained 117 cores and passed their SHA-256 manifests at the time of this
+matrix.
 
 ## Final Device State
 
@@ -103,7 +109,7 @@ cores=117
 frontend=1
 retroarch=0
 flycast=9d88a8421f3035ff41f06d7eca13358a0b1798441b707edb85f54eec8c5120a1
-mupen64plus_next=0a26dd1e28a7693d74c73a948e1acd2defc8627177969e0a293f6afe7a76ff8c
+mupen64plus_next=85f83c640735e56f036a759620ff71c667a51c66ee6032dd2f34059fa53c22cc
 parallel_n64=b1b1cee04f552bed8809cdbedf691a2a7be2818b9e91d4df3ebae9f5013bb662
 ```
 

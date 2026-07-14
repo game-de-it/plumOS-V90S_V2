@@ -151,7 +151,7 @@ Build plumOS V90S as a V90S-specific distribution:
     working Organya BGM; retain the libretro profile as a manual compatibility
     choice for translated content only.
   - [x] Run every currently reachable core through the FE on real hardware:
-    82 of 86 unique cores remain active; four blockers and all 31 cores lacking
+    83 of 86 unique cores remain active; three blockers and all 31 cores lacking
     compatible indexed content are recorded in
     `docs/validation/2026-07-14-v90s-fe-all-core-runtime.md`.
   - [x] Pin YabaSanshiro to performance-oriented 2.10.4 commit `8406a5c`,
@@ -165,11 +165,16 @@ Build plumOS V90S as a V90S-specific distribution:
     controller is fully usable; AeroGauge performance remains a separate
     optimization task. See
     `docs/validation/2026-07-15-v90s-parallel-n64-knulli-a133.md`.
+  - [x] Fix Mupen64Plus-Next startup on the PowerVR GE8300 by disabling the
+    falsely advertised persistent buffer-storage path. Core-dump analysis found
+    a null destination from `glMapBufferRange` in GLideN64; Super Mario 64 now
+    reaches rendered gameplay with the AArch64 dynarec and exits cleanly. See
+    `docs/validation/2026-07-15-v90s-mupen64plus-next-powervr.md`.
   - [x] Restrict Saturn FE choices to standalone YabaSanshiro and the validated
     YabaSanshiro libretro core; remove Beetle/Mednafen and suppress the unusable
     PicoArch Saturn companion profile.
-  - [ ] Resolve the four known FE runtime blockers: ChaiLove SDL video,
-    FBA 2012/FBA 2012 Neo Geo matching ROM sets, and Mupen64Plus-Next SIGSEGV.
+  - [ ] Resolve the three known FE runtime blockers: ChaiLove SDL video and
+    FBA 2012/FBA 2012 Neo Geo matching ROM sets.
   - [ ] Add compatible test content/system definitions and validate the 31
     currently unreachable packaged cores.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
