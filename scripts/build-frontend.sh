@@ -12,6 +12,7 @@ SRC_DIR="$ROOT_DIR/src/frontend"
 OUT_ROOT="$ROOT_DIR/$OUT_DIR"
 PLUMOS_DIR="$OUT_ROOT/plumos"
 BIN_DIR="$PLUMOS_DIR/bin"
+FRONTEND_LIB_DIR="$PLUMOS_DIR/frontend/lib"
 
 common_cflags=(
   -std=gnu99
@@ -79,6 +80,26 @@ build_fbdev_controller() {
   chmod 0755 "$out"
 }
 
+install_frontend_runtime_library() {
+  local soname="$1"
+  local source=""
+
+  source="$(ldconfig -p 2>/dev/null | awk -v soname="$soname" \
+    '$1 == soname && $NF ~ /aarch64-linux-gnu/ { print $NF; exit }')"
+  if [ -z "$source" ] || [ ! -f "$source" ]; then
+    printf 'error: frontend runtime library not found: %s\n' "$soname" >&2
+    exit 1
+  fi
+  install -D -m 0644 "$source" "$FRONTEND_LIB_DIR/$soname"
+}
+
+install_frontend_runtime() {
+  install_frontend_runtime_library libpng16.so.16
+  install_frontend_runtime_library libfreetype.so.6
+  install_frontend_runtime_library libbrotlidec.so.1
+  install_frontend_runtime_library libbrotlicommon.so.1
+}
+
 install_wrapper() {
   local name="$1"
   local path="$BIN_DIR/$name"
@@ -93,6 +114,9 @@ set -eu
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
 export PLUMOS_ROOT PLUMOS_SDCARD_ROOT
+PLUMOS_FRONTEND_LIB_DIR="${PLUMOS_FRONTEND_LIB_DIR:-$PLUMOS_ROOT/frontend/lib}"
+export PLUMOS_FRONTEND_LIB_DIR
+export LD_LIBRARY_PATH="$PLUMOS_FRONTEND_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PLUMOS_DEVICE_ID="${PLUMOS_DEVICE_ID:-v90s}"
 export PLUMOS_RENDERER="${PLUMOS_RENDERER:-fbdev}"
 export PLUMOS_FB="${PLUMOS_FB:-/dev/fb0}"
@@ -428,6 +452,7 @@ build_c_tool "$SRC_DIR/plumos_library_scan.c" "$BIN_DIR/plumos-library-scan"
 build_c_tool "$SRC_DIR/plumos_text_ui.c" "$BIN_DIR/plumos-text-ui"
 build_c_tool "$SRC_DIR/plumos_controller_ui.c" "$BIN_DIR/plumos-controller-ui"
 build_fbdev_controller
+install_frontend_runtime
 
 install_wrapper plumos-controller-ui-v90s
 install_wrapper plumos-frontend-launch

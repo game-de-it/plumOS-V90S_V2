@@ -387,6 +387,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Diagnose the first release image's logo-only boot as a missing `/overlay`
   destination in p5, add it to `release-system`, and reject incompatible
   `--no-rootfs-repack` inputs during image assembly.
+- [x] Diagnose the second release image through p7 logs as a frontend-only
+  `libpng16.so.16` loader failure, package a dedicated frontend dependency
+  closure, and validate it against the extracted release-system rootfs.
 
 ## Milestone 4: FAT32 App Layer
 

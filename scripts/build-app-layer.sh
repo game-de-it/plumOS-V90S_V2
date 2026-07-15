@@ -390,6 +390,15 @@ fi
 
 frontend_root="$frontend_dir/plumos"
 if require_or_note_missing "$frontend_root/bin/plumos-frontend-launch" "frontend"; then
+    for frontend_lib in \
+        libpng16.so.16 \
+        libfreetype.so.6 \
+        libbrotlidec.so.1 \
+        libbrotlicommon.so.1; do
+        require_or_note_missing \
+            "$frontend_root/frontend/lib/$frontend_lib" \
+            "frontend-runtime:$frontend_lib" || true
+    done
     copy_tree "$frontend_root" "$out_dir"
     record_tree "$frontend_root" "frontend" "$frontend_root"
     if [ -f "$frontend_dir/frontend.manifest" ]; then

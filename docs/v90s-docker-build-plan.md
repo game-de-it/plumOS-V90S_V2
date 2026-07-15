@@ -98,7 +98,7 @@ The release-system image keeps the validated p5 squashfs byte-for-byte:
   --no-rootfs-repack \
   --app-layer-dir output/app-layer/v90s \
   --share-size 4096M \
-  --name plumos-v90s-system-squashfs-20260715-2.img
+  --name plumos-v90s-system-squashfs-20260715-3.img
 ```
 
 The no-repack path validates `/boot`, `/overlay`, `/proc`, `/sys`, and `/dev`

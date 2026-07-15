@@ -564,6 +564,9 @@ persist_debian_log() {
             cp "$LOG" /mnt/share/rootfs/plumos-v90s-debian-init.log 2>/dev/null || true
         fi
     fi
+    if [ -d /mnt/plumos/Logs ]; then
+        cp "$LOG" /mnt/plumos/Logs/plumos-v90s-debian-init.log 2>/dev/null || true
+    fi
     copy_to_fat_logs
     boot_log_sync
 }

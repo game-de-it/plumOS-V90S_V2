@@ -62,4 +62,7 @@ Host validation confirmed:
 - p5 contains `/boot`, `/overlay`, `/proc`, `/sys`, and `/dev`
 - vendor boot0 and boot package are used with KNULLI fallback disabled
 
-Real-device boot of the corrected `-2.img` remains to be tested.
+Real-device testing of `-2.img` later proved that this root handoff was fixed:
+p7 and SD2 mounted and the frontend launcher ran. The frontend then stopped on
+a separate missing runtime-library path, documented in
+`docs/validation/2026-07-15-release-image-frontend-runtime-fix.md`.

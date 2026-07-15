@@ -78,8 +78,13 @@ validate_app_layer() {
     COMPAT_VENDOR \
     VERSION \
     bin/plumos-frontend-launch \
+    bin/plumos-controller-ui-v90s \
     bin/plumos-controller-ui-fbdev \
-    bin/plumos-text-ui; do
+    bin/plumos-text-ui \
+    frontend/lib/libpng16.so.16 \
+    frontend/lib/libfreetype.so.6 \
+    frontend/lib/libbrotlidec.so.1 \
+    frontend/lib/libbrotlicommon.so.1; do
     checksum_file "$relative" || {
       report_error "critical checksum failed: $relative"
       return 1
