@@ -492,9 +492,13 @@ Build plumOS V90S as a V90S-specific distribution:
   the gadget and restored `adb devices`.
 - [ ] Physically confirm the FE ADB checkbox can be toggled with V90S controls
   during normal menu navigation.
-- [ ] Investigate ADB host re-enumeration after repeated cable-attached
-  stop/start cycles; V90S can report `udc_state=configured` while macOS sees
-  `plumOS V90S ADB` but `adb devices` stays empty.
+- [x] Investigate and recover ADB host re-enumeration after repeated
+  cable-attached stop/start cycles. macOS still enumerated `plumOS V90S ADB`
+  while ADB 35.0.2 lost its transport after `usb read failed: status = 1`;
+  restarting only the host server restored it. Standardize host access on
+  `scripts/v90s-adb.sh`, which selects ADB 36.0.2 and recovered automatically
+  through three deliberate gadget restart cycles. See
+  `docs/validation/2026-07-15-adb-host-transport-recovery.md`.
 - [ ] Copy PicoArch/PICO payloads into the app layer.
 - [x] Copy standalone emulators into the app layer.
 - [x] Live-capture the V90S physical key evdev mapping for D-pad, ABXY,

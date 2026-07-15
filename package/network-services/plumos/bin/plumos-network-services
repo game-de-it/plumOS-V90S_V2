@@ -323,7 +323,7 @@ status_adb() {
 
   print_status adb "$state" "$summary"
   case "$state" in
-    running) return 0 ;;
+    running|waiting_usb) return 0 ;;
     not_installed) return 1 ;;
     *) return 2 ;;
   esac

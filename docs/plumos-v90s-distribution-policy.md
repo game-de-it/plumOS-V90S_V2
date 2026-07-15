@@ -617,6 +617,21 @@ because the StockOS-derived userspace has no Android framework key-management
 stack; the frontend and docs must describe it as a trusted-host-only local USB
 debugging path.
 
+Host-side V90S development should use `scripts/v90s-adb.sh`. The helper must
+select one current ADB installation instead of allowing older Android SDK and
+package-manager copies to start competing servers. On macOS, it may restart
+only the host ADB server when IOKit still enumerates `plumOS V90S ADB` but the
+ADB transport list is empty. This is host transport recovery, not a device-side
+fallback and must not restart the V90S, its frontend, or unrelated services.
+The validated macOS host version is ADB 36.0.2; ADB 35.0.2 failed to rediscover
+the still-enumerated gadget after a USB read error.
+
+Device-side ADB status must distinguish an active configured transport from an
+enabled gadget waiting for a USB host. `udc_state=configured` or `suspended`
+maps to `running`; a bound gadget with another UDC state maps to `waiting_usb`.
+The persistent FE checkbox continues to represent `adb_enabled`, independently
+of this live status.
+
 The app-layer output should use a stable tree layout under:
 
 ```text

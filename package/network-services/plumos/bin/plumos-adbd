@@ -263,6 +263,7 @@ stop_mode() {
 }
 
 status_mode() {
+  live_udc_state="$(udc_state)"
   printf 'service=adb\n'
   printf 'adbd=%s\n' "$ADBD"
   printf 'pid_file=%s\n' "$PID_FILE"
@@ -272,11 +273,20 @@ status_mode() {
   printf 'running=%s\n' "$( pid_running && echo 1 || echo 0 )"
   printf 'ffs_mounted=%s\n' "$( ffs_mounted && echo 1 || echo 0 )"
   printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
-  printf 'udc_state=%s\n' "$(udc_state)"
+  printf 'udc_state=%s\n' "$live_udc_state"
   if pid_running && gadget_bound; then
-    printf 'state=running\n'
-    printf 'summary=ADB over USB FunctionFS\n'
-    return 0
+    case "$live_udc_state" in
+      configured|suspended)
+        printf 'state=running\n'
+        printf 'summary=ADB over USB FunctionFS\n'
+        return 0
+        ;;
+      *)
+        printf 'state=waiting_usb\n'
+        printf 'summary=ADB waiting for USB host\n'
+        return 0
+        ;;
+    esac
   fi
   if [ ! -x "$ADBD" ]; then
     printf 'state=not_installed\n'
