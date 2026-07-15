@@ -476,6 +476,11 @@ Build plumOS V90S as a V90S-specific distribution:
   full runtime checks on the `INFORMATION` screen.
 - [x] Live-validate FTP, SFTP, and Samba startup plus read/write access from a
   Mac client.
+- [x] Revalidate every enabled network service on the release-system runtime.
+  FTP and Samba passed Mac upload/readback/delete tests; release p5 now contains
+  OpenSSH server; `/run/sshd` permissions no longer depend on the FE umask; and
+  SFTP passed the same roundtrip test. SSH, FTP, SFTP, Samba, and ADB all
+  reported `running` with their persisted switches enabled.
 - [x] Make `network-services` self-contained for FTP by bundling BusyBox,
   `tcpsvd`, and `ftpd`; recover the live V90S from a partial app-layer copy.
 - [x] Recover USB Wi-Fi from `wpa_state=COMPLETED` with no IPv4 by renewing DHCP

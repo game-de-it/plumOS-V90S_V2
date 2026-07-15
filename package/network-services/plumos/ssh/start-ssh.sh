@@ -167,6 +167,8 @@ if [ ! -x "$SSHD_BIN" ]; then
 fi
 
 mkdir -p /run/sshd
+chown 0:0 /run/sshd 2>/dev/null || true
+chmod 0755 /run/sshd
 host_args="$(host_key_args)"
 if [ -z "$host_args" ]; then
   log "no SSH host keys available"
