@@ -1,0 +1,187 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+AUDIO_RUN_DIR="${PLUMOS_AUDIO_RUN_DIR:-$RUNTIME_ROOT/audio}"
+ASOUND_CONFIG="${PLUMOS_ALSA_CONFIG_PATH:-$AUDIO_RUN_DIR/asound.conf}"
+STATUS_FILE="${PLUMOS_AUDIO_STATUS_FILE:-$AUDIO_RUN_DIR/output.status}"
+SYSTEM_ALSA_CONFIG="${PLUMOS_ALSA_SYSTEM_CONFIG:-/usr/share/alsa/alsa.conf}"
+SOUND_SYS_CLASS="${PLUMOS_SOUND_SYS_CLASS:-/sys/class/sound}"
+ASOUND_PROC_ROOT="${PLUMOS_ASOUND_PROC_ROOT:-/proc/asound}"
+DEV_SND_ROOT="${PLUMOS_DEV_SND_ROOT:-/dev/snd}"
+
+fail() {
+  printf 'plumos-audio-output: %s\n' "$*" >&2
+  exit 1
+}
+
+is_uint() {
+  case "${1:-}" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+card_id() {
+  card=$1
+  for id_path in "$SOUND_SYS_CLASS/card$card/id" "$ASOUND_PROC_ROOT/card$card/id"; do
+    if [ -r "$id_path" ]; then
+      sed -n '1p' "$id_path" 2>/dev/null | tr -d '[:space:]'
+      return 0
+    fi
+  done
+  return 1
+}
+
+card_has_playback() {
+  card=$1
+  [ -e "$DEV_SND_ROOT/pcmC${card}D0p" ] && return 0
+  [ -r "$ASOUND_PROC_ROOT/pcm" ] || return 1
+  grep -Eq "^${card}-[0-9]+:.*: playback [1-9]" "$ASOUND_PROC_ROOT/pcm"
+}
+
+card_is_usb() {
+  card=$1
+  [ -r "$ASOUND_PROC_ROOT/card$card/usbid" ] && return 0
+  device_path="$(readlink -f "$SOUND_SYS_CLASS/card$card/device" 2>/dev/null || true)"
+  case "$device_path" in
+    */usb*|*/USB*) return 0 ;;
+  esac
+  return 1
+}
+
+find_card_by_selector() {
+  selector=$1
+  if is_uint "$selector"; then
+    card_has_playback "$selector" || return 1
+    printf '%s\n' "$selector"
+    return 0
+  fi
+
+  for card_path in "$SOUND_SYS_CLASS"/card[0-9]*; do
+    [ -e "$card_path" ] || continue
+    card=${card_path##*/card}
+    is_uint "$card" || continue
+    card_has_playback "$card" || continue
+    [ "$(card_id "$card" 2>/dev/null || true)" = "$selector" ] || continue
+    printf '%s\n' "$card"
+    return 0
+  done
+  return 1
+}
+
+find_usb_card() {
+  if [ -n "${PLUMOS_USB_AUDIO_CARD:-}" ]; then
+    card="$(find_card_by_selector "$PLUMOS_USB_AUDIO_CARD" 2>/dev/null || true)"
+    [ -n "$card" ] || fail "configured USB playback card is unavailable: $PLUMOS_USB_AUDIO_CARD"
+    card_is_usb "$card" || fail "configured playback card is not USB: $PLUMOS_USB_AUDIO_CARD"
+    printf '%s\n' "$card"
+    return 0
+  fi
+
+  for card_path in "$SOUND_SYS_CLASS"/card[0-9]*; do
+    [ -e "$card_path" ] || continue
+    card=${card_path##*/card}
+    is_uint "$card" || continue
+    card_has_playback "$card" || continue
+    card_is_usb "$card" || continue
+    printf '%s\n' "$card"
+    return 0
+  done
+  return 1
+}
+
+find_internal_card() {
+  for card_path in "$SOUND_SYS_CLASS"/card[0-9]*; do
+    [ -e "$card_path" ] || continue
+    card=${card_path##*/card}
+    is_uint "$card" || continue
+    card_has_playback "$card" || continue
+    [ "$(card_id "$card" 2>/dev/null || true)" = "audiocodec" ] || continue
+    printf '%s\n' "$card"
+    return 0
+  done
+  return 1
+}
+
+write_status() {
+  mode=$1
+  card=$2
+  id=$3
+  physical_pcm="hw:$card,0"
+  status_tmp="$STATUS_FILE.tmp.$$"
+  {
+    printf 'mode=%s\n' "$mode"
+    printf 'card=%s\n' "$card"
+    printf 'card_id=%s\n' "$id"
+    printf 'physical_pcm=%s\n' "$physical_pcm"
+    printf 'pcm=plumos_output\n'
+    printf 'alsa_config_path=%s\n' "$ASOUND_CONFIG"
+  } > "$status_tmp"
+  chmod 0644 "$status_tmp"
+  mv -f "$status_tmp" "$STATUS_FILE"
+}
+
+prepare() {
+  [ -r "$SYSTEM_ALSA_CONFIG" ] || fail "system ALSA config not found: $SYSTEM_ALSA_CONFIG"
+  mkdir -p "$AUDIO_RUN_DIR" "$(dirname "$ASOUND_CONFIG")" "$(dirname "$STATUS_FILE")"
+  config_tmp="$ASOUND_CONFIG.tmp.$$"
+  trap 'rm -f "$config_tmp" "$STATUS_FILE.tmp.$$"' EXIT HUP INT TERM
+
+  if [ -n "${PLUMOS_USB_AUDIO_CARD:-}" ]; then
+    usb_card="$(find_usb_card)"
+  else
+    usb_card="$(find_usb_card 2>/dev/null || true)"
+  fi
+  if [ -n "$usb_card" ]; then
+    selected_card=$usb_card
+    mode=usb_stereo
+    cat > "$config_tmp" <<EOF
+<$SYSTEM_ALSA_CONFIG>
+
+pcm.plumos_output {
+    type plug
+    slave.pcm "hw:$selected_card,0"
+}
+EOF
+  else
+    selected_card="$(find_internal_card 2>/dev/null || true)"
+    [ -n "$selected_card" ] || fail "neither USB audio nor the V90S audiocodec playback device is available"
+    mode=internal_mono
+    cat > "$config_tmp" <<EOF
+<$SYSTEM_ALSA_CONFIG>
+
+pcm.plumos_output {
+    type route
+    slave {
+        pcm "hw:$selected_card,0"
+        channels 2
+    }
+    ttable {
+        0.0 0.5
+        1.0 0.5
+        0.1 0.5
+        1.1 0.5
+    }
+}
+EOF
+  fi
+
+  chmod 0644 "$config_tmp"
+  mv -f "$config_tmp" "$ASOUND_CONFIG"
+  selected_id="$(card_id "$selected_card" 2>/dev/null || printf 'unknown')"
+  write_status "$mode" "$selected_card" "$selected_id"
+  trap - EXIT HUP INT TERM
+  cat "$STATUS_FILE"
+}
+
+case "${1:-prepare}" in
+  prepare) prepare ;;
+  status)
+    [ -r "$STATUS_FILE" ] || fail "audio output has not been prepared"
+    cat "$STATUS_FILE"
+    ;;
+  config-path) printf '%s\n' "$ASOUND_CONFIG" ;;
+  *) fail "usage: $0 [prepare|status|config-path]" ;;
+esac

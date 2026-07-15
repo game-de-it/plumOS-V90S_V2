@@ -124,9 +124,22 @@ export XDG_CONFIG_HOME="${STATE_DIR}/.config"
 export PLUMOS_ROOT
 export PLUMOS_MUSIC_FONT="${PLUMOS_MUSIC_FONT:-${PLUMOS_ROOT}/fonts/default.otf}"
 export PLUMOS_MUSIC_FALLBACK_FONT="${PLUMOS_MUSIC_FALLBACK_FONT:-${PLUMOS_ROOT}/fonts/cjk-fallback.ttc}"
-export PLUMOS_MUSIC_ALSA_DEVICE="${PLUMOS_MUSIC_ALSA_DEVICE:-${PLUMOS_MUSIC_PLAYER_AUDIO_DEVICE:-hw:0,0}}"
 export PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export LD_LIBRARY_PATH="${APP_ROOT}/lib:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+
+AUDIO_OUTPUT_HELPER="${PLUMOS_AUDIO_OUTPUT_HELPER:-${PLUMOS_ROOT}/bin/plumos-audio-output}"
+if [ ! -x "${AUDIO_OUTPUT_HELPER}" ]; then
+  echo "error: audio output helper missing: ${AUDIO_OUTPUT_HELPER}" >&2
+  exit 49
+fi
+audio_status="$(${AUDIO_OUTPUT_HELPER} prepare 2>&1)" || {
+  echo "error: audio output prepare failed: ${audio_status}" >&2
+  exit 49
+}
+export ALSA_CONFIG_PATH="${PLUMOS_ALSA_CONFIG_PATH:-/run/plumos/audio/asound.conf}"
+export PLUMOS_MUSIC_ALSA_DEVICE="${PLUMOS_MUSIC_ALSA_DEVICE:-${PLUMOS_MUSIC_PLAYER_AUDIO_DEVICE:-plumos_output}}"
+printf 'audio_device=%s alsa_config=%s %s\n' "${PLUMOS_MUSIC_ALSA_DEVICE}" \
+  "${ALSA_CONFIG_PATH}" "$(printf '%s' "${audio_status}" | tr '\n' ' ')" >>"${LOG_DIR}/music-player.log"
 
 cd "${APP_ROOT}" || exit 1
 exec "${APP_ROOT}/bin/plumos-music-player.bin" >>"${LOG_DIR}/music-player.log" 2>&1
@@ -183,7 +196,7 @@ main() {
     printf 'binary=plumos/apps/music-player/bin/plumos-music-player.bin\n'
     printf 'launcher=plumos/bin/plumos-music-player-launch\n'
     printf 'music_roots=/mnt/plumos/music,/mnt/plumos/MUSIC,/mnt/plumos/roms/music,/run/plumos/sd2/music,/run/plumos/sd2/roms/music\n'
-    printf 'audio_output=ALSA hw:0,0 S16 stereo 48000Hz\n'
+    printf 'audio_output=ALSA plumos_output S16 stereo-input 48000Hz\n'
     printf 'decoder=miniaudio for mp3/flac/wav; FFmpeg/libav fallback for additional formats\n'
     printf 'miniaudio_repo=%s\n' "${MINIAUDIO_REPO}"
     printf 'miniaudio_ref=%s\n' "${MINIAUDIO_REF}"

@@ -617,7 +617,19 @@ fi
 export LD_LIBRARY_PATH="/usr/lib/powervr:${SONAME_DIR}:${PLUMOS_ROOT}/lib/plumos-sdl2-powervr:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
 export SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-mali}
 export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-alsa}
-export AUDIODEV=${AUDIODEV:-hw:0,0}
+AUDIO_OUTPUT_HELPER=${PLUMOS_AUDIO_OUTPUT_HELPER:-${PLUMOS_ROOT}/bin/plumos-audio-output}
+if [ ! -x "${AUDIO_OUTPUT_HELPER}" ]; then
+  echo "plumos-standalone-launch: audio output helper missing: ${AUDIO_OUTPUT_HELPER}" >&2
+  exit 49
+fi
+audio_status=$(${AUDIO_OUTPUT_HELPER} prepare 2>&1) || {
+  echo "plumos-standalone-launch: audio output prepare failed: ${audio_status}" >&2
+  exit 49
+}
+export ALSA_CONFIG_PATH=${PLUMOS_ALSA_CONFIG_PATH:-${PLUMOS_RUNTIME_ROOT}/audio/asound.conf}
+export AUDIODEV=${AUDIODEV:-plumos_output}
+printf 'audio_device=%s alsa_config=%s %s\n' "${AUDIODEV}" "${ALSA_CONFIG_PATH}" \
+  "$(printf '%s' "${audio_status}" | tr '\n' ' ')" >>"${LOG_ROOT}/launcher.log"
 mkdir -p "${HOME}" "${XDG_CONFIG_HOME}" "${XDG_DATA_HOME}" "${XDG_CACHE_HOME}"
 
 cpu_index=1

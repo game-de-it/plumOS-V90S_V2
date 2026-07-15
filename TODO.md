@@ -47,7 +47,8 @@ Build plumOS V90S as a V90S-specific distribution:
   `docs/validation/2026-07-10-step2-stockos-video-perfect-runtime.md`.
 - [x] Known-good RetroArch path: `video_driver=gl`,
   `video_context_driver=mali_fbdev`, `video_refresh_rate=58.917103`,
-  `video_threaded=true`, `vrr_runloop_enable=true`, ALSA `hw:0,0`, QuickNES.
+  `video_threaded=true`, `vrr_runloop_enable=true`, ALSA `plumos_output`
+  (internal physical PCM `hw:0,0`), QuickNES.
 - [x] User confirmed FPS, scrolling, controls, audio output, and audio pitch are
   good on the live device.
 - [x] StockOS/Batocera runtime extracted into ignored artifacts.
@@ -652,7 +653,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `video_threaded = "true"`
   - `vrr_runloop_enable = "true"`
   - `audio_driver = "alsa"`
-  - `audio_device = "hw:0,0"`
+  - `audio_device = "plumos_output"`
   - `audio_latency = "64"`
   - `input_driver = "sdl2"`
   - `input_joypad_driver = "sdl2"`
@@ -661,8 +662,12 @@ Build plumOS V90S as a V90S-specific distribution:
   launch.
 - [ ] Provide a resettable defaults mechanism.
 - [ ] Write RetroArch launch and runtime logs to the app layer.
-- [ ] Keep future Pulse/PipeWire audio experiments separate from the known-good
-  ALSA path unless real-device validation proves a replacement.
+- [x] Route normal app audio through the shared `plumos_output` ALSA PCM.
+- [x] Downmix left and right channels for the built-in mono speaker.
+- [x] Preserve stereo and automatically select a USB DAC detected at app launch.
+- [ ] Validate left/right stereo separation with a physical USB DAC.
+- [x] Keep Pulse/PipeWire out of the normal path; direct hardware playback is an
+  explicit diagnostic only.
 - [x] Replace fixed/OC CPU-frequency presets with dynamic V90S governors:
   Interactive (game default), Performance, Ondemand, Schedutil, and
   Conservative. Restore the full hardware frequency range before applying a

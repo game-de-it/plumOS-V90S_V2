@@ -1655,7 +1655,7 @@ static int open_configured_alsa(struct player_state *state,
     device = getenv("PLUMOS_MUSIC_PLAYER_AUDIO_DEVICE");
   }
   if (!device || !device[0]) {
-    device = "hw:0,0";
+    device = "plumos_output";
   }
   configured_latency = parse_env_ms("PLUMOS_MUSIC_ALSA_LATENCY_US");
   if (configured_latency > 0 && configured_latency <= 1000000) {
@@ -1685,7 +1685,7 @@ static int open_configured_alsa(struct player_state *state,
     return 0;
   }
   pthread_mutex_lock(&state->lock);
-  set_audio_status_locked(state, "audio: ALSA hw:0,0 48k stereo");
+  set_audio_status_locked(state, "audio: ALSA plumos_output 48k stereo input");
   pthread_mutex_unlock(&state->lock);
   fprintf(stderr, "audio alsa setup ok device=%s rate=%d channels=%d\n", device,
           MUSIC_OUTPUT_RATE, MUSIC_OUTPUT_CHANNELS);

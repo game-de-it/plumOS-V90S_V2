@@ -25,6 +25,7 @@ RETROARCH_PID=
 RETROARCH_WATCHDOG_PID=
 LOG_MIRROR_PID=
 RETROARCH_APPEND_CONFIG=
+AUDIO_OUTPUT_HELPER="${PLUMOS_AUDIO_OUTPUT_HELPER:-${PLUMOS_ROOT:-/mnt/plumos}/bin/plumos-audio-output}"
 
 if [ -r "$ROUTE_CONFIG" ]; then
     . "$ROUTE_CONFIG"
@@ -516,7 +517,7 @@ video_aspect_ratio = "1.333333"
 
 audio_enable = "true"
 audio_driver = "$audio_driver"
-audio_device = "hw:0,0"
+audio_device = "${PLUMOS_V90S_AUDIO_DEVICE:-plumos_output}"
 audio_sync = "true"
 audio_latency = "${PLUMOS_V90S_AUDIO_LATENCY:-64}"
 
@@ -662,20 +663,31 @@ ensure_parallel_n64_defaults() {
 prepare_launch_append_config() {
     audio_override="${PLUMOS_V90S_AUDIO_DRIVER_OVERRIDE:-}"
     latency_override="${PLUMOS_V90S_AUDIO_LATENCY_OVERRIDE:-}"
-
-    if [ -z "$audio_override" ] && [ -z "$latency_override" ]; then
-        return 0
-    fi
+    audio_device="${PLUMOS_V90S_AUDIO_DEVICE:-plumos_output}"
 
     RETROARCH_APPEND_CONFIG="$RUN_DIR/retroarch-launch-$$.cfg"
     : > "$RETROARCH_APPEND_CONFIG" || return 1
+    printf 'audio_device = "%s"\n' "$audio_device" >> "$RETROARCH_APPEND_CONFIG"
     if [ -n "$audio_override" ]; then
         printf 'audio_driver = "%s"\n' "$audio_override" >> "$RETROARCH_APPEND_CONFIG"
     fi
     if [ -n "$latency_override" ]; then
         printf 'audio_latency = "%s"\n' "$latency_override" >> "$RETROARCH_APPEND_CONFIG"
     fi
-    log "retroarch-launch: append_config=$RETROARCH_APPEND_CONFIG audio_override=${audio_override:-none} latency_override=${latency_override:-none}"
+    log "retroarch-launch: append_config=$RETROARCH_APPEND_CONFIG audio_device=$audio_device audio_override=${audio_override:-none} latency_override=${latency_override:-none}"
+}
+
+prepare_audio_output() {
+    if [ ! -x "$AUDIO_OUTPUT_HELPER" ]; then
+        log "retroarch-launch: audio output helper missing: $AUDIO_OUTPUT_HELPER"
+        return 1
+    fi
+    audio_status="$($AUDIO_OUTPUT_HELPER prepare 2>&1)" || {
+        log "retroarch-launch: audio output prepare failed: $audio_status"
+        return 1
+    }
+    export ALSA_CONFIG_PATH="${PLUMOS_ALSA_CONFIG_PATH:-$RUNTIME_ROOT/audio/asound.conf}"
+    log "retroarch-launch: audio output prepared: $(printf '%s' "$audio_status" | tr '\n' ' ')"
 }
 
 ensure_v90s_input_binds() {
@@ -948,6 +960,10 @@ set_config_string "$cfg" core_options_path \
     "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
 set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
 set_config_string "$cfg" savestate_directory "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
+if ! prepare_audio_output; then
+    mirror_logs
+    exit 49
+fi
 if ! prepare_launch_append_config; then
     log "retroarch-launch: could not create per-launch append config"
     mirror_logs

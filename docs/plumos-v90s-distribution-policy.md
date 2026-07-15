@@ -65,7 +65,8 @@ video_refresh_rate: 58.917103
 video_threaded: true
 vrr_runloop_enable: true
 audio_driver: alsa
-audio_device: hw:0,0
+audio_device: plumos_output
+internal physical PCM: hw:0,0
 ```
 
 User-visible result:
@@ -810,7 +811,7 @@ vrr_runloop_enable = "true"
 video_vsync = "true"
 video_swap_interval = "1"
 audio_driver = "alsa"
-audio_device = "hw:0,0"
+audio_device = "plumos_output"
 audio_latency = "64"
 audio_sync = "true"
 input_driver = "sdl2"
@@ -824,6 +825,34 @@ Policy:
 - generated defaults should be resettable, not constantly regenerated
 - diagnostics and fallback experiments must be explicit, not hidden inside normal
   launch paths
+
+### Audio Output Policy
+
+Normal plumOS applications must open the logical ALSA PCM `plumos_output`, not
+bind directly to a numbered hardware card.
+
+- With only the V90S `audiocodec` present, `plumos_output` routes
+  `0.5 * left + 0.5 * right` to both hardware channels of `hw:<card>,0`. The
+  built-in speaker therefore receives all stereo content as mono without
+  clipping the sum.
+- When a USB playback card is present at application launch,
+  `plumos_output` selects that card through an ALSA `plug` PCM and preserves
+  two-channel stereo.
+- `plumos-audio-output prepare` owns runtime detection and atomically writes
+  `/run/plumos/audio/asound.conf` and `/run/plumos/audio/output.status`.
+- RetroArch, PicoArch, standalone emulators, and plumOS Music Player must run
+  the helper before opening audio and must export the generated file through
+  `ALSA_CONFIG_PATH`.
+- Failure to detect or configure a valid output is fatal to that application
+  launch. The normal path must not silently fall back to `hw:0,0`.
+- Direct `hw:0,0` playback remains available only in explicit audio diagnostics.
+- USB DAC hotplug is evaluated at application launch. Connect the DAC before
+  starting or restarting an application; an already-open ALSA stream is not
+  transparently migrated.
+
+This route does not require PulseAudio or PipeWire. The StockOS-era
+`auto_mono_output` script is retained as design evidence, but its PulseAudio
+daemon and sink-monitoring model is not part of the plumOS runtime.
 
 ## Validation Policy
 
