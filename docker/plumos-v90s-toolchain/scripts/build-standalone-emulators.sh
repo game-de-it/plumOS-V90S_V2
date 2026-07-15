@@ -85,13 +85,13 @@ validate_filter() {
   for id in ${requested}; do
     known=0
     case "${id}" in
-      ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus|nxengine-evo|yabasanshiro)
+      launcher-only|ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus|nxengine-evo|yabasanshiro)
         known=1
         ;;
     esac
     if [ "${known}" -ne 1 ]; then
       printf 'error: unknown standalone emulator ID: %s\n' "${id}" >&2
-      printf 'valid IDs: ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus nxengine-evo yabasanshiro\n' >&2
+      printf 'valid IDs: launcher-only ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus nxengine-evo yabasanshiro\n' >&2
       return 2
     fi
   done
@@ -593,6 +593,7 @@ write_launcher() {
 #!/bin/sh
 set -u
 PLUMOS_ROOT=${PLUMOS_ROOT:-/mnt/plumos}
+PLUMOS_RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 EMU_ROOT="${PLUMOS_ROOT}/standalone"
 LOG_ROOT="${PLUMOS_ROOT}/Logs/standalone"
 id=${1:-}
@@ -601,10 +602,10 @@ mkdir -p "${LOG_ROOT}"
 export HOME="${PLUMOS_ROOT}/state/standalone/${id}"
 export XDG_CONFIG_HOME="${HOME}/config"
 export XDG_DATA_HOME="${HOME}/data"
-export XDG_CACHE_HOME="${HOME}/cache"
+export XDG_CACHE_HOME="${PLUMOS_RUNTIME_ROOT}/cache/standalone/${id}"
 export PATH="${PLUMOS_ROOT}/bin:${PATH}"
 SONAME_MAP="${PLUMOS_ROOT}/config/standalone/soname-links.tsv"
-SONAME_DIR=/tmp/plumos-standalone-lib
+SONAME_DIR="${PLUMOS_RUNTIME_ROOT}/standalone/lib"
 mkdir -p "${SONAME_DIR}"
 find "${SONAME_DIR}" -type l -delete 2>/dev/null || true
 if [ -f "${SONAME_MAP}" ]; then
@@ -727,7 +728,7 @@ case "${id}" in
   *) echo "unknown standalone emulator: ${id}" >&2; exit 2 ;;
 esac
 [ -x "${exe}" ] || { echo "missing standalone emulator: ${exe}" >&2; exit 127; }
-PID_ROOT=/run/plumos-standalone
+PID_ROOT="${PLUMOS_RUNTIME_ROOT}/standalone"
 pid_file="${PID_ROOT}/${id}.pid"
 exe_file="${PID_ROOT}/${id}.exe"
 mkdir -p "${PID_ROOT}"
@@ -779,12 +780,13 @@ EOF
 #!/bin/sh
 set -u
 PLUMOS_ROOT=${PLUMOS_ROOT:-/mnt/plumos}
+PLUMOS_RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 id=${1:-}
 [ -n "${id}" ] || { echo "usage: plumos-standalone-stop EMULATOR_ID" >&2; exit 2; }
 case "${id}" in
   *[!A-Za-z0-9_.-]*) echo "invalid emulator ID: ${id}" >&2; exit 2 ;;
 esac
-PID_ROOT=/run/plumos-standalone
+PID_ROOT="${PLUMOS_RUNTIME_ROOT}/standalone"
 pid_file="${PID_ROOT}/${id}.pid"
 exe_file="${PID_ROOT}/${id}.exe"
 pid=$(cat "${pid_file}" 2>/dev/null || true)

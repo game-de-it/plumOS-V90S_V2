@@ -1164,3 +1164,58 @@ DVFS disabled and an active clock around 700 MHz, while runtime PM can still
 suspend the GPU when idle. Therefore plumOS must not present a GPU governor
 setting. Add one only if a stable vendor-supported runtime interface is found
 and validated on the V90S.
+
+### 2026-07-15: Release SquashFS Ownership Boundary
+
+Decision:
+
+The official `system-rootfs` target builds the `release-system` profile by
+default and writes:
+
+```text
+output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs
+```
+
+This squashfs owns init, p7 mount-before-fsck, safe reboot/poweroff, PowerVR
+and SDL2 PowerVR integration, minimal diagnostics, and the app-layer bootstrap.
+It does not contain the frontend, RetroArch, libretro cores, PicoArch,
+standalone emulators, or private ROMs. The older Step 1 and Step 2 profiles are
+development diagnostics and require an explicit `--profile` argument.
+The `release-system` profile refuses Wi-Fi credentials, SSH keys, and root
+passwords even when those values are present in the build environment.
+
+The rootfs bootstrap validates `/mnt/plumos/COMPAT_VENDOR`, release metadata,
+and checksums for the critical frontend entry points before starting the FE.
+Missing, damaged, or vendor-incompatible app layers stop with a visible error.
+They must not silently start an application bundled in the squashfs.
+
+Transient runtime ownership is standardized as:
+
+```text
+/run/plumos/frontend
+/run/plumos/network-services
+/run/plumos/network-control
+/run/plumos/network-recovery
+/run/plumos/ssh
+/run/plumos/adb
+/run/plumos/usb-disk
+/run/plumos/retroarch
+/run/plumos/picoarch
+/run/plumos/standalone
+/run/plumos/cache
+/run/plumos/tmp
+```
+
+PID files, executable ownership records, locks, temporary command results,
+in-progress scraper state, runtime volume state, and disposable emulator caches
+belong under this tmpfs tree. Persistent settings, frontend library indexes,
+favorites/recent history, emulator configuration, saves, states, screenshots,
+downloaded artwork, and user-visible logs remain on the FAT32 app layer.
+
+Rationale:
+
+Moving immutable hardware glue and power/mount policy into squashfs prevents a
+partially damaged FAT32 partition from changing the boot contract. Keeping
+volatile high-churn files off p7 reduces needless FAT updates and eliminates
+stale PID/lock state after a reset, while preserving the Windows/macOS copy-over
+update model for user-facing applications and data.

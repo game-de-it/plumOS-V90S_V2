@@ -15,7 +15,8 @@ PERIODIC_LOG_MIRROR="${PLUMOS_V90S_PERIODIC_LOG_MIRROR:-0}"
 RETROARCH_CONFIG_SRC="${PLUMOS_V90S_RETROARCH_CONFIG:-}"
 RETROARCH_CONFIG_DIR="${PLUMOS_V90S_RETROARCH_CONFIG_DIR:-/mnt/share/retroarch}"
 RETROARCH_CONFIG_PATH="${PLUMOS_V90S_RETROARCH_CONFIG_PATH:-}"
-RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_V90S_RUN_DIR:-$RUNTIME_ROOT/retroarch}"
 ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-/etc/plumos-v90s-retroarch-route}"
 LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
 RETROARCH_PID_FILE="$RUN_DIR/retroarch.pid"
@@ -866,9 +867,9 @@ export HOME=/root
 export USER=root
 export LOGNAME=root
 export XDG_CONFIG_HOME=/root/.config
-export XDG_CACHE_HOME=/tmp/retroarch-cache
+export XDG_CACHE_HOME="$RUNTIME_ROOT/cache/retroarch"
 export XDG_RUNTIME_DIR=/run
-mkdir -p /root/.config/retroarch/system /tmp/retroarch-cache /run 2>/dev/null || true
+mkdir -p /root/.config/retroarch/system "$XDG_CACHE_HOME" /run 2>/dev/null || true
 
 if [ -z "$sdl2_runtime_dir" ]; then
     log "retroarch-launch: required SDL2 PowerVR runtime missing: ${PLUMOS_V90S_SDL2_POWERVR_DIR:-/usr/local/lib/plumos-sdl2-powervr}"

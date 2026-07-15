@@ -10,7 +10,8 @@ FAT_LOG=
 SHARE_LOG=
 SSHD_LOG=/tmp/plumos-v90s-sshd.log
 WPA_CONF=/etc/wpa_supplicant/wpa_supplicant.conf
-RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_V90S_RUN_DIR:-$RUNTIME_ROOT/network-recovery}"
 SSHD_PID_FILE="$RUN_DIR/sshd.pid"
 WPA_PID_FILE="$RUN_DIR/wpa_supplicant.pid"
 

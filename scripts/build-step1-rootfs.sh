@@ -27,7 +27,7 @@ Usage:
   build-step1-rootfs.sh [options]
 
 Options:
-  --profile NAME        all, stage1, debian-minbase, debian-retroarch,
+  --profile NAME        all, release-system, stage1, debian-minbase, debian-retroarch,
                         debian-retroarch-pvr-probe, debian-retroarch-pvr-sdl2,
                         debian-retroarch-powervr, or legacy
                         debian-retroarch-knulli; default all
@@ -152,7 +152,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$profile" in
-    all|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe|debian-retroarch-pvr-sdl2|debian-retroarch-powervr|debian-retroarch-knulli)
+    all|release-system|stage1|debian-minbase|debian-retroarch|debian-retroarch-pvr-probe|debian-retroarch-pvr-sdl2|debian-retroarch-powervr|debian-retroarch-knulli)
         ;;
     *)
         printf 'error: unknown profile: %s\n' "$profile" >&2
@@ -181,7 +181,7 @@ if ! command -v mksquashfs >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-powervr" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
+if [ "$profile" = "all" ] || [ "$profile" = "release-system" ] || [ "$profile" = "debian-minbase" ] || [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-powervr" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if ! command -v debootstrap >/dev/null 2>&1; then
         printf 'error: debootstrap is required for profile %s\n' "$profile" >&2
         exit 1
@@ -204,7 +204,7 @@ if [ "$profile" = "debian-retroarch" ] || [ "$profile" = "debian-retroarch-pvr-p
     fi
 fi
 
-if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-powervr" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
+if [ "$profile" = "release-system" ] || [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-powervr" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if [ ! -d "$pvr_dir/fbdev/glibc/lib64" ] || [ ! -x "$pvr_dir/fbdev/glibc/bin/pvrsrvctl" ]; then
         printf 'error: GE8300 fbdev/glibc driver payload not found under: %s\n' "$pvr_dir" >&2
         exit 1
@@ -215,7 +215,7 @@ if [ "$profile" = "debian-retroarch-pvr-probe" ] || [ "$profile" = "debian-retro
     fi
 fi
 
-if [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-powervr" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
+if [ "$profile" = "release-system" ] || [ "$profile" = "debian-retroarch-pvr-sdl2" ] || [ "$profile" = "debian-retroarch-powervr" ] || [ "$profile" = "debian-retroarch-knulli" ]; then
     if [ ! -f "$sdl2_powervr_dir/usr/local/lib/plumos-sdl2-powervr/libSDL2-2.0.so.0" ] || [ ! -x "$sdl2_powervr_dir/usr/local/bin/v90s-sdl2-video-probe" ]; then
         printf 'error: patched SDL2/PowerVR payload not found under: %s\n' "$sdl2_powervr_dir" >&2
         printf 'hint: run ./scripts/docker-build.sh sdl2-powervr first\n' >&2
@@ -817,6 +817,8 @@ mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 mount -t devpts devpts /dev/pts 2>/dev/null || true
 chmod 1777 /tmp
+mkdir -p /run/plumos /run/plumos/frontend /run/plumos/network-services \
+    /run/plumos/picoarch /run/plumos/retroarch /run/plumos/standalone
 prepare_fat_logs
 
 log "debian-init: init entered before tty setup"
@@ -861,10 +863,17 @@ frontend_attempted=0
 frontend_pid=""
 if prepare_plumos_app_layer; then
     frontend_attempted=1
-    log "debian-init: starting plumOS frontend"
+    log "debian-init: starting plumOS frontend through rootfs bootstrap"
     persist_debian_log
     (
-        PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos /mnt/plumos/bin/plumos-frontend-launch
+        if [ -x /usr/sbin/plumos-app-layer-bootstrap ]; then
+            PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+                PLUMOS_RUNTIME_ROOT=/run/plumos \
+                /usr/sbin/plumos-app-layer-bootstrap start
+        else
+            log "debian-init: rootfs app-layer bootstrap is missing"
+            exit 127
+        fi
         rc=$?
         log "debian-init: plumOS frontend exited rc=$rc"
         persist_debian_log
@@ -874,9 +883,15 @@ if prepare_plumos_app_layer; then
     persist_debian_log
 
     start_plumos_network_services_bg after-frontend
+else
+    log "debian-init: app layer unavailable; no application fallback will be started"
+    printf '%s\n' 'plumOS app layer unavailable; repair the PLUMOS partition.' > /dev/console 2>/dev/null || true
 fi
 
-if [ "$frontend_attempted" -eq 0 ] && [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
+if [ "$frontend_attempted" -eq 0 ] &&
+   [ "${PLUMOS_ENABLE_ROOTFS_RETROARCH_FALLBACK:-0}" = 1 ] &&
+   [ -x /usr/local/sbin/v90s-retroarch-launch ]; then
+    log "debian-init: explicit legacy rootfs RetroArch fallback enabled"
     log "debian-init: starting RetroArch launcher"
     persist_debian_log
     /usr/local/sbin/v90s-retroarch-launch
@@ -907,6 +922,12 @@ EOF
 install_power_action() {
     root="$1"
     install -D -m 0755 "$script_dir/plumos-power-action-rootfs.sh" "$root/usr/sbin/plumos-power-action"
+}
+
+install_app_layer_bootstrap() {
+    root="$1"
+    install -D -m 0755 "$script_dir/plumos-app-layer-bootstrap.sh" "$root/usr/sbin/plumos-app-layer-bootstrap"
+    printf '%s\n' 'v90s-stockos-r1' > "$root/etc/plumos-v90s-vendor-id"
 }
 
 build_stage1() {
@@ -945,6 +966,7 @@ build_debian_minbase() {
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
+    install_app_layer_bootstrap "$root"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     printf 'plumos-v90s-step1\n' > "$root/etc/hostname"
     cat > "$root/etc/plumos-step1-release" <<EOF
@@ -1162,6 +1184,67 @@ ssh_password_auth=$([ -n "$ssh_root_password" ] && printf yes || printf no)
 EOF
 }
 
+build_release_system() {
+    root="$work_dir/release-system-root"
+    release_packages="alsa-utils,input-utils,procps,psmisc,kmod,dosfstools,coreutils,util-linux,ca-certificates"
+    if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
+        printf 'error: release-system refuses embedded Wi-Fi or SSH credentials; use an explicit development profile\n' >&2
+        exit 2
+    fi
+
+    rm -rf "$root"
+    mkdir -p "$root"
+    debootstrap --arch=arm64 --variant=minbase --include="$release_packages" "$suite" "$root" "$mirror"
+
+    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" \
+        "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
+    write_debian_init "$root/sbin/init"
+    install_power_action "$root"
+    install_app_layer_bootstrap "$root"
+    install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
+    install_pvr_probe "$root"
+    install_sdl2_powervr "$root"
+
+    printf 'plumos-v90s\n' > "$root/etc/hostname"
+    cat > "$root/etc/plumos-runtime.env" <<'EOF'
+PLUMOS_ROOT=/mnt/plumos
+PLUMOS_SDCARD_ROOT=/mnt/plumos
+PLUMOS_RUNTIME_ROOT=/run/plumos
+EOF
+    cat > "$root/etc/plumos-v90s-NOTICE" <<'EOF'
+plumOS V90S uses hardware-enabling runtime components derived from the
+POWKIDDY V90S StockOS/Batocera distribution. Open-source components retain
+their upstream licenses. See the FAT32 app layer for the full release notices.
+EOF
+    cat > "$root/etc/plumos-system-release" <<EOF
+name=plumOS V90S System Rootfs
+suite=$suite
+rootfs_profile=release-system
+vendor_runtime=v90s-stockos-r1
+app_layer_mount=/mnt/plumos
+runtime_state=/run/plumos
+packages=$release_packages
+contains_frontend=no
+contains_retroarch=no
+contains_libretro_cores=no
+contains_standalone_emulators=no
+EOF
+
+    rm -rf "$root/var/cache/apt/archives/"*.deb "$root/var/lib/apt/lists/"*
+    rm -rf "$root/usr/share/doc" "$root/usr/share/man" "$root/usr/share/info" \
+        "$root/usr/share/lintian" "$root/usr/share/locale"
+
+    mkdir -p "$out_dir"
+    mksquashfs "$root" "$out_dir/plumos-v90s-system-rootfs.squashfs" \
+        -noappend -comp zstd -b 131072
+    sha256sum "$out_dir/plumos-v90s-system-rootfs.squashfs" \
+        > "$out_dir/plumos-v90s-system-rootfs.squashfs.sha256"
+    du -sh "$root" > "$out_dir/plumos-v90s-system-rootfs-root.du.txt"
+    find "$root" \( -type f -o -type l \) | sed "s#^$root/##" | sort \
+        > "$out_dir/plumos-v90s-system-rootfs.manifest"
+    printf 'created: %s/plumos-v90s-system-rootfs.squashfs\n' "$out_dir"
+}
+
 build_debian_retroarch_payload() {
     payload_suffix="$1"
     profile_name="$2"
@@ -1181,6 +1264,7 @@ build_debian_retroarch_payload() {
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root" "$root/roms/nes"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
+    install_app_layer_bootstrap "$root"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     install -D -m 0755 "$script_dir/v90s-retroarch-launch.sh" "$root/usr/local/sbin/v90s-retroarch-launch"
     install -D -m 0755 "$script_dir/v90s-retroarch-stop.sh" "$root/usr/local/sbin/v90s-retroarch-stop"
@@ -1261,6 +1345,10 @@ build_debian_retroarch_knulli() {
 
 if [ "$profile" = "all" ] || [ "$profile" = "stage1" ]; then
     build_stage1
+fi
+
+if [ "$profile" = "release-system" ]; then
+    build_release_system
 fi
 
 if [ "$profile" = "all" ] || [ "$profile" = "debian-minbase" ]; then

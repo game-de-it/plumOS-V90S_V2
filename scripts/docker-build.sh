@@ -35,7 +35,7 @@ Commands:
   stockos-image    Transitional alias for sd-image.
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
   picoarch         Build the AArch64 V90S PicoArch runtime.
-  standalone [ID...] Build all standalone emulators, or only the selected IDs.
+  standalone [ID...] Build all standalone emulators, only selected IDs, or launcher-only.
   frontend         Build the V90S frontend ported from plumOS-MMF.
   release          Assemble update-only release packages from the app layer.
   all              Reserved for the normal release build chain.
@@ -130,6 +130,19 @@ docker_run_root=(
     "$IMAGE"
 )
 
+run_system_rootfs() {
+    local arg has_profile=0 has_out_dir=0
+
+    for arg in "$@"; do
+        [ "$arg" = "--profile" ] && has_profile=1
+        [ "$arg" = "--out-dir" ] && has_out_dir=1
+    done
+    [ "$has_profile" -eq 1 ] || set -- --profile release-system "$@"
+    [ "$has_out_dir" -eq 1 ] || set -- --out-dir output/system-rootfs/v90s "$@"
+
+    docker run "${docker_run_root[@]}" /workspace/scripts/build-step1-rootfs.sh "$@"
+}
+
 cmd="${1:-}"
 if [ -n "$cmd" ]; then
     shift || true
@@ -215,12 +228,12 @@ case "$cmd" in
         ;;
     system-rootfs)
         ensure_image
-        docker run "${docker_run_root[@]}" /workspace/scripts/build-step1-rootfs.sh "$@"
+        run_system_rootfs "$@"
         ;;
     rootfs)
         echo "warning: rootfs is a transitional alias; use system-rootfs" >&2
         ensure_image
-        docker run "${docker_run_root[@]}" /workspace/scripts/build-step1-rootfs.sh "$@"
+        run_system_rootfs "$@"
         ;;
     sd-image)
         ensure_image

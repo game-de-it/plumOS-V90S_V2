@@ -7,8 +7,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 cd / 2>/dev/null || true
 
-LOG_FILE="${PLUMOS_POWER_ACTION_LOG:-/run/plumos-power-action.log}"
-LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/tmp/plumos-power-action.lock}"
+LOG_FILE="${PLUMOS_POWER_ACTION_LOG:-/run/plumos/power-action.log}"
+LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/run/plumos/power-action.lock}"
 
 ACTION=shutdown
 POWER_OFF=0

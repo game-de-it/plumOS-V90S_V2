@@ -3,10 +3,11 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 
-RUN_DIR="${PLUMOS_ROOT}/run"
+RUN_DIR="${PLUMOS_ADBD_RUN_DIR:-$RUNTIME_ROOT/adb}"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${LOG_DIR}/adbd.log"
 ADBD="${PLUMOS_ADBD_BIN:-${PLUMOS_ROOT}/adb/bin/adbd}"

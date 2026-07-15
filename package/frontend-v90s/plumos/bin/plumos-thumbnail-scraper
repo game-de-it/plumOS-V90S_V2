@@ -14,7 +14,7 @@ SYSTEMS_JSON="${PLUMOS_SYSTEMS_JSON:-${PLUMOS_ROOT}/config/frontend/systems.json
 SOURCES_TSV="${PLUMOS_SCRAPER_SOURCES:-${PLUMOS_ROOT}/config/frontend/scraper-sources.tsv}"
 IMAGE_ROOT="${PLUMOS_IMAGE_ROOT:-${SDCARD_ROOT}/Images}"
 IMAGE_ROOT="${IMAGE_ROOT%/}"
-STATE_DIR="${PLUMOS_THUMBNAIL_STATE_DIR:-${PLUMOS_ROOT}/state/frontend/artwork-scraper}"
+STATE_DIR="${PLUMOS_THUMBNAIL_STATE_DIR:-/run/plumos/artwork-scraper}"
 CACHE_DIR="${PLUMOS_THUMBNAIL_CACHE_DIR:-${PLUMOS_ROOT}/cache/frontend/artwork-scraper}"
 PRELOAD_DIR="${PLUMOS_THUMBNAIL_PRELOAD_DIR:-${PLUMOS_ROOT}/share/frontend/artwork-scraper}"
 LOG_DIR="${PLUMOS_LOG_DIR:-${PLUMOS_ROOT}/logs}"
@@ -59,7 +59,7 @@ Environment:
   PLUMOS_SCRAPER_SOURCES         Default: $PLUMOS_ROOT/config/frontend/scraper-sources.tsv
   PLUMOS_ROM_ROOT                Default: $PLUMOS_ROOT/roms
   PLUMOS_IMAGE_ROOT              Default: $PLUMOS_SDCARD_ROOT/Images
-  PLUMOS_THUMBNAIL_STATE_DIR     Default: $PLUMOS_ROOT/state/frontend/artwork-scraper
+  PLUMOS_THUMBNAIL_STATE_DIR     Default: /run/plumos/artwork-scraper
   PLUMOS_THUMBNAIL_CACHE_DIR     Default: $PLUMOS_ROOT/cache/frontend/artwork-scraper
   PLUMOS_THUMBNAIL_PRELOAD_DIR   Default: $PLUMOS_ROOT/share/frontend/artwork-scraper
   PLUMOS_THUMBNAIL_FETCH_TIMEOUT Default: 45 seconds

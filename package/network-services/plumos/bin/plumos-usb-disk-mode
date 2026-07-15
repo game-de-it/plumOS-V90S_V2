@@ -3,11 +3,12 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 
 STATE_DIR="${PLUMOS_USB_DISK_STATE_DIR:-${PLUMOS_ROOT}/state/usb-disk}"
-RUN_DIR="${PLUMOS_USB_DISK_RUN_DIR:-${PLUMOS_ROOT}/run/usb-disk}"
+RUN_DIR="${PLUMOS_USB_DISK_RUN_DIR:-${RUNTIME_ROOT}/usb-disk}"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${LOG_DIR}/usb-disk-mode.log"
 IMAGE="${PLUMOS_USB_DISK_IMAGE:-${STATE_DIR}/plumos-usb-transfer.img}"

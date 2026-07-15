@@ -2,7 +2,8 @@
 set -u
 
 BASE_DIR="${PLUMOS_SSH_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
-RUN_DIR="${BASE_DIR}/run"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_SSH_RUN_DIR:-$RUNTIME_ROOT/ssh}"
 LOG_DIR="${BASE_DIR}/log"
 PID_FILE="${RUN_DIR}/sshd.pid"
 LOG_FILE="${LOG_DIR}/sshd.log"

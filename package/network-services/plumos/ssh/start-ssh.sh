@@ -4,8 +4,9 @@ set -u
 BASE_DIR="${PLUMOS_SSH_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 ETC_DIR="${BASE_DIR}/etc"
-RUN_DIR="${BASE_DIR}/run"
+RUN_DIR="${PLUMOS_SSH_RUN_DIR:-$RUNTIME_ROOT/ssh}"
 LOG_DIR="${BASE_DIR}/log"
 PORT="${PLUMOS_SSH_PORT:-22}"
 LISTEN="${PLUMOS_SSH_LISTEN:-0.0.0.0}"
@@ -144,8 +145,8 @@ if [ -s "$PID_FILE" ]; then
   fi
 fi
 
-if [ -s /run/plumos-v90s/sshd.pid ]; then
-  pid="$(sed -n '1p' /run/plumos-v90s/sshd.pid 2>/dev/null | tr -d '[:space:]')"
+if [ -s "$RUNTIME_ROOT/network-recovery/sshd.pid" ]; then
+  pid="$(sed -n '1p' "$RUNTIME_ROOT/network-recovery/sshd.pid" 2>/dev/null | tr -d '[:space:]')"
   if pid_running "$pid"; then
     printf '%s\n' "$pid" > "$PID_FILE"
     log "adopted system sshd pid=${pid}"

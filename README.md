@@ -72,7 +72,10 @@ Docker build flow です。
 ./scripts/docker-build.sh cores
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
+./scripts/docker-build.sh system-rootfs
 ./scripts/docker-build.sh release
+
+# Explicit Step 2 diagnostic profile; not the release rootfs.
 ./scripts/docker-build.sh system-rootfs \
   --profile debian-retroarch-powervr \
   --out-dir output/rootfs-step2 \

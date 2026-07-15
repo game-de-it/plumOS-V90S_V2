@@ -3,14 +3,15 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH
 
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 CONFIG_DIR="${PLUMOS_ROOT}/config/network"
-RUN_DIR="${PLUMOS_NETWORK_RUN_DIR:-/run/plumos-network-control}"
+RUN_DIR="${PLUMOS_NETWORK_RUN_DIR:-$RUNTIME_ROOT/network-control}"
 LOG_FILE="${LOG_DIR}/network-control.log"
-WPA_STATUS="${PLUMOS_WPA_STATUS:-${PLUMOS_A30_WPA_STATUS:-/tmp/wpa_status.txt}}"
+WPA_STATUS="${PLUMOS_WPA_STATUS:-${PLUMOS_A30_WPA_STATUS:-$RUN_DIR/wpa_status.txt}}"
 WPA_STATUS_PERSIST="${CONFIG_DIR}/wpa_status.txt"
 WPA_CONFIG="${PLUMOS_WPA_CONFIG:-${CONFIG_DIR}/wpa_supplicant.conf}"
 ROOT_WPA_CONFIG="${PLUMOS_ROOT_WPA_CONFIG:-/etc/wpa_supplicant/wpa_supplicant.conf}"

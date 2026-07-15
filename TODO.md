@@ -330,10 +330,12 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Milestone 3: System Rootfs
 
-- [ ] Rename or introduce a release-oriented `system-rootfs` builder.
-- [ ] Keep Step 1/Step 2 rootfs profiles as explicit development or diagnostic
+- [x] Introduce a release-oriented `system-rootfs` builder whose default is the
+  `release-system` profile and whose output is
+  `output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs`.
+- [x] Keep Step 1/Step 2 rootfs profiles as explicit development or diagnostic
   profiles only.
-- [ ] Keep release `system-rootfs` focused on:
+- [x] Keep release `system-rootfs` focused on:
   - init
   - mount policy
   - `/tmp`, `/run`, `/dev`, `/proc`, `/sys`, `/boot`, `/mnt/plumos`
@@ -341,20 +343,25 @@ Build plumOS V90S as a V90S-specific distribution:
   - PowerVR startup
   - audio startup
   - input startup
-  - development-mode Wi-Fi and SSH hooks
+  - app-layer Wi-Fi and SSH service launch hooks without embedded credentials
   - safe process stop/restart helpers
   - minimal diagnostics and recovery console
   - app-layer launch wrappers
   - default configuration templates
   - base license and notice files
-- [ ] Remove normal RetroArch binaries from release squashfs.
-- [ ] Remove normal libretro cores from release squashfs.
-- [ ] Remove frontend, PicoArch, and standalone emulators from release squashfs.
-- [ ] Remove private ROMs from release squashfs.
-- [ ] Ensure development-only Wi-Fi credentials and SSH credentials are never
+- [x] Remove normal RetroArch binaries from release squashfs.
+- [x] Remove normal libretro cores from release squashfs.
+- [x] Remove frontend, PicoArch, and standalone emulators from release squashfs.
+- [x] Remove private ROMs from release squashfs.
+- [x] Ensure development-only Wi-Fi credentials and SSH credentials are never
   present in release squashfs.
-- [ ] Make launch wrappers execute applications from `/mnt/plumos`.
-- [ ] Make boot diagnostics report missing or invalid app-layer metadata clearly.
+- [x] Make the rootfs bootstrap validate and execute applications from
+  `/mnt/plumos`.
+- [x] Make boot diagnostics report missing, damaged, or vendor-incompatible
+  app-layer metadata clearly without an application fallback.
+- [x] Move transient PID, lock, in-progress scraper state, runtime volume state,
+  and disposable emulator cache files to `/run/plumos` tmpfs while keeping
+  persistent settings and saves on p7.
 - [x] Disable the old fb0 black-screen/white-band boot probe by default; keep it
   available only through explicit diagnostic opt-in.
 - [x] Start the frontend before slow development services by backgrounding
@@ -372,6 +379,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Add a development init hook that probes p7/p6 for `/mnt/plumos`
   app-layer metadata and starts `/mnt/plumos/bin/plumos-frontend-launch` when
   present.
+- [ ] Restore/extract the ignored `v90s-stockos-r1` vendor input, assemble the
+  first release-system SD image, and validate boot, FE startup, services,
+  emulator launch/stop, and safe reboot/poweroff on hardware; see
+  `docs/validation/2026-07-15-release-squashfs-boundary.md`.
 
 ## Milestone 4: FAT32 App Layer
 

@@ -184,13 +184,15 @@ For current development images, the app layer can be copied into p7 `SHARE`:
 ```sh
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
+./scripts/docker-build.sh system-rootfs
 ./scripts/docker-build.sh sd-image \
   --app-layer-dir output/app-layer/v90s \
-  --share-size 1024M \
+  --rootfs-squashfs output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
+  --share-size 4096M \
   --name plumos-v90s-stockos-frontend-YYYYMMDD-N.img
 ```
 
-The assembler defaults p7 `SHARE` to 1024MB FAT32 so the full generated app
+The assembler defaults p7 `PLUMOS` to 4096MB FAT32 so the full generated app
 layer can be included in a development image. This is still a hardware
 validation point: the final release layout should keep the FAT32 app/update/data
 partition mounted at `/mnt/plumos`, but real-device boot evidence decides

@@ -4,9 +4,9 @@ set -u
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${LOG_DIR}/stock-services.log"
-NTP_PID_FILE="${PLUMOS_NTP_PID_FILE:-/tmp/plumos-ntpd.pid}"
+NTP_PID_FILE="${PLUMOS_NTP_PID_FILE:-/run/plumos/stock-services/ntpd.pid}"
 
-mkdir -p "$LOG_DIR" 2>/dev/null || true
+mkdir -p "$LOG_DIR" "${NTP_PID_FILE%/*}" 2>/dev/null || true
 
 log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo unknown-time)" "$*" >>"$LOG_FILE" 2>/dev/null || true

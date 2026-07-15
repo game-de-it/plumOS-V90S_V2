@@ -3,9 +3,11 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 SYSTEM_SETTINGS="${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/settings.json}"
-LOG="${PLUMOS_VOLUME_LOG:-/tmp/.plumos_volume_set}"
-RUNTIME_STATE="${PLUMOS_VOLUME_RUNTIME_STATE:-$PLUMOS_ROOT/state/runtime/volume}"
+LOG="${PLUMOS_VOLUME_LOG:-/run/plumos/volume/last-apply.log}"
+RUNTIME_STATE="${PLUMOS_VOLUME_RUNTIME_STATE:-/run/plumos/volume/current}"
 HEADPHONE_MAX="${PLUMOS_V90S_HEADPHONE_VOLUME_MAX:-7}"
+
+mkdir -p "${LOG%/*}" "${RUNTIME_STATE%/*}" 2>/dev/null || true
 
 find_cmd() {
   for path in "$@"; do

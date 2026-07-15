@@ -8,7 +8,7 @@ export PATH
 ROOTFS_POWER_ACTION="${PLUMOS_POWER_ACTION_ROOTFS_HELPER:-/usr/sbin/plumos-power-action}"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${PLUMOS_POWER_ACTION_LOG:-${LOG_DIR}/power-action.log}"
-LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/tmp/plumos-safe-shutdown.lock}"
+LOCK_DIR="${PLUMOS_POWER_ACTION_LOCK:-/run/plumos/safe-shutdown.lock}"
 
 ACTION=shutdown
 POWER_OFF=0
@@ -46,7 +46,7 @@ delegate_to_rootfs_power_action() {
   if has_arg --reboot "$@" || has_arg --poweroff "$@"; then
     PLUMOS_ROOT="$PLUMOS_ROOT" \
     PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}" \
-    PLUMOS_POWER_ACTION_LOG="${PLUMOS_POWER_ACTION_ROOTFS_LOG:-/run/plumos-power-action.log}" \
+    PLUMOS_POWER_ACTION_LOG="${PLUMOS_POWER_ACTION_ROOTFS_LOG:-/run/plumos/power-action.log}" \
       "$ROOTFS_POWER_ACTION" "$@" </dev/null >/dev/null 2>&1 &
     echo "result=power_action_scheduled"
     exit 0
@@ -221,7 +221,7 @@ run_final_command_with_watchdog() {
   marker=""
   watchdog_pid=""
   if [ "$FINAL_WATCHDOG_SEC" -gt 0 ] 2>/dev/null && [ -w /proc/sysrq-trigger ]; then
-    marker="/tmp/plumos-final-action.$$.$name"
+    marker="/run/plumos/final-action.$$.$name"
     if : > "$marker" 2>/dev/null; then
       (
         sleep "$FINAL_WATCHDOG_SEC" 2>/dev/null || true

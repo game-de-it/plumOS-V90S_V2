@@ -4,7 +4,8 @@ set -u
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
-RUN_DIR="${PLUMOS_V90S_RUN_DIR:-/run/plumos-v90s}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_V90S_RUN_DIR:-$RUNTIME_ROOT/retroarch}"
 RETROARCH_PID_FILE="$RUN_DIR/retroarch.pid"
 LAUNCHER_PID_FILE="$RUN_DIR/retroarch-launch.pid"
 STOP_WAIT_SECONDS="${PLUMOS_V90S_STOP_WAIT_SECONDS:-5}"

@@ -4,10 +4,12 @@ set -u
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
 SHARE_DIR="${PLUMOS_NETWORK_SHARE_DIR:-${PLUMOS_SDCARD_ROOT}}"
-RUN_DIR="${PLUMOS_ROOT}/run"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_NETWORK_SERVICES_RUN_DIR:-$RUNTIME_ROOT/network-services}"
+SSH_RUN_DIR="${PLUMOS_SSH_RUN_DIR:-$RUNTIME_ROOT/ssh}"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 CONFIG_DIR="${PLUMOS_ROOT}/config/network"
-SAMBA_RUNTIME_DIR="${PLUMOS_SAMBA_RUNTIME_DIR:-/tmp/plumos-samba}"
+SAMBA_RUNTIME_DIR="${PLUMOS_SAMBA_RUNTIME_DIR:-$RUNTIME_ROOT/samba}"
 SAMBA_PRIVATE_DIR="${SAMBA_RUNTIME_DIR}/private"
 SAMBA_LOG_DIR="${SAMBA_RUNTIME_DIR}/log"
 FTP_PORT="${PLUMOS_FTP_PORT:-21}"
@@ -182,15 +184,15 @@ nmbd_pid_file() {
 }
 
 ssh_pid_file() {
-  if [ -s "${PLUMOS_ROOT}/ssh/run/sshd.pid" ]; then
-    printf '%s\n' "${PLUMOS_ROOT}/ssh/run/sshd.pid"
+  if [ -s "${SSH_RUN_DIR}/sshd.pid" ]; then
+    printf '%s\n' "${SSH_RUN_DIR}/sshd.pid"
     return
   fi
-  if [ -s "${PLUMOS_ROOT}/ssh/run/dropbear.pid" ]; then
-    printf '%s\n' "${PLUMOS_ROOT}/ssh/run/dropbear.pid"
+  if [ -s "${SSH_RUN_DIR}/dropbear.pid" ]; then
+    printf '%s\n' "${SSH_RUN_DIR}/dropbear.pid"
     return
   fi
-  printf '%s\n' "${PLUMOS_ROOT}/ssh/run/sshd.pid"
+  printf '%s\n' "${SSH_RUN_DIR}/sshd.pid"
 }
 
 kill_ftp_children() {

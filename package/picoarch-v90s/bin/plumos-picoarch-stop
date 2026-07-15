@@ -2,8 +2,9 @@
 set -eu
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 PICOARCH_BIN="${PLUMOS_PICOARCH_BIN:-$PLUMOS_ROOT/picoarch/bin/picoarch}"
-PID_FILE="$PLUMOS_ROOT/state/picoarch/runtime.pid"
+PID_FILE="$RUNTIME_ROOT/picoarch/runtime.pid"
 
 [ -r "$PID_FILE" ] || exit 0
 pid="$(cat "$PID_FILE")"
