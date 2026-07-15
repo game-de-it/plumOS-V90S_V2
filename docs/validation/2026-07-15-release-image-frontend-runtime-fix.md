@@ -62,4 +62,6 @@ hash, and the four frontend runtime files. The tested `-2` SD was also patched
 with the same wrapper and libraries and safely unmounted for a quick device
 retest without rewriting the whole image.
 
-Real-device frontend display after this runtime fix remains to be confirmed.
+The patched `-2` SD subsequently booted the frontend on real hardware. The
+follow-up Wi-Fi runtime findings are recorded in
+`2026-07-15-release-wifi-runtime-fix.md`.

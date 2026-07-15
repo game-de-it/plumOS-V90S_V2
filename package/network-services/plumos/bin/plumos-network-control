@@ -19,7 +19,8 @@ WIFI_IFACE="${PLUMOS_WIFI_INTERFACE:-auto}"
 WIFI_IFACE_WAIT_SECONDS="${PLUMOS_WIFI_IFACE_WAIT_SECONDS:-5}"
 WPA_WAIT_SECONDS="${PLUMOS_WPA_WAIT_SECONDS:-15}"
 DHCP_WAIT_SECONDS="${PLUMOS_DHCP_WAIT_SECONDS:-10}"
-SCAN_WAIT_SECONDS="${PLUMOS_WIFI_SCAN_WAIT_SECONDS:-2}"
+SCAN_WAIT_SECONDS="${PLUMOS_WIFI_SCAN_WAIT_SECONDS:-8}"
+UDHCPC_SCRIPT="${PLUMOS_UDHCPC_SCRIPT:-${PLUMOS_ROOT}/bin/plumos-udhcpc-script}"
 WPA_PID_FILE="${RUN_DIR}/wpa_supplicant.pid"
 ENSURE_WIFI_STAGE_FILE="${RUN_DIR}/ensure-wifi-stage.$$"
 NETWORK_SERVICES="${PLUMOS_ROOT}/bin/plumos-network-services"
@@ -308,9 +309,9 @@ iface_down() {
 get_iface_ip() {
   iface="$1"
   if ip_tool; then
-    ip -4 addr show dev "$iface" 2>/dev/null |
-      awk '/inet / { sub(/\/.*/, "", $2); print $2; exit }'
-    return 0
+    ip addr show dev "$iface" 2>/dev/null |
+      awk '/^[[:space:]]*inet / { sub(/\/.*/, "", $2); print $2; exit }'
+    return $?
   fi
   if command -v ifconfig >/dev/null 2>&1; then
     ifconfig "$iface" 2>/dev/null |
@@ -512,8 +513,13 @@ request_dhcp() {
   fi
 
   if command -v udhcpc >/dev/null 2>&1; then
-    run_limited 15 udhcpc -i "$iface" -n -q -t 5 -T 2 >> "$LOG_FILE" 2>&1 || true
-    return 0
+    if [ ! -x "$UDHCPC_SCRIPT" ]; then
+      log "dhcp hook missing path=${UDHCPC_SCRIPT}"
+      return 1
+    fi
+    run_limited 15 udhcpc -i "$iface" -n -q -t 5 -T 2 \
+      -s "$UDHCPC_SCRIPT" >> "$LOG_FILE" 2>&1
+    return $?
   fi
 
   log "dhcp client missing"
@@ -726,8 +732,13 @@ scan_networks() {
   if command -v wpa_cli >/dev/null 2>&1 &&
      wpa_cli -i "$iface" ping 2>/dev/null | grep -q PONG; then
     wpa_cli -i "$iface" scan >> "$LOG_FILE" 2>&1 || true
-    sleep "$SCAN_WAIT_SECONDS"
-    if wpa_cli -i "$iface" scan_results 2>/dev/null |
+    scan_results="${RUN_DIR}/scan-results.$$"
+    scan_rows="${RUN_DIR}/scan-rows.$$"
+    scan_elapsed=0
+    while [ "$scan_elapsed" -lt "$SCAN_WAIT_SECONDS" ]; do
+      sleep 1
+      scan_elapsed=$((scan_elapsed + 1))
+      wpa_cli -i "$iface" scan_results > "$scan_results" 2>/dev/null || true
       awk '
         BEGIN { FS = "\t" }
         NR > 1 {
@@ -741,11 +752,20 @@ scan_networks() {
           security = ($4 ~ /WPA|WEP/) ? "secured" : "open"
           print "network\t" security "\t" $3 "\t" ssid
         }
-      '; then
-      log "scan completed source=wpa_cli iface=${iface}"
-      [ "$started_for_scan" -eq 1 ] && stop_wifi_processes "$iface"
-      return 0
-    fi
+      ' "$scan_results" > "$scan_rows"
+      if [ -s "$scan_rows" ]; then
+        cat "$scan_rows"
+        network_count="$(wc -l < "$scan_rows" | tr -d '[:space:]')"
+        log "scan completed source=wpa_cli iface=${iface} networks=${network_count} wait=${scan_elapsed}s"
+        rm -f "$scan_results" "$scan_rows" 2>/dev/null || true
+        [ "$started_for_scan" -eq 1 ] && stop_wifi_processes "$iface"
+        return 0
+      fi
+    done
+    rm -f "$scan_results" "$scan_rows" 2>/dev/null || true
+    log "scan completed source=wpa_cli iface=${iface} networks=0 wait=${scan_elapsed}s"
+    [ "$started_for_scan" -eq 1 ] && stop_wifi_processes "$iface"
+    return 0
   fi
 
   if command -v iwlist >/dev/null 2>&1; then

@@ -480,6 +480,12 @@ Build plumOS V90S as a V90S-specific distribution:
   `tcpsvd`, and `ftpd`; recover the live V90S from a partial app-layer copy.
 - [x] Recover USB Wi-Fi from `wpa_state=COMPLETED` with no IPv4 by renewing DHCP
   and restarting enabled services after address acquisition.
+- [x] Restore Wi-Fi scanning and connection in the release-system image: keep
+  `wpa_supplicant`, `wpa_cli`, `iw`, and regulatory data in p5; poll Realtek
+  scan results for up to eight seconds; and apply BusyBox `udhcpc` leases with
+  the app-owned DHCP hook in p7. Live validation found `example-wifi-2`, acquired
+  `192.0.2.120`, installed the default route and DNS, and reached the
+  gateway.
 - [x] Route SFTP through the app-layer subsystem, validate SFTP OFF/ON without
   stopping SSH, and restrict SSH process adoption to the real listener.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi

@@ -1,0 +1,40 @@
+#!/bin/sh
+set -u
+
+interface="${interface:-}"
+action="${1:-}"
+
+[ -n "$interface" ] || exit 1
+
+case "$action" in
+  deconfig)
+    ifconfig "$interface" 0.0.0.0 up
+    ;;
+  bound|renew)
+    [ -n "${ip:-}" ] || exit 1
+    subnet="${subnet:-255.255.255.0}"
+    if [ -n "${broadcast:-}" ]; then
+      ifconfig "$interface" "$ip" netmask "$subnet" broadcast "$broadcast" up
+    else
+      ifconfig "$interface" "$ip" netmask "$subnet" up
+    fi
+
+    route del default dev "$interface" 2>/dev/null || true
+    for gateway in ${router:-}; do
+      route add default gw "$gateway" dev "$interface"
+      break
+    done
+
+    if [ -n "${dns:-}" ]; then
+      : > /etc/resolv.conf
+      for server in $dns; do
+        printf 'nameserver %s\n' "$server" >> /etc/resolv.conf
+      done
+      if [ -n "${domain:-}" ]; then
+        printf 'search %s\n' "$domain" >> /etc/resolv.conf
+      fi
+    fi
+    ;;
+esac
+
+exit 0
