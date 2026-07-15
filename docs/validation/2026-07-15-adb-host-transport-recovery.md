@@ -90,3 +90,38 @@ not PicoArch changing USB state and not `adbd` timing out. The earlier failure
 recorded on 2026-07-12, where the V90S UDC itself became `not attached`, remains
 a separate physical-link/device-gadget failure mode and is recovered by
 restarting the device-side ADB service over SSH.
+
+## Later physical-link occurrence
+
+After the PicoArch validation was complete, ADB disappeared again at
+`12:56:41`. This time the host helper correctly did not restart the ADB server:
+
+```text
+usb_enumerated=0
+transport_ready=0
+```
+
+Wi-Fi, the frontend, and the OS remained alive. The V90S kernel recorded an
+actual link loss rather than only a host transport failure:
+
+```text
+ERR : dev->driver=..., dev->gadget.speed=0
+android_work: sent uevent USB_STATE=DISCONNECTED
+```
+
+Device status agreed:
+
+```text
+running=1
+ffs_mounted=1
+gadget_bound=0
+udc_state=not attached
+state=stopped
+```
+
+Starting only `plumos-adbd` over SSH rebuilt and rebound the gadget, producing
+`gadget_bound=1` and `state=waiting_usb`. The UDC remained `not attached` and
+macOS still had no USB device, proving that the remaining condition was the
+physical cable/hub link rather than PicoArch, the frontend, or the host ADB
+server. No periodic recovery poll was added; the audio-sensitive runtime should
+not gain another timer loop merely to conceal a physically absent USB link.
