@@ -84,6 +84,8 @@ git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-frame-audio-callback.patch"
 git -C "$SRC" apply --recount \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-async-audio-callback.patch"
+git -C "$SRC" apply --recount --unidiff-zero \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-display-audio-rate.patch"
 
 perl -0pi -e 's{#include "core\.h"}{#include "core.h"\n#include "picoarch_v90s_host.h"} or die "host interface include marker missing\n";
   s~\tcase RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY: \{ /\* 30 \*/~\tcase RETRO_ENVIRONMENT_GET_PERF_INTERFACE: { /* 28 */\n\t\treturn v90s_get_perf_interface(data);\n\t}\n\tcase RETRO_ENVIRONMENT_GET_VFS_INTERFACE: { /* 45 | experimental */\n\t\treturn v90s_get_vfs_interface(data, core_path);\n\t}\n\tcase RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY: { /* 30 */~ or die "host interface environment marker missing\n"' \

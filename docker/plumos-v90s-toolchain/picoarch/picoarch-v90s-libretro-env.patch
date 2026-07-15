@@ -34,7 +34,7 @@
  	case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: { /* 23 */
          struct retro_rumble_interface *iface =
             (struct retro_rumble_interface*)data;
-@@ -410,12 +424,30 @@ static bool pa_environment(unsigned cmd, void *data) {
+@@ -410,12 +424,36 @@ static bool pa_environment(unsigned cmd, void *data) {
  			log_cb->log = pa_log;
  		break;
  	}
@@ -62,15 +62,12 @@
 +		        geometry->aspect_ratio);
 +		break;
 +	}
++	case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE: { /* 47 | experimental */
++		int *out = (int *)data;
++		if (out)
++			*out = 3; /* Video and audio are both enabled. */
++		break;
++	}
  	case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS: { /* 52 */
  		bool *out = (bool *)data;
  		if (out)
-@@ -482,7 +514,7 @@ static bool pa_environment(unsigned cmd, void *data) {
- 		break;
- 	}
- 	default:
--		PA_DEBUG("Unsupported environment cmd: %u\n", cmd);
-+		PA_WARN("Unsupported environment cmd: %u\n", cmd);
- 		return false;
- 	}
- 

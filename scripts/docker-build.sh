@@ -25,6 +25,7 @@ Commands:
   quicknes         Compatibility alias for the current QuickNES-only core build.
   userland         Build plumOS BusyBox and command-line tools.
   network-services Build plumOS FTP/SFTP/Samba service package and FTP userland dependencies.
+  audio-router     Build the lightweight ALSA hotplug routing plugin.
   nextcommander    Build the V90S NextCommander file manager app.
   file-manager     Alias for nextcommander.
   music-player     Build the V90S plumOS Music Player app.
@@ -193,6 +194,10 @@ case "$cmd" in
             *) docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-busybox.sh ;;
         esac
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-network-services.sh "$@"
+        ;;
+    audio-router|audio-output)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-audio-router.sh "$@"
         ;;
     nextcommander|file-manager|filemanager)
         ensure_image

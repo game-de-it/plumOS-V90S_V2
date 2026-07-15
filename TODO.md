@@ -664,10 +664,21 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Write RetroArch launch and runtime logs to the app layer.
 - [x] Route normal app audio through the shared `plumos_output` ALSA PCM.
 - [x] Downmix left and right channels for the built-in mono speaker.
-- [x] Preserve stereo and automatically select a USB DAC detected at app launch.
+- [x] Preserve stereo and automatically select a USB DAC, including insertion
+  and removal while an application stream remains open.
 - [x] Validate left/right stereo separation with a physical USB DAC. The
   CX31993 was detected as ALSA card 1 and the user heard the long left-channel
   tone and short right-channel tones separately through `usb_stereo`.
+- [x] Build and package the process-local ALSA hotplug ioplug. Active RetroArch,
+  PicoArch, and standalone YabaSanshiro streams now migrate between the
+  built-in mono route and CX31993 stereo output without restarting the app.
+- [x] Preserve RetroArch fast-forward while using the hotplug route. Only the
+  RetroArch launcher enables bounded fast-producer drops; normal playback and
+  the transition out of fast-forward were confirmed without audio breakup.
+- [x] Decouple PicoArch presentation from the 58.955 Hz LCD clock. QuickNES now
+  keeps native 48 kHz audio and normal pitch while the framebuffer presenter
+  runs on a separate thread. The user confirmed clean USB DAC playback; the
+  remaining scrolling cadence matched RetroArch on a second test game.
 - [x] Keep Pulse/PipeWire out of the normal path; direct hardware playback is an
   explicit diagnostic only.
 - [x] Replace fixed/OC CPU-frequency presets with dynamic V90S governors:

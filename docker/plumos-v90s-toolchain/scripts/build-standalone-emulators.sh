@@ -627,6 +627,7 @@ audio_status=$(${AUDIO_OUTPUT_HELPER} prepare 2>&1) || {
   exit 49
 }
 export ALSA_CONFIG_PATH=${PLUMOS_ALSA_CONFIG_PATH:-${PLUMOS_RUNTIME_ROOT}/audio/asound.conf}
+export ALSA_PLUGIN_DIR=${PLUMOS_ALSA_PLUGIN_DIR:-${PLUMOS_ROOT}/lib/alsa-lib}
 export AUDIODEV=${AUDIODEV:-plumos_output}
 printf 'audio_device=%s alsa_config=%s %s\n' "${AUDIODEV}" "${ALSA_CONFIG_PATH}" \
   "$(printf '%s' "${audio_status}" | tr '\n' ' ')" >>"${LOG_ROOT}/launcher.log"

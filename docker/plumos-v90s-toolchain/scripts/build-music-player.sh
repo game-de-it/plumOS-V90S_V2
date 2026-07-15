@@ -137,6 +137,7 @@ audio_status="$(${AUDIO_OUTPUT_HELPER} prepare 2>&1)" || {
   exit 49
 }
 export ALSA_CONFIG_PATH="${PLUMOS_ALSA_CONFIG_PATH:-/run/plumos/audio/asound.conf}"
+export ALSA_PLUGIN_DIR="${PLUMOS_ALSA_PLUGIN_DIR:-${PLUMOS_ROOT}/lib/alsa-lib}"
 export PLUMOS_MUSIC_ALSA_DEVICE="${PLUMOS_MUSIC_ALSA_DEVICE:-${PLUMOS_MUSIC_PLAYER_AUDIO_DEVICE:-plumos_output}}"
 printf 'audio_device=%s alsa_config=%s %s\n' "${PLUMOS_MUSIC_ALSA_DEVICE}" \
   "${ALSA_CONFIG_PATH}" "$(printf '%s' "${audio_status}" | tr '\n' ' ')" >>"${LOG_DIR}/music-player.log"

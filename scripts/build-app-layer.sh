@@ -12,6 +12,7 @@ sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
 frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
 userland_dir="${PLUMOS_V90S_USERLAND_DIR:-output/userland/v90s}"
 network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-services/v90s}"
+audio_router_dir="${PLUMOS_V90S_AUDIO_ROUTER_DIR:-output/audio-router/v90s}"
 nextcommander_dir="${PLUMOS_V90S_NEXTCOMMANDER_DIR:-output/nextcommander/v90s}"
 music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
 standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
@@ -39,6 +40,7 @@ Options:
   --userland-dir PATH    BusyBox/command tools payload; default output/userland/v90s.
   --network-services-dir PATH
                           FTP/SFTP/Samba payload; default output/network-services/v90s.
+  --audio-router-dir PATH Audio hotplug runtime; default output/audio-router/v90s.
   --nextcommander-dir PATH
                           NextCommander payload; default output/nextcommander/v90s.
   --music-player-dir PATH Music Player payload; default output/music-player/v90s.
@@ -94,6 +96,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --network-services-dir)
             network_services_dir="$2"
+            shift 2
+            ;;
+        --audio-router-dir)
+            audio_router_dir="$2"
             shift 2
             ;;
         --nextcommander-dir)
@@ -229,6 +235,7 @@ mkdir -p \
     "$out_dir/gnu/libexec" \
     "$out_dir/lib/plumos-sdl2-powervr" \
     "$out_dir/apps" \
+    "$out_dir/audio-router" \
     "$out_dir/cores" \
     "$out_dir/info" \
     "$out_dir/frontend" \
@@ -293,6 +300,20 @@ if require_or_note_missing "$network_services_root/bin/plumos-network-services" 
     if [ -f "$network_services_dir/network-services.manifest" ]; then
         copy_file "$network_services_dir/network-services.manifest" "$out_dir/licenses/network-services-manifest.txt"
         record_file "licenses/network-services-manifest.txt" "network-services" "$network_services_dir/network-services.manifest"
+    fi
+fi
+
+audio_router_root="$audio_router_dir/plumos"
+if require_or_note_missing "$audio_router_root/lib/alsa-lib/libasound_module_pcm_plumos_hotplug.so" "audio-router"; then
+    copy_tree "$audio_router_root" "$out_dir"
+    record_tree "$audio_router_root" "audio-router" "$audio_router_root"
+    if [ -f "$audio_router_dir/audio-router.manifest" ]; then
+        copy_file "$audio_router_dir/audio-router.manifest" "$out_dir/licenses/audio-router-manifest.txt"
+        record_file "licenses/audio-router-manifest.txt" "audio-router" "$audio_router_dir/audio-router.manifest"
+    fi
+    if [ -d "$audio_router_dir/licenses" ]; then
+        copy_tree "$audio_router_dir/licenses" "$out_dir/licenses/audio-router"
+        record_mapped_tree "$audio_router_dir/licenses" "licenses/audio-router" "audio-router-license" "$audio_router_dir/licenses"
     fi
 fi
 
@@ -518,7 +539,7 @@ fi
     printf '  "libretro_core_count": %s,\n' "$core_count"
     printf '  "minimum_libretro_core_count": %s,\n' "$minimum_core_count"
     printf '  "directories": [\n'
-    printf '    "bin", "lib", "apps", "cores", "info", "frontend", "picoarch", "standalone",\n'
+    printf '    "bin", "lib", "apps", "audio-router", "cores", "info", "frontend", "picoarch", "standalone",\n'
     printf '    "config", "fonts", "share", "state", "themes", "Images", "media",\n'
     printf '    "roms", "bios", "Saves", "States", "Screenshots", "Logs",\n'
     printf '    "updates", "licenses"\n'

@@ -52,19 +52,30 @@ bash -n package/picoarch-v90s/bin/plumos-picoarch-launch
 git diff --check
 ```
 
-The final diagnostic-free binary was copied to:
+The original diagnostic-free EasyRPG validation binary was copied to:
 
 ```text
 /mnt/plumos/picoarch/bin/picoarch
 ```
 
-Host and device SHA-256:
+Original host and device SHA-256:
 
 ```text
 c996ae4fbf4c23ea0a4c9a7177353a2d9288a2018e78c378c907ec93a5d18d07
 ```
 
-The final binary contains no `VIDEO_PROBE` diagnostic logging.
+That binary contained no `VIDEO_PROBE` diagnostic logging.
+
+The 2026-07-16 consolidated PicoArch build retains the same asynchronous audio
+callback lifecycle and adds threaded V90S framebuffer presentation plus the
+shared ALSA hotplug route. Its SHA-256 is:
+
+```text
+df82476720649ccdeba2a39ca3e84e2c8d96da93beda36447d99b62f3f12f400
+```
+
+See `2026-07-15-v90s-alsa-mono-usb-audio.md` for the consolidated timing and
+USB DAC validation.
 
 ## Physical V90S result
 

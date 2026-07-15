@@ -687,6 +687,8 @@ prepare_audio_output() {
         return 1
     }
     export ALSA_CONFIG_PATH="${PLUMOS_ALSA_CONFIG_PATH:-$RUNTIME_ROOT/audio/asound.conf}"
+    export ALSA_PLUGIN_DIR="${PLUMOS_ALSA_PLUGIN_DIR:-${PLUMOS_ROOT:-/mnt/plumos}/lib/alsa-lib}"
+    export PLUMOS_AUDIO_FAST_FORWARD_DROP=1
     log "retroarch-launch: audio output prepared: $(printf '%s' "$audio_status" | tr '\n' ' ')"
 }
 

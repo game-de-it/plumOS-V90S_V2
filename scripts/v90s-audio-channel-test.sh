@@ -58,5 +58,5 @@ echo "Playing left continuous tone, then right short tones (mode=$MODE)."
 if [ "$MODE" = raw ]; then
   "$@" shell "aplay -q -D hw:0,0 '$REMOTE_WAV'"
 else
-  "$@" shell "/mnt/plumos/bin/plumos-audio-output prepare && ALSA_CONFIG_PATH=/run/plumos/audio/asound.conf aplay -q -D plumos_output '$REMOTE_WAV'"
+  "$@" shell "/mnt/plumos/bin/plumos-audio-output prepare && ALSA_CONFIG_PATH=/run/plumos/audio/asound.conf ALSA_PLUGIN_DIR=/mnt/plumos/lib/alsa-lib aplay -q -D plumos_output '$REMOTE_WAV'"
 fi

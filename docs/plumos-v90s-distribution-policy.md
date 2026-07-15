@@ -835,24 +835,51 @@ bind directly to a numbered hardware card.
   `0.5 * left + 0.5 * right` to both hardware channels of `hw:<card>,0`. The
   built-in speaker therefore receives all stereo content as mono without
   clipping the sum.
-- When a USB playback card is present at application launch,
-  `plumos_output` selects that card through an ALSA `plug` PCM and preserves
+- When a USB playback card is present, `plumos_output` selects it and preserves
   two-channel stereo.
 - `plumos-audio-output prepare` owns runtime detection and atomically writes
   `/run/plumos/audio/asound.conf` and `/run/plumos/audio/output.status`.
+- `plumos_output` is backed by the plumOS-owned ALSA ioplug
+  `libasound_module_pcm_plumos_hotplug.so`. The plugin runs inside the
+  application process, monitors playback-card availability without a daemon,
+  and migrates an already-open stream between the built-in codec and a USB DAC.
 - RetroArch, PicoArch, standalone emulators, and plumOS Music Player must run
   the helper before opening audio and must export the generated file through
-  `ALSA_CONFIG_PATH`.
+  `ALSA_CONFIG_PATH` and the plugin directory through `ALSA_PLUGIN_DIR`.
+- RetroArch alone enables the bounded nonblocking producer policy needed for
+  fast-forward. PicoArch, standalone emulators, and Music Player use blocking
+  physical writes so ordinary playback cannot discard samples.
 - Failure to detect or configure a valid output is fatal to that application
   launch. The normal path must not silently fall back to `hw:0,0`.
 - Direct `hw:0,0` playback remains available only in explicit audio diagnostics.
-- USB DAC hotplug is evaluated at application launch. Connect the DAC before
-  starting or restarting an application; an already-open ALSA stream is not
-  transparently migrated.
+- USB DAC insertion and removal during gameplay must not require restarting the
+  emulator. Physical USB disconnect errors are recorded by the vendor kernel;
+  the normal application route follows the resulting ALSA card state.
 
 This route does not require PulseAudio or PipeWire. The StockOS-era
 `auto_mono_output` script is retained as design evidence, but its PulseAudio
-daemon and sink-monitoring model is not part of the plumOS runtime.
+daemon and sink-monitoring model is not part of the plumOS runtime. A
+PulseAudio migration prototype reduced even Game Boy content to about 36 FPS
+on the physical V90S and is explicitly rejected as the normal route.
+
+### PicoArch Timing Policy
+
+PicoArch must keep emulation and audio on the core's native clock. The fixed
+V90S LCD refresh must not be used as the audio clock.
+
+- `PLUMOS_PICOARCH_AUDIO_TARGET_FPS=0` is the normal setting. It preserves the
+  core sample rate and normal pitch.
+- A fixed `58.955` audio target remains a diagnostic option only. It removes
+  underfeed when video and audio share the LCD clock, but lowers pitch and is
+  not an acceptable default.
+- V90S framebuffer conversion and presentation run on a dedicated thread. The
+  emulation thread queues the newest RGB565 frame without waiting for LCD
+  VBlank, matching the proven RetroArch `video_threaded=true` ownership split.
+- The LCD is approximately 58.955 Hz while NTSC NES content is approximately
+  60.10 FPS. Small cadence differences shared with RetroArch are a hardware
+  display boundary, not a reason to slow the core or alter audio pitch.
+- Cores that register the libretro asynchronous-audio callback continue to use
+  PicoArch's dedicated callback thread and must stop it before core unload.
 
 ## Validation Policy
 

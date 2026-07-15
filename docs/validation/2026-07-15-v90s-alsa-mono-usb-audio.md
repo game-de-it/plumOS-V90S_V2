@@ -1,6 +1,6 @@
 # V90S ALSA mono speaker and USB DAC routing validation
 
-Date: 2026-07-15
+Date: 2026-07-15 (updated 2026-07-16)
 
 ## Purpose
 
@@ -39,15 +39,22 @@ The user confirmed both audible patterns after the ALSA route was applied.
 
 ## Runtime implementation
 
-`/mnt/plumos/bin/plumos-audio-output prepare` detects the playback route at
-each application launch and writes:
+`/mnt/plumos/bin/plumos-audio-output prepare` installs the logical
+`plumos_output` PCM and writes:
 
 ```text
 /run/plumos/audio/asound.conf
 /run/plumos/audio/output.status
 ```
 
-With the built-in codec, the generated transfer table is:
+`plumos_output` loads the process-local plugin:
+
+```text
+/mnt/plumos/lib/alsa-lib/libasound_module_pcm_plumos_hotplug.so
+```
+
+The plugin opens the current physical PCM at the rate, period, and buffer size
+negotiated by the application. With the built-in codec, each frame is mixed as:
 
 ```text
 left input  -> left hardware output  * 0.5
@@ -61,9 +68,10 @@ summed. On the current hardware the audible speaker is the right physical
 output, but duplicating the mix to both channels keeps the route independent of
 that board-level detail.
 
-When a USB playback card is present, the generated logical PCM is an ALSA
-`plug` connected to `hw:<usb-card>,0`. It does not apply the mono transfer table.
-The selected route is recorded as `mode=usb_stereo`.
+When a USB playback card is present, the plugin opens `hw:<usb-card>,0` and
+preserves the stereo samples. It checks card availability during transfer and
+can replace the physical handle while the logical application stream remains
+open. The selected route is recorded as `mode=usb_stereo`.
 
 The shared route is used by:
 
@@ -74,6 +82,10 @@ The shared route is used by:
 
 No launcher silently falls back to raw internal audio if route preparation
 fails. A route failure is reported and that application launch stops.
+
+No audio server or monitor daemon is involved. RetroArch enables a bounded
+nonblocking mode for fast-forward only. PicoArch, standalone emulators, and the
+Music Player keep blocking physical writes for ordinary playback.
 
 ## Verification evidence
 
@@ -92,8 +104,8 @@ Host fixture coverage also confirmed:
 
 - internal `audiocodec` selects `internal_mono`
 - a USB playback card takes priority and selects `usb_stereo`
-- an invalid explicit `PLUMOS_USB_AUDIO_CARD` is rejected instead of falling
-  back to the internal card
+- the generated ALSA configuration points to the packaged ioplug rather than a
+  numbered hardware PCM
 
 The live vendor kernel reports:
 
@@ -128,14 +140,65 @@ pcm=plumos_output
 alsa_config_path=/run/plumos/audio/asound.conf
 ```
 
-The generated USB configuration used an ALSA `plug` PCM connected directly to
-`hw:1,0`; it contained no mono route table. The channel identification test
-completed successfully, and the user confirmed that the continuous left tone
-and short right tones were audible from their respective channels through the
-USB DAC.
+The channel identification test completed successfully, and the user confirmed
+that the continuous left tone and short right tones were audible from their
+respective channels through the USB DAC.
 
-Connect the DAC before launching or relaunching an application. Active ALSA
-streams are not migrated during hotplug.
+## Active-stream hotplug validation
+
+The same running RetroArch process was observed opening:
+
+```text
+/dev/snd/pcmC1D0p -> /dev/snd/pcmC0D0p -> /dev/snd/pcmC1D0p
+```
+
+while the CX31993 was removed and inserted. The ROM and RetroArch process were
+not restarted. The user confirmed normal internal mono audio, normal USB stereo
+audio, stable FPS, working fast-forward, and normal audio after leaving
+fast-forward.
+
+Standalone YabaSanshiro initially exposed a 44.1 kHz/period mismatch. Matching
+the application's negotiated physical period and buffer removed the noise. The
+user then confirmed normal internal output, normal USB DAC output, and repeated
+DAC removal/insertion during the same game.
+
+PicoArch QuickNES required a separate timing fix. Its synchronous framebuffer
+presentation had tied the approximately 60.10 FPS NES core to the 58.955 Hz LCD,
+causing recurring ALSA underfeed. A fixed 58.955 audio ratio removed breakup but
+lowered pitch, so it was rejected. The accepted build keeps native 48 kHz audio
+and presents framebuffer frames from a dedicated nonblocking thread. The user
+confirmed perfect USB DAC audio and normal pitch. A second game showed that the
+remaining scrolling cadence matched RetroArch on this LCD.
+
+The final physical route status was:
+
+```text
+mode=usb_stereo
+router=alsa_ioplug_hotplug
+card=1
+physical_pcm=hw:1,0
+pcm=plumos_output
+```
+
+The final PicoArch binary SHA-256 is:
+
+```text
+df82476720649ccdeba2a39ca3e84e2c8d96da93beda36447d99b62f3f12f400
+```
+
+The final strict app-layer was deployed incrementally and validated with:
+
+```text
+app_layer=ready
+version=0.1.0-dev
+vendor=v90s-stockos-r1
+```
+
+## Rejected PulseAudio prototype
+
+A minimal PulseAudio sink-migration prototype could move streams, but reduced
+Game Boy emulation to about 36 FPS on the real V90S. It was removed. The final
+runtime uses ALSA only and does not leave a polling or sink-monitor process.
 
 ## Frontend startup incident during validation
 
