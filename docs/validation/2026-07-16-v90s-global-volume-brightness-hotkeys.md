@@ -41,10 +41,10 @@ the same service.
 
 `plumos-volume-control` remains the single 0..20 volume policy:
 
-- the internal speaker uses the StockOS `Headphone` / `HpSpeaker` ALSA mixer;
-- a USB DAC uses software gain in
-  `libasound_module_pcm_plumos_hotplug.so`, because the DAC is not guaranteed
-  to expose a writable hardware mixer;
+- the internal speaker and USB DAC both use 0..20 software gain in
+  `libasound_module_pcm_plumos_hotplug.so`;
+- the internal path keeps the StockOS `Headphone` / `HpSpeaker` ALSA controls
+  as a fixed output stage and mute switch;
 - the running ALSA plugin reads `/run/plumos/volume/current` first and falls
   back to `/mnt/plumos/config/system/settings.json`.
 
@@ -118,8 +118,10 @@ Deployed hashes:
 ac1e43cc85fa1f397a68e755067327138191dc9df1f0551638c2f098d31d19b4  bin/plumos-hardware-keys
 f069e5eef651f4c2726c1a05e84466a945bc43df4f411153005587763b364ed3  bin/plumos-hardware-keys-service
 5d407cc78e0eef5623c7c7e63f6e18d21c61ba295d6fcf69686feb5ec3d5e942  bin/plumos-display-control
+3ef2f7f48b86c349163ab1b686388f93616ba4217dfcc2afa1417a0bc5c363ea  bin/plumos-volume-control
+4c39d37ac0cf2dc52f28634cfd702189e7c20c2f2b4e09d3f2f1d9236080fad9  bin/v90s-retroarch-launch
 26de5470ce52e738dbb946262bfa8f7584f458b8a4340345cee85198a513955a  bin/plumos-controller-ui-fbdev
-a70d131ef6d00f1b9d3a5be66a61d1294b065242984cab6e75c97c2719e6984c  lib/alsa-lib/libasound_module_pcm_plumos_hotplug.so
+5cefdad859b61bdb219fd65f980f20e866099730d905b6d27f2f7ad309d70030  lib/alsa-lib/libasound_module_pcm_plumos_hotplug.so
 ```
 
 ## Build validation
@@ -136,3 +138,38 @@ The following completed successfully:
 The rebuilt release-system squashfs is 73.13 MiB. A host-side fake-sysfs test
 also confirmed `plumos-display-control runtime-up` changes `5 -> 6`, writes
 `50 -> 60`, persists the JSON setting atomically, and removes transient state.
+
+## Internal volume correction
+
+The first live gameplay test found that physical key events and saved values
+changed, but relying on the seven-step `Headphone` mixer did not produce a
+useful audible volume range. The audio router was corrected so the same 0..20
+software gain used for USB output is also applied after internal stereo-to-mono
+mixing. For nonzero volume the hardware `Headphone` gain now remains fixed;
+volume zero still mutes the hardware output stage.
+
+Further live tests isolated the actual speaker gain control:
+
+- `Headphone` and `LINEOUT volume` changes produced no audible change.
+- plumOS software gain `20 -> 4` produced a clear change.
+- codec `DAC volume` `160 -> 32` produced a clear change.
+- the user tested increasing `DAC volume` manually and selected `190,190` as
+  the highest value without audible distortion.
+
+The final policy therefore fixes internal card 0 `DAC volume` at `190,190`
+during boot/service initialization and emulator launch, then applies the user
+0..20 setting only through software gain. USB-DAC playback remains stereo and
+does not use the internal card-0 mixer value.
+
+Live startup-path proof changed card 0 manually to `160,160`, restarted only
+`plumos-hardware-keys-service`, and observed:
+
+```text
+dac_before_service_restart=160,160
+dac_after_service_restart=190,190
+volume=20
+frontend_count=1
+game_pid=14776
+```
+
+The frontend and running standalone game were not restarted by this check.

@@ -6,6 +6,8 @@ SYSTEM_SETTINGS="${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/setti
 LOG="${PLUMOS_VOLUME_LOG:-/run/plumos/volume/last-apply.log}"
 RUNTIME_STATE="${PLUMOS_VOLUME_RUNTIME_STATE:-/run/plumos/volume/current}"
 HEADPHONE_MAX="${PLUMOS_V90S_HEADPHONE_VOLUME_MAX:-7}"
+DAC_VOLUME="${PLUMOS_V90S_DAC_VOLUME:-190}"
+AMIXER_CARD="${PLUMOS_V90S_AMIXER_CARD:-0}"
 
 mkdir -p "${LOG%/*}" "${RUNTIME_STATE%/*}" 2>/dev/null || true
 
@@ -26,7 +28,8 @@ usage() {
 Usage: plumos-volume-control init|apply [0..20]|up|down|step +/-N|get|status
        plumos-volume-control runtime-up|runtime-down|runtime-step +/-N|persist-runtime
 
-Controls the V90S StockOS ALSA speaker path through Headphone/HpSpeaker.
+Keeps the validated V90S internal DAC gain fixed and publishes the 0..20
+software-volume state consumed by the plumOS ALSA hotplug plugin.
 USAGE
 }
 
@@ -97,36 +100,23 @@ clear_runtime_volume_state() {
 
 backend_available() {
   [ -n "$AMIXER" ] || return 1
-  "$AMIXER" sget Headphone >/dev/null 2>&1 || return 1
-  "$AMIXER" sget HpSpeaker >/dev/null 2>&1 || return 1
+  "$AMIXER" -c "$AMIXER_CARD" sget Headphone >/dev/null 2>&1 || return 1
+  "$AMIXER" -c "$AMIXER_CARD" sget HpSpeaker >/dev/null 2>&1 || return 1
+  "$AMIXER" -c "$AMIXER_CARD" sget 'DAC volume' >/dev/null 2>&1 || return 1
   return 0
 }
 
-scale_headphone() {
-  volume="$1"
+fixed_headphone_gain() {
   max="$HEADPHONE_MAX"
   case "$max" in
     ""|*[!0-9]*) max=7 ;;
   esac
   [ "$max" -gt 7 ] && max=7
-  if [ "$volume" -le 0 ] || [ "$max" -le 0 ]; then
+  if [ "$max" -le 0 ]; then
     printf '%s\n' 0
     return 0
   fi
-  if [ "$max" -eq 7 ]; then
-    if [ "$volume" -le 7 ]; then
-      value=1
-    elif [ "$volume" -le 14 ]; then
-      value=2
-    else
-      value=$(( 2 + ((volume - 14) * 5 + 3) / 6 ))
-    fi
-  else
-    value=$(( (volume * max + 10) / 20 ))
-  fi
-  [ "$value" -lt 1 ] && value=1
-  [ "$value" -gt "$max" ] && value="$max"
-  printf '%s\n' "$value"
+  printf '%s\n' "$max"
 }
 
 init_backend() {
@@ -134,8 +124,14 @@ init_backend() {
     echo "V90S mixer backend unavailable" >"$LOG"
     return 1
   }
-  "$AMIXER" -q sset LINEOUT on >/dev/null 2>&1 || true
-  "$AMIXER" -q sset HpSpeaker on >/dev/null 2>&1 || true
+  case "$DAC_VOLUME" in
+    ""|*[!0-9]*) DAC_VOLUME=190 ;;
+  esac
+  [ "$DAC_VOLUME" -gt 255 ] && DAC_VOLUME=255
+  "$AMIXER" -q -c "$AMIXER_CARD" sset 'DAC volume' \
+    "$DAC_VOLUME,$DAC_VOLUME" >/dev/null 2>&1 || return 1
+  "$AMIXER" -q -c "$AMIXER_CARD" sset LINEOUT on >/dev/null 2>&1 || true
+  "$AMIXER" -q -c "$AMIXER_CARD" sset HpSpeaker on >/dev/null 2>&1 || true
   return 0
 }
 
@@ -149,19 +145,20 @@ apply_volume() {
     volume="$(read_runtime_volume)"
   fi
   init_backend || return 1
-  headphone="$(scale_headphone "$volume")"
+  headphone="$(fixed_headphone_gain)"
   if [ "$volume" -le 0 ]; then
-    "$AMIXER" -q sset Headphone 0 mute >"$LOG" 2>&1 || return 1
-    "$AMIXER" -q sset HpSpeaker off >>"$LOG" 2>&1 || true
+    "$AMIXER" -q -c "$AMIXER_CARD" sset Headphone 0 mute >"$LOG" 2>&1 || return 1
+    "$AMIXER" -q -c "$AMIXER_CARD" sset HpSpeaker off >>"$LOG" 2>&1 || true
   else
-    "$AMIXER" -q sset HpSpeaker on >"$LOG" 2>&1 || true
-    "$AMIXER" -q sset LINEOUT on >>"$LOG" 2>&1 || true
-    "$AMIXER" -q sset Headphone "$headphone" unmute >>"$LOG" 2>&1 || return 1
+    "$AMIXER" -q -c "$AMIXER_CARD" sset HpSpeaker on >"$LOG" 2>&1 || true
+    "$AMIXER" -q -c "$AMIXER_CARD" sset LINEOUT on >>"$LOG" 2>&1 || true
+    "$AMIXER" -q -c "$AMIXER_CARD" sset Headphone "$headphone" unmute >>"$LOG" 2>&1 || return 1
   fi
   {
     printf 'backend=v90s-stock-mixer\n'
     printf 'volume=%s\n' "$volume"
     printf 'headphone=%s\n' "$headphone"
+    printf 'dac_volume=%s,%s\n' "$DAC_VOLUME" "$DAC_VOLUME"
   } >>"$LOG"
 }
 
@@ -261,6 +258,10 @@ case "$cmd" in
     if backend_available; then
       printf 'backend=v90s-stock-mixer\n'
       printf 'volume=%s\n' "$(read_runtime_volume)"
+      printf 'dac_target=%s,%s\n' "$DAC_VOLUME" "$DAC_VOLUME"
+      actual_dac="$("$AMIXER" -c "$AMIXER_CARD" cget numid=8 2>/dev/null | \
+        sed -n 's/.*values=//p' | tail -n 1)"
+      printf 'dac_actual=%s\n' "${actual_dac:-unknown}"
       exit 0
     fi
     printf 'backend=unavailable\n'

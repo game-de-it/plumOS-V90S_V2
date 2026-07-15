@@ -396,10 +396,9 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
                 int16_t mono = (int16_t)(((int32_t)left + right) / 2);
                 left = mono;
                 right = mono;
-            } else {
-                left = apply_software_volume(left, pcm->volume_level);
-                right = apply_software_volume(right, pcm->volume_level);
             }
+            left = apply_software_volume(left, pcm->volume_level);
+            right = apply_software_volume(right, pcm->volume_level);
             pcm->output_buffer[frame * 2] = left;
             pcm->output_buffer[frame * 2 + 1] = right;
         }
@@ -426,7 +425,8 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
                         right = s16_input[frame * 2 + 1];
                     }
                     int32_t mixed = (int32_t)left + right;
-                    int16_t mono = (int16_t)(mixed / 2);
+                    int16_t mono = apply_software_volume(
+                        (int16_t)(mixed / 2), pcm->volume_level);
                     pcm->output_buffer[frame * 2] = mono;
                     pcm->output_buffer[frame * 2 + 1] = mono;
                 }

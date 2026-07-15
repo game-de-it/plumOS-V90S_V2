@@ -575,7 +575,9 @@ Build plumOS V90S as a V90S-specific distribution:
   physical Volume +/- changes the global 0..20 volume, while Select+Volume +/-
   changes the V90S display-enhance luminance. Keep the daemon independent of
   FE/emulator lifetime, rediscover evdev nodes by device name, debounce FAT32
-  setting writes, and route USB-DAC volume through the ALSA hotplug plugin.
+  setting writes, fix the validated internal codec DAC gain at `190,190`, and
+  route user volume for both speaker and USB-DAC through the ALSA hotplug
+  plugin's software gain.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.
