@@ -104,6 +104,61 @@ CONFIG_SND_USB_AUDIO=y
 USB Audio Class support is therefore built into the kernel rather than
 depending on a separately deployed module.
 
-Physical USB DAC left/right separation remains to be tested when a DAC is
-connected. Connect the DAC before launching or relaunching an application;
-active ALSA streams are not migrated during hotplug.
+## Physical USB DAC validation
+
+The CX31993 DAC was connected to the V90S OTG port while ADB remained connected
+through the separate USB port. The live device reported:
+
+```text
+Bus 001 Device 002: ID 3302:3365 TTGK Technology Co.,Ltd
+  CX31993 384Khz HIFI AUDIO
+
+0 [audiocodec]: audiocodec
+1 [AUDIO]: USB-Audio - CX31993 384Khz HIFI AUDIO
+```
+
+The managed route then selected:
+
+```text
+mode=usb_stereo
+card=1
+card_id=AUDIO
+physical_pcm=hw:1,0
+pcm=plumos_output
+alsa_config_path=/run/plumos/audio/asound.conf
+```
+
+The generated USB configuration used an ALSA `plug` PCM connected directly to
+`hw:1,0`; it contained no mono route table. The channel identification test
+completed successfully, and the user confirmed that the continuous left tone
+and short right tones were audible from their respective channels through the
+USB DAC.
+
+Connect the DAC before launching or relaunching an application. Active ALSA
+streams are not migrated during hotplug.
+
+## Frontend startup incident during validation
+
+After a reboot with the DAC connected, the frontend did not start. USB audio
+was not the cause: the CX31993 had already enumerated successfully as ALSA card
+1. The app-layer bootstrap stopped on:
+
+```text
+critical checksum failed: bin/plumos-controller-ui-fbdev
+```
+
+The deployed frontend binary itself matched the current formal app-layer
+artifact:
+
+```text
+babd87bb95fbb488432bfe960faae876105c32da70b001ecfc614af0f6bbc891
+```
+
+Only the device's `checksums.sha256` entry still contained an older frontend
+hash. Updating that single metadata entry made all ten bootstrap-critical files
+match their formal artifacts, `plumos-app-layer-bootstrap validate` returned
+`app_layer=ready`, and the frontend was restored as one process.
+
+The same boot also found a dirty p7 FAT filesystem and repaired damaged state
+and SSH configuration cluster chains. That filesystem damage and the stale
+incremental-deployment checksum are separate from USB DAC enumeration.

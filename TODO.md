@@ -665,7 +665,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Route normal app audio through the shared `plumos_output` ALSA PCM.
 - [x] Downmix left and right channels for the built-in mono speaker.
 - [x] Preserve stereo and automatically select a USB DAC detected at app launch.
-- [ ] Validate left/right stereo separation with a physical USB DAC.
+- [x] Validate left/right stereo separation with a physical USB DAC. The
+  CX31993 was detected as ALSA card 1 and the user heard the long left-channel
+  tone and short right-channel tones separately through `usb_stereo`.
 - [x] Keep Pulse/PipeWire out of the normal path; direct hardware playback is an
   explicit diagnostic only.
 - [x] Replace fixed/OC CPU-frequency presets with dynamic V90S governors:
