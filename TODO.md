@@ -384,6 +384,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `docs/validation/2026-07-15-release-squashfs-boundary.md`.
 - [ ] Validate the release-system image boot, FE startup, services, emulator
   launch/stop, and safe reboot/poweroff on hardware.
+- [x] Diagnose the first release image's logo-only boot as a missing `/overlay`
+  destination in p5, add it to `release-system`, and reject incompatible
+  `--no-rootfs-repack` inputs during image assembly.
 
 ## Milestone 4: FAT32 App Layer
 

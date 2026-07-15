@@ -98,8 +98,12 @@ The release-system image keeps the validated p5 squashfs byte-for-byte:
   --no-rootfs-repack \
   --app-layer-dir output/app-layer/v90s \
   --share-size 4096M \
-  --name plumos-v90s-system-squashfs-20260715-1.img
+  --name plumos-v90s-system-squashfs-20260715-2.img
 ```
+
+The no-repack path validates `/boot`, `/overlay`, `/proc`, `/sys`, and `/dev`
+because the StockOS boot ramdisk moves its early mounts into those paths before
+switching to the system rootfs.
 
 `rootfs` is a transitional alias for `system-rootfs`. `stockos-image` is a
 transitional alias for `sd-image` while the partition contract remains

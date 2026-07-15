@@ -271,6 +271,16 @@ if [ "$repack_rootfs" -eq 1 ]; then
     mksquashfs "$rootfs_unpack" "$input_dir/batocera-rootfs.squashfs" \
         -noappend -comp zstd -b 131072 -all-root >/dev/null
 else
+    rootfs_listing="$(unsquashfs -ll "$rootfs_squashfs")"
+    for required_dir in boot overlay proc sys dev; do
+        if ! printf '%s\n' "$rootfs_listing" |
+            grep -Eq "^d.*[[:space:]]squashfs-root/$required_dir$"; then
+            printf 'error: --no-rootfs-repack requires /%s in rootfs: %s\n' \
+                "$required_dir" "$rootfs_squashfs" >&2
+            printf 'hint: rebuild the release-system rootfs or omit --no-rootfs-repack\n' >&2
+            exit 1
+        fi
+    done
     cp "$rootfs_squashfs" "$input_dir/batocera-rootfs.squashfs"
 fi
 app_layer_manifest_sha256=none

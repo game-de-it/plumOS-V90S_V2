@@ -23,7 +23,7 @@ been booted on a V90S.
   --no-rootfs-repack \
   --app-layer-dir output/app-layer/v90s \
   --share-size 4096M \
-  --name plumos-v90s-system-squashfs-20260715-1.img
+  --name plumos-v90s-system-squashfs-20260715-2.img
 ```
 
 ## Results
@@ -38,7 +38,7 @@ Recorded output:
 
 ```text
 compressed size: 69,513,216 bytes
-sha256: 34784c7d0061ff541041e7267b6ca564366f2a0102f8e92a8423103617be3fab
+sha256: 55e508f11f155700c673b70f4712f53915732bce2f8b0bb7c7cbaf94340499eb
 app-layer files checked: 3,798
 app-layer compatibility: v90s-stockos-r1
 ```
@@ -76,16 +76,16 @@ The resulting prepared runtime and complete image are:
 
 ```text
 output/vendor/v90s-stockos-r1
-output/images/plumos-v90s-system-squashfs-20260715-1.img
-output/images/plumos-v90s-system-squashfs-20260715-1.img.manifest.txt
+output/images/plumos-v90s-system-squashfs-20260715-2.img
+output/images/plumos-v90s-system-squashfs-20260715-2.img.manifest.txt
 ```
 
 Recorded image result:
 
 ```text
 size: 4,522,835,968 bytes
-sha256: 285973f2b84175119727028d4ca5c70dda8143430a64eb046e45702fe514e116
-p5 sha256: 34784c7d0061ff541041e7267b6ca564366f2a0102f8e92a8423103617be3fab
+sha256: c7ee745401ad20b65f5f1f82f8e4bd42e3ccce0d9112bc3d594262c0776e559f
+p5 sha256: 55e508f11f155700c673b70f4712f53915732bce2f8b0bb7c7cbaf94340499eb
 boot0 source: vendor-runtime
 boot package source: vendor-runtime
 KNULLI boot fallback: disabled
@@ -95,7 +95,10 @@ The image uses `PLUMBOOT` for the 33 MiB p1 FAT volume and `PLUMOS` for the
 4 GiB p7 FAT32 app layer. macOS read-only validation mounted both filesystems,
 passed `fsck_msdos -n`, and verified all 3,798 p7 checksums. The p5 hash is
 identical to the separately validated release-system squashfs because image
-assembly used `--no-rootfs-repack`.
+assembly used `--no-rootfs-repack`. The initial `-1.img` lacked the `/overlay`
+mountpoint required by the vendor boot ramdisk and stopped after its boot logo;
+the diagnosis and corrected host validation are recorded in
+`docs/validation/2026-07-15-release-image-overlay-mountpoint-fix.md`.
 
 Real-device boot, frontend startup, service control, emulator launch/stop, and
 safe reboot/poweroff remain the next hardware validation boundary.

@@ -85,7 +85,7 @@ Docker build flow です。
   --no-rootfs-repack \
   --app-layer-dir output/app-layer/v90s \
   --share-size 4096M \
-  --name plumos-v90s-system-squashfs-20260715-1.img
+  --name plumos-v90s-system-squashfs-20260715-2.img
 
 # Explicit Step 2 diagnostic profile; not the release rootfs.
 ./scripts/docker-build.sh system-rootfs \

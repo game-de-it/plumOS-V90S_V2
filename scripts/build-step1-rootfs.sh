@@ -1197,7 +1197,8 @@ build_release_system() {
     debootstrap --arch=arm64 --variant=minbase --include="$release_packages" "$suite" "$root" "$mirror"
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" \
-        "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
+        "$root/boot" "$root/overlay" "$root/mnt/share" "$root/mnt/plumos" \
+        "$root/root"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
     install_app_layer_bootstrap "$root"
