@@ -539,7 +539,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Fix and live-validate `Network Settings -> INFORMATION`: refresh the USB
   Wi-Fi runtime status when the screen opens, report `COMPLETED` with an IPv4
   address as `Connected`, and show compact live/boot state for every network
-  service without blank or clipped values.
+  service without blank or clipped values. Keep the release FE and network
+  controller on the same `/run/plumos/network-control/wpa_status.txt` source;
+  do not fall back silently to the former `/tmp/wpa_status.txt` path.
 - [x] Validate the FE navigation/action path for
   `START -> Network Settings -> NW Service -> ADB` by running the controller UI
   script path that presses `A` on the ADB checkbox and confirming `adb devices`

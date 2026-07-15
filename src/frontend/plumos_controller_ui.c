@@ -4196,6 +4196,8 @@ static void refresh_wifi_runtime_status(struct ui_state *ui) {
       !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->sdcard_root) ||
       !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_ROOT=") ||
       !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
+      !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_WPA_STATUS=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->wpa_status_path) ||
       !append_string(cmd, sizeof(cmd), &pos, " ") ||
       !append_shell_quoted(cmd, sizeof(cmd), &pos, script) ||
       !append_string(cmd, sizeof(cmd), &pos,
@@ -4208,6 +4210,12 @@ static void refresh_wifi_runtime_status(struct ui_state *ui) {
 static void load_wifi_runtime_status(struct ui_state *ui) {
   struct device_settings *device = &ui->device;
 
+  device->wpa_loaded = 0;
+  device->wifi_state[0] = '\0';
+  device->wifi_ip[0] = '\0';
+  device->wifi_rssi[0] = '\0';
+  device->wifi_linkspeed[0] = '\0';
+  device->wifi_frequency[0] = '\0';
   refresh_wifi_runtime_status(ui);
   device->wifi_runtime_enabled = runtime_wifi_enabled();
   copy_string(device->network_status_source, sizeof(device->network_status_source),
@@ -14668,7 +14676,8 @@ static void usage(const char *argv0) {
   printf("  PLUMOS_MALI_SWAP_INTERVAL  0 or 1. Default: 1\n");
   printf("  PLUMOS_CONTROLLER_RESCUE network opens a disabled compatibility screen\n");
   printf("  PLUMOS_SYSTEM_SETTINGS_JSON  Default: $PLUMOS_ROOT/config/system/settings.json\n");
-  printf("  PLUMOS_A30_WPA_STATUS   Default: /tmp/wpa_status.txt\n");
+  printf("  PLUMOS_WPA_STATUS   Default: /run/plumos/network-control/wpa_status.txt\n");
+  printf("  PLUMOS_A30_WPA_STATUS   Legacy status-path override\n");
   printf("  PLUMOS_CONTROLLER_CPU_DEFAULT  Ondemand/2-core FE default; set 0 to skip\n");
   printf("  PLUMOS_CPU_BASELINE_GOVERNOR  ondemand, powersave, performance, or userspace\n");
 }
@@ -14807,11 +14816,14 @@ int main(int argc, char **argv) {
     fprintf(stderr, "error: plumOS system settings path is too long\n");
     return 1;
   }
-  wpa_status_env = getenv("PLUMOS_A30_WPA_STATUS");
+  wpa_status_env = getenv("PLUMOS_WPA_STATUS");
+  if (!wpa_status_env || !wpa_status_env[0]) {
+    wpa_status_env = getenv("PLUMOS_A30_WPA_STATUS");
+  }
   if (!copy_string(ui.wpa_status_path, sizeof(ui.wpa_status_path),
                    wpa_status_env && wpa_status_env[0] ? wpa_status_env
-                                                       : "/tmp/wpa_status.txt")) {
-    fprintf(stderr, "error: A30 WPA status path is too long\n");
+                                                       : "/run/plumos/network-control/wpa_status.txt")) {
+    fprintf(stderr, "error: WPA status path is too long\n");
     return 1;
   }
   fb_path = getenv("PLUMOS_FB");

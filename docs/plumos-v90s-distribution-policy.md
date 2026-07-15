@@ -549,6 +549,14 @@ bring-up must eventually honor the same key; while the legacy rootfs
 `v90s-network-ssh-init` hook remains, this is a known migration boundary rather
 than a separate source of truth.
 
+`Network Settings -> INFORMATION` must refresh and read the V90S runtime status
+from `/run/plumos/network-control/wpa_status.txt`. The frontend passes that same
+path to `plumos-network-control` as `PLUMOS_WPA_STATUS`, so producer and consumer
+cannot silently diverge. `/mnt/plumos/config/network/wpa_status.txt` is a
+persistent troubleshooting mirror, not the live frontend source. The older
+`/tmp/wpa_status.txt` path is A30/MMF compatibility history and is not the V90S
+release default.
+
 `Network Settings -> NW Service` checkboxes are persistent service toggles, not
 momentary status lamps. Turning a checkbox ON must start the service now and
 write `*_enabled=1` so boot-time `plumos-network-services start-enabled` starts
