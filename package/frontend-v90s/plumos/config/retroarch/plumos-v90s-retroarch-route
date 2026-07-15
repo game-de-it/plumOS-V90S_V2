@@ -4,7 +4,7 @@
 # set PLUMOS_V90S_ROUTE_CONFIG. Use default assignments so explicit user or
 # launcher environment overrides remain possible.
 
-: "${PLUMOS_V90S_RETROARCH_BIN:=/usr/local/bin/retroarch}"
+: "${PLUMOS_V90S_RETROARCH_BIN:=${PLUMOS_ROOT:-/mnt/plumos}/bin/retroarch}"
 : "${PLUMOS_V90S_VIDEO_DRIVER:=gl}"
 : "${PLUMOS_V90S_VIDEO_CONTEXT_DRIVER:=mali_fbdev}"
 : "${PLUMOS_V90S_VIDEO_THREADED:=true}"

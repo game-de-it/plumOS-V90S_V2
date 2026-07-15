@@ -135,16 +135,46 @@ Implemented app-layer target:
 This writes `output/app-layer/v90s/` with `VERSION`, `COMPAT_VENDOR`,
 `MOUNT_PATH`, `manifest.json`, `checksums.sha256`, standard user data
 directories, the MMF-derived V90S frontend, BusyBox/command tools,
-SSH/FTP/SFTP/Samba service payloads, RetroArch, QuickNES, SDL2 PowerVR private
-libraries, and the current known-good RetroArch defaults template. SSH logins
-prefer `/mnt/plumos/bin` and then `/mnt/plumos/gnu/bin` in PATH. Files are
-copied without symlinks so the tree can be placed on FAT32.
+SSH/FTP/SFTP/Samba service payloads, RetroArch, the complete 118-core V90S
+catalog, SDL2 PowerVR private libraries, and the current known-good RetroArch
+defaults template. SSH logins prefer `/mnt/plumos/bin` and then
+`/mnt/plumos/gnu/bin` in PATH. Files are copied without symlinks so the tree can
+be placed on FAT32.
 
 The `network-services` target builds its BusyBox userland dependency first and
 copies `busybox`, `tcpsvd`, and `ftpd` into the network-services artifact. This
 keeps the FTP runtime atomic with its controller. A strict app-layer manifest
 sets `complete=true`; release packaging rejects manifests with missing optional
 components.
+
+The canonical core output is the complete set:
+
+```sh
+./scripts/docker-build.sh cores
+# output/libretro-cores/v90s/cores: 118 cores
+```
+
+Filtered development builds never replace that directory implicitly:
+
+```sh
+./scripts/docker-build.sh cores --filter quicknes
+# output/libretro-cores/v90s-filtered/quicknes
+```
+
+Use `--out-dir` for a specifically named diagnostic artifact. A filtered build
+targeting `output/libretro-cores/v90s` is rejected unless the destructive
+intent is made explicit with `--replace-canonical`. `--stage-existing` can
+reconstruct package outputs from already-built AArch64 recipe trees without a
+source rebuild. Strict app-layer generation requires at least 118 cores, so a
+one-core diagnostic output cannot be accepted as a release/image app layer.
+
+RetroArch is app-layer-owned and the FE route must resolve its binary as
+`/mnt/plumos/bin/retroarch`; `/usr/local/bin/retroarch` is a legacy squashfs
+path and is not a valid release default. Shared-library real files remain on
+FAT32, while `config/standalone/soname-links.tsv` is used to create the normal
+Linux SONAME aliases under `/run/plumos/retroarch/lib` at launch time. Strict
+app-layer generation verifies that the mapping and all referenced real files
+are present.
 
 Implemented update-only release target:
 

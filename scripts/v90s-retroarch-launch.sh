@@ -444,6 +444,30 @@ apply_plumos_volume() {
         log "retroarch-launch: plumOS volume apply failed"
 }
 
+prepare_app_runtime_sonames() {
+    soname_map="${PLUMOS_V90S_SONAME_MAP:-${PLUMOS_ROOT:-/mnt/plumos}/config/standalone/soname-links.tsv}"
+    soname_dir="$RUN_DIR/lib"
+    soname_count=0
+
+    APP_RUNTIME_SONAME_DIR=""
+    [ -r "$soname_map" ] || return 0
+    mkdir -p "$soname_dir" 2>/dev/null || return 0
+    find "$soname_dir" -type l -delete 2>/dev/null || true
+    while IFS="$(printf '\t')" read -r soname real_name; do
+        [ -n "$soname" ] || continue
+        [ "$soname" = "${soname##*/}" ] || continue
+        [ "$real_name" = "${real_name##*/}" ] || continue
+        [ -f "${PLUMOS_ROOT:-/mnt/plumos}/lib/$real_name" ] || continue
+        if ln -sf "${PLUMOS_ROOT:-/mnt/plumos}/lib/$real_name" "$soname_dir/$soname"; then
+            soname_count=$((soname_count + 1))
+        fi
+    done < "$soname_map"
+    if [ "$soname_count" -gt 0 ]; then
+        APP_RUNTIME_SONAME_DIR="$soname_dir"
+        log "retroarch-launch: prepared app runtime sonames=$soname_count dir=$soname_dir"
+    fi
+}
+
 write_config() {
     cfg="$1"
     video_driver="$2"
@@ -783,6 +807,7 @@ if [ -z "$resolved_retroarch" ]; then
 fi
 RETROARCH_BIN="$resolved_retroarch"
 log "retroarch-launch: retroarch_bin=$RETROARCH_BIN"
+prepare_app_runtime_sonames
 
 sdl2_runtime_dir=""
 sdl2_runtime_label=""
@@ -806,6 +831,9 @@ libretro_runtime_dir="${PLUMOS_V90S_LIBRETRO_RUNTIME_DIR:-${PLUMOS_ROOT:-/mnt/pl
 if [ -d "$libretro_runtime_dir" ]; then
     export LD_LIBRARY_PATH="$libretro_runtime_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     log "retroarch-launch: libretro_runtime_dir=$libretro_runtime_dir"
+fi
+if [ -n "${APP_RUNTIME_SONAME_DIR:-}" ]; then
+    export LD_LIBRARY_PATH="$APP_RUNTIME_SONAME_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 if [ -d /usr/lib/powervr ]; then
     if [ -n "$sdl2_runtime_dir" ]; then

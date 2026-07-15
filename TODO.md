@@ -109,8 +109,9 @@ Build plumOS V90S as a V90S-specific distribution:
   partition contract remains StockOS/Batocera-compatible.
 - [x] Keep `knulli-image` as a legacy investigation target only.
 - [x] Implement `cores` as the normal libretro-core build target.
-- [x] Make the normal `cores` target build the MMF-compatible plumOS A/B core
-  set for V90S.
+- [x] Make the normal `cores` target build the complete V90S catalog. Keep the
+  MMF-compatible A/B subset available through `--filter plumos` in an isolated
+  filtered-output directory.
 - [x] Align V90S libretro recipe IDs, repos, refs, and classes with the MMF
   source-built recipe inventory:
   - `A`: 37 recipes
@@ -119,10 +120,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Validate that the V90S A/B output matches MMF's built
   `dist/plumos-libretro-cores` file set: 41 cores and 41 `.info` files.
 - [x] Extend and triage the V90S full catalog against the MMF final package:
-  - V90S recipes: `A`: 37, `B`: 4, `O`: 72, total 113
-  - V90S output: 117 `*_libretro.so`
+  - V90S recipes: `A`: 37, `B`: 4, `O`: 73, total 114
+  - V90S output: 118 `*_libretro.so`
   - MMF final package output: 117 `*_libretro.so`
-  - filename comparison: no missing and no extra files
+  - filename comparison: no MMF files missing; one V90S-only Flycast Xtreme
+    output is additional
   - compatibility aliases:
     `dosbox_pure_0.9.7`, `beetle_saturn`,
     `km_puae_xtreme_amped`, and `uae4arm`
@@ -132,6 +134,14 @@ Build plumOS V90S as a V90S-specific distribution:
     `flycast_xtreme_libretro.so` without replacing standard Flycast.
 - [x] Validate that `PLUMOS_CORE_FILTER=all FAIL_ON_CORE_ERROR=1
   ./scripts/docker-build.sh cores` completes with zero failed recipes.
+- [x] Prevent filtered one-core builds from deleting the canonical full core
+  set: filtered builds now use `output/libretro-cores/v90s-filtered/FILTER`,
+  explicit filtered replacement of the canonical output is rejected, and a
+  strict app-layer requires at least 118 staged cores.
+- [x] Recover release-image FE game launch after the partial core package:
+  restore and deploy all 118 cores, route RetroArch to the app-layer binary,
+  prepare FAT32 SONAME aliases under `/run`, and confirm QuickNES video, audio,
+  and input through the real FE launch path on V90S.
 - [ ] Real-device runtime validation for non-baseline libretro cores.
   - [x] Inventory the refreshed live FE library and run the 2026-07-13 launch
     matrix for all 57 systems with indexed ROMs; see
@@ -139,8 +149,8 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Confirm the live QuickNES core starts NES content through the FE.
   - [x] Confirm the separately deployed `nxengine_libretro.so` can draw Cave
     Story by direct diagnostic launch.
-  - [x] Deploy and hash-check the complete 117-core app-layer output on the
-    live V90S under `/mnt/plumos/cores`.
+  - [x] Deploy and hash-check the complete 118-core app-layer output on the
+  live V90S under `/mnt/plumos/cores`.
   - [x] Re-run FE launch validation after full deployment. All 48 systems
     previously blocked by missing live libretro cores now pass FE preflight;
     the only remaining preflight failure is non-libretro Pyxel.

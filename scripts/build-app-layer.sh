@@ -17,6 +17,7 @@ music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
 standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
 picoarch_dir="${PLUMOS_V90S_PICOARCH_DIR:-output/picoarch/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
+minimum_core_count="${PLUMOS_V90S_MIN_CORE_COUNT:-118}"
 strict=0
 
 usage() {
@@ -130,6 +131,13 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+case "$minimum_core_count" in
+    ''|*[!0-9]*)
+        printf 'error: PLUMOS_V90S_MIN_CORE_COUNT must be a non-negative integer\n' >&2
+        exit 2
+        ;;
+esac
 
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -300,7 +308,7 @@ cat > "$out_dir/config/retroarch/plumos-v90s-retroarch-route" <<'EOF'
 # set PLUMOS_V90S_ROUTE_CONFIG. Use default assignments so explicit user or
 # launcher environment overrides remain possible.
 
-: "${PLUMOS_V90S_RETROARCH_BIN:=/usr/local/bin/retroarch}"
+: "${PLUMOS_V90S_RETROARCH_BIN:=${PLUMOS_ROOT:-/mnt/plumos}/bin/retroarch}"
 : "${PLUMOS_V90S_VIDEO_DRIVER:=gl}"
 : "${PLUMOS_V90S_VIDEO_CONTEXT_DRIVER:=mali_fbdev}"
 : "${PLUMOS_V90S_VIDEO_THREADED:=true}"
@@ -329,8 +337,8 @@ fi
 quicknes_src="$cores_dir/quicknes_libretro.so"
 cores_stage_dir="$cores_dir/cores"
 info_stage_dir="$cores_dir/info"
+core_count=0
 if [ -d "$cores_stage_dir" ]; then
-    core_count=0
     for core_src in "$cores_stage_dir"/*_libretro.so; do
         [ -f "$core_src" ] || continue
         core_name="$(basename "$core_src")"
@@ -368,9 +376,19 @@ if [ -d "$cores_stage_dir" ]; then
 elif require_or_note_missing "$quicknes_src" "quicknes"; then
     copy_file "$quicknes_src" "$out_dir/cores/quicknes_libretro.so"
     record_file "cores/quicknes_libretro.so" "libretro-core" "$quicknes_src"
+    core_count=1
     if [ -f "$cores_dir/quicknes-manifest.txt" ]; then
         copy_file "$cores_dir/quicknes-manifest.txt" "$out_dir/licenses/quicknes-manifest.txt"
         record_file "licenses/quicknes-manifest.txt" "libretro-core" "$cores_dir/quicknes-manifest.txt"
+    fi
+fi
+if [ "$core_count" -lt "$minimum_core_count" ]; then
+    printf 'libretro-core-count:%s<%s\n' \
+        "$core_count" "$minimum_core_count" >> "$missing_file"
+    if [ "$strict" -eq 1 ]; then
+        printf 'error: incomplete libretro core set: found %s, require at least %s\n' \
+            "$core_count" "$minimum_core_count" >&2
+        exit 1
     fi
 fi
 
@@ -449,6 +467,16 @@ if require_or_note_missing "$standalone_dir/bin/plumos-standalone-launch" "stand
     fi
 fi
 
+retroarch_soname_map="$out_dir/config/standalone/soname-links.tsv"
+if require_or_note_missing "$retroarch_soname_map" "retroarch-runtime-soname-map"; then
+    while IFS="$(printf '\t')" read -r soname real_name; do
+        [ -n "$soname" ] || continue
+        require_or_note_missing \
+            "$out_dir/lib/$real_name" \
+            "retroarch-runtime:$soname" || true
+    done < "$retroarch_soname_map"
+fi
+
 if require_or_note_missing "$picoarch_dir/bin/plumos-picoarch-launch" "picoarch"; then
     copy_tree "$picoarch_dir/picoarch" "$out_dir/picoarch"
     record_mapped_tree "$picoarch_dir/picoarch" "picoarch" "picoarch-runtime" "$picoarch_dir/picoarch"
@@ -485,6 +513,8 @@ fi
     printf '  "mount_path": "%s",\n' "$(json_escape "$mount_path")"
     printf '  "generated_at": "%s",\n' "$generated_at"
     printf '  "complete": %s,\n' "$complete"
+    printf '  "libretro_core_count": %s,\n' "$core_count"
+    printf '  "minimum_libretro_core_count": %s,\n' "$minimum_core_count"
     printf '  "directories": [\n'
     printf '    "bin", "lib", "apps", "cores", "info", "frontend", "picoarch", "standalone",\n'
     printf '    "config", "fonts", "share", "state", "themes", "Images", "media",\n'

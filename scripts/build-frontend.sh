@@ -354,7 +354,7 @@ case "$cpu_policy" in
     ;;
 esac
 
-export PLUMOS_V90S_RETROARCH_BIN="${PLUMOS_V90S_RETROARCH_BIN:-/usr/local/bin/retroarch}"
+export PLUMOS_V90S_RETROARCH_BIN="${PLUMOS_V90S_RETROARCH_BIN:-$PLUMOS_ROOT/bin/retroarch}"
 export PLUMOS_V90S_CORE="$core"
 export PLUMOS_V90S_ROM="$rom"
 export PLUMOS_V90S_RETROARCH_START_MODE=content
@@ -400,7 +400,7 @@ export PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 
 mkdir -p "$PLUMOS_ROOT/Logs" "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/bios"
 
-export PLUMOS_V90S_RETROARCH_BIN="${PLUMOS_V90S_RETROARCH_BIN:-/usr/local/bin/retroarch}"
+export PLUMOS_V90S_RETROARCH_BIN="${PLUMOS_V90S_RETROARCH_BIN:-$PLUMOS_ROOT/bin/retroarch}"
 export PLUMOS_V90S_RETROARCH_START_MODE=menu
 export PLUMOS_V90S_ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-$PLUMOS_ROOT/config/retroarch/plumos-v90s-retroarch-route}"
 export PLUMOS_V90S_RETROARCH_CONFIG_DIR="${PLUMOS_V90S_RETROARCH_CONFIG_DIR:-$PLUMOS_ROOT/config/retroarch}"

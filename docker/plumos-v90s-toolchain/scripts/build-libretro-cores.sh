@@ -4,12 +4,16 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 DEFAULT_ROOT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)"
 ROOT_DIR="${ROOT_DIR:-$DEFAULT_ROOT_DIR}"
+OUT_DIR_EXPLICIT=0
+if [ "${PLUMOS_V90S_CORES_OUT+x}" = x ]; then
+  OUT_DIR_EXPLICIT=1
+fi
 OUT_DIR="${PLUMOS_V90S_CORES_OUT:-output/libretro-cores/v90s}"
 SRC_ROOT="${PLUMOS_V90S_CORES_SRC:-output/build/libretro-cores/src}"
 CORE_RECIPES="${CORE_RECIPES:-${ROOT_DIR}/docker/plumos-v90s-toolchain/libretro-core-recipes.tsv}"
 CORE_INFO_REPO="${CORE_INFO_REPO:-https://github.com/libretro/libretro-core-info.git}"
 CORE_INFO_REF="${CORE_INFO_REF:-HEAD}"
-PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-plumos}"
+PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-all}"
 FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 2)}"
 BUILD_JOB_FALLBACKS="${BUILD_JOB_FALLBACKS:-1}"
@@ -27,6 +31,8 @@ READELF="${READELF:-readelf}"
 YABASANSHIRO_CC="${YABASANSHIRO_CC:-clang}"
 YABASANSHIRO_CXX="${YABASANSHIRO_CXX:-clang++}"
 YABASANSHIRO_AS="${YABASANSHIRO_AS:-$YABASANSHIRO_CC -c}"
+STAGE_EXISTING=0
+REPLACE_CANONICAL=0
 
 usage() {
   cat <<'EOF'
@@ -39,9 +45,11 @@ Options:
   --recipes PATH       Recipe TSV; default docker/plumos-v90s-toolchain/libretro-core-recipes.tsv.
   --filter FILTER      all, v90s, plumos, class-a, class-b, class-o,
                        class-ab, or comma-separated core IDs.
-                       Default: plumos.
+                       Default: all. Filtered builds use an isolated output.
   --jobs N             Per-core make jobs; default nproc.
   --fail-on-error 0|1  Fail if any selected core fails; default 1.
+  --stage-existing     Restage already-built AArch64 core outputs without rebuilding.
+  --replace-canonical  Allow a filtered build to replace the canonical full output.
   --list               Print selected recipes and exit.
 
 Environment:
@@ -55,6 +63,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --out-dir)
       OUT_DIR="$2"
+      OUT_DIR_EXPLICIT=1
       shift 2
       ;;
     --src-root)
@@ -76,6 +85,14 @@ while [ "$#" -gt 0 ]; do
     --fail-on-error)
       FAIL_ON_CORE_ERROR="$2"
       shift 2
+      ;;
+    --stage-existing)
+      STAGE_EXISTING=1
+      shift
+      ;;
+    --replace-canonical)
+      REPLACE_CANONICAL=1
+      shift
       ;;
     --list)
       LIST_ONLY=1
@@ -109,10 +126,28 @@ case "$ROOT_DIR" in
   /*) ;;
   *) ROOT_DIR="$(pwd)/$ROOT_DIR" ;;
 esac
+case "$PLUMOS_CORE_FILTER" in
+  all|ALL) complete_filter=1 ;;
+  *) complete_filter=0 ;;
+esac
+if [ "$complete_filter" -eq 0 ] && [ "$OUT_DIR_EXPLICIT" -eq 0 ]; then
+  safe_filter="$(printf '%s' "$PLUMOS_CORE_FILTER" |
+    tr '[:upper:]' '[:lower:]' |
+    sed 's/[^a-z0-9._-]/_/g; s/^_*//; s/_*$//')"
+  [ -n "$safe_filter" ] || safe_filter=custom
+  OUT_DIR="output/libretro-cores/v90s-filtered/$safe_filter"
+fi
 case "$OUT_DIR" in
   /*) ;;
   *) OUT_DIR="$ROOT_DIR/$OUT_DIR" ;;
 esac
+CANONICAL_OUT_DIR="$ROOT_DIR/output/libretro-cores/v90s"
+if [ "$complete_filter" -eq 0 ] && [ "$OUT_DIR" = "$CANONICAL_OUT_DIR" ] &&
+   [ "$REPLACE_CANONICAL" -ne 1 ]; then
+  printf 'error: filtered core builds cannot replace canonical output: %s\n' "$OUT_DIR" >&2
+  printf 'hint: omit --out-dir, choose a separate path, or pass --replace-canonical explicitly\n' >&2
+  exit 2
+fi
 case "$SRC_ROOT" in
   /*) ;;
   *) SRC_ROOT="$ROOT_DIR/$SRC_ROOT" ;;
@@ -855,6 +890,11 @@ stage_outputs() {
     if ! "$READELF" -h "$so" >/dev/null 2>&1; then
       continue
     fi
+    if ! "$READELF" -h "$so" 2>/dev/null |
+         grep -Eq 'Machine:[[:space:]]*(AArch64|ARM aarch64)'; then
+      msg "ignoring non-AArch64 output for $id: $so"
+      continue
+    fi
     source_base="$(basename "$so")"
     base="$source_base"
     case "$base" in
@@ -1040,6 +1080,49 @@ EOF_CMAKE_ARGS
   fi
 }
 
+stage_existing_core() {
+  local id="$1"
+  local class="$2"
+  local repo="$3"
+  local ref="$4"
+  local src="$SRC_ROOT/$id"
+  local commit=unknown
+
+  if ! core_selected "$id" "$class"; then
+    SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+    return 0
+  fi
+
+  append_manifest ""
+  append_manifest "[$id]"
+  append_manifest "class=$class"
+  append_manifest "repo=$repo"
+  append_manifest "ref=$ref"
+  append_manifest "mode=stage-existing"
+  if [ -d "$src/.git" ]; then
+    commit="$(git -C "$src" rev-parse HEAD 2>/dev/null || printf unknown)"
+  fi
+  append_manifest "commit=$commit"
+
+  if [ ! -d "$src" ]; then
+    msg "FAILED $id: existing source tree is missing"
+    append_manifest "status=failed"
+    append_manifest "reason=source_missing"
+    FAILED_COUNT=$((FAILED_COUNT + 1))
+    return 0
+  fi
+  if stage_outputs "$id" "$src"; then
+    append_manifest "status=staged-existing"
+    BUILT_COUNT=$((BUILT_COUNT + 1))
+    msg "staged existing $id"
+  else
+    msg "FAILED $id: no existing AArch64 libretro output"
+    append_manifest "status=failed"
+    append_manifest "reason=existing_output_missing"
+    FAILED_COUNT=$((FAILED_COUNT + 1))
+  fi
+}
+
 if [ ! -f "$CORE_RECIPES" ]; then
   printf 'error: recipe file not found: %s\n' "$CORE_RECIPES" >&2
   exit 1
@@ -1079,11 +1162,23 @@ SKIPPED_COUNT=0
   printf 'jobs=%s\n' "$JOBS"
   printf 'job_fallbacks=%s\n' "$BUILD_JOB_FALLBACKS"
   printf 'serial_cores=%s\n' "$LIBRETRO_SERIAL_CORES"
+  if [ "$STAGE_EXISTING" -eq 1 ]; then
+    printf 'mode=stage-existing\n'
+  else
+    printf 'mode=build\n'
+  fi
 } > "$MANIFEST"
 
 core_info_log="$LOG_DIR_ABS/core-info.log"
 : > "$core_info_log"
-if clone_or_update_repo core-info "$CORE_INFO_REPO" "$CORE_INFO_REF" "$SRC_ROOT/core-info" "$core_info_log"; then
+if [ "$STAGE_EXISTING" -eq 1 ] && [ -d "$SRC_ROOT/core-info" ]; then
+  append_manifest ""
+  append_manifest "[core-info]"
+  append_manifest "repo=$CORE_INFO_REPO"
+  append_manifest "ref=$CORE_INFO_REF"
+  append_manifest "commit=$(git -C "$SRC_ROOT/core-info" rev-parse HEAD 2>/dev/null || printf unknown)"
+  append_manifest "status=existing"
+elif clone_or_update_repo core-info "$CORE_INFO_REPO" "$CORE_INFO_REF" "$SRC_ROOT/core-info" "$core_info_log"; then
   append_manifest ""
   append_manifest "[core-info]"
   append_manifest "repo=$CORE_INFO_REPO"
@@ -1100,7 +1195,11 @@ else
 fi
 
 while IFS='|' read -r id class repo ref subdir makefile make_args; do
-  build_one_core "$id" "$class" "$repo" "$ref" "$subdir" "$makefile" "$make_args"
+  if [ "$STAGE_EXISTING" -eq 1 ]; then
+    stage_existing_core "$id" "$class" "$repo" "$ref"
+  else
+    build_one_core "$id" "$class" "$repo" "$ref" "$subdir" "$makefile" "$make_args"
+  fi
 done <<EOF_CORES
 $(core_table)
 EOF_CORES
