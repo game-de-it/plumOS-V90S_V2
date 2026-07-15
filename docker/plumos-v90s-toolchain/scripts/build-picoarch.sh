@@ -72,6 +72,8 @@ git -C "$SRC" apply \
 git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-libretro-env.patch"
 git -C "$SRC" apply \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-controller-init.patch"
+git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-frame-audio-callback.patch"
 git -C "$SRC" apply --recount \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-async-audio-callback.patch"
