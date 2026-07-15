@@ -74,10 +74,12 @@ order and then started RetroArch YabaSanshiro without rebooting. The 32X and
 3DO exits left no process residue, and the user confirmed Saturn controls were
 normal. This does not reproduce a cross-frontend input ownership leak.
 
-## Separate Amiga issue
+## Amiga follow-up
 
-PUAe crashed with a segmentation fault before PicoArch input initialization.
-No PicoArch process or PID file remained after the crash. That failure is a
-separate core/content startup problem and is not evidence that this controller
-registration fix failed; Amiga gameplay input remains unvalidated until the
-PUAe crash is resolved.
+The separate PUAe startup crash was caused by PicoArch dereferencing the direct
+`RETRO_ENVIRONMENT_SET_CORE_OPTIONS` definition pointer as a pointer-to-pointer.
+It is fixed, and both live Amiga PicoArch profiles now remain active and update
+the framebuffer. See
+`docs/validation/2026-07-15-v90s-picoarch-all-runtime.md` for the core-dump
+analysis and full PICO route matrix. Amiga gameplay input still needs a manual
+gameplay-level confirmation.

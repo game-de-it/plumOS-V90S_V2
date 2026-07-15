@@ -27,7 +27,7 @@ git -C "$SRC" submodule update --init --recursive
 git -C "$SRC" submodule foreach --recursive 'git reset --hard; git clean -ffdx'
 checkout_source "$SDL12_REPO" "$SDL12_REF" "$SDL12_SRC"
 
-perl -0pi -e 's/scaler_neon\.o/scaler_c.o/ or die "scaler object marker missing\n";
+perl -0pi -e 's/scaler_neon\.o/scaler_c.o picoarch_v90s_host.o/ or die "scaler object marker missing\n";
   s/-lpng12/-lpng/ or die "libpng marker missing\n";
   s/else ifeq \(\$\(platform\), unix\)/else ifeq (\$(platform), v90s)\n\tOBJS += plat_linux.o\n\tCFLAGS += -march=armv8-a+crc -mtune=cortex-a53 -pthread -DCONTENT_DIR='"'"'"\/mnt\/plumos\/roms"'"'"'\n\tLDFLAGS += -fPIE -pthread\nelse ifeq (\$(platform), unix)/ or die "platform marker missing\n"' "$SRC/Makefile"
 
@@ -48,6 +48,10 @@ mv "$SRC/Makefile.v90s" "$SRC/Makefile"
 
 cp "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch_v90s_fbdev.h" \
   "$SRC/picoarch_v90s_fbdev.h"
+cp "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch_v90s_host.c" \
+  "$SRC/picoarch_v90s_host.c"
+cp "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch_v90s_host.h" \
+  "$SRC/picoarch_v90s_host.h"
 
 git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-input-aspect.patch"
@@ -67,6 +71,9 @@ perl -0pi -e 's{static void get_tag_name\(const char\* in_path, char\* out_tag\)
 
 perl -0pi -e 's{static void set_directories\(const char \*core_name, const char \*tag_name\) \{.*?\n\}\n\n// based on eggs}{static void set_directories(const char *core_name, const char *tag_name) {\n\tconst char *home = getenv("HOME");\n\tconst char *save_root = getenv("PLUMOS_PICOARCH_SAVE_ROOT");\n\tconst char *bios_dir = getenv("PLUMOS_PICOARCH_BIOS_DIR");\n\tif (home) {\n\t\tsnprintf(config_dir, MAX_PATH, "%s/.picoarch-%s-%s/", home, core_name, tag_name);\n\t\tmkdir(config_dir, 0755);\n\t}\n\tif (!save_root || !save_root[0]) save_root = "/mnt/plumos/Saves";\n\tif (!bios_dir || !bios_dir[0]) bios_dir = "/mnt/plumos/bios";\n\tsnprintf(save_dir, MAX_PATH, "%s/%s/", save_root, tag_name);\n\tmkdir(save_root, 0755);\n\tmkdir(save_dir, 0755);\n\tsnprintf(system_dir, MAX_PATH, "%s", bios_dir);\n}\n\n// based on eggs}s or die "directory function marker missing\n"' "$SRC/core.c"
 
+perl -0pi -e 's{options_init\(\*\(const struct retro_core_option_definition \*\*\)data\);}{options_init((const struct retro_core_option_definition *)data);} or die "core options pointer marker missing\n"' \
+  "$SRC/core.c"
+
 git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-pixel-format.patch"
 git -C "$SRC" apply \
@@ -78,6 +85,13 @@ git -C "$SRC" apply \
 git -C "$SRC" apply --recount \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-async-audio-callback.patch"
 
+perl -0pi -e 's{#include "core\.h"}{#include "core.h"\n#include "picoarch_v90s_host.h"} or die "host interface include marker missing\n";
+  s~\tcase RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY: \{ /\* 30 \*/~\tcase RETRO_ENVIRONMENT_GET_PERF_INTERFACE: { /* 28 */\n\t\treturn v90s_get_perf_interface(data);\n\t}\n\tcase RETRO_ENVIRONMENT_GET_VFS_INTERFACE: { /* 45 | experimental */\n\t\treturn v90s_get_vfs_interface(data, core_path);\n\t}\n\tcase RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY: { /* 30 */~ or die "host interface environment marker missing\n"' \
+  "$SRC/core.c"
+
+# Upstream does not order the libpicofe patch stamp before every parallel
+# object consumer, so resolve it before starting the parallel build.
+make -C "$SRC" platform=v90s MMENU=0 libpicofe/.patched
 make -C "$SRC" platform=v90s MMENU=0 -j"$JOBS" picoarch
 
 cmake -S "$SDL12_SRC" -B "$SDL12_SRC/build-v90s" \

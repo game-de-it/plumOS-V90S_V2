@@ -176,8 +176,17 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Restrict Saturn FE choices to standalone YabaSanshiro and the validated
     YabaSanshiro libretro core; remove Beetle/Mednafen and suppress the unusable
     PicoArch Saturn companion profile.
-  - [ ] Resolve the three known FE runtime blockers: ChaiLove SDL video and
-    FBA 2012/FBA 2012 Neo Geo matching ROM sets.
+  - [x] Fix PicoArch PUAe startup by correcting the direct libretro core-option
+    definition pointer. Add the missing VFS/PERF host interfaces and validate
+    every live FE PICO route: 94 of 97 routes run on hardware with no segfault;
+    see `docs/validation/2026-07-15-v90s-picoarch-all-runtime.md`.
+  - [x] Suppress only the crashing PicoArch ChaiLove companion route while
+    retaining its RetroArch route; ChaiLove's embedded SDL runtime cannot open
+    a second V90S video device below PicoArch.
+  - [ ] Add the three Channel F BIOS files and rerun FreeChaF without its
+    incomplete HLE fallback.
+  - [ ] Supply FBA 2012-matched Neo Geo ROM/BIOS sets and validate both
+    `fbalpha2012` routes. The current set lacks required CRC `5be10ffd`.
   - [ ] Add compatible test content/system definitions and validate the 31
     currently unreachable packaged cores.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
@@ -195,6 +204,9 @@ Build plumOS V90S as a V90S-specific distribution:
     controls are confirmed in PicoDrive/32X and Opera/3DO; the same test
     sequence did not regress RetroArch YabaSanshiro controls. See
     `docs/validation/2026-07-15-v90s-picoarch-game-input.md`.
+  - [x] Add `scripts/v90s-fe-pico-smoke-test.sh` to derive all live FE PICO
+    choices, verify loaded cores and framebuffer updates, stop by owned PID,
+    and restore exactly one frontend process.
 - [x] Implement `standalone` for the MMF final-package emulator set plus
   V90S PPSSPP, Dreamcast, and N64:
   - PPSSPP 1.20.4
@@ -504,7 +516,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `scripts/v90s-adb.sh`, which selects ADB 36.0.2 and recovered automatically
   through three deliberate gadget restart cycles. See
   `docs/validation/2026-07-15-adb-host-transport-recovery.md`.
-- [ ] Copy PicoArch/PICO payloads into the app layer.
+- [x] Copy PicoArch/PICO payloads into the app layer. The final PicoArch and
+  frontend hashes match their standalone build outputs, and all 3,798 app-layer
+  checksum entries pass.
 - [x] Copy standalone emulators into the app layer.
 - [x] Live-capture the V90S physical key evdev mapping for D-pad, ABXY,
   shoulders, select/start/function, volume, and power; record the result in

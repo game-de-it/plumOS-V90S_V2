@@ -1245,6 +1245,13 @@ static int picoarch_core_id_allowed(const char *core_id) {
   if (strcmp(core_id, "frodo") == 0) {
     return 0;
   }
+  /*
+   * ChaiLove embeds its own SDL video runtime. It cannot acquire a second
+   * V90S video device below PicoArch and terminates with a segmentation fault.
+   */
+  if (strcmp(core_id, "chailove") == 0) {
+    return 0;
+  }
   return 1;
 }
 
