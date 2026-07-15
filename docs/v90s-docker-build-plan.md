@@ -45,8 +45,13 @@ Use three layers:
 The prepared vendor runtime is generated from the ignored artifact:
 
 ```sh
+./scripts/capture-v90s-vendor-runtime-adb.sh --force
 ./scripts/docker-build.sh vendor-runtime
 ```
+
+The capture command reads the currently running known-good V90S SD through
+plumOS ADB. It is only required when the ignored vendor input is missing or is
+being deliberately refreshed.
 
 Default input:
 
@@ -83,6 +88,17 @@ The V90S build entrypoint is:
 ./scripts/docker-build.sh app-layer ...
 ./scripts/docker-build.sh sd-image ...
 ./scripts/docker-build.sh release ...
+```
+
+The release-system image keeps the validated p5 squashfs byte-for-byte:
+
+```sh
+./scripts/docker-build.sh sd-image \
+  --rootfs-squashfs output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
+  --no-rootfs-repack \
+  --app-layer-dir output/app-layer/v90s \
+  --share-size 4096M \
+  --name plumos-v90s-system-squashfs-20260715-1.img
 ```
 
 `rootfs` is a transitional alias for `system-rootfs`. `stockos-image` is a

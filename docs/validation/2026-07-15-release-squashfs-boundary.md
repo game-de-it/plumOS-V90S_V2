@@ -3,8 +3,9 @@
 ## Scope
 
 Implement the distribution-policy split between the read-only system squashfs
-and the writable FAT32 app layer. This is a host-side build validation; the new
-system squashfs has not yet been booted on a V90S.
+and the writable FAT32 app layer, then assemble the first complete SD image.
+This is a host-side build and filesystem validation; the new image has not yet
+been booted on a V90S.
 
 ## Build Commands
 
@@ -15,6 +16,14 @@ system squashfs has not yet been booted on a V90S.
 ./scripts/docker-build.sh standalone launcher-only
 ./scripts/docker-build.sh app-layer --strict
 ./scripts/docker-build.sh system-rootfs
+./scripts/capture-v90s-vendor-runtime-adb.sh --force
+./scripts/docker-build.sh vendor-runtime
+./scripts/docker-build.sh sd-image \
+  --rootfs-squashfs output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
+  --no-rootfs-repack \
+  --app-layer-dir output/app-layer/v90s \
+  --share-size 4096M \
+  --name plumos-v90s-system-squashfs-20260715-1.img
 ```
 
 ## Results
@@ -56,25 +65,37 @@ saves, states, artwork, and user-visible logs remain in `/mnt/plumos`.
 
 ## SD Image Status
 
-Full SD image assembly was attempted with the generated p5 squashfs and p7 app
-layer, but stopped before writing an image because the ignored local vendor
-input is absent:
+The known-good running V90S SD was captured over ADB into the ignored vendor
+input directory:
 
 ```text
-artifacts/vendor/v90s-stockos-r1/files/stockos-selected-files.tar.gz
+artifacts/vendor/v90s-stockos-r1
 ```
 
-This is intentionally not bypassed with the legacy KNULLI boot fallback. After
-restoring or re-extracting the StockOS vendor input, run:
+The resulting prepared runtime and complete image are:
 
-```sh
-./scripts/docker-build.sh vendor-runtime
-./scripts/docker-build.sh sd-image \
-  --rootfs-squashfs output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
-  --app-layer-dir output/app-layer/v90s \
-  --share-size 4096M \
-  --name plumos-v90s-system-squashfs-20260715-1.img
+```text
+output/vendor/v90s-stockos-r1
+output/images/plumos-v90s-system-squashfs-20260715-1.img
+output/images/plumos-v90s-system-squashfs-20260715-1.img.manifest.txt
 ```
+
+Recorded image result:
+
+```text
+size: 4,522,835,968 bytes
+sha256: 285973f2b84175119727028d4ca5c70dda8143430a64eb046e45702fe514e116
+p5 sha256: 34784c7d0061ff541041e7267b6ca564366f2a0102f8e92a8423103617be3fab
+boot0 source: vendor-runtime
+boot package source: vendor-runtime
+KNULLI boot fallback: disabled
+```
+
+The image uses `PLUMBOOT` for the 33 MiB p1 FAT volume and `PLUMOS` for the
+4 GiB p7 FAT32 app layer. macOS read-only validation mounted both filesystems,
+passed `fsck_msdos -n`, and verified all 3,798 p7 checksums. The p5 hash is
+identical to the separately validated release-system squashfs because image
+assembly used `--no-rootfs-repack`.
 
 Real-device boot, frontend startup, service control, emulator launch/stop, and
 safe reboot/poweroff remain the next hardware validation boundary.

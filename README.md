@@ -75,6 +75,18 @@ Docker build flow です。
 ./scripts/docker-build.sh system-rootfs
 ./scripts/docker-build.sh release
 
+# Vendor inputがない場合だけ、既知良好な実機SDからADB経由で採取します。
+./scripts/capture-v90s-vendor-runtime-adb.sh --force
+./scripts/docker-build.sh vendor-runtime
+
+# 正式なrelease-system SD imageです。p5を再パックしません。
+./scripts/docker-build.sh sd-image \
+  --rootfs-squashfs output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
+  --no-rootfs-repack \
+  --app-layer-dir output/app-layer/v90s \
+  --share-size 4096M \
+  --name plumos-v90s-system-squashfs-20260715-1.img
+
 # Explicit Step 2 diagnostic profile; not the release rootfs.
 ./scripts/docker-build.sh system-rootfs \
   --profile debian-retroarch-powervr \
@@ -122,7 +134,7 @@ p3 env-redund
 p4 boot Android boot image
 p5 batocera squashfs
 p6 rootfs / BATOCERA ext4
-p7 rootfs_data / SHARE ext4
+p7 rootfs_data / PLUMOS FAT32
 ```
 
 反復テストを速くするため、p1 の FAT 領域はデフォルトで `33M` に抑えます。

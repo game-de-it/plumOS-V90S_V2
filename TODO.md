@@ -379,10 +379,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Add a development init hook that probes p7/p6 for `/mnt/plumos`
   app-layer metadata and starts `/mnt/plumos/bin/plumos-frontend-launch` when
   present.
-- [ ] Restore/extract the ignored `v90s-stockos-r1` vendor input, assemble the
-  first release-system SD image, and validate boot, FE startup, services,
-  emulator launch/stop, and safe reboot/poweroff on hardware; see
+- [x] Capture the ignored `v90s-stockos-r1` vendor input from the known-good
+  live SD over ADB and assemble the first release-system SD image; see
   `docs/validation/2026-07-15-release-squashfs-boundary.md`.
+- [ ] Validate the release-system image boot, FE startup, services, emulator
+  launch/stop, and safe reboot/poweroff on hardware.
 
 ## Milestone 4: FAT32 App Layer
 
@@ -664,7 +665,7 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Milestone 8: Validation
 
-- [ ] Build the first policy-aligned development image with:
+- [x] Build the first policy-aligned development image with:
   - `v90s-stockos-r1` vendor runtime
   - system squashfs on p5
   - FAT32 app layer on the chosen p6/p7 partition
