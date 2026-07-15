@@ -2950,6 +2950,98 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
   return 0;
 }
 
+static int plumos_fbdev_find_wifi_keyboard_cursor(
+    char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
+    int *row_out, int *col_out) {
+  const char *value;
+  char *endptr;
+  long row;
+  long col;
+
+  if (row_out) {
+    *row_out = -1;
+  }
+  if (col_out) {
+    *col_out = -1;
+  }
+  value = plumos_fbdev_find_value(lines, line_count,
+                                  "wifi_keyboard_cursor=");
+  if (!value) {
+    return 0;
+  }
+  row = strtol(value, &endptr, 10);
+  if (endptr == value || *endptr != ',') {
+    return 0;
+  }
+  value = endptr + 1;
+  col = strtol(value, &endptr, 10);
+  if (endptr == value || row < 0 || col < 0) {
+    return 0;
+  }
+  if (row_out) {
+    *row_out = (int)row;
+  }
+  if (col_out) {
+    *col_out = (int)col;
+  }
+  return 1;
+}
+
+static void plumos_fbdev_draw_text_token_row(
+    struct plumos_fbdev_renderer *r, const char *text, int selected_token,
+    int x, int y, int scale, int max_x, uint32_t color) {
+  const char *p = text;
+  int pen_x = 0;
+  int token_index = 0;
+  int space_width = plumos_fbdev_text_width_font(r, " ", scale, 1);
+  uint32_t selected_fg = plumos_fbdev_pack_color(r, 255, 224, 102);
+  uint32_t selected_bg = plumos_fbdev_pack_color(r, 56, 24, 5);
+
+  if (!text || scale <= 0) {
+    return;
+  }
+  while (*p) {
+    char token[32];
+    size_t token_len = 0;
+    size_t consumed;
+    int token_width;
+    int is_selected;
+
+    while (*p == ' ') {
+      pen_x += space_width;
+      p++;
+    }
+    if (!*p || x + pen_x >= max_x) {
+      break;
+    }
+    while (p[token_len] && p[token_len] != ' ' &&
+           token_len + 1 < sizeof(token)) {
+      token[token_len] = p[token_len];
+      token_len++;
+    }
+    token[token_len] = '\0';
+    consumed = token_len;
+    while (p[consumed] && p[consumed] != ' ') {
+      consumed++;
+    }
+    p += consumed;
+    if (!token[0]) {
+      continue;
+    }
+
+    token_width = plumos_fbdev_text_width_font(r, token, scale, 1);
+    is_selected = token_index == selected_token;
+    if (is_selected) {
+      plumos_fbdev_fill_rect(r, x + pen_x - 3, y - 4, token_width + 6,
+                             scale * 7 + 8, selected_bg);
+    }
+    plumos_fbdev_draw_text_font(r, x + pen_x, y, token, scale, 1,
+                                is_selected ? selected_fg : color, max_x);
+    pen_x += token_width;
+    token_index++;
+  }
+}
+
 static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
                                        char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX],
                                        size_t line_count,
@@ -2971,9 +3063,13 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
   int right_x;
   int cell_width;
   int y;
+  int wifi_connect_page;
+  int wifi_keyboard_row = -1;
+  int wifi_keyboard_col = -1;
   uint32_t accent;
   const char *footer1;
   const char *footer2;
+  const char *wifi_password;
 
   memset(selected, 0, sizeof(selected));
   plumos_fbdev_screen_title(title, sizeof(title), lines, line_count);
@@ -2996,6 +3092,11 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
                            : p->accent;
   footer1 = plumos_fbdev_find_value(lines, line_count, "footer1=");
   footer2 = plumos_fbdev_find_value(lines, line_count, "footer2=");
+  wifi_password = plumos_fbdev_find_value(lines, line_count, "wifi_password=");
+  wifi_connect_page = strstr(title, "Connect Wi-Fi") != NULL;
+  plumos_fbdev_find_wifi_keyboard_cursor(lines, line_count,
+                                         &wifi_keyboard_row,
+                                         &wifi_keyboard_col);
 
   for (i = 1; i < line_count && item_count < 18; i++) {
     const char *line = plumos_fbdev_ltrim(lines[i]);
@@ -3017,22 +3118,29 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
   plumos_fbdev_fill_rect(r, 0, 0, w, h, p->background);
   plumos_fbdev_draw_tty_top_bar(r);
   plumos_fbdev_fill_rect(r, 0, 0, 5, h, accent);
-  plumos_fbdev_draw_text(r, 14, 48, title, 2, p->muted, w - 8);
+  plumos_fbdev_draw_text_font(r, 14, 48, title, 2, wifi_connect_page,
+                              p->muted, w - 8);
   y = settings_family ? 82 : 104;
 
   for (i = 0; i < item_count; i++) {
+    int keyboard_row = wifi_keyboard_row >= 0;
+    int keyboard_selected = keyboard_row && (int)i == wifi_keyboard_row;
     uint32_t fg = selected[i] ? p->selection_foreground : p->foreground;
     if (y > h - 34) {
       break;
     }
-    if (selected[i]) {
+    if (selected[i] && !keyboard_selected) {
       plumos_fbdev_fill_rect(r, 10, y - 7, w - 20,
                              entry_scale * 7 + 10,
                              p->selection_background);
     }
     plumos_fbdev_draw_text(r, cursor_x, y, selected[i] ? ">" : " ",
                            entry_scale, fg, w - 8);
-    if (settings_page) {
+    if (keyboard_row) {
+      plumos_fbdev_draw_text_token_row(
+          r, items[i], keyboard_selected ? wifi_keyboard_col : -1,
+          name_x, y, entry_scale, w - 8, fg);
+    } else if (settings_page) {
       char setting_label[160];
       char setting_control[80];
       int control_width;
@@ -3055,18 +3163,30 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
         plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg, w - 8);
       }
     } else {
-      plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg, w - 8);
+      plumos_fbdev_draw_text_font(r, name_x, y, items[i], entry_scale,
+                                  wifi_connect_page, fg, w - 8);
     }
     y += line_height;
   }
-  if ((footer1 && footer1[0]) || (footer2 && footer2[0])) {
+  if ((footer1 && footer1[0]) || (footer2 && footer2[0]) ||
+      (wifi_password && wifi_password[0])) {
     plumos_fbdev_fill_rect(r, 0, h - 74, w, 74, p->panel_inner);
     plumos_fbdev_fill_rect(r, 0, h - 76, w, 2, p->panel);
-    if (footer1 && footer1[0]) {
-      plumos_fbdev_draw_text(r, 14, h - 56, footer1, 2, p->muted, w - 8);
+    if (wifi_password && wifi_password[0]) {
+      const char *label = "Password:";
+      int label_width = plumos_fbdev_text_width_font(r, label, 2, 1);
+      plumos_fbdev_draw_text_font(r, 14, h - 56, label, 2, 1,
+                                  p->muted, w - 8);
+      plumos_fbdev_draw_text_font(r, 14 + label_width + 12, h - 56,
+                                  wifi_password, 2, 1,
+                                  p->selection_foreground, w - 8);
+    } else if (footer1 && footer1[0]) {
+      plumos_fbdev_draw_text_font(r, 14, h - 56, footer1, 2,
+                                  wifi_connect_page, p->muted, w - 8);
     }
     if (footer2 && footer2[0]) {
-      plumos_fbdev_draw_text(r, 14, h - 34, footer2, 2, p->muted, w - 8);
+      plumos_fbdev_draw_text_font(r, 14, h - 34, footer2, 2,
+                                  wifi_connect_page, p->muted, w - 8);
     }
   }
   return 1;
