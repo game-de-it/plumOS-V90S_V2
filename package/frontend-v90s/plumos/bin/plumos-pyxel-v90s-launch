@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+VENV_DIR="${PLUMOS_PYXEL_VENV:-$PLUMOS_ROOT/venvs/pyxel}"
+PYTHON="$VENV_DIR/bin/python3"
+SDL2_DIR="${PLUMOS_V90S_SDL2_POWERVR_DIR:-$PLUMOS_ROOT/lib/plumos-sdl2-powervr}"
+AUDIO_HELPER="$PLUMOS_ROOT/bin/plumos-audio-output"
+
+[ -x "$PYTHON" ] || {
+  printf 'error: Pyxel environment is not installed: %s\n' "$VENV_DIR" >&2
+  printf 'run Apps -> Pyxel Setup first\n' >&2
+  exit 1
+}
+[ -r "$SDL2_DIR/libSDL2-2.0.so.0" ] || {
+  printf 'error: V90S SDL2 PowerVR runtime is missing: %s\n' "$SDL2_DIR" >&2
+  exit 1
+}
+
+if [ -x "$AUDIO_HELPER" ]; then
+  "$AUDIO_HELPER" prepare >/dev/null
+fi
+
+export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT
+export PYTHONNOUSERSITE=1
+export PYGAME_HIDE_SUPPORT_PROMPT=1
+export LD_LIBRARY_PATH="$SDL2_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-mali}"
+export SDL_RENDER_DRIVER="${SDL_RENDER_DRIVER:-software}"
+export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-alsa}"
+export AUDIODEV="${AUDIODEV:-plumos_output}"
+export ALSA_CONFIG_PATH="${ALSA_CONFIG_PATH:-$RUNTIME_ROOT/audio/asound.conf}"
+export ALSA_PLUGIN_DIR="${ALSA_PLUGIN_DIR:-$PLUMOS_ROOT/lib/alsa-lib}"
+
+exec "$PYTHON" "$@"

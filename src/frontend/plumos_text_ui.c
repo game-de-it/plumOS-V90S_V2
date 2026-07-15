@@ -2939,14 +2939,16 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
     char launcher_dir[PATH_MAX];
     char extension[32];
     const char *pyxel_profile = launch_profile + 6;
-    const char *launcher_name = "plumos-pyxel-mmf-launch";
+    const char *launcher_name = "plumos-pyxel-v90s-launch";
     const char *pyxel_command = NULL;
 
     copy_string(plan->kind, sizeof(plan->kind), "pyxel");
     if (strcmp(pyxel_profile, "a30") == 0) {
       launcher_name = "plumos-pyxel-a30-launch";
-    } else if (!pyxel_profile[0] || strcmp(pyxel_profile, "mmf") == 0) {
+    } else if (strcmp(pyxel_profile, "mmf") == 0) {
       launcher_name = "plumos-pyxel-mmf-launch";
+    } else if (!pyxel_profile[0] || strcmp(pyxel_profile, "v90s") == 0) {
+      launcher_name = "plumos-pyxel-v90s-launch";
     } else {
       plan->can_execute = 0;
       return 1;

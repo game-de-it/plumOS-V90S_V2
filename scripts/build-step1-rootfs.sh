@@ -1189,7 +1189,7 @@ EOF
 
 build_release_system() {
     root="$work_dir/release-system-root"
-    release_packages="alsa-utils,input-utils,procps,psmisc,kmod,dosfstools,coreutils,util-linux,openssh-server,wpasupplicant,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates"
+    release_packages="alsa-utils,input-utils,procps,psmisc,kmod,dosfstools,coreutils,util-linux,openssh-server,wpasupplicant,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates,python3,python3-venv,python3-pip"
     if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
         printf 'error: release-system refuses embedded Wi-Fi or SSH credentials; use an explicit development profile\n' >&2
         exit 2

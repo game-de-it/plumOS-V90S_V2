@@ -1,0 +1,211 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+ROM_DIR="${PLUMOS_PYXEL_ROM_DIR:-$PLUMOS_ROOT/roms/pyxel}"
+REQUIREMENTS="${PLUMOS_PYXEL_REQUIREMENTS:-$ROM_DIR/requirements.txt}"
+VENV_DIR="${PLUMOS_PYXEL_VENV:-$PLUMOS_ROOT/venvs/pyxel}"
+CACHE_DIR="${PLUMOS_PYXEL_PIP_CACHE:-$PLUMOS_ROOT/cache/pip}"
+TMP_DIR="${PLUMOS_PYXEL_PIP_TMP:-$PLUMOS_ROOT/cache/pip-tmp}"
+LOCK_DIR="${PLUMOS_PYXEL_SETUP_LOCK:-$RUNTIME_ROOT/pyxel-setup.lock}"
+BACKUP_DIR="${VENV_DIR}.previous"
+INSTALL_TIMEOUT="${PLUMOS_PYXEL_INSTALL_TIMEOUT:-900}"
+ONLY_BINARY="${PLUMOS_PYXEL_PIP_ONLY_BINARY:-1}"
+
+export PIP_CACHE_DIR="$CACHE_DIR"
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+export PIP_NO_INPUT=1
+export PYGAME_HIDE_SUPPORT_PROMPT=1
+export TMPDIR="$TMP_DIR"
+
+log() {
+  printf '%s\n' "$*"
+}
+
+fail() {
+  log "ERROR: $*"
+  exit 1
+}
+
+is_uint() {
+  case "${1:-}" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+release_lock() {
+  rm -rf "$LOCK_DIR" 2>/dev/null || true
+}
+
+restore_previous() {
+  rm -rf "$VENV_DIR" 2>/dev/null || return 1
+  if [ -d "$BACKUP_DIR" ]; then
+    mv "$BACKUP_DIR" "$VENV_DIR" 2>/dev/null || return 1
+  fi
+  return 0
+}
+
+rollback_and_fail() {
+  reason="$1"
+  if restore_previous; then
+    fail "$reason; the previous environment was restored"
+  fi
+  fail "$reason; restoring the previous environment also failed"
+}
+
+runtime_library_path() {
+  printf '%s' "$PLUMOS_ROOT/lib/plumos-sdl2-powervr"
+  [ -z "${LD_LIBRARY_PATH:-}" ] || printf ':%s' "$LD_LIBRARY_PATH"
+}
+
+create_fat_venv() {
+  python3 - "$VENV_DIR" <<'PY'
+import os
+import sys
+import venv
+
+env_dir = os.path.abspath(sys.argv[1])
+lib64_path = os.path.join(env_dir, "lib64")
+original_symlink = os.symlink
+
+
+def fat_safe_symlink(source, destination, *args, **kwargs):
+    # CPython creates this optional alias even with --copies. FAT32 cannot.
+    if source == "lib" and os.path.abspath(destination) == lib64_path:
+        return
+    return original_symlink(source, destination, *args, **kwargs)
+
+
+os.symlink = fat_safe_symlink
+venv.EnvBuilder(
+    system_site_packages=False,
+    clear=False,
+    symlinks=False,
+    with_pip=True,
+).create(env_dir)
+PY
+}
+
+verify_environment() {
+  LD_LIBRARY_PATH="$(runtime_library_path)" "$VENV_DIR/bin/python3" - <<'PY'
+from importlib import import_module, metadata
+
+modules = (
+    ("pyxel", "pyxel"),
+    ("pygame", "pygame"),
+    ("numpy", "numpy"),
+    ("Pillow", "PIL"),
+)
+for distribution, module in modules:
+    import_module(module)
+    print(f"verified {distribution}={metadata.version(distribution)}")
+PY
+}
+
+run_pip_install() {
+  pip="$VENV_DIR/bin/python3"
+  if command -v timeout >/dev/null 2>&1; then
+    if [ "$ONLY_BINARY" = "0" ]; then
+      timeout "$INSTALL_TIMEOUT" "$pip" -m pip install --progress-bar off \
+        --requirement "$REQUIREMENTS"
+    else
+      timeout "$INSTALL_TIMEOUT" "$pip" -m pip install --progress-bar off \
+        --only-binary=:all: --requirement "$REQUIREMENTS"
+    fi
+  elif [ "$ONLY_BINARY" = "0" ]; then
+    "$pip" -m pip install --progress-bar off --requirement "$REQUIREMENTS"
+  else
+    "$pip" -m pip install --progress-bar off --only-binary=:all: \
+      --requirement "$REQUIREMENTS"
+  fi
+}
+
+print_status() {
+  log "Pyxel Setup status"
+  log "requirements=$REQUIREMENTS"
+  log "venv=$VENV_DIR"
+  if ! command -v python3 >/dev/null 2>&1; then
+    log "runtime=missing (python3 is not in the system squashfs)"
+    return 1
+  fi
+  log "runtime=$(python3 --version 2>&1)"
+  if [ ! -r "$REQUIREMENTS" ]; then
+    log "requirements=missing"
+    return 1
+  fi
+  if [ ! -x "$VENV_DIR/bin/python3" ]; then
+    log "environment=not installed"
+    return 1
+  fi
+  "$VENV_DIR/bin/python3" -m pip check || return 1
+  verify_environment
+}
+
+install_environment() {
+  is_uint "$INSTALL_TIMEOUT" || fail "invalid install timeout: $INSTALL_TIMEOUT"
+  command -v python3 >/dev/null 2>&1 ||
+    fail "python3 is missing; install the Pyxel-enabled system squashfs first"
+  python3 -m venv --help >/dev/null 2>&1 ||
+    fail "python3-venv is missing from the system squashfs"
+  [ -r "$REQUIREMENTS" ] ||
+    fail "requirements.txt not found: $REQUIREMENTS"
+
+  mkdir -p "$RUNTIME_ROOT" "$(dirname "$VENV_DIR")" "$CACHE_DIR" "$TMP_DIR" ||
+    fail "cannot create Pyxel setup directories"
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    fail "another Pyxel setup is already running"
+  fi
+  trap 'release_lock' EXIT
+  trap 'release_lock; exit 130' HUP INT TERM
+
+  if [ -d "$BACKUP_DIR" ]; then
+    log "recovering the environment preserved by an interrupted setup"
+    rm -rf "$VENV_DIR" 2>/dev/null ||
+      fail "cannot remove an interrupted environment"
+    mv "$BACKUP_DIR" "$VENV_DIR" || fail "cannot recover previous environment"
+  fi
+
+  log "Pyxel Setup"
+  log "runtime=$(python3 --version 2>&1)"
+  log "requirements=$REQUIREMENTS"
+  log "requirements_sha256=$(sha256sum "$REQUIREMENTS" | awk '{print $1}')"
+  log "venv=$VENV_DIR"
+  log "pip_policy=$([ "$ONLY_BINARY" = "0" ] && printf source-allowed || printf binary-wheels-only)"
+
+  rm -rf "$BACKUP_DIR" 2>/dev/null || fail "cannot remove stale backup environment"
+  if [ -d "$VENV_DIR" ]; then
+    mv "$VENV_DIR" "$BACKUP_DIR" || fail "cannot preserve current environment"
+  fi
+
+  if ! create_fat_venv; then
+    rollback_and_fail "venv creation failed"
+  fi
+  run_pip_install
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -eq 124 ]; then
+      rollback_and_fail "pip timed out after ${INSTALL_TIMEOUT}s"
+    fi
+    rollback_and_fail "pip install failed rc=$rc"
+  fi
+  if ! "$VENV_DIR/bin/python3" -m pip check; then
+    rollback_and_fail "pip dependency check failed"
+  fi
+  if ! verify_environment; then
+    rollback_and_fail "module import verification failed"
+  fi
+
+  rm -rf "$BACKUP_DIR" 2>/dev/null || true
+  log "RESULT: Pyxel environment installed successfully"
+}
+
+case "${1:-install}" in
+  install) install_environment ;;
+  status) print_status ;;
+  *)
+    log "usage: plumos-pyxel-setup [install|status]"
+    exit 2
+    ;;
+esac

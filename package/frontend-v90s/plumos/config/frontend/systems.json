@@ -1474,8 +1474,8 @@
           {"root": "sdcard", "path": "Images/pyxel"}
         ]
       },
-      "launch_profiles": ["pyxel:mmf"],
-      "default_launch_profile": "pyxel:mmf",
+      "launch_profiles": ["pyxel:v90s"],
+      "default_launch_profile": "pyxel:v90s",
       "default_cpu_policy": "interactive",
       "scraper": {
         "enabled": false,

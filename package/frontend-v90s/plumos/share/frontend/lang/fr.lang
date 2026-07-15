@@ -40,6 +40,8 @@ app.thumbnail-results.name=Résultats des miniatures
 app.settings.name=Paramètres
 app.network.name=Réseau
 app.retroarch.name=RetroArch
+app.pyxel_setup.name=Configuration Pyxel
+pyxel_setup.running.installing=Installation des modules depuis requirements.txt
 
 scraping.title=Scraping
 scraping.instructions=HAUT/BAS: élément  G/D: changer  A: démarrer  SELECT: résultats  B: applis  Q: quitter

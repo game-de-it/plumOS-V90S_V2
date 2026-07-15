@@ -34,6 +34,15 @@
       "menu": "apps"
     },
     {
+      "id": "pyxel_setup",
+      "display_name": "Pyxel Setup",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-pyxel-setup install",
+      "show_results": true,
+      "visible": true,
+      "menu": "apps"
+    },
+    {
       "id": "thumbnail-plan",
       "display_name": "Thumbnail Plan",
       "kind": "tool",

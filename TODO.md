@@ -578,6 +578,17 @@ Build plumOS V90S as a V90S-specific distribution:
   setting writes, fix the validated internal codec DAC gain at `190,190`, and
   route user volume for both speaker and USB-DAC through the ALSA hotplug
   plugin's software gain.
+- [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
+  release-system squashfs while keeping pip-installed modules on p7.
+- [x] Add `Apps -> Pyxel Setup` to install
+  `/mnt/plumos/roms/pyxel/requirements.txt` into the FAT-safe copied venv at
+  `/mnt/plumos/venvs/pyxel`, preserve the previous venv on failure, and show
+  the complete result in the frontend.
+- [x] Replace the inherited `pyxel:mmf` V90S default with the device-owned
+  `pyxel:v90s` launcher contract.
+- [ ] Boot the Pyxel-enabled system image on V90S, run Pyxel Setup through the
+  physical FE controls, and validate a `.py` and `.pyxapp` launch including
+  video, audio, controls, and clean return to FE.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.

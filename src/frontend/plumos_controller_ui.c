@@ -650,6 +650,7 @@ struct ui_state {
   size_t thumbnail_result_count;
   size_t thumbnail_result_cursor;
   char thumbnail_running_title[128];
+  char thumbnail_result_return_app_id[64];
   char thumbnail_running_phase[32];
   char thumbnail_running_system[64];
   long thumbnail_progress_current;
@@ -6697,6 +6698,16 @@ static void add_thumbnail_result_from_log_line(struct ui_state *ui, const char *
     snprintf(out, sizeof(out), "%s is already running",
              thumbnail_action_label(ui, fields[1]));
     add_thumbnail_result_line(ui, out);
+  } else if (strcmp(ui->thumbnail_result_return_app_id, "scraping") != 0) {
+    char *p;
+
+    copy_truncated_string(out, sizeof(out), line);
+    for (p = out; *p; p++) {
+      if (*p == '\t') {
+        *p = ' ';
+      }
+    }
+    add_thumbnail_result_line(ui, out);
   }
 }
 
@@ -9337,6 +9348,9 @@ static void render_scraping(struct ui_state *ui) {
 }
 
 static void render_thumbnail_results(struct ui_state *ui) {
+  const char *result_owner = ui->thumbnail_running_title[0]
+                                 ? ui->thumbnail_running_title
+                                 : tr(ui, "app.scraping.name", "Scraping");
   size_t i;
   size_t window = ui_list_window_size(ui);
   size_t start = 0;
@@ -9345,8 +9359,12 @@ static void render_thumbnail_results(struct ui_state *ui) {
   if (window == 0) {
     window = UI_THUMBNAIL_RESULT_WINDOW;
   }
-  ui_printf(ui, "plumOS controller UI - %s\n",
-            tr(ui, "scraping_results.title", "Scraping Results"));
+  if (strcmp(ui->thumbnail_result_return_app_id, "scraping") == 0) {
+    ui_printf(ui, "plumOS controller UI - %s\n",
+              tr(ui, "scraping_results.title", "Scraping Results"));
+  } else {
+    ui_printf(ui, "plumOS controller UI - %s Results\n", result_owner);
+  }
   ui_printf(ui, "thumbnail_results_screen=1\n");
   ui_printf(ui, "%s\n",
             tr(ui, "scraping_results.instructions",
@@ -9381,9 +9399,13 @@ static void render_thumbnail_running(struct ui_state *ui) {
   const char *title = ui->thumbnail_running_title[0]
                           ? ui->thumbnail_running_title
                           : "Thumbnail Task";
-  int scraping = strcmp(title, "Scraping") == 0;
-  const char *display_title = scraping ? tr(ui, "scraping.title", "Scraping")
-                                       : tr(ui, "thumbnail_task.title", title);
+  int scraping = strcmp(ui->thumbnail_result_return_app_id, "scraping") == 0;
+  int pyxel_setup = strcmp(ui->thumbnail_result_return_app_id, "pyxel_setup") == 0;
+  const char *display_title = scraping
+                                  ? tr(ui, "scraping.title", "Scraping")
+                                  : (pyxel_setup
+                                         ? title
+                                         : tr(ui, "thumbnail_task.title", title));
   const char *phase = ui->thumbnail_running_phase[0]
                           ? ui->thumbnail_running_phase
                           : "starting";
@@ -9403,9 +9425,15 @@ static void render_thumbnail_running(struct ui_state *ui) {
     percent = (ui->thumbnail_progress_current * 100) / ui->thumbnail_progress_total;
   }
 
-  ui_printf(ui, "plumOS controller UI - %s\n",
-            scraping ? tr(ui, "scraping_running.title", "Scraping Running")
-                     : tr(ui, "thumbnail_running.title", "Thumbnail Running"));
+  if (scraping) {
+    ui_printf(ui, "plumOS controller UI - %s\n",
+              tr(ui, "scraping_running.title", "Scraping Running"));
+  } else if (pyxel_setup) {
+    ui_printf(ui, "plumOS controller UI - %s Running\n", title);
+  } else {
+    ui_printf(ui, "plumOS controller UI - %s\n",
+              tr(ui, "thumbnail_running.title", "Thumbnail Running"));
+  }
   ui_printf(ui, "thumbnail_running=1\n");
   ui_printf(ui, "thumbnail_running_title=%s\n", title);
   ui_printf(ui, "thumbnail_running_phase=%s\n", phase_label);
@@ -9417,10 +9445,28 @@ static void render_thumbnail_running(struct ui_state *ui) {
             ui->thumbnail_progress_downloaded,
             ui->thumbnail_progress_no_match,
             ui->thumbnail_progress_failed);
-  ui_printf(ui, "entries=6 cursor=1\n");
+  ui_printf(ui, "entries=%d cursor=1\n", pyxel_setup ? 4 : 6);
   ui_printf(ui, "\n");
   ui_printf(ui, ">   1  %s: %s\n",
             tr(ui, "scraping_running.field.running", "RUNNING"), display_title);
+  if (pyxel_setup) {
+    ui_printf(ui, "    2  %s\n",
+              tr(ui, "pyxel_setup.running.installing",
+                 "Installing modules from requirements.txt"));
+    ui_printf(ui, "    3  %s\n",
+              tr(ui, "scraping_running.hint.results_auto",
+                 "Results will open automatically"));
+    ui_printf(ui, "    4  %s\n",
+              tr(ui, "scraping_running.hint.no_poweroff", "Do not power off"));
+    ui_printf(ui, "footer1=%s is running.\n", title);
+    ui_printf(ui, "footer2=%s\n",
+              tr(ui, "scraping_running.footer2",
+                 "The latest result will open when it finishes."));
+    if (ui->status[0]) {
+      ui_printf(ui, "\nstatus: %s\n", ui->status);
+    }
+    return;
+  }
   if (percent >= 0) {
     ui_printf(ui, "    2  %s: %ld / %ld (%ld%%)\n",
               tr(ui, "scraping_running.field.progress", "Progress"),
@@ -10043,6 +10089,10 @@ static void open_help_screen(struct ui_state *ui) {
 }
 
 static void open_thumbnail_results_screen(struct ui_state *ui) {
+  copy_tr(ui, "app.scraping.name", "Scraping", ui->thumbnail_running_title,
+          sizeof(ui->thumbnail_running_title));
+  copy_string(ui->thumbnail_result_return_app_id,
+              sizeof(ui->thumbnail_result_return_app_id), "scraping");
   ui->screen = SCREEN_THUMBNAIL_RESULTS;
   ui->thumbnail_result_cursor = 0;
   if (!load_thumbnail_results(ui)) {
@@ -10055,6 +10105,10 @@ static void open_thumbnail_results_screen(struct ui_state *ui) {
 }
 
 static void open_scraping_screen(struct ui_state *ui) {
+  copy_tr(ui, "app.scraping.name", "Scraping", ui->thumbnail_running_title,
+          sizeof(ui->thumbnail_running_title));
+  copy_string(ui->thumbnail_result_return_app_id,
+              sizeof(ui->thumbnail_result_return_app_id), "scraping");
   ui->screen = SCREEN_SCRAPING;
   set_status(ui, tr(ui, "scraping.status.refreshing_roms", "refreshing ROM list"));
   render_ui(ui);
@@ -11748,6 +11802,8 @@ static int run_menu_shell_action(struct ui_state *ui, const struct menu_entry *e
   if (entry->show_results) {
     copy_string(ui->thumbnail_running_title, sizeof(ui->thumbnail_running_title),
                 entry->display_name);
+    copy_string(ui->thumbnail_result_return_app_id,
+                sizeof(ui->thumbnail_result_return_app_id), entry->id);
     ui->screen = SCREEN_THUMBNAIL_RUNNING;
     snprintf(ui->status, sizeof(ui->status), "running %.80s", entry->display_name);
   } else {
@@ -13268,7 +13324,9 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
     }
     if (action == ACTION_B) {
       open_apps_menu(ui);
-      select_menu_entry_by_id(ui, "scraping");
+      select_menu_entry_by_id(ui, ui->thumbnail_result_return_app_id[0]
+                                      ? ui->thumbnail_result_return_app_id
+                                      : "scraping");
       return;
     }
     if (action == ACTION_A || action == ACTION_SELECT) {

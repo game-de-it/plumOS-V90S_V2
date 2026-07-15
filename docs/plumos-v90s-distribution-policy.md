@@ -512,6 +512,7 @@ plumOS-built applications.
 - development-mode Wi-Fi and SSH support
 - safe process stop/restart helpers
 - minimal diagnostics and recovery console
+- base Python 3 runtime, `venv`, and `pip` tooling for user-managed Python apps
 - launch wrappers that execute applications from the app layer
 - default configuration templates
 - base notices and licenses
@@ -530,6 +531,7 @@ test ROM or temporary payload only when the profile name makes that explicit.
 - PicoArch/PICO payloads
 - standalone emulators
 - frontend
+- user-created Python virtual environments, wheel caches, and Python app modules
 - plumOS-owned private libraries
 - default and user-editable config directories
 - themes and assets
@@ -997,6 +999,12 @@ vendor runtime trees there. Keep boot, kernel, PowerVR, audio, input, and other
 hardware-critical runtime pieces in the protected system/vendor layer unless a
 specific replacement is validated.
 
+Python virtual environments on FAT32 must be created without symbolic links.
+In particular, CPython's optional `lib64 -> lib` alias must be omitted while
+the environment's interpreter files are copied. Normal Python app modules must
+remain outside the squashfs so a user can replace `requirements.txt` and
+recreate the environment without rewriting the SD image.
+
 Follow-up:
 
 Choose and validate the actual FAT32 app-layer partition, then define the
@@ -1283,3 +1291,39 @@ partially damaged FAT32 partition from changing the boot contract. Keeping
 volatile high-churn files off p7 reduces needless FAT updates and eliminates
 stale PID/lock state after a reset, while preserving the Windows/macOS copy-over
 update model for user-facing applications and data.
+
+### 2026-07-16: Pyxel Python and Virtual-Environment Boundary
+
+Decision:
+
+The system squashfs owns the Bookworm Python 3 interpreter and the standard
+`venv` and `pip` tooling. Pyxel and project-specific Python modules are not
+baked into the squashfs. They are installed into the p7 app/data layer:
+
+```text
+requirements: /mnt/plumos/roms/pyxel/requirements.txt
+venv:         /mnt/plumos/venvs/pyxel
+wheel cache:  /mnt/plumos/cache/pip
+temporary:    /mnt/plumos/cache/pip-tmp
+```
+
+`Apps -> Pyxel Setup` is the user-facing installer. It must return a bounded
+failure when Python, `requirements.txt`, networking, or a compatible wheel is
+unavailable, and it must display the captured result in the frontend. The
+normal policy accepts binary wheels only so an SD-card install cannot
+unexpectedly begin a native compiler/Rust toolchain build. A failed update
+restores the previous working virtual environment.
+
+The V90S launch profile is `pyxel:v90s` and executes through
+`/mnt/plumos/bin/plumos-pyxel-v90s-launch`. MMF and A30 launcher names remain
+device-specific compatibility profiles and must not be used as the V90S
+default.
+
+Rationale:
+
+Keeping Python itself read-only makes the interpreter and standard library
+stable across resets. Keeping pip-installed modules on p7 preserves the normal
+Windows/macOS copy-over workflow and allows a project's `requirements.txt` to
+change independently of the OS image. The FAT-safe venv creator skips only
+CPython's optional `lib64` symlink and otherwise uses the standard copied-file
+venv layout.

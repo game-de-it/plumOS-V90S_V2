@@ -40,6 +40,8 @@ app.thumbnail-results.name=Thumbnail Results
 app.settings.name=Settings
 app.network.name=Network
 app.retroarch.name=RetroArch
+app.pyxel_setup.name=Pyxel Setup
+pyxel_setup.running.installing=Installing modules from requirements.txt
 
 scraping.title=Scraping
 scraping.instructions=UP/DOWN: item  LEFT/RIGHT: change  A: start  SELECT: results  B: Apps  Q: quit
