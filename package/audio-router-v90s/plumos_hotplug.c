@@ -17,6 +17,7 @@
 #define INTERNAL_CARD 0
 #define MAX_CARD_INDEX 15
 #define USB_PROBE_INTERVAL 8
+#define VOLUME_PROBE_INTERVAL 16
 
 typedef struct {
     snd_pcm_ioplug_t io;
@@ -28,12 +29,83 @@ typedef struct {
     int16_t *output_buffer;
     size_t output_capacity;
     unsigned int probe_countdown;
+    unsigned int volume_probe_countdown;
+    int volume_level;
     struct timespec last_transfer;
     int producer_is_fast;
     int allow_fast_drop;
     unsigned int fast_streak;
     unsigned int normal_streak;
 } plumos_pcm_t;
+
+static int clamp_volume(int volume)
+{
+    if (volume < 0)
+        return 0;
+    if (volume > 20)
+        return 20;
+    return volume;
+}
+
+static int read_volume_file(const char *path, int json)
+{
+    char buffer[1024];
+    char *cursor;
+    char *end;
+    FILE *fp = fopen(path, "r");
+    long value;
+    size_t length;
+
+    if (!fp)
+        return -1;
+    length = fread(buffer, 1, sizeof(buffer) - 1, fp);
+    fclose(fp);
+    buffer[length] = '\0';
+    cursor = buffer;
+    if (json) {
+        cursor = strstr(buffer, "\"volume\"");
+        if (!cursor)
+            return -1;
+        cursor = strchr(cursor, ':');
+        if (!cursor)
+            return -1;
+        cursor++;
+    }
+    errno = 0;
+    value = strtol(cursor, &end, 10);
+    if (errno || end == cursor)
+        return -1;
+    return clamp_volume((int)value);
+}
+
+static int read_system_volume(void)
+{
+    const char *root;
+    char settings[PATH_MAX];
+    int volume = read_volume_file("/run/plumos/volume/current", 0);
+
+    if (volume >= 0)
+        return volume;
+    root = getenv("PLUMOS_ROOT");
+    if (!root || !root[0])
+        root = "/mnt/plumos";
+    if (snprintf(settings, sizeof(settings), "%s/config/system/settings.json",
+                 root) >= (int)sizeof(settings))
+        return 14;
+    volume = read_volume_file(settings, 1);
+    return volume >= 0 ? volume : 14;
+}
+
+static int16_t apply_software_volume(int16_t sample, int volume)
+{
+    int32_t scaled;
+
+    volume = clamp_volume(volume);
+    if (volume == 20)
+        return sample;
+    scaled = (int32_t)sample * volume;
+    return (int16_t)(scaled / 20);
+}
 
 static int card_has_usb_id(int card)
 {
@@ -280,6 +352,13 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
             offset * areas[0].step / 8;
     update_producer_speed(pcm, size);
 
+    if (pcm->volume_probe_countdown == 0) {
+        pcm->volume_level = read_system_volume();
+        pcm->volume_probe_countdown = VOLUME_PROBE_INTERVAL;
+    } else {
+        pcm->volume_probe_countdown--;
+    }
+
     if (pcm->probe_countdown == 0) {
         err = switch_route(pcm, 0);
         if (err < 0)
@@ -296,7 +375,8 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
     }
 
     output = input;
-    if (io->format == SND_PCM_FORMAT_FLOAT_LE || !pcm->physical_is_usb) {
+    if (io->format == SND_PCM_FORMAT_FLOAT_LE || !pcm->physical_is_usb ||
+        pcm->volume_level < 20) {
         err = ensure_output_buffer(pcm, size);
         if (err < 0)
             return err;
@@ -316,6 +396,9 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
                 int16_t mono = (int16_t)(((int32_t)left + right) / 2);
                 left = mono;
                 right = mono;
+            } else {
+                left = apply_software_volume(left, pcm->volume_level);
+                right = apply_software_volume(right, pcm->volume_level);
             }
             pcm->output_buffer[frame * 2] = left;
             pcm->output_buffer[frame * 2 + 1] = right;
@@ -355,9 +438,26 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
                 for (frame = 0; frame < size; frame++) {
                     const float *float_input = input;
                     pcm->output_buffer[frame * 2] =
-                        float_to_s16(float_input[frame * 2]);
+                        apply_software_volume(
+                            float_to_s16(float_input[frame * 2]),
+                            pcm->volume_level);
                     pcm->output_buffer[frame * 2 + 1] =
-                        float_to_s16(float_input[frame * 2 + 1]);
+                        apply_software_volume(
+                            float_to_s16(float_input[frame * 2 + 1]),
+                            pcm->volume_level);
+                }
+                output = pcm->output_buffer;
+            } else if (pcm->volume_level < 20) {
+                const int16_t *s16_input = input;
+
+                err = ensure_output_buffer(pcm, size);
+                if (err < 0)
+                    return err;
+                for (frame = 0; frame < size; frame++) {
+                    pcm->output_buffer[frame * 2] = apply_software_volume(
+                        s16_input[frame * 2], pcm->volume_level);
+                    pcm->output_buffer[frame * 2 + 1] = apply_software_volume(
+                        s16_input[frame * 2 + 1], pcm->volume_level);
                 }
                 output = pcm->output_buffer;
             } else {
@@ -495,6 +595,7 @@ SND_PCM_PLUGIN_DEFINE_FUNC(plumos_hotplug)
     if (!pcm)
         return -ENOMEM;
     pcm->physical_card = -1;
+    pcm->volume_level = read_system_volume();
     pcm->allow_fast_drop =
         getenv("PLUMOS_AUDIO_FAST_FORWARD_DROP") &&
         !strcmp(getenv("PLUMOS_AUDIO_FAST_FORWARD_DROP"), "1");

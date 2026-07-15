@@ -13840,9 +13840,10 @@ static enum ui_action action_from_key_code(unsigned int code) {
   case KEY_ESC:
     return ACTION_NONE;
   case KEY_VOLUMEDOWN:
-    return ACTION_VOLUME_DOWN;
   case KEY_VOLUMEUP:
-    return ACTION_VOLUME_UP;
+    /* The boot-persistent hardware-key service owns the physical V90S
+     * volume keys so they keep working after the frontend exits. */
+    return ACTION_NONE;
   case KEY_Q:
     return ACTION_QUIT;
   default:

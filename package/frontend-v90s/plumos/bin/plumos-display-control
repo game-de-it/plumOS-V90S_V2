@@ -1,0 +1,138 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+SYSTEM_SETTINGS="${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/settings.json}"
+RUNTIME_STATE="${PLUMOS_DISPLAY_RUNTIME_STATE:-/run/plumos/display/lumination}"
+LOG="${PLUMOS_DISPLAY_LOG:-/run/plumos/display/last-apply.log}"
+ENHANCE_BRIGHT="${PLUMOS_V90S_ENHANCE_BRIGHT:-/sys/class/disp/disp/attr/enhance_bright}"
+
+mkdir -p "${RUNTIME_STATE%/*}" "${LOG%/*}" 2>/dev/null || true
+
+usage() {
+  cat <<USAGE
+Usage: plumos-display-control apply [0..10]|up|down|get|status
+       plumos-display-control runtime-up|runtime-down|persist-runtime
+
+Controls V90S display luminance through enhance_bright. The vendor kernel does
+not expose a hardware backlight control.
+USAGE
+}
+
+normalize_level() {
+  value="${1:-}"
+  case "$value" in
+    ""|*[!0-9]*) return 1 ;;
+  esac
+  value="$(printf '%s' "$value" | sed 's/^0*//')"
+  [ -n "$value" ] || value=0
+  [ "$value" -gt 10 ] && value=10
+  printf '%s\n' "$value"
+}
+
+read_saved_level() {
+  value=""
+  if [ -r "$SYSTEM_SETTINGS" ]; then
+    value="$(sed -n 's/.*"lumination"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$SYSTEM_SETTINGS" 2>/dev/null | head -n 1)"
+  fi
+  normalize_level "${value:-5}" || printf '%s\n' 5
+}
+
+read_runtime_level() {
+  value=""
+  if [ -r "$RUNTIME_STATE" ]; then
+    value="$(sed -n '1s/^\([0-9][0-9]*\).*$/\1/p' "$RUNTIME_STATE" 2>/dev/null | head -n 1)"
+  fi
+  case "$value" in
+    ""|*[!0-9]*) read_saved_level ;;
+    *) normalize_level "$value" ;;
+  esac
+}
+
+write_runtime_level() {
+  level="$(normalize_level "$1")" || return 2
+  tmp="$RUNTIME_STATE.tmp.$$"
+  printf '%s\n' "$level" >"$tmp" || { rm -f "$tmp"; return 1; }
+  mv -f "$tmp" "$RUNTIME_STATE" || { rm -f "$tmp"; return 1; }
+}
+
+write_saved_level() {
+  level="$(normalize_level "$1")" || return 2
+  settings_dir="${SYSTEM_SETTINGS%/*}"
+  mkdir -p "$settings_dir" 2>/dev/null || return 1
+  tmp="$SYSTEM_SETTINGS.tmp.$$"
+  if [ -r "$SYSTEM_SETTINGS" ] && grep -q '"lumination"[[:space:]]*:' "$SYSTEM_SETTINGS" 2>/dev/null; then
+    sed 's/"lumination"[[:space:]]*:[[:space:]]*[0-9][0-9]*/"lumination": '"$level"'/' \
+      "$SYSTEM_SETTINGS" >"$tmp" || { rm -f "$tmp"; return 1; }
+  else
+    cat >"$tmp" <<EOF
+{
+  "version": 1,
+  "lumination": $level
+}
+EOF
+  fi
+  mv -f "$tmp" "$SYSTEM_SETTINGS"
+}
+
+apply_level() {
+  level="$(normalize_level "${1:-$(read_runtime_level)}")" || return 2
+  [ -w "$ENHANCE_BRIGHT" ] || {
+    printf 'backend=unavailable\n' >"$LOG"
+    return 1
+  }
+  raw=$((level * 10))
+  printf '%s\n' "$raw" >"$ENHANCE_BRIGHT" || return 1
+  {
+    printf 'backend=v90s-disp-enhance\n'
+    printf 'lumination=%s\n' "$level"
+    printf 'enhance_bright=%s\n' "$raw"
+  } >"$LOG"
+}
+
+change_runtime() {
+  current="$(read_runtime_level)"
+  next=$((current + $1))
+  [ "$next" -lt 0 ] && next=0
+  [ "$next" -gt 10 ] && next=10
+  write_runtime_level "$next" || return 1
+  apply_level "$next"
+}
+
+change_saved() {
+  current="$(read_saved_level)"
+  next=$((current + $1))
+  [ "$next" -lt 0 ] && next=0
+  [ "$next" -gt 10 ] && next=10
+  write_saved_level "$next" || return 1
+  rm -f "$RUNTIME_STATE" 2>/dev/null || true
+  apply_level "$next"
+}
+
+case "${1:-}" in
+  apply) apply_level "${2:-$(read_runtime_level)}" ;;
+  up) change_saved 1 ;;
+  down) change_saved -1 ;;
+  runtime-up) change_runtime 1 ;;
+  runtime-down) change_runtime -1 ;;
+  persist-runtime)
+    level="$(read_runtime_level)"
+    write_saved_level "$level" || exit 1
+    rm -f "$RUNTIME_STATE" 2>/dev/null || true
+    apply_level "$level"
+    ;;
+  get) read_saved_level ;;
+  status)
+    if [ -w "$ENHANCE_BRIGHT" ]; then
+      printf 'backend=v90s-disp-enhance\n'
+      printf 'lumination=%s\n' "$(read_runtime_level)"
+      printf 'enhance_bright='
+      cat "$ENHANCE_BRIGHT"
+    else
+      printf 'backend=unavailable\n'
+      exit 1
+    fi
+    ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

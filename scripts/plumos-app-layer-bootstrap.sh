@@ -78,6 +78,10 @@ validate_app_layer() {
     COMPAT_VENDOR \
     VERSION \
     bin/plumos-frontend-launch \
+    bin/plumos-hardware-keys \
+    bin/plumos-hardware-keys-service \
+    bin/plumos-display-control \
+    bin/plumos-volume-control \
     bin/plumos-controller-ui-v90s \
     bin/plumos-controller-ui-fbdev \
     bin/plumos-text-ui \
@@ -100,6 +104,16 @@ validate_app_layer() {
 
 start_frontend() {
   validate_app_layer >/dev/null || return 1
+  if [ -x "$PLUMOS_ROOT/bin/plumos-hardware-keys-service" ]; then
+    log "starting hardware key service"
+    "$PLUMOS_ROOT/bin/plumos-hardware-keys-service" start >> "$LOG_FILE" 2>&1 || {
+      report_error "hardware key service failed to start"
+      return 1
+    }
+  else
+    report_error "hardware key service is missing"
+    return 1
+  fi
   log "starting frontend launcher=$PLUMOS_ROOT/bin/plumos-frontend-launch"
   exec "$PLUMOS_ROOT/bin/plumos-frontend-launch"
 }

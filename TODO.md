@@ -571,6 +571,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Live-test StockOS-style V90S input combos: `Select+Start` emits
   `BTN_MODE` in addition to Select/Start, while the tested `Select+R2`
   sequence did not switch the D-pad away from `ABS_HAT0X/Y`.
+- [x] Add and live-validate the boot-persistent V90S hardware-key service:
+  physical Volume +/- changes the global 0..20 volume, while Select+Volume +/-
+  changes the V90S display-enhance luminance. Keep the daemon independent of
+  FE/emulator lifetime, rediscover evdev nodes by device name, debounce FAT32
+  setting writes, and route USB-DAC volume through the ALSA hotplug plugin.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.

@@ -9,6 +9,7 @@ STRIP="${STRIP:-strip}"
 BUILD_STATIC="${PLUMOS_V90S_FRONTEND_STATIC:-0}"
 
 SRC_DIR="$ROOT_DIR/src/frontend"
+SERVICE_SRC_DIR="$ROOT_DIR/src/services"
 OUT_ROOT="$ROOT_DIR/$OUT_DIR"
 PLUMOS_DIR="$OUT_ROOT/plumos"
 BIN_DIR="$PLUMOS_DIR/bin"
@@ -174,6 +175,12 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" ]; then
       "$PLUMOS_ROOT/bin/plumos-sd2-content-mount" start >> "$log" 2>&1 || true
       ;;
   esac
+fi
+
+if [ -x "$PLUMOS_ROOT/bin/plumos-hardware-keys-service" ]; then
+  "$PLUMOS_ROOT/bin/plumos-hardware-keys-service" start >> "$log" 2>&1 || {
+    printf 'plumos-frontend-launch: hardware key service failed to start\n' >> "$log"
+  }
 fi
 
 exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s" >> "$log" 2>&1
@@ -453,6 +460,8 @@ build_c_tool "$SRC_DIR/plumos_frontend.c" "$BIN_DIR/plumos-frontend"
 build_c_tool "$SRC_DIR/plumos_library_scan.c" "$BIN_DIR/plumos-library-scan"
 build_c_tool "$SRC_DIR/plumos_text_ui.c" "$BIN_DIR/plumos-text-ui"
 build_c_tool "$SRC_DIR/plumos_controller_ui.c" "$BIN_DIR/plumos-controller-ui"
+build_c_tool "$SERVICE_SRC_DIR/plumos_v90s_hardware_keys.c" \
+  "$BIN_DIR/plumos-hardware-keys"
 build_fbdev_controller
 install_frontend_runtime
 
