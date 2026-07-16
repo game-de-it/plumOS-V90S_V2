@@ -41,6 +41,8 @@ app.settings.name=設定
 app.network.name=ネットワーク
 app.retroarch.name=RetroArch
 app.pyxel_setup.name=Pyxelセットアップ
+app.portmaster.name=PortMaster
+app.portmaster_update.name=PortMasterを更新
 pyxel_setup.running.installing=requirements.txtからモジュールをインストール中
 
 scraping.title=スクレイピング

@@ -29,6 +29,7 @@ Commands:
   nextcommander    Build the V90S NextCommander file manager app.
   file-manager     Alias for nextcommander.
   music-player     Build the V90S plumOS Music Player app.
+  portmaster       Package the pinned official PortMaster GUI with the V90S adapter.
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
   app-layer        Assemble the FAT32 plumOS app/update/data layer.
@@ -106,6 +107,10 @@ docker_env=(
     -e YABASANSHIRO_AS="${YABASANSHIRO_AS:-clang -c}"
     -e NEXTCOMMANDER_REF="${NEXTCOMMANDER_REF:-}"
     -e MINIAUDIO_REF="${MINIAUDIO_REF:-}"
+    -e PORTMASTER_VERSION="${PORTMASTER_VERSION:-2026.06.23-0015}"
+    -e PORTMASTER_URL="${PORTMASTER_URL:-}"
+    -e PORTMASTER_MD5="${PORTMASTER_MD5:-41d137e6bb123c755806939831bcce2f}"
+    -e PORTMASTER_SHA256="${PORTMASTER_SHA256:-772f2d56fc1abfbf79a3404ca78f240776c81c5a5b92786a0a748ae554339b7b}"
 )
 if [ -n "${PLUMOS_V90S_STOCKOS_ARTIFACT:-}" ]; then
     docker_env+=(-e PLUMOS_V90S_STOCKOS_ARTIFACT="$PLUMOS_V90S_STOCKOS_ARTIFACT")
@@ -206,6 +211,10 @@ case "$cmd" in
     music-player|musicplayer)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-music-player.sh "$@"
+        ;;
+    portmaster)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-portmaster.sh "$@"
         ;;
     sdl2-powervr|sdl2-ge8300)
         ensure_image

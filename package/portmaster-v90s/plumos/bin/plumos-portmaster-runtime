@@ -1,0 +1,73 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
+APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
+PM_DIR="${APP_ROOT}/upstream/PortMaster"
+ADAPTER_DIR="${APP_ROOT}/adapter"
+LIB_DIR="${RUN_ROOT}/lib"
+SONAME_MAP="${PLUMOS_ROOT}/config/standalone/soname-links.tsv"
+
+link_one() {
+  soname=$1
+  shift
+  for source in "$@"; do
+    if [ -f "$source" ]; then
+      ln -sf "$source" "${LIB_DIR}/${soname}"
+      return 0
+    fi
+  done
+  printf 'plumos-portmaster-runtime: missing library for %s\n' "$soname" >&2
+  return 1
+}
+
+prepare() {
+  [ -f "${PM_DIR}/pugwash" ] || {
+    printf 'plumos-portmaster-runtime: incomplete PortMaster payload: %s\n' "$PM_DIR" >&2
+    exit 1
+  }
+  mkdir -p "$RUN_ROOT" "$LIB_DIR" "${PLUMOS_ROOT}/Logs/apps"
+  [ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd 2>/dev/null || true
+  [ -e /dev/stdin ] || ln -s /proc/self/fd/0 /dev/stdin 2>/dev/null || true
+  [ -e /dev/stdout ] || ln -s /proc/self/fd/1 /dev/stdout 2>/dev/null || true
+  [ -e /dev/stderr ] || ln -s /proc/self/fd/2 /dev/stderr 2>/dev/null || true
+  find "$LIB_DIR" -type l -delete 2>/dev/null || true
+
+  if [ -f "$SONAME_MAP" ]; then
+    while IFS="$(printf '\t')" read -r soname real_name; do
+      [ -n "$soname" ] || continue
+      [ -f "${PLUMOS_ROOT}/lib/${real_name}" ] || continue
+      ln -sf "${PLUMOS_ROOT}/lib/${real_name}" "${LIB_DIR}/${soname}"
+    done < "$SONAME_MAP"
+  fi
+
+  link_one libSDL2-2.0.so.0 \
+    "${PLUMOS_ROOT}/lib/plumos-sdl2-powervr/libSDL2-2.0.so.0.3000.6" \
+    "${PLUMOS_ROOT}/lib/plumos-sdl2-powervr/libSDL2-2.0.so.0"
+  link_one libSDL2_image-2.0.so.0 \
+    "${PLUMOS_ROOT}/lib/libSDL2_image-2.0.so.0.600.3" \
+    "${PLUMOS_ROOT}/apps/nextcommander/lib/libSDL2_image-2.0.so.0.600.3"
+  link_one libSDL2_mixer-2.0.so.0 \
+    "${PLUMOS_ROOT}/lib/libSDL2_mixer-2.0.so.0.600.2"
+  link_one libSDL2_ttf-2.0.so.0 \
+    "${PLUMOS_ROOT}/apps/nextcommander/lib/libSDL2_ttf-2.0.so.0.2000.1"
+  link_one libSDL2_gfx-1.0.so.0 \
+    "${PLUMOS_ROOT}/lib/libSDL2_gfx-1.0.so.0.0.2"
+
+  cat > "${RUN_ROOT}/gamecontrollerdb.txt" <<'EOF'
+1900c50a330100009011000000000000,adc_gamepad,a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:b6,righttrigger:b7,crc:0ac5,platform:Linux
+EOF
+  cp -f "${ADAPTER_DIR}/control.txt" "${PM_DIR}/control.txt"
+  cp -f "${ADAPTER_DIR}/mod_plumOS.txt" "${PM_DIR}/mod_plumOS.txt"
+  chmod 0755 "${PM_DIR}/control.txt" "${PM_DIR}/mod_plumOS.txt"
+  printf '%s\n' "$LIB_DIR"
+}
+
+case "${1:-prepare}" in
+  prepare) prepare ;;
+  *)
+    printf 'usage: plumOS-portmaster-runtime prepare\n' >&2
+    exit 64
+    ;;
+esac

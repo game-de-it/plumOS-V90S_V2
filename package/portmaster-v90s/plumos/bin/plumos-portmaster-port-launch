@@ -1,0 +1,106 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
+APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
+ROMS_ROOT="${PLUMOS_ROOT}/roms"
+LOG_FILE="${PLUMOS_ROOT}/Logs/apps/portmaster-ports.log"
+PID_FILE="${RUN_ROOT}/port.pid"
+START_FILE="${RUN_ROOT}/port.starttime"
+SCRIPT_FILE="${RUN_ROOT}/port.script"
+child=""
+restore_frontend=0
+script="${1:-}"
+[ -n "$script" ] || { printf 'usage: plumOS-portmaster-port-launch SCRIPT [ARGS...]\n' >&2; exit 64; }
+shift
+script="$(readlink -f "$script" 2>/dev/null || true)"
+case "$script" in
+  "${ROMS_ROOT}"/[Pp][Oo][Rr][Tt][Ss]/*.sh)
+    port_relative="${script#"${ROMS_ROOT}"/}"
+    port_relative="${port_relative#*/}"
+    case "$port_relative" in
+      */*) printf 'refusing nested PortMaster helper script: %s\n' "$script" >&2; exit 64 ;;
+    esac
+    ;;
+  *) printf 'refusing script outside %s/ports: %s\n' "$ROMS_ROOT" "$script" >&2; exit 64 ;;
+esac
+[ -f "$script" ] || { printf 'missing PortMaster script: %s\n' "$script" >&2; exit 127; }
+
+frontend_is_ancestor() {
+  parent=$PPID
+  count=0
+  while [ "$parent" -gt 1 ] 2>/dev/null && [ "$count" -lt 16 ]; do
+    cmdline="$(tr '\000' ' ' < "/proc/${parent}/cmdline" 2>/dev/null || true)"
+    case "$cmdline" in
+      *plumos-controller-ui-v90s*|*plumos-controller-ui-fbdev*) return 0 ;;
+    esac
+    parent="$(sed 's/.*) //' "/proc/${parent}/stat" 2>/dev/null | awk '{print $2}' || true)"
+    case "$parent" in ''|*[!0-9]*) return 1 ;; esac
+    count=$((count + 1))
+  done
+  return 1
+}
+
+frontend_running() {
+  "${PLUMOS_ROOT}/bin/plumos-frontend-stop" status 2>/dev/null | grep -q 'pid='
+}
+
+cleanup() {
+  if [ -n "$child" ]; then
+    recorded="$(cat "$PID_FILE" 2>/dev/null || true)"
+    [ "$recorded" = "$child" ] && kill -TERM "-$child" 2>/dev/null || true
+  fi
+  "${PLUMOS_ROOT}/bin/plumos-portmaster-gptokeyb-stop" stop 2>/dev/null || true
+  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
+  if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
+    nohup "${PLUMOS_ROOT}/bin/plumos-frontend-launch" >/dev/null 2>&1 &
+  fi
+}
+
+trap cleanup EXIT HUP INT TERM
+
+if [ -f "$PID_FILE" ]; then
+  old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+  if [ -d "/proc/${old_pid}" ]; then
+    printf 'PortMaster port is already running: pid=%s\n' "$old_pid" >&2
+    exit 75
+  fi
+  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
+fi
+
+"${PLUMOS_ROOT}/bin/plumos-portmaster-runtime" prepare >/dev/null || exit 1
+audio_status="$("${PLUMOS_ROOT}/bin/plumos-audio-output" prepare 2>&1)" || {
+  printf 'PortMaster port audio prepare failed: %s\n' "$audio_status" >&2
+  exit 49
+}
+
+mkdir -p "$RUN_ROOT" "$(dirname "$LOG_FILE")" "${PLUMOS_ROOT}/state/portmaster/home"
+export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="/run/plumos"
+export HOME="${PLUMOS_ROOT}/state/portmaster/home"
+export XDG_CONFIG_HOME="${HOME}/.config"
+export XDG_DATA_HOME="${APP_ROOT}/upstream"
+export PATH="${APP_ROOT}/adapter/shims:${PLUMOS_ROOT}/bin:${PATH}"
+export LD_LIBRARY_PATH="/usr/lib/powervr:${RUN_ROOT}/lib:${PLUMOS_ROOT}/lib/plumos-sdl2-powervr:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+export SDL_VIDEODRIVER="mali"
+export SDL_AUDIODRIVER="alsa"
+export SDL_GAMECONTROLLERCONFIG_FILE="${RUN_ROOT}/gamecontrollerdb.txt"
+export ALSA_CONFIG_PATH="${PLUMOS_ALSA_CONFIG_PATH:-/run/plumos/audio/asound.conf}"
+export ALSA_PLUGIN_DIR="${PLUMOS_ALSA_PLUGIN_DIR:-${PLUMOS_ROOT}/lib/alsa-lib}"
+export AUDIODEV="plumos_output"
+
+if ! frontend_is_ancestor && frontend_running; then
+  "${PLUMOS_ROOT}/bin/plumos-frontend-stop" stop >> "$LOG_FILE" 2>&1
+  restore_frontend=1
+fi
+
+printf '\n[%s] script=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$script" \
+  "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
+setsid bash "$script" "$@" >> "$LOG_FILE" 2>&1 &
+child=$!
+printf '%s\n' "$child" > "$PID_FILE"
+sed 's/.*) //' "/proc/${child}/stat" | awk '{print $20}' > "$START_FILE"
+printf '%s\n' "$script" > "$SCRIPT_FILE"
+wait "$child"
+rc=$?
+exit "$rc"

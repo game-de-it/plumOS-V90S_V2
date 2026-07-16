@@ -1,0 +1,53 @@
+#!/bin/sh
+set -eu
+
+RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
+PID_FILE="${RUN_ROOT}/port.pid"
+START_FILE="${RUN_ROOT}/port.starttime"
+SCRIPT_FILE="${RUN_ROOT}/port.script"
+
+[ -f "$PID_FILE" ] || {
+  printf 'plumos-portmaster-port-stop: not running\n'
+  exit 0
+}
+pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+expected_start="$(cat "$START_FILE" 2>/dev/null || true)"
+script="$(cat "$SCRIPT_FILE" 2>/dev/null || true)"
+case "$pid" in ''|*[!0-9]*) printf 'plumos-portmaster-port-stop: invalid pid record\n' >&2; exit 1 ;; esac
+case "$expected_start" in ''|*[!0-9]*) printf 'plumos-portmaster-port-stop: invalid start-time record\n' >&2; exit 1 ;; esac
+[ -r "/proc/${pid}/stat" ] || {
+  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
+  exit 0
+}
+stat_fields="$(sed 's/.*) //' "/proc/${pid}/stat")"
+set -- $stat_fields
+pgrp="${3:-}"
+session="${4:-}"
+starttime="${20:-}"
+if [ "$pgrp" != "$pid" ] || [ "$session" != "$pid" ] ||
+   [ "$starttime" != "$expected_start" ]; then
+  printf 'plumos-portmaster-port-stop: refusing unowned process group pid=%s\n' "$pid" >&2
+  exit 1
+fi
+case "$script" in
+  /mnt/plumos/roms/[Pp][Oo][Rr][Tt][Ss]/*.sh) ;;
+  *)
+    printf 'plumos-portmaster-port-stop: invalid script ownership: %s\n' "$script" >&2
+    exit 1
+    ;;
+esac
+
+kill -TERM "-$pid" 2>/dev/null || true
+for _ in 1 2 3 4 5; do
+  [ -d "/proc/${pid}" ] || break
+  sleep 1
+done
+if [ -d "/proc/${pid}" ]; then
+  stat_fields="$(sed 's/.*) //' "/proc/${pid}/stat")"
+  set -- $stat_fields
+  if [ "${3:-}" = "$pid" ] && [ "${4:-}" = "$pid" ] &&
+     [ "${20:-}" = "$expected_start" ]; then
+    kill -KILL "-$pid" 2>/dev/null || true
+  fi
+fi
+rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"

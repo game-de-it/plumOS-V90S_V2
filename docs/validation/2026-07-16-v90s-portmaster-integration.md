@@ -1,0 +1,150 @@
+# V90S PortMaster Integration
+
+Date: 2026-07-16
+
+## Result
+
+The official PortMaster stable GUI and one lightweight Ready-to-Run port now
+run through the plumOS V90S app-layer contract. The GUI rendered at 640x480,
+loaded the PowerVR SDL stack, opened `adc_gamepad`, fetched current catalog
+metadata, stopped through its owned PID, removed its bind mounts, and restored
+exactly one frontend process.
+
+Apotris then rendered a real game screen through the FE `external:port` route,
+used `plumos_output`, ran GPTokeYB under an owned PID, stopped through its owned
+process group, and again restored exactly one FE process.
+
+## Reproducible Package
+
+Official release:
+
+```text
+channel: stable
+version: 2026.06.23-0015
+official MD5: 41d137e6bb123c755806939831bcce2f
+plumOS SHA-256: 772f2d56fc1abfbf79a3404ca78f240776c81c5a5b92786a0a748ae554339b7b
+```
+
+Build commands:
+
+```text
+./scripts/docker-build.sh portmaster
+./scripts/docker-build.sh frontend
+./scripts/docker-build.sh app-layer --strict
+```
+
+The strict app-layer manifest reported `complete=true` and contained the
+PortMaster upstream payload, adapter, launchers, updater, manifest, and hashes.
+
+## Update Validation
+
+The live V90S reached the official release endpoint and reported:
+
+```text
+installed=2026.06.23-0015
+latest=2026.06.23-0015
+channel=stable
+update_available=no
+official_md5=41d137e6bb123c755806939831bcce2f
+```
+
+A local synthetic newer release exercised the complete staged switch. The
+updater verified its archive, installed `2099.01.01-0000` into `upstream`, and
+kept the original test payload as `upstream.previous`. This test used temporary
+paths only and did not modify the V90S installation. A future real upstream
+release should be used to repeat the network switch itself.
+
+The GUI always launches with `--no-check`; only the plumOS-owned staged updater
+may replace the official payload. Port catalog, runtime, and game downloads
+inside the GUI remain enabled.
+
+## GUI Runtime Evidence
+
+Live device: ADB serial `plumos-v90s-a778c2b9`.
+
+The official log recorded:
+
+```text
+PM: 2026.06.23-0015
+SDL DLL: /run/plumos/portmaster/lib/libSDL2-2.0.so.0, 2.30.6
+TTF DLL: /run/plumos/portmaster/lib/libSDL2_ttf-2.0.so.0, 2.20.1
+IMG DLL: /run/plumos/portmaster/lib/libSDL2_image-2.0.so.0, 2.6.3
+MIX DLL: /run/plumos/portmaster/lib/libSDL2_mixer-2.0.so.0, 2.6.2
+Opened GameController 0: adc_gamepad
+device: powkiddy-v90s
+name: plumOS
+resolution: 640x480
+analogsticks: 0
+cpu: a133plus
+primary_arch: aarch64
+glibc: 2.36
+Display size: 640x480
+```
+
+Catalog refresh created persistent source, featured-port, port-info, porter,
+runtime, and statistics JSON files under
+`/mnt/plumos/state/portmaster/config`. The GUI state directories were bind
+mounted only for the GUI lifetime and no PortMaster mounts remained after
+stop. The upstream `pugwash.txt` path was file-bind-mounted to
+`/mnt/plumos/Logs/apps/portmaster-upstream.log`, keeping runtime logs outside
+the replaceable official payload.
+
+While GUI PID `26997` was alive, an update attempt failed as intended:
+
+```text
+plumos-portmaster-update: PortMaster is running (pid=26997); close it before updating
+```
+
+The ignored local framebuffer capture is:
+
+```text
+output/validation/portmaster-v90s-integration/fb0-page0.png
+SHA-256: 6a8d4852f82e84eae54858f2abd18220ab2ba505e27afc98c7b4427d59269fab
+```
+
+It shows the correctly framed official PortMaster disclaimer at 640x480.
+
+## Ready-to-Run Port Evidence
+
+The FE launch plan for `PORTS/Apotris.sh` resolved to:
+
+```text
+launch_profile: external:port
+command: /mnt/plumos/bin/plumos-portmaster-port-launch /mnt/plumos/roms/PORTS/Apotris.sh
+can_execute: yes
+```
+
+Live ownership while the game rendered:
+
+```text
+session leader: bash /mnt/plumos/roms/PORTS/Apotris.sh
+game: ./Apotris.aarch64
+input helper: PortMaster/gptokeyb Apotris.aarch64
+audio: mode=internal_mono pcm=plumos_output physical_pcm=hw:0,0
+```
+
+The ignored game framebuffer capture is:
+
+```text
+output/validation/portmaster-v90s-integration/apotris-page0.png
+SHA-256: b55a80b1ce9a75a8b4f88fb45fc6d070d21280151898496937b5e08e109e0b68
+```
+
+After `plumos-portmaster-port-stop`, the game, wrapper, and GPTokeYB processes
+were absent, all ownership files were removed, and one frontend remained:
+
+```text
+plumos-frontend-stop: pid=26554 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+```
+
+## Compatibility Boundary
+
+The pre-existing A7Xpg Ready-to-Run installation did not start because its
+port-local runtime lacks `libFLAC.so.8`. Its launcher and process cleanup still
+completed safely. This is recorded as a port payload/runtime compatibility
+failure, not a PortMaster GUI or V90S platform-adapter failure.
+
+Physical GUI navigation and game-control confirmation remain for the user. SDL
+opened the real `adc_gamepad` with the V90S mapping in both paths, but process
+and framebuffer evidence do not replace a physical button test. ARMHF and
+heavier runtime classes remain unadvertised pending separate validation.

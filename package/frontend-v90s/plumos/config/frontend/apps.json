@@ -43,6 +43,24 @@
       "menu": "apps"
     },
     {
+      "id": "portmaster",
+      "display_name": "PortMaster",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-portmaster-launch",
+      "visible": true,
+      "menu": "apps"
+    },
+    {
+      "id": "portmaster_update",
+      "display_name": "Update PortMaster",
+      "kind": "tool",
+      "launch_profile": "shell:/mnt/plumos/bin/plumos-portmaster-update install stable",
+      "confirm": true,
+      "show_results": true,
+      "visible": true,
+      "menu": "apps"
+    },
+    {
       "id": "thumbnail-plan",
       "display_name": "Thumbnail Plan",
       "kind": "tool",

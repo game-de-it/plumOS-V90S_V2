@@ -1022,8 +1022,9 @@ vendor-runtime -> system-rootfs -> app-layer -> sd-image -> release
 ```
 
 Application targets such as RetroArch, libretro cores, PicoArch, standalone
-emulators, and frontend should build into reusable outputs, then be collected
-into the FAT32 app layer rather than being baked into the release squashfs.
+emulators, PortMaster, and frontend should build into reusable outputs, then be
+collected into the FAT32 app layer rather than being baked into the release
+squashfs.
 
 Rationale:
 
@@ -1336,3 +1337,56 @@ optional SD2 content partition from becoming a prerequisite for the base Pyxel
 runtime. The FAT-safe venv creator skips only
 CPython's optional `lib64` symlink and otherwise uses the standard copied-file
 venv layout.
+
+### 2026-07-16: PortMaster Ownership and Update Boundary
+
+Decision:
+
+PortMaster is an optional FAT32 app-layer component. Keep its official payload,
+V90S integration, and writable state as three separate layers:
+
+```text
+official payload: /mnt/plumos/apps/portmaster/upstream/PortMaster
+V90S adapter:     /mnt/plumos/apps/portmaster/adapter
+writable state:   /mnt/plumos/state/portmaster
+installed ports:  /mnt/plumos/roms/ports
+runtime files:    /run/plumos/portmaster
+logs:             /mnt/plumos/Logs/apps
+```
+
+The reproducible build target pins an official stable `PortMaster.zip` by both
+the upstream MD5 and a plumOS-recorded SHA-256. It packages the upstream license
+files without patching them in place. Hardware identification, PowerVR SDL2,
+ALSA routing, V90S controls, FAT32 SONAME aliases, and process ownership remain
+in the external plumOS adapter so an upstream update cannot replace them.
+
+Online updates must use `/mnt/plumos/bin/plumos-portmaster-update`. The official
+GUI runs with its in-place self-update check disabled. The plumOS updater:
+
+1. reads the selected official stable/beta/alpha release metadata
+2. downloads into a sibling staging directory on p7
+3. verifies the official MD5, records SHA-256, rejects unsafe archive paths and
+   symlinks, and checks the required PortMaster files and version
+4. refuses to switch while the GUI is running
+5. renames the current payload to `upstream.previous` and atomically renames the
+   validated stage to `upstream`
+
+Pre-switch failure leaves the current payload untouched. A switch failure is
+reported explicitly and leaves the previous payload named
+`upstream.previous`; plumOS must not silently launch that copy as a fallback.
+Normal Windows/macOS copy-over releases may also replace the official payload,
+but must preserve adapter and state paths.
+
+PortMaster GUI and installed-port launchers must use PID files plus validated
+process identity. Port games run in an owned session/process group. Legacy port
+requests to broadly stop GPTokeYB or restart `oga_events` are intercepted and
+limited to the owned GPTokeYB PID; they must never stop SSH, ADB, the frontend,
+or unrelated emulators. FE-launched apps borrow the FE display lifecycle,
+whereas direct SSH/ADB launches stop and restore exactly one frontend process.
+
+Initial capability metadata is deliberately conservative: AArch64, 640x480,
+4:3, 1GB RAM, and no analog sticks. Do not advertise ARMHF, desktop OpenGL,
+Weston/GL4ES, Box64, Mono, Java, or other runtime classes until each class has a
+packaged V90S runtime and real-device video, audio, input, exit, save, and FE
+restoration evidence. A working GUI or successful download alone is not a port
+compatibility result.

@@ -41,6 +41,8 @@ app.settings.name=设置
 app.network.name=网络
 app.retroarch.name=RetroArch
 app.pyxel_setup.name=Pyxel 设置
+app.portmaster.name=PortMaster
+app.portmaster_update.name=更新 PortMaster
 pyxel_setup.running.installing=正在从 requirements.txt 安装模块
 
 scraping.title=媒体抓取

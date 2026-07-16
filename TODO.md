@@ -99,6 +99,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `quicknes`
   - `picoarch`
   - `standalone`
+  - `portmaster`
   - `frontend`
   - `system-rootfs`
   - `app-layer`
@@ -608,22 +609,31 @@ Build plumOS V90S as a V90S-specific distribution:
   `adc_gamepad`; see
   `docs/research/2026-07-16-v90s-portmaster-feasibility.md`.
 - [ ] Integrate PortMaster as a pinned, reproducible app-layer component.
-  - [ ] Add a `portmaster` build/package target with manifest, SHA256, and
+  - [x] Add a `portmaster` build/package target with manifest, SHA256, and
     upstream license notices.
-  - [ ] Add a `plumOS` platform/control adapter and an explicit POWKIDDY V90S
+  - [x] Add a `plumOS` platform/control adapter and an explicit POWKIDDY V90S
     A133P hardware definition. Do not retain the current TrimUI Smart Pro
     misidentification.
-  - [ ] Recreate SDL2 extension and other ELF SONAME aliases under `/run` for
+  - [x] Recreate SDL2 extension and other ELF SONAME aliases under `/run` for
     the FAT32 app layer.
-  - [ ] Add a PID-owned GUI/port lifecycle wrapper that uses the existing
+  - [x] Add a PID-owned GUI/port lifecycle wrapper that uses the existing
     frontend stop/launch helpers and does not use broad `pkill`, `pidof`, or
     unrelated systemd service restarts.
-  - [ ] Route PortMaster and launched ports through the proven PowerVR SDL2,
+  - [x] Route PortMaster and launched ports through the proven PowerVR SDL2,
     `adc_gamepad`, and `plumos_output` contracts.
-  - [ ] Add PortMaster to FE Apps and validate GUI controls, network metadata,
-    install/update behavior, and single-frontend restoration on hardware.
-  - [ ] Validate one lightweight AArch64 Ready-to-Run SDL2/GLES port before
+  - [x] Add PortMaster and its confirmed staged updater to FE Apps. On hardware,
+    validate the official stable metadata refresh, GUI rendering, controller
+    discovery, and single-frontend restoration. A future newer upstream release
+    still needs one real network switch test.
+  - [x] Validate one lightweight AArch64 Ready-to-Run SDL2/GLES port before
     enabling wider catalog classes.
+    Apotris rendered and used the normal internal audio route; its owned process
+    group stopped cleanly and restored exactly one FE process. A7Xpg remains an
+    explicit incompatible sample because that installed port omits
+    `libFLAC.so.8`.
+  - [ ] Physically confirm PortMaster GUI navigation and game controls with the
+    V90S buttons. SDL opened `adc_gamepad` with the V90S mapping during both
+    paths, but this still needs user input confirmation.
   - [ ] Keep ARMHF-only, desktop-OpenGL, Weston/GL4ES, Box64, Mono, Java, and
     other runtime classes unavailable until each class is explicitly packaged
     and validated on V90S.

@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
+export PLUMOS_ROOT PLUMOS_PORTMASTER_APP_ROOT="$APP_ROOT"
+exec python3 "${APP_ROOT}/adapter/plumos_portmaster_update.py" "$@"

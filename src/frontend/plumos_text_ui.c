@@ -3083,9 +3083,28 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
   }
 
   if (strncmp(launch_profile, "external:", 9) == 0) {
+    char portmaster_launcher[PATH_MAX];
+
     copy_string(plan->kind, sizeof(plan->kind), "external");
-    plan->runtime_exists = 1;
     plan->core_exists = 1;
+    if (strcmp(launch_profile, "external:port") == 0) {
+      if (!join_path(portmaster_launcher, sizeof(portmaster_launcher), plumos_root,
+                     "bin/plumos-portmaster-port-launch")) {
+        return 0;
+      }
+      plan->runtime_exists = file_exists(portmaster_launcher);
+      if (!append_shell_quoted(plan->command, sizeof(plan->command), &pos,
+                               portmaster_launcher) ||
+          !append_string(plan->command, sizeof(plan->command), &pos, " ") ||
+          !append_shell_quoted(plan->command, sizeof(plan->command), &pos,
+                               plan->rom_path)) {
+        return 0;
+      }
+      plan->can_execute = plan->runtime_exists && plan->rom_exists;
+      return 1;
+    }
+
+    plan->runtime_exists = 1;
     if (!append_string(plan->command, sizeof(plan->command), &pos, "/bin/sh ") ||
         !append_shell_quoted(plan->command, sizeof(plan->command), &pos, plan->rom_path)) {
       return 0;

@@ -41,6 +41,8 @@ app.settings.name=Configurações
 app.network.name=Rede
 app.retroarch.name=RetroArch
 app.pyxel_setup.name=Configurar Pyxel
+app.portmaster.name=PortMaster
+app.portmaster_update.name=Atualizar PortMaster
 pyxel_setup.running.installing=Instalando modulos de requirements.txt
 
 scraping.title=Scraping

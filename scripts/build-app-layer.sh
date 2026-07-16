@@ -15,6 +15,7 @@ network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-service
 audio_router_dir="${PLUMOS_V90S_AUDIO_ROUTER_DIR:-output/audio-router/v90s}"
 nextcommander_dir="${PLUMOS_V90S_NEXTCOMMANDER_DIR:-output/nextcommander/v90s}"
 music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
+portmaster_dir="${PLUMOS_V90S_PORTMASTER_DIR:-output/portmaster/v90s}"
 standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
 picoarch_dir="${PLUMOS_V90S_PICOARCH_DIR:-output/picoarch/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
@@ -44,6 +45,7 @@ Options:
   --nextcommander-dir PATH
                           NextCommander payload; default output/nextcommander/v90s.
   --music-player-dir PATH Music Player payload; default output/music-player/v90s.
+  --portmaster-dir PATH PortMaster payload; default output/portmaster/v90s.
   --standalone-dir PATH  Standalone emulator payload; default output/standalone-emulators/v90s.
   --picoarch-dir PATH    PicoArch payload; default output/picoarch/v90s.
   --retroarch-config PATH
@@ -108,6 +110,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --music-player-dir)
             music_player_dir="$2"
+            shift 2
+            ;;
+        --portmaster-dir)
+            portmaster_dir="$2"
             shift 2
             ;;
         --standalone-dir)
@@ -458,6 +464,24 @@ music_player_root="$music_player_dir/plumos"
 if require_or_note_missing "$music_player_root/apps/music-player/bin/plumos-music-player.bin" "music-player"; then
     copy_tree "$music_player_root" "$out_dir"
     record_tree "$music_player_root" "music-player" "$music_player_root"
+fi
+
+portmaster_root="$portmaster_dir/plumos"
+if require_or_note_missing "$portmaster_root/apps/portmaster/upstream/PortMaster/pugwash" "portmaster"; then
+    require_or_note_missing "$portmaster_root/bin/plumos-portmaster-launch" "portmaster:launcher" || true
+    require_or_note_missing "$portmaster_root/bin/plumos-portmaster-update" "portmaster:updater" || true
+    require_or_note_missing "$portmaster_root/bin/plumos-portmaster-port-stop" "portmaster:port-stop" || true
+    require_or_note_missing "$portmaster_root/apps/portmaster/adapter/control.txt" "portmaster:adapter" || true
+    copy_tree "$portmaster_root" "$out_dir"
+    record_tree "$portmaster_root" "portmaster" "$portmaster_root"
+    if [ -f "$portmaster_dir/portmaster.manifest" ]; then
+        copy_file "$portmaster_dir/portmaster.manifest" "$out_dir/licenses/portmaster-manifest.txt"
+        record_file "licenses/portmaster-manifest.txt" "portmaster" "$portmaster_dir/portmaster.manifest"
+    fi
+    if [ -f "$portmaster_dir/checksums.sha256" ]; then
+        copy_file "$portmaster_dir/checksums.sha256" "$out_dir/licenses/portmaster-checksums.sha256"
+        record_file "licenses/portmaster-checksums.sha256" "portmaster" "$portmaster_dir/checksums.sha256"
+    fi
 fi
 
 if require_or_note_missing "$standalone_dir/bin/plumos-standalone-launch" "standalone-emulators"; then
