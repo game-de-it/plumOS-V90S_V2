@@ -637,6 +637,12 @@ Build plumOS V90S as a V90S-specific distribution:
     group stopped cleanly and restored exactly one FE process. A7Xpg remains an
     explicit incompatible sample because that installed port omits
     `libFLAC.so.8`.
+  - [x] Make the installed Balatro and Donut Dodo ports launch on V90S.
+    Balatro now uses the packaged AArch64 OpenAL Soft ALSA library. Donut Dodo
+    uses the shared persistent HarbourMaster runtime metadata and a
+    SHA-256-keyed userspace extraction cache for zlib SquashFS runtimes, which
+    the StockOS kernel cannot mount. Both titles rendered and owned the active
+    ALSA PCM on hardware, then stopped without leaving processes or mounts.
   - [ ] Physically confirm PortMaster GUI navigation and game controls with the
     V90S buttons. SDL opened `adc_gamepad` with the V90S mapping during both
     paths, but this still needs user input confirmation.

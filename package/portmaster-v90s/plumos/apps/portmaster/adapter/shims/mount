@@ -1,0 +1,49 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
+STATE_ROOT="${PLUMOS_ROOT}/state/portmaster"
+PM_DIR="${APP_ROOT}/upstream/PortMaster"
+UNSQUASHFS="${APP_ROOT}/adapter/bin/aarch64/unsquashfs"
+MOUNTS_FILE="${PLUMOS_PORTMASTER_MOUNTS_FILE:-/run/plumos/portmaster/port.mounts}"
+
+source_path="${1:-}"
+target_path="${2:-}"
+case "${source_path}:${target_path}" in
+  "${PM_DIR}"/libs/*.squashfs:"${STATE_ROOT}"/home/*) ;;
+  *) exec /bin/mount "$@" ;;
+esac
+
+[ -f "$source_path" ] || {
+  printf 'plumos-portmaster-mount: missing runtime: %s\n' "$source_path" >&2
+  exit 1
+}
+[ -x "$UNSQUASHFS" ] || {
+  printf 'plumos-portmaster-mount: missing unsquashfs: %s\n' "$UNSQUASHFS" >&2
+  exit 1
+}
+
+digest="$(sha256sum "$source_path" | awk '{print $1}')"
+runtime_name="$(basename "$source_path")"
+cache_root="${STATE_ROOT}/runtime-cache"
+cache_dir="${cache_root}/${runtime_name}.${digest}"
+ready_file="${cache_dir}/.plumos-runtime-ready"
+
+if [ ! -f "$ready_file" ]; then
+  cache_tmp="${cache_dir}.tmp.$$"
+  rm -rf "$cache_tmp"
+  mkdir -p "$cache_root" "$cache_tmp"
+  if ! "$UNSQUASHFS" -no-progress -no-xattrs -no-exit-code \
+      -dest "$cache_tmp" "$source_path"; then
+    rm -rf "$cache_tmp"
+    exit 1
+  fi
+  printf '%s\n' "$digest" > "${cache_tmp}/.plumos-runtime-ready"
+  rm -rf "$cache_dir"
+  mv "$cache_tmp" "$cache_dir"
+fi
+
+mkdir -p "$target_path"
+/bin/mount --bind "$cache_dir" "$target_path"
+printf '%s\n' "$target_path" >> "$MOUNTS_FILE"

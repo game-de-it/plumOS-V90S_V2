@@ -170,6 +170,58 @@ hold by the boot-persistent hardware-key daemon. A live hung
 hotkey path. Its entire owned group and state files disappeared, one FE resumed,
 and ADB, SSH, and the key daemon remained alive.
 
+## Balatro And Donut Dodo Compatibility
+
+Balatro initially stopped before startup because its bundled LÖVE 11.5 runtime
+requires `libopenal.so.1`. Adapter version 4 builds OpenAL Soft 1.23.1 as an
+AArch64 ALSA-only library and exposes it from the volatile PortMaster library
+directory. On hardware, `love.aarch64 Balatro` remained running, owned the
+active ALSA PCM, and continuously changed both framebuffer pages. The captured
+title screen is:
+
+```text
+output/validation/portmaster-v90s-integration/balatro-page0.png
+SHA-256: 2c76141c78790c85f9e5ee4eff38ee78c0881f418ceda9c2a9d3beaf15fe8ad3
+```
+
+Donut Dodo exposed two separate integration defects. Installed-port launchers
+did not export the same `HM_TOOLS_DIR`, `HM_PORTS_DIR`, and `HM_SCRIPTS_DIR`
+contract as the GUI, so HarbourMaster could not find the persistent runtime
+metadata. After aligning that environment, it downloaded
+`frt_3.5.2.squashfs` and verified the expected MD5
+`d98d82d86ae7630b8ef62da9705cbda8`.
+
+The StockOS kernel then rejected that image because its SquashFS driver lacks
+zlib decompression. The V90S adapter therefore treats PortMaster SquashFS
+runtimes as userspace archives: the pinned AArch64 `unsquashfs` extracts each
+archive into a SHA-256-keyed p7 cache, and the adapter bind-mounts that cache at
+the port's requested runtime directory. This is the selected V90S runtime mode,
+not a retry after a failed kernel mount. The first extraction produced:
+
+```text
+/mnt/plumos/state/portmaster/runtime-cache/
+  frt_3.5.2.squashfs.b7599230407793a5befcad6f544694f298bca61ed9c7a4f686af1ed5c430f45e/
+```
+
+`frt_3.5.2 --resolution 640x480 -f` then remained running, owned the active
+ALSA PCM, and updated the framebuffer. The captured title screen is:
+
+```text
+output/validation/portmaster-v90s-integration/donutdodo-page0.png
+SHA-256: 46c6ae1134e9bf42a460a4d4499c1e84c3c4dfeb8afdd285bab3cea1e09be8
+```
+
+Godot 3.5 rejects the newer SDL mapping `crc` field, so the generated V90S
+mapping omits that optional field. GPTokeYB loaded `donutdodo.gptk`, opened
+`adc_gamepad`, and entered fake-keyboard mode without the mapping parse error.
+Physical gameplay control still requires the user's button test.
+
+Stopping either title removed the owned game and GPTokeYB processes. The port
+launcher now waits for its process group before reversing runtime, theme,
+library, and configuration mounts. The final Donut Dodo stop left no FRT or
+PortMaster mount and restored exactly one frontend process. `status` is also a
+non-destructive action now; it no longer aliases the stop operation.
+
 ## Compatibility Boundary
 
 The pre-existing A7Xpg Ready-to-Run installation did not start because its

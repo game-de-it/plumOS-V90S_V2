@@ -54,9 +54,13 @@ prepare() {
     "${PLUMOS_ROOT}/apps/nextcommander/lib/libSDL2_ttf-2.0.so.0.2000.1"
   link_one libSDL2_gfx-1.0.so.0 \
     "${PLUMOS_ROOT}/lib/libSDL2_gfx-1.0.so.0.0.2"
+  link_one libopenal.so.1 \
+    "${ADAPTER_DIR}/lib/aarch64/libopenal.so.1"
+  link_one liblzo2.so.2 \
+    "${ADAPTER_DIR}/lib/aarch64/liblzo2.so.2"
 
   cat > "${RUN_ROOT}/gamecontrollerdb.txt" <<'EOF'
-1900c50a330100009011000000000000,adc_gamepad,a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:b6,righttrigger:b7,crc:0ac5,platform:Linux
+1900c50a330100009011000000000000,adc_gamepad,a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:b6,righttrigger:b7,platform:Linux
 EOF
   cp -f "${ADAPTER_DIR}/control.txt" "${PM_DIR}/control.txt"
   cp -f "${ADAPTER_DIR}/mod_plumOS.txt" "${PM_DIR}/mod_plumOS.txt"

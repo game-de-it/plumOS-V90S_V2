@@ -34,7 +34,7 @@ REQUIRED_FILES = {
     "PortMaster/funcs.txt",
     "PortMaster/version",
 }
-ADAPTER_VERSION = 2
+ADAPTER_VERSION = 4
 
 
 def fail(message: str) -> NoReturn:

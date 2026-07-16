@@ -1387,6 +1387,25 @@ requests to broadly stop GPTokeYB or restart `oga_events` are intercepted and
 limited to the owned GPTokeYB PID; they must never stop SSH, ADB, the frontend,
 or unrelated emulators. FE-launched apps borrow the FE display lifecycle,
 whereas direct SSH/ADB launches stop and restore exactly one frontend process.
+Both launch paths must bind the same persistent `config`, `libs`, and `themes`
+directories and export the same HarbourMaster tools, ports, and scripts paths.
+An installed port must not see a second empty PortMaster state tree.
+
+The StockOS kernel SquashFS implementation does not support the zlib-compressed
+runtimes currently distributed by PortMaster. The V90S adapter therefore uses
+a packaged AArch64 `unsquashfs` and extracts PortMaster runtime images into
+`/mnt/plumos/state/portmaster/runtime-cache`. Cache directories include the
+source SHA-256, so an upstream runtime replacement creates a new cache instead
+of reusing stale files. The extracted directory is bind-mounted only for the
+owned port session and must be unmounted after its process group exits. This
+userspace extraction mode is the normal V90S contract; do not attempt a kernel
+mount first or silently select another runtime.
+
+Port-local libraries absent from the base userspace belong to the external
+adapter. In particular, LÖVE-based ports use the adapter-owned AArch64 OpenAL
+Soft build configured for ALSA, while the normal plumOS audio router remains
+the only PCM route.
+
 The boot-persistent hardware-key service provides a one-second `Select+Start`
 emergency exit for PortMaster ports by calling the same ownership-validated
 stop helper. It must not signal a process name, PID outside the recorded

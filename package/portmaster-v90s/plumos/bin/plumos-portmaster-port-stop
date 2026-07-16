@@ -5,6 +5,15 @@ RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
 PID_FILE="${RUN_ROOT}/port.pid"
 START_FILE="${RUN_ROOT}/port.starttime"
 SCRIPT_FILE="${RUN_ROOT}/port.script"
+action="${1:-stop}"
+
+case "$action" in
+  status|stop) ;;
+  *)
+    printf 'usage: plumOS-portmaster-port-stop [status|stop]\n' >&2
+    exit 64
+    ;;
+esac
 
 [ -f "$PID_FILE" ] || {
   printf 'plumos-portmaster-port-stop: not running\n'
@@ -36,6 +45,11 @@ case "$script" in
     exit 1
     ;;
 esac
+
+if [ "$action" = "status" ]; then
+  printf 'plumos-portmaster-port-stop: pid=%s script=%s\n' "$pid" "$script"
+  exit 0
+fi
 
 kill -TERM "-$pid" 2>/dev/null || true
 for _ in 1 2 3 4 5; do

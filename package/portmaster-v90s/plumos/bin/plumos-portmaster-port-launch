@@ -5,10 +5,12 @@ PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
 APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
 ROMS_ROOT="${PLUMOS_ROOT}/roms"
+STATE_ROOT="${PLUMOS_ROOT}/state/portmaster"
 LOG_FILE="${PLUMOS_ROOT}/Logs/apps/portmaster-ports.log"
 PID_FILE="${RUN_ROOT}/port.pid"
 START_FILE="${RUN_ROOT}/port.starttime"
 SCRIPT_FILE="${RUN_ROOT}/port.script"
+MOUNTS_FILE="${RUN_ROOT}/port.mounts"
 child=""
 restore_frontend=0
 script="${1:-}"
@@ -46,13 +48,30 @@ frontend_running() {
   "${PLUMOS_ROOT}/bin/plumos-frontend-stop" status 2>/dev/null | grep -q 'pid='
 }
 
+is_mounted() {
+  awk -v path="$1" '$5 == path { found=1 } END { exit !found }' /proc/self/mountinfo
+}
+
 cleanup() {
   if [ -n "$child" ]; then
     recorded="$(cat "$PID_FILE" 2>/dev/null || true)"
-    [ "$recorded" = "$child" ] && kill -TERM "-$child" 2>/dev/null || true
+    if [ "$recorded" = "$child" ]; then
+      kill -TERM "-$child" 2>/dev/null || true
+      for _ in 1 2 3 4 5; do
+        kill -0 "-$child" 2>/dev/null || break
+        sleep 1
+      done
+      kill -KILL "-$child" 2>/dev/null || true
+    fi
   fi
   "${PLUMOS_ROOT}/bin/plumos-portmaster-gptokeyb-stop" stop 2>/dev/null || true
-  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
+  if [ -f "$MOUNTS_FILE" ]; then
+    sed '1!G;h;$!d' "$MOUNTS_FILE" 2>/dev/null | while IFS= read -r target; do
+      [ -n "$target" ] || continue
+      is_mounted "$target" && umount "$target" 2>/dev/null || true
+    done
+  fi
+  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE" "$MOUNTS_FILE"
   if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
     nohup "${PLUMOS_ROOT}/bin/plumos-frontend-launch" >/dev/null 2>&1 &
   fi
@@ -75,19 +94,38 @@ audio_status="$("${PLUMOS_ROOT}/bin/plumos-audio-output" prepare 2>&1)" || {
   exit 49
 }
 
-mkdir -p "$RUN_ROOT" "$(dirname "$LOG_FILE")" "${PLUMOS_ROOT}/state/portmaster/home"
+mkdir -p "$RUN_ROOT" "$(dirname "$LOG_FILE")" "$STATE_ROOT/home"
+: > "$MOUNTS_FILE"
+for name in config libs themes; do
+  source_dir="${STATE_ROOT}/${name}"
+  target_dir="${APP_ROOT}/upstream/PortMaster/${name}"
+  mkdir -p "$source_dir" "$target_dir"
+  if is_mounted "$target_dir"; then
+    printf 'PortMaster port has a stale state mount: %s\n' "$target_dir" >&2
+    exit 1
+  fi
+  mount --bind "$source_dir" "$target_dir" || exit 1
+  printf '%s\n' "$target_dir" >> "$MOUNTS_FILE"
+done
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="/run/plumos"
-export HOME="${PLUMOS_ROOT}/state/portmaster/home"
+export PLUMOS_PORTMASTER_MOUNTS_FILE="$MOUNTS_FILE"
+export HOME="${STATE_ROOT}/home"
 export XDG_CONFIG_HOME="${HOME}/.config"
+export XDG_CACHE_HOME="${RUN_ROOT}/cache"
 export XDG_DATA_HOME="${APP_ROOT}/upstream"
+export HM_TOOLS_DIR="${APP_ROOT}/upstream"
+export HM_PORTS_DIR="${ROMS_ROOT}/ports"
+export HM_SCRIPTS_DIR="${ROMS_ROOT}/ports"
 export PATH="${APP_ROOT}/adapter/shims:${PLUMOS_ROOT}/bin:${PATH}"
 export LD_LIBRARY_PATH="/usr/lib/powervr:${RUN_ROOT}/lib:${PLUMOS_ROOT}/lib/plumos-sdl2-powervr:${PLUMOS_ROOT}/lib:${LD_LIBRARY_PATH:-}"
 export SDL_VIDEODRIVER="mali"
 export SDL_AUDIODRIVER="alsa"
+export ALSOFT_DRIVERS="alsa"
 export SDL_GAMECONTROLLERCONFIG_FILE="${RUN_ROOT}/gamecontrollerdb.txt"
 export ALSA_CONFIG_PATH="${PLUMOS_ALSA_CONFIG_PATH:-/run/plumos/audio/asound.conf}"
 export ALSA_PLUGIN_DIR="${PLUMOS_ALSA_PLUGIN_DIR:-${PLUMOS_ROOT}/lib/alsa-lib}"
 export AUDIODEV="plumos_output"
+mkdir -p "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
 
 if ! frontend_is_ancestor && frontend_running; then
   "${PLUMOS_ROOT}/bin/plumos-frontend-stop" stop >> "$LOG_FILE" 2>&1
