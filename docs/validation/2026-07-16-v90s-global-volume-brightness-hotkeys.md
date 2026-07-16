@@ -180,10 +180,12 @@ Further live tests isolated the actual speaker gain control:
 - `Headphone` and `LINEOUT volume` changes produced no audible change.
 - plumOS software gain `20 -> 4` produced a clear change.
 - codec `DAC volume` `160 -> 32` produced a clear change.
-- the user tested increasing `DAC volume` manually and selected `190,190` as
-  the highest value without audible distortion.
+- the original test selected `190,190`, but it was performed with an unstable
+  software-volume state and later proved to distort at software volume 20.
+- a repeat test at software volume 20 selected `170,170` as the highest value
+  without audible distortion.
 
-The final policy therefore fixes internal card 0 `DAC volume` at `190,190`
+The corrected policy therefore fixes internal card 0 `DAC volume` at `170,170`
 during boot/service initialization and emulator launch, then applies the user
 0..20 setting only through software gain. USB-DAC playback remains stereo and
 does not use the internal card-0 mixer value.
@@ -193,10 +195,45 @@ Live startup-path proof changed card 0 manually to `160,160`, restarted only
 
 ```text
 dac_before_service_restart=160,160
-dac_after_service_restart=190,190
+dac_after_service_restart=190,190 (superseded by the 170 correction)
 volume=20
 frontend_count=1
 game_pid=14776
 ```
 
 The frontend and running standalone game were not restarted by this check.
+
+On 2026-07-17, a 50 ms live trace around Flycast Xtreme startup showed the
+vendor PCM preparation changing the control after the launcher had set it:
+
+```text
+PCM=SETUP     DAC=190,190
+PCM=PREPARED  DAC=160,160
+PCM=RUNNING   DAC=160,160
+```
+
+The shared ALSA ioplug now restores the validated `170,170` immediately after
+the physical PCM reaches `PREPARED`, covering RetroArch, PicoArch, standalone
+emulators, and Music Player without changing USB-DAC gain.
+
+Live validation of the corrected plugin on 2026-07-17 showed:
+
+```text
+silent plumos_output RUNNING: DAC=170,170
+silent plumos_output closed:  DAC=170,170
+Flycast Xtreme RUNNING:       DAC=170,170 owner_pid=22056
+Flycast Xtreme stopped:       DAC=170,170
+software volume:              20
+frontend after validation:    one process
+```
+
+Build/deployment evidence:
+
+```text
+99e12e0a3ed0f2ed4025bcb51371c51015d07ab25385c171829eedb8942ddb6d  libasound_module_pcm_plumos_hotplug.so
+d81f5919f7d5c8a93af79313c8407964741c5901603131b70386fcb16326df31  output/frontend/v90s/checksums.sha256
+37f38fea7473421920f474841bc456c472cca8d88e4d8b0972d091f427f9a4ee  output/app-layer/v90s/checksums.sha256
+14615634d9d4abc6180b3a39a522e0f11ad265eb55370c5e100e43975f5522f7  output/app-layer/v90s/manifest.json
+```
+
+The plugin hash matched `/mnt/plumos/lib/alsa-lib/` on the live device.

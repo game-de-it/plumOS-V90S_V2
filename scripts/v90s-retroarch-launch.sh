@@ -417,7 +417,7 @@ setup_audio_mixer() {
     adc_swap="${PLUMOS_V90S_ADC_SWAP:-0}"
     dac_swap="${PLUMOS_V90S_DAC_SWAP:-1}"
     adc_volume="${PLUMOS_V90S_ADC_VOLUME:-160}"
-    dac_volume="${PLUMOS_V90S_DAC_VOLUME:-190}"
+    dac_volume="${PLUMOS_V90S_DAC_VOLUME:-170}"
     digital_volume="${PLUMOS_V90S_DIGITAL_VOLUME:-0}"
     headphone_volume="${PLUMOS_V90S_HEADPHONE_VOLUME:-2}"
     lineout_volume="${PLUMOS_V90S_LINEOUT_VOLUME:-26}"

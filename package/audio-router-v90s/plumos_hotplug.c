@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #define INTERNAL_CARD 0
+#define INTERNAL_DAC_VOLUME 170
 #define MAX_CARD_INDEX 15
 #define USB_PROBE_INTERVAL 8
 #define VOLUME_PROBE_INTERVAL 16
@@ -155,6 +156,77 @@ static void write_route_status(int card, int is_usb)
         unlink(temporary);
 }
 
+static int internal_dac_volume(void)
+{
+    const char *configured = getenv("PLUMOS_V90S_DAC_VOLUME");
+    char *end;
+    long value;
+
+    if (!configured || !configured[0])
+        return INTERNAL_DAC_VOLUME;
+    errno = 0;
+    value = strtol(configured, &end, 10);
+    if (errno || end == configured || *end != '\0' || value < 0 || value > 255)
+        return INTERNAL_DAC_VOLUME;
+    return (int)value;
+}
+
+static int apply_internal_dac_volume(int card)
+{
+    snd_ctl_t *control = NULL;
+    snd_ctl_elem_id_t *id;
+    snd_ctl_elem_info_t *info;
+    snd_ctl_elem_value_t *value;
+    char control_name[32];
+    unsigned int index;
+    unsigned int count;
+    long target = internal_dac_volume();
+    long minimum;
+    long maximum;
+    int err;
+
+    snprintf(control_name, sizeof(control_name), "hw:%d", card);
+    if ((err = snd_ctl_open(&control, control_name, 0)) < 0)
+        return err;
+
+    snd_ctl_elem_id_alloca(&id);
+    snd_ctl_elem_info_alloca(&info);
+    snd_ctl_elem_value_alloca(&value);
+    snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_MIXER);
+    snd_ctl_elem_id_set_name(id, "DAC volume");
+    snd_ctl_elem_info_set_id(info, id);
+    if ((err = snd_ctl_elem_info(control, info)) < 0)
+        goto out;
+    if (snd_ctl_elem_info_get_type(info) != SND_CTL_ELEM_TYPE_INTEGER) {
+        err = -EINVAL;
+        goto out;
+    }
+
+    minimum = snd_ctl_elem_info_get_min(info);
+    maximum = snd_ctl_elem_info_get_max(info);
+    if (target < minimum)
+        target = minimum;
+    if (target > maximum)
+        target = maximum;
+    count = snd_ctl_elem_info_get_count(info);
+    snd_ctl_elem_value_set_id(value, id);
+    for (index = 0; index < count; index++)
+        snd_ctl_elem_value_set_integer(value, index, target);
+    err = snd_ctl_elem_write(control, value);
+
+out:
+    snd_ctl_close(control);
+    return err;
+}
+
+static int restore_active_internal_dac(const plumos_pcm_t *pcm)
+{
+    if (!pcm->physical || pcm->physical_is_usb ||
+        pcm->physical_card != INTERNAL_CARD)
+        return 0;
+    return apply_internal_dac_volume(INTERNAL_CARD);
+}
+
 static int configure_physical(snd_pcm_t *pcm, const snd_pcm_ioplug_t *io)
 {
     snd_pcm_hw_params_t *params;
@@ -205,6 +277,10 @@ static snd_pcm_t *open_physical(const snd_pcm_ioplug_t *io, int card)
         return NULL;
     err = configure_physical(pcm, io);
     if (err < 0) {
+        snd_pcm_close(pcm);
+        return NULL;
+    }
+    if (card == INTERNAL_CARD && apply_internal_dac_volume(card) < 0) {
         snd_pcm_close(pcm);
         return NULL;
     }
@@ -297,8 +373,12 @@ static snd_pcm_sframes_t write_physical(plumos_pcm_t *pcm,
             pcm->physical, samples + completed * 2, frames - completed);
         if (written == -EPIPE || written == -ESTRPIPE) {
             int recovered = snd_pcm_recover(pcm->physical, (int)written, 1);
-            if (recovered >= 0)
+            if (recovered >= 0) {
+                int volume_err = restore_active_internal_dac(pcm);
+                if (volume_err < 0)
+                    return volume_err;
                 continue;
+            }
             written = recovered;
         }
         if (written == -EAGAIN) {
@@ -478,7 +558,10 @@ static int plumos_prepare(snd_pcm_ioplug_t *io)
     if (err < 0)
         return err;
     pcm->hw_ptr = 0;
-    return snd_pcm_prepare(pcm->physical);
+    err = snd_pcm_prepare(pcm->physical);
+    if (err < 0)
+        return err;
+    return restore_active_internal_dac(pcm);
 }
 
 static int plumos_drain(snd_pcm_ioplug_t *io)
@@ -500,8 +583,13 @@ static int plumos_delay(snd_pcm_ioplug_t *io, snd_pcm_sframes_t *delayp)
 static int plumos_close(snd_pcm_ioplug_t *io)
 {
     plumos_pcm_t *pcm = io->private_data;
-    if (pcm->physical)
+    int restore_internal = pcm->physical && !pcm->physical_is_usb &&
+                           pcm->physical_card == INTERNAL_CARD;
+    if (pcm->physical) {
         snd_pcm_close(pcm->physical);
+        if (restore_internal)
+            apply_internal_dac_volume(INTERNAL_CARD);
+    }
     close(pcm->poll_pipe[0]);
     close(pcm->poll_pipe[1]);
     free(pcm->output_buffer);

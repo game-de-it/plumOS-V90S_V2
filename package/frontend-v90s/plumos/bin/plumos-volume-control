@@ -6,7 +6,7 @@ SYSTEM_SETTINGS="${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/setti
 LOG="${PLUMOS_VOLUME_LOG:-/run/plumos/volume/last-apply.log}"
 RUNTIME_STATE="${PLUMOS_VOLUME_RUNTIME_STATE:-/run/plumos/volume/current}"
 HEADPHONE_MAX="${PLUMOS_V90S_HEADPHONE_VOLUME_MAX:-7}"
-DAC_VOLUME="${PLUMOS_V90S_DAC_VOLUME:-190}"
+DAC_VOLUME="${PLUMOS_V90S_DAC_VOLUME:-170}"
 AMIXER_CARD="${PLUMOS_V90S_AMIXER_CARD:-0}"
 
 mkdir -p "${LOG%/*}" "${RUNTIME_STATE%/*}" 2>/dev/null || true
@@ -125,7 +125,7 @@ init_backend() {
     return 1
   }
   case "$DAC_VOLUME" in
-    ""|*[!0-9]*) DAC_VOLUME=190 ;;
+    ""|*[!0-9]*) DAC_VOLUME=170 ;;
   esac
   [ "$DAC_VOLUME" -gt 255 ] && DAC_VOLUME=255
   "$AMIXER" -q -c "$AMIXER_CARD" sset 'DAC volume' \

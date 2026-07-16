@@ -914,6 +914,11 @@ bind directly to a numbered hardware card.
   `0.5 * left + 0.5 * right` to both hardware channels of `hw:<card>,0`. The
   built-in speaker therefore receives all stereo content as mono without
   clipping the sum.
+- Internal card 0 uses fixed codec `DAC volume` `170,170`, the highest value
+  validated without distortion at software volume 20. The vendor PCM prepare
+  path resets this control to 160, so the plumOS ioplug must restore 170 after
+  each successful physical `snd_pcm_prepare()`. User volume remains the shared
+  0..20 software gain and USB-DAC output does not use this card-0 control.
 - When a USB playback card is present, `plumos_output` selects it and preserves
   two-channel stereo.
 - `plumos-audio-output prepare` owns runtime detection and atomically writes
