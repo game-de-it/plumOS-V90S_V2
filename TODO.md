@@ -590,9 +590,12 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Complete Pyxel real-device validation through the physical FE controls.
   - [x] Boot the Pyxel-enabled system image, install the p7 venv, and run a
     `.pyxapp` long enough to prove PowerVR video and ALSA audio initialization.
+  - [x] Confirm visible output and audible game audio on real hardware; fix the
+    inherited GE8300 SDL2 1280x720 native-window override so Pyxel uses the
+    V90S active 640x480 display mode without horizontal displacement or crop.
   - [x] Restore exactly one frontend process after the bounded runtime test.
-  - [ ] Confirm visible video, audible audio, gamepad controls, game-owned exit,
-    and a `.py` title whose project requirements are present.
+  - [ ] Confirm gamepad controls, game-owned exit, and a `.py` title whose
+    project requirements are present.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.

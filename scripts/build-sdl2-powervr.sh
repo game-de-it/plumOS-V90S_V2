@@ -86,8 +86,13 @@ for tool in curl tar patch make gcc pkg-config; do
 done
 
 patch_path="$knulli_src/board/allwinner/a133/powkiddy-v90s/patches/sdl2/001-add-pvr-ge8300-mali-driver.patch"
+native_window_patch="$repo_root/package/sdl2-powervr-v90s/0001-use-native-display-window-size.patch"
 if [ ! -f "$patch_path" ]; then
     printf 'error: KNULLI V90S SDL2 patch not found: %s\n' "$patch_path" >&2
+    exit 1
+fi
+if [ ! -f "$native_window_patch" ]; then
+    printf 'error: V90S native-window patch not found: %s\n' "$native_window_patch" >&2
     exit 1
 fi
 
@@ -130,6 +135,7 @@ awk '
 (
     cd "$src"
     patch -p1 < "$filtered_patch"
+    patch -p1 < "$native_window_patch"
 
     export CPPFLAGS="-I$repo_root/$pvr_dir/3rdparty/include/khronos"
     export LDFLAGS="-L$repo_root/$pvr_dir/fbdev/glibc/lib64 -Wl,-rpath,/usr/lib/powervr"
@@ -179,6 +185,8 @@ strip --strip-unneeded "$out_dir/usr/local/bin/v90s-sdl2-video-probe" 2>/dev/nul
 {
     printf 'sdl2_version=%s\n' "$version"
     printf 'patch=%s\n' "$patch_path"
+    printf 'native_window_patch=%s\n' "$native_window_patch"
+    printf 'native_window_patch_sha256=%s\n' "$(sha256sum "$native_window_patch" | awk '{print $1}')"
     printf 'pvr_dir=%s\n' "$pvr_dir"
     printf 'built_arch=%s\n' "$arch"
     printf 'video_drivers='

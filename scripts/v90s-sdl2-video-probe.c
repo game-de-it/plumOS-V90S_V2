@@ -168,6 +168,10 @@ int main(int argc, char **argv)
         return 2;
     }
     printf("sdl2-probe: SDL_CreateWindow ok\n");
+    int window_w = 0;
+    int window_h = 0;
+    SDL_GetWindowSize(window, &window_w, &window_h);
+    printf("sdl2-probe: window_size=%dx%d\n", window_w, window_h);
 
     SDL_GLContext context = SDL_GL_CreateContext(window);
     if (!context) {
@@ -177,6 +181,10 @@ int main(int argc, char **argv)
         return 3;
     }
     printf("sdl2-probe: SDL_GL_CreateContext ok\n");
+    int drawable_w = 0;
+    int drawable_h = 0;
+    SDL_GL_GetDrawableSize(window, &drawable_w, &drawable_h);
+    printf("sdl2-probe: drawable_size=%dx%d\n", drawable_w, drawable_h);
 
     SDL_GL_SwapWindow(window);
     SDL_Delay(750);

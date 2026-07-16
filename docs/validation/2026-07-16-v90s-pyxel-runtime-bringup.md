@@ -58,6 +58,44 @@ load all of the intended libraries:
 /mnt/plumos/lib/plumos-sdl2-powervr/libSDL2-2.0.so.0
 ```
 
+### Native window geometry fix
+
+The first visible Pyxel frame exposed a second video defect: the left half was
+black, the game was shifted to the right, and its right edge was clipped. Both
+640x480 pages of the V90S 640x960 virtual framebuffer contained the same bad
+frame, so this was not stale frontend content or a page-flip mismatch.
+
+The KNULLI-derived GE8300 SDL2 patch forced every native window to 1280x720.
+Pyxel therefore centered its game surface in a window twice as wide as the
+V90S LCD, while the physical framebuffer still exposed only 640x480. The local
+V90S follow-up patch now reports the active SDL display mode instead:
+
+```c
+window->w = _this->displays[0].current_mode.w;
+window->h = _this->displays[0].current_mode.h;
+```
+
+The rebuilt SDL2 probe confirmed the corrected geometry on hardware:
+
+```text
+sdl2-probe: current_video_driver=mali
+sdl2-probe: window_size=640x480
+sdl2-probe: drawable_size=640x480
+sdl2-probe: ok
+```
+
+The fixed `dungeon-antiqua.pyxapp` capture fills the expected viewport without
+the previous horizontal displacement or clipping. Both framebuffer pages were
+again identical:
+
+```text
+4e579b110381ec4023842830fee6802ae3179a3156e7fe60b539be4120a67a79  title-page0.png
+4e579b110381ec4023842830fee6802ae3179a3156e7fe60b539be4120a67a79  title-page1.png
+```
+
+The generated and deployed SDL2 library has SHA-256
+`2a574a9b495f8c68aac3f3696003aab7f31d55afd5d93ee2700be65444605bb0`.
+
 ## Audio failure and fix
 
 Pyxel 2.9.3 requests 22.05 kHz, signed 16-bit, mono audio and does not allow SDL
@@ -107,6 +145,7 @@ The FE backend also resolves both content forms:
 The following official targets completed:
 
 ```text
+./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh audio-router
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer
@@ -118,9 +157,8 @@ and default requirements files.
 
 ## Remaining user validation
 
-The process-level video and audio initialization failures are fixed. Physical
-confirmation is still required for visible output, audible game audio,
-gamepad controls, and game-owned exit back to FE. The loose
-`pyxel_midi-keybord.py` additionally imports `mido`; its project must provide
-that dependency in `roms/pyxel/requirements.txt` before it is a valid `.py`
-runtime test.
+Visible output and audible game audio are now physically confirmed. Gamepad
+controls and game-owned exit back to FE still require physical confirmation.
+The loose `pyxel_midi-keybord.py` additionally imports `mido`; its project must
+provide that dependency in `roms/pyxel/requirements.txt` before it is a valid
+`.py` runtime test.

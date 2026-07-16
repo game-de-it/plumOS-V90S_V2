@@ -1,0 +1,19 @@
+--- a/src/video/mali-fbdev/SDL_malivideo.c
++++ b/src/video/mali-fbdev/SDL_malivideo.c
+@@ -245,14 +245,8 @@ MALI_CreateWindow(_THIS, SDL_Window * window)
+         return SDL_OutOfMemory();
+     }
+ 
+-#ifndef SDL2_POWERVR_GE8300
+-    /* Windows have one size for now */
+-    window->w = displaydata->native_display.width;
+-    window->h = displaydata->native_display.height;
+-#else
+-    window->w = 1280;
+-    window->h = 720;
+-#endif
++    window->w = _this->displays[0].current_mode.w;
++    window->h = _this->displays[0].current_mode.h;
+ 
+     /* OpenGL ES is the law here */
+     window->flags |= SDL_WINDOW_OPENGL;
