@@ -625,6 +625,75 @@ set_config_string_if_unbound() {
     fi
 }
 
+set_config_path_if_legacy() {
+    cfg="$1"
+    key="$2"
+    value="$3"
+    current="$(sed -n "s|^${key}[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*$|\1|p" "$cfg" 2>/dev/null | tail -n 1)"
+
+    case "$current" in
+        ""|default|nul|"~/.config/retroarch/"*|"/root/.config/retroarch/"*)
+            set_config_string "$cfg" "$key" "$value"
+            ;;
+    esac
+}
+
+migrate_v90s_directory_paths() {
+    cfg="$1"
+    root="${PLUMOS_ROOT:-/mnt/plumos}"
+    config_root="$root/config/retroarch"
+    playlist_root="$config_root/playlists"
+    builtin_playlist_root="$playlist_root/builtin"
+    log_root="$root/Logs/retroarch"
+    cache_root="$RUNTIME_ROOT/cache/retroarch"
+
+    mkdir -p \
+        "$cache_root" \
+        "$config_root/assets/wallpapers" \
+        "$config_root/cheats" \
+        "$config_root/config" \
+        "$config_root/downloads" \
+        "$config_root/filters/audio" \
+        "$config_root/filters/video" \
+        "$config_root/overlays/keyboards" \
+        "$builtin_playlist_root" \
+        "$config_root/records_config" \
+        "$root/config/shaders" \
+        "$root/Images/retroarch" \
+        "$log_root/runtime" \
+        "$root/Recordings" \
+        "$root/Screenshots" 2>/dev/null || true
+
+    set_config_path_if_legacy "$cfg" audio_filter_dir "$config_root/filters/audio"
+    set_config_path_if_legacy "$cfg" cache_directory "$cache_root"
+    set_config_path_if_legacy "$cfg" cheat_database_path "$config_root/cheats"
+    set_config_path_if_legacy "$cfg" content_favorites_directory "$builtin_playlist_root"
+    set_config_path_if_legacy "$cfg" content_favorites_path "$builtin_playlist_root/content_favorites.lpl"
+    set_config_path_if_legacy "$cfg" content_history_directory "$builtin_playlist_root"
+    set_config_path_if_legacy "$cfg" content_history_path "$builtin_playlist_root/content_history.lpl"
+    set_config_path_if_legacy "$cfg" content_image_history_directory "$builtin_playlist_root"
+    set_config_path_if_legacy "$cfg" content_image_history_path "$builtin_playlist_root/content_image_history.lpl"
+    set_config_path_if_legacy "$cfg" content_music_history_directory "$builtin_playlist_root"
+    set_config_path_if_legacy "$cfg" content_music_history_path "$builtin_playlist_root/content_music_history.lpl"
+    set_config_path_if_legacy "$cfg" content_video_directory "$root/roms"
+    set_config_path_if_legacy "$cfg" content_video_history_path "$builtin_playlist_root/content_video_history.lpl"
+    set_config_path_if_legacy "$cfg" core_assets_directory "$config_root/downloads"
+    set_config_path_if_legacy "$cfg" dynamic_wallpapers_directory "$config_root/assets/wallpapers"
+    set_config_path_if_legacy "$cfg" log_dir "$log_root"
+    set_config_path_if_legacy "$cfg" osk_overlay_directory "$config_root/overlays/keyboards"
+    set_config_path_if_legacy "$cfg" overlay_directory "$config_root/overlays"
+    set_config_path_if_legacy "$cfg" playlist_directory "$playlist_root"
+    set_config_path_if_legacy "$cfg" recording_config_directory "$config_root/records_config"
+    set_config_path_if_legacy "$cfg" recording_output_directory "$root/Recordings"
+    set_config_path_if_legacy "$cfg" rgui_browser_directory "$root/roms"
+    set_config_path_if_legacy "$cfg" rgui_config_directory "$config_root/config"
+    set_config_path_if_legacy "$cfg" runtime_log_directory "$log_root/runtime"
+    set_config_path_if_legacy "$cfg" screenshot_directory "$root/Screenshots"
+    set_config_path_if_legacy "$cfg" thumbnails_directory "$root/Images/retroarch"
+    set_config_path_if_legacy "$cfg" video_filter_dir "$config_root/filters/video"
+    set_config_path_if_legacy "$cfg" video_shader_dir "$root/config/shaders"
+}
+
 set_core_option_if_missing() {
     options="$1"
     key="$2"
@@ -960,6 +1029,7 @@ migrate_v90s_joypad_driver "$cfg" "$joypad_driver"
 migrate_v90s_sdl2_logical_binds "$cfg" "$joypad_driver"
 set_config_string "$cfg" core_options_path \
     "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
+migrate_v90s_directory_paths "$cfg"
 set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
 set_config_string "$cfg" savestate_directory "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
 if ! prepare_audio_output; then

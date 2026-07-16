@@ -749,6 +749,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Ensure users can save RetroArch settings.
 - [ ] Ensure frontend/config tooling does not overwrite user settings on every
   launch.
+- [x] Migrate RetroArch's unset/default `/root/.config/retroarch` directory
+  values to the V90S `/mnt/plumos` layout while preserving explicit user paths
+  and keeping disposable cache under `/run/plumos`.
 - [ ] Provide a resettable defaults mechanism.
 - [ ] Write RetroArch launch and runtime logs to the app layer.
 - [x] Route normal app audio through the shared `plumos_output` ALSA PCM.

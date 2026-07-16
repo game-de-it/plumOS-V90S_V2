@@ -380,6 +380,28 @@ LD_LIBRARY_PATH=/mnt/plumos/lib:...
 RETROARCH_CONFIG_DIR=/mnt/plumos/config/retroarch
 ```
 
+RetroArch directory settings must not silently resolve to
+`/root/.config/retroarch`. V90S launch-time migration owns only unset,
+`default`, `nul`, and legacy `/root`/tilde defaults; an explicit custom path
+chosen by the user must be preserved. The canonical layout is:
+
+```text
+/mnt/plumos/config/retroarch   RA configuration, playlists, overlays, filters
+/mnt/plumos/config/shaders     GLSL shader presets and source files
+/mnt/plumos/bios               system/BIOS files
+/mnt/plumos/Saves              save files, with per-system launch subdirectory
+/mnt/plumos/States             save states, with per-system launch subdirectory
+/mnt/plumos/Screenshots        screenshots
+/mnt/plumos/Recordings         recordings
+/mnt/plumos/Images/retroarch   RetroArch thumbnails
+/mnt/plumos/Logs/retroarch     logs and runtime logs
+/run/plumos/cache/retroarch    disposable cache; never persistent FAT data
+```
+
+Read-only system assets and databases may remain under `/usr/share/libretro`.
+The launcher must create writable targets before starting RetroArch and keep
+`config_save_on_exit` compatible with this layout.
+
 Power actions are a special case. The frontend may expose a compatibility
 entry point in the FAT32 app layer, but the final Reboot/Shutdown implementation
 must live in the system squashfs and run without depending on `/mnt/plumos`.
