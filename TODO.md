@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -603,6 +603,30 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Restore exactly one frontend process after the bounded runtime test.
   - [ ] Confirm gamepad controls, game-owned exit, and a `.py` title whose
     project requirements are present.
+- [x] Investigate PortMaster feasibility on V90S. The official GUI runs on the
+  real device with the plumOS PowerVR SDL2 route, renders at 640x480, and opens
+  `adc_gamepad`; see
+  `docs/research/2026-07-16-v90s-portmaster-feasibility.md`.
+- [ ] Integrate PortMaster as a pinned, reproducible app-layer component.
+  - [ ] Add a `portmaster` build/package target with manifest, SHA256, and
+    upstream license notices.
+  - [ ] Add a `plumOS` platform/control adapter and an explicit POWKIDDY V90S
+    A133P hardware definition. Do not retain the current TrimUI Smart Pro
+    misidentification.
+  - [ ] Recreate SDL2 extension and other ELF SONAME aliases under `/run` for
+    the FAT32 app layer.
+  - [ ] Add a PID-owned GUI/port lifecycle wrapper that uses the existing
+    frontend stop/launch helpers and does not use broad `pkill`, `pidof`, or
+    unrelated systemd service restarts.
+  - [ ] Route PortMaster and launched ports through the proven PowerVR SDL2,
+    `adc_gamepad`, and `plumos_output` contracts.
+  - [ ] Add PortMaster to FE Apps and validate GUI controls, network metadata,
+    install/update behavior, and single-frontend restoration on hardware.
+  - [ ] Validate one lightweight AArch64 Ready-to-Run SDL2/GLES port before
+    enabling wider catalog classes.
+  - [ ] Keep ARMHF-only, desktop-OpenGL, Weston/GL4ES, Box64, Mono, Java, and
+    other runtime classes unavailable until each class is explicitly packaged
+    and validated on V90S.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.
