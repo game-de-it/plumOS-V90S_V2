@@ -482,6 +482,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Live-validate the FE `Network Settings -> Wi-Fi` checkbox for runtime
   OFF/ON control: OFF stops `wpa_supplicant` and removes the IP, ON reconnects
   `wlan0`, restores the IP, and persists `wifi_enabled`.
+- [x] Make Wi-Fi ON initialize the USB radio before checking saved credentials.
+  With no WPA config, load the matching vendor module, bring `wlan0` up, keep
+  the checkbox enabled, and direct the user to `Connect Wi-Fi` instead of
+  leaving the dongle uninitialized behind `missing_config`.
 - [x] Preserve uppercase/lowercase SSID and password text in the V90S Wi-Fi
   editor, highlight the selected on-screen keyboard character, and validate
   mixed-case `qQ` input from a real-device framebuffer capture.

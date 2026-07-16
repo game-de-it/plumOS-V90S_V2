@@ -10695,6 +10695,7 @@ static int run_network_wifi_control(struct ui_state *ui, int enable) {
   size_t pos = 0;
   int rc;
   int connected = 0;
+  int ready = 0;
 
   if (!ui) {
     return 0;
@@ -10741,6 +10742,8 @@ static int run_network_wifi_control(struct ui_state *ui, int enable) {
       trim_line_end(line);
       if (strcmp(line, "result=connected") == 0) {
         connected = 1;
+      } else if (strcmp(line, "result=ready") == 0) {
+        ready = 1;
       } else if (strncmp(line, "ip=", 3) == 0) {
         copy_truncated_string(ip, sizeof(ip), line + 3);
       } else if (strncmp(line, "stage=", 6) == 0) {
@@ -10756,6 +10759,13 @@ static int run_network_wifi_control(struct ui_state *ui, int enable) {
       update_settings_entries_after_save(ui);
       snprintf(ui->status, sizeof(ui->status), "Wi-Fi connected IP=%s",
                ip[0] ? ip : "-");
+      return 1;
+    }
+    if (ready && rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 0) {
+      ui->device.wifi_enabled = 1;
+      ui->device.wifi_runtime_enabled = 1;
+      update_settings_entries_after_save(ui);
+      set_status(ui, "Wi-Fi on; use Connect Wi-Fi");
       return 1;
     }
     ui->device.wifi_enabled = 1;

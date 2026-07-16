@@ -582,14 +582,6 @@ start_enabled_network_services() {
 }
 
 wifi_on() {
-  conf="$(active_wpa_config 2>/dev/null || true)"
-  if [ -z "$conf" ]; then
-    log "wifi_on failed stage=missing_config"
-    write_runtime_status_off
-    echo "result=failed"
-    echo "stage=missing_config"
-    return 1
-  fi
   if ! iface="$(ensure_wifi_iface "$WIFI_IFACE_WAIT_SECONDS")"; then
     stage="$(last_ensure_wifi_stage)"
     write_runtime_status_values "$stage" "" "" "" ""
@@ -599,6 +591,15 @@ wifi_on() {
   fi
 
   iface_up "$iface"
+  conf="$(active_wpa_config 2>/dev/null || true)"
+  if [ -z "$conf" ]; then
+    log "wifi_on ready iface=${iface} stage=missing_config"
+    write_runtime_status_current "$iface"
+    echo "result=ready"
+    echo "stage=missing_config"
+    echo "iface=${iface}"
+    return 0
+  fi
   if wifi_runtime_on "$iface"; then
     ip_addr="$(get_iface_ip "$iface" || true)"
     write_runtime_status_current "$iface"
