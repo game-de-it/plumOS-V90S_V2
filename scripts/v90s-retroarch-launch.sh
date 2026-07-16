@@ -12,6 +12,8 @@ SHARE_LAUNCH_LOG=
 SHARE_RETROARCH_LOG=
 RETROARCH_TIMEOUT_SECONDS="${PLUMOS_V90S_RETROARCH_TIMEOUT_SECONDS:-0}"
 PERIODIC_LOG_MIRROR="${PLUMOS_V90S_PERIODIC_LOG_MIRROR:-0}"
+DIAGNOSTICS="${PLUMOS_V90S_RETROARCH_DIAGNOSTICS:-0}"
+SYNC_LOGS="${PLUMOS_V90S_RETROARCH_SYNC_LOGS:-0}"
 RETROARCH_CONFIG_SRC="${PLUMOS_V90S_RETROARCH_CONFIG:-}"
 RETROARCH_CONFIG_DIR="${PLUMOS_V90S_RETROARCH_CONFIG_DIR:-/mnt/share/retroarch}"
 RETROARCH_CONFIG_PATH="${PLUMOS_V90S_RETROARCH_CONFIG_PATH:-}"
@@ -46,7 +48,7 @@ fi
 : > "$RETROARCH_LOG" 2>/dev/null || true
 [ -n "$SHARE_LAUNCH_LOG" ] && : > "$SHARE_LAUNCH_LOG" 2>/dev/null || true
 [ -n "$SHARE_RETROARCH_LOG" ] && : > "$SHARE_RETROARCH_LOG" 2>/dev/null || true
-sync 2>/dev/null || true
+[ "$SYNC_LOGS" != "1" ] || sync 2>/dev/null || true
 
 log_count=0
 
@@ -58,7 +60,8 @@ log() {
         echo "$line" >> "$SHARE_LAUNCH_LOG" 2>/dev/null || true
     fi
     log_count=$((log_count + 1))
-    if [ "$log_count" -lt 30 ] || [ $((log_count % 10)) -eq 0 ]; then
+    if [ "$SYNC_LOGS" = "1" ] &&
+       { [ "$log_count" -lt 30 ] || [ $((log_count % 10)) -eq 0 ]; }; then
         sync 2>/dev/null || true
     fi
 }
@@ -174,9 +177,8 @@ stop_fb_console() {
         return
     fi
 
-    for proc in /proc/[0-9]*; do
-        [ -d "$proc" ] || continue
-        pid="${proc#/proc/}"
+    command -v pidof >/dev/null 2>&1 || return 0
+    for pid in $(pidof v90s-fb-console 2>/dev/null || true); do
         case "$pid" in
             ''|*[!0-9]*)
                 continue
@@ -184,6 +186,7 @@ stop_fb_console() {
         esac
 
         [ "$pid" != "$$" ] || continue
+        proc="/proc/$pid"
         [ -r "$proc/cmdline" ] || continue
         cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)"
         case "$cmdline" in
@@ -217,6 +220,7 @@ stop_fb_console() {
 append_cmd() {
     label="$1"
     shift
+    [ "$DIAGNOSTICS" = "1" ] || return 0
     {
         echo ""
         echo "===== $label ====="
@@ -226,7 +230,7 @@ append_cmd() {
     if [ -n "$SHARE_LAUNCH_LOG" ] && [ "$SHARE_LAUNCH_LOG" != "$LAUNCH_LOG" ]; then
         cp "$LAUNCH_LOG" "$SHARE_LAUNCH_LOG" 2>/dev/null || true
     fi
-    sync 2>/dev/null || true
+    [ "$SYNC_LOGS" != "1" ] || sync 2>/dev/null || true
 }
 
 mirror_logs() {
@@ -240,7 +244,7 @@ mirror_logs() {
         cp "$LAUNCH_LOG" "$SHARE_DIR/rootfs/plumos-v90s-retroarch-launch.log" 2>/dev/null || true
         cp "$RETROARCH_LOG" "$SHARE_DIR/rootfs/plumos-v90s-retroarch.log" 2>/dev/null || true
     fi
-    sync 2>/dev/null || true
+    [ "$SYNC_LOGS" != "1" ] || sync 2>/dev/null || true
 }
 
 start_periodic_log_mirror() {
@@ -369,7 +373,11 @@ read_file() {
 
 amixer_try() {
     if command -v amixer >/dev/null 2>&1; then
-        amixer -c 0 "$@" >> "$LAUNCH_LOG" 2>&1 || true
+        if [ "$DIAGNOSTICS" = "1" ]; then
+            amixer -c 0 "$@" >> "$LAUNCH_LOG" 2>&1 || true
+        else
+            amixer -q -c 0 "$@" >/dev/null 2>&1 || true
+        fi
     fi
 }
 
@@ -448,25 +456,26 @@ apply_plumos_volume() {
 prepare_app_runtime_sonames() {
     soname_map="${PLUMOS_V90S_SONAME_MAP:-${PLUMOS_ROOT:-/mnt/plumos}/config/standalone/soname-links.tsv}"
     soname_dir="$RUN_DIR/lib"
-    soname_count=0
+    runtime_helper="${PLUMOS_APP_RUNTIME_PREPARE:-${PLUMOS_ROOT:-/mnt/plumos}/bin/plumos-app-runtime-prepare}"
 
     APP_RUNTIME_SONAME_DIR=""
-    [ -r "$soname_map" ] || return 0
-    mkdir -p "$soname_dir" 2>/dev/null || return 0
-    find "$soname_dir" -type l -delete 2>/dev/null || true
-    while IFS="$(printf '\t')" read -r soname real_name; do
-        [ -n "$soname" ] || continue
-        [ "$soname" = "${soname##*/}" ] || continue
-        [ "$real_name" = "${real_name##*/}" ] || continue
-        [ -f "${PLUMOS_ROOT:-/mnt/plumos}/lib/$real_name" ] || continue
-        if ln -sf "${PLUMOS_ROOT:-/mnt/plumos}/lib/$real_name" "$soname_dir/$soname"; then
-            soname_count=$((soname_count + 1))
-        fi
-    done < "$soname_map"
-    if [ "$soname_count" -gt 0 ]; then
-        APP_RUNTIME_SONAME_DIR="$soname_dir"
-        log "retroarch-launch: prepared app runtime sonames=$soname_count dir=$soname_dir"
-    fi
+    [ -r "$soname_map" ] || {
+        log "retroarch-launch: app runtime SONAME map missing: $soname_map"
+        return 1
+    }
+    [ -x "$runtime_helper" ] || {
+        log "retroarch-launch: app runtime helper missing: $runtime_helper"
+        return 1
+    }
+    runtime_status="$(
+        PLUMOS_APP_RUNTIME_SONAME_DIR="$soname_dir" \
+            "$runtime_helper" 2>&1
+    )" || {
+        log "retroarch-launch: app runtime helper failed: $runtime_status"
+        return 1
+    }
+    APP_RUNTIME_SONAME_DIR="$soname_dir"
+    log "retroarch-launch: app runtime prepared: $runtime_status"
 }
 
 write_config() {
@@ -575,6 +584,9 @@ prepare_config_path() {
 
 ensure_config_save_enabled() {
     cfg="$1"
+    current="$(sed -n 's/^config_save_on_exit[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$cfg" 2>/dev/null | tail -n 1)"
+
+    [ "$current" != "true" ] || return 0
 
     if grep -q '^config_save_on_exit[[:space:]]*=' "$cfg" 2>/dev/null; then
         sed -i 's/^config_save_on_exit[[:space:]]*=.*/config_save_on_exit = "true"/' "$cfg" 2>/dev/null || true
@@ -605,6 +617,8 @@ set_config_string() {
     cfg="$1"
     key="$2"
     value="$3"
+    current="$(sed -n "s|^${key}[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*$|\1|p" "$cfg" 2>/dev/null | tail -n 1)"
+    [ "$current" != "$value" ] || return 0
     escaped_value="$(printf '%s' "$value" | sed 's/[&|\\]/\\&/g')"
 
     if grep -q "^${key}[[:space:]]*=" "$cfg" 2>/dev/null; then
@@ -733,17 +747,21 @@ prepare_launch_append_config() {
     audio_override="${PLUMOS_V90S_AUDIO_DRIVER_OVERRIDE:-}"
     latency_override="${PLUMOS_V90S_AUDIO_LATENCY_OVERRIDE:-}"
     audio_device="${PLUMOS_V90S_AUDIO_DEVICE:-plumos_output}"
+    savefile_dir="${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
+    savestate_dir="${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
 
     RETROARCH_APPEND_CONFIG="$RUN_DIR/retroarch-launch-$$.cfg"
     : > "$RETROARCH_APPEND_CONFIG" || return 1
     printf 'audio_device = "%s"\n' "$audio_device" >> "$RETROARCH_APPEND_CONFIG"
+    printf 'savefile_directory = "%s"\n' "$savefile_dir" >> "$RETROARCH_APPEND_CONFIG"
+    printf 'savestate_directory = "%s"\n' "$savestate_dir" >> "$RETROARCH_APPEND_CONFIG"
     if [ -n "$audio_override" ]; then
         printf 'audio_driver = "%s"\n' "$audio_override" >> "$RETROARCH_APPEND_CONFIG"
     fi
     if [ -n "$latency_override" ]; then
         printf 'audio_latency = "%s"\n' "$latency_override" >> "$RETROARCH_APPEND_CONFIG"
     fi
-    log "retroarch-launch: append_config=$RETROARCH_APPEND_CONFIG audio_device=$audio_device audio_override=${audio_override:-none} latency_override=${latency_override:-none}"
+    log "retroarch-launch: append_config=$RETROARCH_APPEND_CONFIG audio_device=$audio_device audio_override=${audio_override:-none} latency_override=${latency_override:-none} savefile_dir=$savefile_dir savestate_dir=$savestate_dir"
 }
 
 prepare_audio_output() {
@@ -858,19 +876,24 @@ log "retroarch-launch: launch_log=$LAUNCH_LOG"
 log "retroarch-launch: retroarch_log=$RETROARCH_LOG"
 log "retroarch-launch: retroarch_timeout_seconds=$RETROARCH_TIMEOUT_SECONDS"
 log "retroarch-launch: periodic_log_mirror=$PERIODIC_LOG_MIRROR"
+log "retroarch-launch: diagnostics=$DIAGNOSTICS sync_logs=$SYNC_LOGS"
 log "retroarch-launch: external_config=${RETROARCH_CONFIG_SRC:-none}"
 log "retroarch-launch: start_mode=${PLUMOS_V90S_RETROARCH_START_MODE:-content}"
 log "retroarch-launch: run_dir=$RUN_DIR"
-log "retroarch-launch: route_config=$ROUTE_CONFIG present=$([ -r "$ROUTE_CONFIG" ] && printf yes || printf no)"
-log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
-log "retroarch-launch: cmdline=$(read_file /proc/cmdline)"
+if [ "$DIAGNOSTICS" = "1" ]; then
+    log "retroarch-launch: route_config=$ROUTE_CONFIG present=$([ -r "$ROUTE_CONFIG" ] && printf yes || printf no)"
+    log "retroarch-launch: uname=$(uname -a 2>/dev/null || true)"
+    log "retroarch-launch: cmdline=$(read_file /proc/cmdline)"
+fi
 stop_fb_console
 
-for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
-    if [ -r "$info" ]; then
-        log "retroarch-launch: fb0 $(basename "$info")=$(read_file "$info")"
-    fi
-done
+if [ "$DIAGNOSTICS" = "1" ]; then
+    for info in /sys/class/graphics/fb0/name /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel /sys/class/graphics/fb0/stride; do
+        if [ -r "$info" ]; then
+            log "retroarch-launch: fb0 $(basename "$info")=$(read_file "$info")"
+        fi
+    done
+fi
 
 append_cmd "mount" mount
 append_cmd "framebuffer-devices" sh -c 'find /dev -maxdepth 1 -name "fb*" -print 2>/dev/null; find /dev/dri -maxdepth 1 -print 2>/dev/null || true'
@@ -890,7 +913,10 @@ if [ -z "$resolved_retroarch" ]; then
 fi
 RETROARCH_BIN="$resolved_retroarch"
 log "retroarch-launch: retroarch_bin=$RETROARCH_BIN"
-prepare_app_runtime_sonames
+if ! prepare_app_runtime_sonames; then
+    mirror_logs
+    exit 50
+fi
 
 sdl2_runtime_dir=""
 sdl2_runtime_label=""
@@ -999,6 +1025,8 @@ sdl_render="${PLUMOS_V90S_SDL_RENDER_DRIVER:-software}"
 cfg="$(prepare_config_path)"
 cfg_dir="$(dirname "$cfg")"
 mkdir -p "$cfg_dir" 2>/dev/null || true
+config_schema_marker="$cfg_dir/.plumos-retroarch-launch-config-v1"
+config_initialized=0
 
 if [ -n "$RETROARCH_CONFIG_SRC" ]; then
     if [ ! -f "$RETROARCH_CONFIG_SRC" ]; then
@@ -1008,6 +1036,7 @@ if [ -n "$RETROARCH_CONFIG_SRC" ]; then
     fi
     if [ "$RETROARCH_CONFIG_SRC" != "$cfg" ]; then
         cp "$RETROARCH_CONFIG_SRC" "$cfg"
+        config_initialized=1
         log "retroarch-launch: copied external RetroArch config from $RETROARCH_CONFIG_SRC to $cfg"
     else
         log "retroarch-launch: using external RetroArch config in place: $cfg"
@@ -1017,21 +1046,37 @@ else
         log "retroarch-launch: reusing persistent RetroArch config: $cfg"
     else
         write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
+        config_initialized=1
         log "retroarch-launch: created RetroArch config: $cfg"
     fi
 fi
-ensure_config_save_enabled "$cfg"
-ensure_v90s_autoconfig "$cfg"
-set_config_string "$cfg" joypad_autoconfig_dir "$V90S_AUTOCONFIG_DIR"
-ensure_v90s_input_binds "$cfg"
-ensure_parallel_n64_defaults "$cfg"
-migrate_v90s_joypad_driver "$cfg" "$joypad_driver"
-migrate_v90s_sdl2_logical_binds "$cfg" "$joypad_driver"
-set_config_string "$cfg" core_options_path \
-    "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
-migrate_v90s_directory_paths "$cfg"
-set_config_string "$cfg" savefile_directory "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
-set_config_string "$cfg" savestate_directory "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
+if [ "$config_initialized" = "1" ] || [ ! -f "$config_schema_marker" ]; then
+    ensure_config_save_enabled "$cfg"
+    ensure_v90s_autoconfig "$cfg"
+    set_config_string "$cfg" joypad_autoconfig_dir "$V90S_AUTOCONFIG_DIR"
+    ensure_v90s_input_binds "$cfg"
+    migrate_v90s_joypad_driver "$cfg" "$joypad_driver"
+    migrate_v90s_sdl2_logical_binds "$cfg" "$joypad_driver"
+    set_config_string "$cfg" core_options_path \
+        "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
+    migrate_v90s_directory_paths "$cfg"
+    : > "$config_schema_marker" 2>/dev/null || true
+    log "retroarch-launch: completed one-time config migration"
+else
+    V90S_AUTOCONFIG_DIR="$(dirname "$cfg")/autoconfig"
+    log "retroarch-launch: config migration already complete"
+fi
+
+case "$(basename "$core")" in
+    parallel_n64_libretro.so|parallel-n64*.so)
+        parallel_n64_marker="$cfg_dir/.plumos-parallel-n64-config-v1"
+        if [ ! -f "$parallel_n64_marker" ]; then
+            ensure_parallel_n64_defaults "$cfg"
+            : > "$parallel_n64_marker" 2>/dev/null || true
+            log "retroarch-launch: completed one-time Parallel-N64 setup"
+        fi
+        ;;
+esac
 if ! prepare_audio_output; then
     mirror_logs
     exit 49
@@ -1044,19 +1089,21 @@ fi
 log "retroarch-launch: config_path=$cfg"
 
 log "retroarch-launch: route video=$video_driver context=$video_context_driver threaded=$video_threaded input=$input_driver joypad=$joypad_driver audio=$audio_driver sdl_video=$sdl_video sdl_render=$sdl_render"
-{
-    echo ""
-    echo "===== config ====="
-    cat "$cfg"
-    echo "===== runtime ====="
-} >> "$RETROARCH_LOG" 2>/dev/null || true
-mirror_logs
+if [ "$DIAGNOSTICS" = "1" ]; then
+    {
+        echo ""
+        echo "===== config ====="
+        cat "$cfg"
+        echo "===== runtime ====="
+    } >> "$RETROARCH_LOG" 2>/dev/null || true
+    mirror_logs
+fi
 
 export SDL_VIDEODRIVER="$sdl_video"
 export SDL_RENDER_DRIVER="$sdl_render"
 export SDL_AUDIODRIVER=alsa
-log "retroarch-launch: pre-launch sync complete"
-mirror_logs
+log "retroarch-launch: runtime environment prepared"
+[ "$DIAGNOSTICS" != "1" ] || mirror_logs
 
 start_periodic_log_mirror
 run_retroarch "$cfg" "$start_mode"

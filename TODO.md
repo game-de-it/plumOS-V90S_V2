@@ -752,6 +752,14 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Migrate RetroArch's unset/default `/root/.config/retroarch` directory
   values to the V90S `/mnt/plumos` layout while preserving explicit user paths
   and keeping disposable cache under `/run/plumos`.
+- [x] Remove the old bring-up diagnostic sweep and repeated global `sync` calls
+  from normal RetroArch startup; retain them behind explicit diagnostic flags.
+- [x] Make RetroArch config migrations one-time and pass per-system save/state
+  paths through the volatile append-config instead of rewriting the main cfg.
+- [x] Cache the 113-link app-runtime SONAME map per boot and generate it in one
+  Python process instead of rebuilding it with 113 commands for every RA game.
+- [x] Replace normal RetroArch `/proc`-wide fb-console discovery and verbose
+  mixer dumps with targeted process validation and quiet mixer assignments.
 - [ ] Provide a resettable defaults mechanism.
 - [ ] Write RetroArch launch and runtime logs to the app layer.
 - [x] Route normal app audio through the shared `plumos_output` ALSA PCM.

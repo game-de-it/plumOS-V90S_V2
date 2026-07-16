@@ -402,6 +402,20 @@ Read-only system assets and databases may remain under `/usr/share/libretro`.
 The launcher must create writable targets before starting RetroArch and keep
 `config_save_on_exit` compatible with this layout.
 
+Normal RetroArch launch must not run the early bring-up diagnostic sweep or
+force repeated full-filesystem synchronization. Mount/input/ALSA/PowerVR,
+RetroArch feature, dmesg, and ROM-hash collection belongs behind the explicit
+`PLUMOS_V90S_RETROARCH_DIAGNOSTICS=1` switch. Per-log `sync` is separately
+diagnostic-only through `PLUMOS_V90S_RETROARCH_SYNC_LOGS=1`; safe shutdown and
+bulk-deploy boundaries remain responsible for normal filesystem durability.
+Persistent RetroArch config migrations must be versioned and idempotent, not
+rescanned on every game launch. Per-game save/state destinations belong in the
+volatile append-config so normal launch does not rewrite the user's main config.
+Generated app-runtime SONAME links must be signature-cached per boot; individual
+emulator launches must not rebuild the complete compatibility map when its
+signature is unchanged. Background prewarming must not leave an unreaped child
+under the vendor PID 1 or move noticeable latency into frontend startup.
+
 Power actions are a special case. The frontend may expose a compatibility
 entry point in the FAT32 app layer, but the final Reboot/Shutdown implementation
 must live in the system squashfs and run without depending on `/mnt/plumos`.

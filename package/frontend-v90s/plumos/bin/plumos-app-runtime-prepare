@@ -1,0 +1,91 @@
+#!/usr/bin/python3
+import hashlib
+import os
+import shutil
+import sys
+import time
+from pathlib import Path
+
+
+plumos_root = Path(os.environ.get("PLUMOS_ROOT", "/mnt/plumos"))
+runtime_root = Path(os.environ.get("PLUMOS_RUNTIME_ROOT", "/run/plumos"))
+soname_map = Path(
+    os.environ.get(
+        "PLUMOS_V90S_SONAME_MAP",
+        str(plumos_root / "config/standalone/soname-links.tsv"),
+    )
+)
+soname_dir = Path(
+    os.environ.get(
+        "PLUMOS_APP_RUNTIME_SONAME_DIR",
+        str(runtime_root / "retroarch/lib"),
+    )
+)
+lock_dir = runtime_root / "app-runtime-sonames.lock"
+signature_file = soname_dir / ".map.sha256"
+
+
+def cached(signature: str) -> bool:
+    try:
+        return signature_file.read_text(encoding="ascii").strip() == signature
+    except OSError:
+        return False
+
+
+try:
+    map_data = soname_map.read_bytes()
+except OSError as error:
+    print(f"app-runtime-prepare: cannot read map: {error}", file=sys.stderr)
+    sys.exit(1)
+
+map_signature = hashlib.sha256(map_data).hexdigest()
+if cached(map_signature):
+    print(f"mode=cached dir={soname_dir}")
+    sys.exit(0)
+
+runtime_root.mkdir(parents=True, exist_ok=True)
+try:
+    lock_dir.mkdir()
+except FileExistsError:
+    for _ in range(100):
+        if cached(map_signature):
+            print(f"mode=waited dir={soname_dir}")
+            sys.exit(0)
+        time.sleep(0.05)
+    print("app-runtime-prepare: timed out waiting for runtime lock", file=sys.stderr)
+    sys.exit(1)
+
+staging_dir = Path(f"{soname_dir}.new.{os.getpid()}")
+try:
+    shutil.rmtree(staging_dir, ignore_errors=True)
+    staging_dir.mkdir(parents=True)
+    soname_count = 0
+    for raw_line in map_data.decode("utf-8").splitlines():
+        fields = raw_line.split("\t")
+        if len(fields) != 2:
+            continue
+        soname, real_name = fields
+        if (
+            not soname
+            or Path(soname).name != soname
+            or Path(real_name).name != real_name
+        ):
+            continue
+        target = plumos_root / "lib" / real_name
+        if not target.is_file():
+            continue
+        (staging_dir / soname).symlink_to(target)
+        soname_count += 1
+
+    (staging_dir / ".map.sha256").write_text(
+        f"{map_signature}\n", encoding="ascii"
+    )
+    shutil.rmtree(soname_dir, ignore_errors=True)
+    staging_dir.rename(soname_dir)
+    print(f"mode=prepared count={soname_count} dir={soname_dir}")
+finally:
+    shutil.rmtree(staging_dir, ignore_errors=True)
+    try:
+        lock_dir.rmdir()
+    except OSError:
+        pass
