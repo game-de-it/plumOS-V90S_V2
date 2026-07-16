@@ -20,6 +20,7 @@
 #define REPEAT_DELAY_MS 450
 #define REPEAT_INTERVAL_MS 120
 #define PERSIST_DELAY_MS 750
+#define PORTMASTER_EXIT_HOLD_MS 1000
 
 struct input_source {
     const char *name;
@@ -144,7 +145,10 @@ int main(void)
     long long next_reopen = 0;
     long long repeat_due = 0;
     long long persist_due = 0;
+    long long portmaster_exit_due = 0;
     int select_down = 0;
+    int start_down = 0;
+    int portmaster_exit_latched = 0;
     int held_direction = 0;
     int held_is_display = 0;
     int volume_pending = 0;
@@ -211,8 +215,22 @@ int main(void)
 
                 if (bytes == (ssize_t)sizeof(event)) {
                     if (source == &gamepad && event.type == EV_KEY &&
-                        event.code == BTN_SELECT) {
-                        select_down = event.value != 0;
+                        (event.code == BTN_SELECT ||
+                         event.code == BTN_START)) {
+                        if (event.code == BTN_SELECT)
+                            select_down = event.value != 0;
+                        else
+                            start_down = event.value != 0;
+
+                        if (select_down && start_down) {
+                            if (!portmaster_exit_latched &&
+                                portmaster_exit_due == 0)
+                                portmaster_exit_due =
+                                    now + PORTMASTER_EXIT_HOLD_MS;
+                        } else {
+                            portmaster_exit_due = 0;
+                            portmaster_exit_latched = 0;
+                        }
                     } else if (source == &volume_keys && event.type == EV_KEY &&
                                (event.code == KEY_VOLUMEUP ||
                                 event.code == KEY_VOLUMEDOWN)) {
@@ -248,8 +266,12 @@ int main(void)
                         source->name, bytes < 0 ? errno : 0);
                 close(source->fd);
                 source->fd = -1;
-                if (source == &gamepad)
+                if (source == &gamepad) {
                     select_down = 0;
+                    start_down = 0;
+                    portmaster_exit_due = 0;
+                    portmaster_exit_latched = 0;
+                }
                 if (source == &volume_keys) {
                     held_direction = 0;
                     repeat_due = 0;
@@ -260,6 +282,16 @@ int main(void)
         }
 
         now = monotonic_ms();
+        if (!portmaster_exit_latched && portmaster_exit_due > 0 &&
+            now >= portmaster_exit_due) {
+            int result = run_helper("plumos-portmaster-port-stop", "stop");
+
+            fprintf(stderr,
+                    "hardware-keys: action=portmaster-force-exit rc=%d\n",
+                    result);
+            portmaster_exit_due = 0;
+            portmaster_exit_latched = 1;
+        }
         if (held_direction && repeat_due > 0 && now >= repeat_due) {
             int result = apply_key_action(held_direction, held_is_display);
 

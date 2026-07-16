@@ -619,6 +619,9 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Add a PID-owned GUI/port lifecycle wrapper that uses the existing
     frontend stop/launch helpers and does not use broad `pkill`, `pidof`, or
     unrelated systemd service restarts.
+  - [x] Add a one-second `Select+Start` emergency exit for hung PortMaster
+    ports. Validate that it stops only the recorded process group, clears
+    ownership state, restores one FE, and leaves ADB/SSH running.
   - [x] Route PortMaster and launched ports through the proven PowerVR SDL2,
     `adc_gamepad`, and `plumos_output` contracts.
   - [x] Add PortMaster and its confirmed staged updater to FE Apps. On hardware,

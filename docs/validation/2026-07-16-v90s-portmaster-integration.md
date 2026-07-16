@@ -164,6 +164,12 @@ were absent, all ownership files were removed, and one frontend remained:
 plumos-frontend-stop: pid=26554 cmd=/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
 ```
 
+The same stop contract is exposed as a one-second `Select+Start` emergency
+hold by the boot-persistent hardware-key daemon. A live hung
+`8-BIT BUCCANEER` session at PID/PGID `31349` was terminated through that
+hotkey path. Its entire owned group and state files disappeared, one FE resumed,
+and ADB, SSH, and the key daemon remained alive.
+
 ## Compatibility Boundary
 
 The pre-existing A7Xpg Ready-to-Run installation did not start because its

@@ -25,6 +25,8 @@ is the same backend as the frontend `Lumination` setting.
   for applications;
 - tracks `BTN_SELECT` from `adc_gamepad` and `KEY_VOLUMEDOWN` /
   `KEY_VOLUMEUP` from `sunxi-keyboard`;
+- tracks `BTN_SELECT` plus `BTN_START` and, after a one-second hold, invokes
+  the ownership-validated PortMaster port stop helper once per hold;
 - supports held-key repeat after 450 ms at 120 ms intervals;
 - retries missing or recreated input nodes every two seconds;
 - writes runtime state immediately, then persists it after 750 ms of idle
@@ -51,6 +53,31 @@ the same service.
 The frontend no longer treats physical `KEY_VOLUMEUP` / `KEY_VOLUMEDOWN` as
 frontend actions. The resident service is the only physical volume-key owner,
 which prevents duplicate increments while the FE is active.
+
+## PortMaster forced exit
+
+`Select + Start` held for one second is the emergency exit for a running
+PortMaster port. The resident service does not signal arbitrary processes. It
+calls `/mnt/plumos/bin/plumos-portmaster-port-stop`, which validates the saved
+PID, start time, session/process-group ownership, and script path before sending
+`TERM` and, only after a bounded wait, `KILL` to that owned process group.
+
+Live validation used a hung `8-BIT BUCCANEER` session with owned PID/PGID
+`31349`. The hold produced:
+
+```text
+hardware-keys: action=portmaster-force-exit rc=0
+```
+
+Afterward, every process in PGID `31349` was absent, all three PortMaster port
+ownership files were removed, and exactly one frontend remained. The hardware
+key daemon, ADB, and SSH stayed running. The framebuffer showed the FE `PORTS`
+list with `8-BIT BUCCANEER` selected.
+
+```text
+output/validation/portmaster-v90s-force-exit/frontend-restored.png
+SHA-256: 1cfc816c6568256e56cfbbfe0afe5e6d3ca28db390ba982e95bf0667f274d958
+```
 
 ## Display routing
 

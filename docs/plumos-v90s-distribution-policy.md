@@ -1387,6 +1387,10 @@ requests to broadly stop GPTokeYB or restart `oga_events` are intercepted and
 limited to the owned GPTokeYB PID; they must never stop SSH, ADB, the frontend,
 or unrelated emulators. FE-launched apps borrow the FE display lifecycle,
 whereas direct SSH/ADB launches stop and restore exactly one frontend process.
+The boot-persistent hardware-key service provides a one-second `Select+Start`
+emergency exit for PortMaster ports by calling the same ownership-validated
+stop helper. It must not signal a process name, PID outside the recorded
+session, SSH, ADB, the frontend, or another emulator.
 
 Initial capability metadata is deliberately conservative: AArch64, 640x480,
 4:3, 1GB RAM, and no analog sticks. Do not advertise ARMHF, desktop OpenGL,
