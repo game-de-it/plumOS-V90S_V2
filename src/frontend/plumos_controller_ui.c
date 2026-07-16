@@ -2926,6 +2926,15 @@ static void format_storage_status(const char *path, char *out, size_t out_size) 
   snprintf(out, out_size, "%llu/%llu MB (%llu%%)", used_mb, total_mb, percent);
 }
 
+static int filesystem_is_read_only(const char *path) {
+  struct statvfs st;
+
+  if (!path || !path[0] || statvfs(path, &st) != 0) {
+    return 0;
+  }
+  return (st.f_flag & ST_RDONLY) != 0;
+}
+
 static int read_meminfo_kb(const char *text, const char *key,
                            unsigned long long *value_out) {
   const char *p = text;
@@ -11324,6 +11333,10 @@ static int launch_rom_entry(struct ui_state *ui, const struct rom_entry *entry) 
   system_id = entry->system_id[0] ? entry->system_id : ui->current_system_id;
   if (!valid_system_id(system_id)) {
     set_status(ui, "launch system id is invalid");
+    return 0;
+  }
+  if (filesystem_is_read_only(ui->plumos_root)) {
+    set_status(ui, "PLUMOS is read-only; reboot to repair it");
     return 0;
   }
   if (!join_path(text_ui, sizeof(text_ui), ui->plumos_root, "bin/plumos-text-ui") ||

@@ -222,6 +222,65 @@ library, and configuration mounts. The final Donut Dodo stop left no FRT or
 PortMaster mount and restored exactly one frontend process. `status` is also a
 non-destructive action now; it no longer aliases the stop operation.
 
+## FE Launch Failure And p7 Recovery
+
+A later physical FE retest appeared to make both fixed ports fail before their
+launch logs were created. The failure had two independent app-layer causes,
+not a Balatro or Donut Dodo runtime regression.
+
+At the Balatro selection time, FE successfully wrote its recent and resume
+records, then the vendor FAT driver reported:
+
+```text
+FAT-fs (mmcblk0p7): error, fat_free_clusters: deleting FAT entry beyond EOF
+FAT-fs (mmcblk0p7): Filesystem has been set read-only
+```
+
+The PortMaster launcher could no longer create its p7 log or persistent state.
+A safe sysrq reboot allowed the system-rootfs boot fsck to repair p7. It
+reclaimed 91 clusters from ten damaged chains and restored `/mnt/plumos` as
+read-write. The repair also truncated damaged copies of PortMaster metadata,
+the update adapter, SSH configuration, and several Python package RECORD files.
+
+The next boot then stopped at app-layer validation because the device still had
+an older `checksums.sha256`, while a previous incremental deployment had already
+installed a newer `plumos-hardware-keys` binary. The binary matched the current
+build output; the stale metadata described an older hash. This was a partial
+deployment error rather than damage to that binary.
+
+`scripts/deploy-app-layer-adb.sh` now compares the installed and built
+app-layer manifests, transfers only changed payload files, installs
+`manifest.json` and `checksums.sha256` last, verifies every transferred file on
+the device, and then restarts the FE. The recovery deployed and verified 215
+changed files, including the fsck-truncated PortMaster files. Boot validation
+then reported:
+
+```text
+app_layer=ready
+version=0.1.0-dev
+vendor=v90s-stockos-r1
+runtime_root=/run/plumos
+```
+
+The controller FE now checks the app-layer mount before shutting down its
+renderer for a game launch. If p7 has been remounted read-only, it keeps the FE
+visible and reports `PLUMOS is read-only; reboot to repair it` instead of
+appearing to ignore the launch action.
+
+Both ports were revalidated through the same `plumos-text-ui launch ports ...
+--execute` route used by FE. Balatro ran `love.aarch64 Balatro`; Donut Dodo ran
+`frt_3.5.2 --resolution 640x480 -f`. Both owned an active ALSA PCM and their
+GPTokeYB process. The ignored Donut Dodo framebuffer proof showed its live
+`GAME OVER` screen:
+
+```text
+output/validation/v90s-portmaster-failure-20260716-2124/donutdodo-page0.png
+SHA-256: f5dadcb47d64cd2dc50625b20dd67ce1593970663e819ac1d5eeb631db7b793d
+```
+
+After each owned stop, the game, wrapper, and input helper were absent, p7
+remained read-write without new FAT errors, and exactly one FE process returned.
+
 ## Compatibility Boundary
 
 The pre-existing A7Xpg Ready-to-Run installation did not start because its
