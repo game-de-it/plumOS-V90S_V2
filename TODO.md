@@ -585,7 +585,8 @@ Build plumOS V90S as a V90S-specific distribution:
   FE/emulator lifetime, rediscover evdev nodes by device name, debounce FAT32
   setting writes, fix the validated internal codec DAC gain at `170,170`, and
   route user volume for both speaker and USB-DAC through the ALSA hotplug
-  plugin's software gain.
+  plugin's software gain. Keep the physical PCM path enabled at software volume
+  zero so RetroArch `audio_sync` cannot stall the emulation runloop.
 - [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
   release-system squashfs while keeping pip-installed modules on p7.
 - [x] Add `Apps -> Pyxel Setup` to install

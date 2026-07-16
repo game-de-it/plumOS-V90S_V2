@@ -146,14 +146,12 @@ apply_volume() {
   fi
   init_backend || return 1
   headphone="$(fixed_headphone_gain)"
-  if [ "$volume" -le 0 ]; then
-    "$AMIXER" -q -c "$AMIXER_CARD" sset Headphone 0 mute >"$LOG" 2>&1 || return 1
-    "$AMIXER" -q -c "$AMIXER_CARD" sset HpSpeaker off >>"$LOG" 2>&1 || true
-  else
-    "$AMIXER" -q -c "$AMIXER_CARD" sset HpSpeaker on >"$LOG" 2>&1 || true
-    "$AMIXER" -q -c "$AMIXER_CARD" sset LINEOUT on >>"$LOG" 2>&1 || true
-    "$AMIXER" -q -c "$AMIXER_CARD" sset Headphone "$headphone" unmute >>"$LOG" 2>&1 || return 1
-  fi
+  # Keep the physical playback path running even at software volume zero.
+  # Disabling HpSpeaker while a synchronized PCM stream is active stops its
+  # DMA consumption and stalls the emulator runloop behind audio_sync.
+  "$AMIXER" -q -c "$AMIXER_CARD" sset HpSpeaker on >"$LOG" 2>&1 || true
+  "$AMIXER" -q -c "$AMIXER_CARD" sset LINEOUT on >>"$LOG" 2>&1 || true
+  "$AMIXER" -q -c "$AMIXER_CARD" sset Headphone "$headphone" unmute >>"$LOG" 2>&1 || return 1
   {
     printf 'backend=v90s-stock-mixer\n'
     printf 'volume=%s\n' "$volume"

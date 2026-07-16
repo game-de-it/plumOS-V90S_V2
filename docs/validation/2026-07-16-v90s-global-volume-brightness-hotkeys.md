@@ -173,7 +173,8 @@ changed, but relying on the seven-step `Headphone` mixer did not produce a
 useful audible volume range. The audio router was corrected so the same 0..20
 software gain used for USB output is also applied after internal stereo-to-mono
 mixing. For nonzero volume the hardware `Headphone` gain now remains fixed;
-volume zero still mutes the hardware output stage.
+volume zero emits software silence while keeping the hardware output stage
+active so the synchronized PCM stream continues consuming samples.
 
 Further live tests isolated the actual speaker gain control:
 
@@ -237,3 +238,47 @@ d81f5919f7d5c8a93af79313c8407964741c5901603131b70386fcb16326df31  output/fronten
 ```
 
 The plugin hash matched `/mnt/plumos/lib/alsa-lib/` on the live device.
+
+## Software-volume-zero runloop validation
+
+On 2026-07-17, lowering software volume from 1 to 0 while RetroArch Flycast
+Xtreme was running caused the on-screen rate to fall to 9.74 fps and gameplay
+input appeared unresponsive. This was not a CPU, GPU, thermal, memory, or I/O
+limit:
+
+```text
+CPU governor: performance
+CPU frequency: 1800000 kHz
+GPU frequency: 702 MHz
+CPU/GPU temperature: approximately 51-62 C
+memory pressure: none
+I/O wait: 0%
+RetroArch CPU at the failure: approximately 3.3% of one core
+RetroArch threads: futex/poll wait
+PCM delay/avail: 3072/0 frames
+```
+
+The volume-zero branch had disabled `HpSpeaker` and muted `Headphone`. The
+physical PCM stopped draining, and RetroArch's required `audio_sync=true`
+therefore held back the entire emulation runloop. Restoring software volume 20
+immediately raised RetroArch to approximately 64% of one core split between its
+main and rendering threads.
+
+`plumos-volume-control` now leaves `HpSpeaker`, `LINEOUT`, and `Headphone`
+enabled at volume zero. The ALSA ioplug already multiplies samples by zero, so
+the output remains silent without stopping codec DMA. Repeating the live test
+at software volume zero produced:
+
+```text
+RetroArch main thread:   34.71%
+RetroArch render thread: 28.16%
+RetroArch audio thread:   1.39%
+PVR interrupts:          236.4/s
+PCM state:               RUNNING
+PCM delay/avail:         2133/939 frames
+DAC volume:              170,170
+CPU idle:                approximately 93%
+```
+
+No competing background process exceeded 3.3% of one core. This confirms the
+9.74 fps event was an audio-route stall, not a V90S performance limit.
