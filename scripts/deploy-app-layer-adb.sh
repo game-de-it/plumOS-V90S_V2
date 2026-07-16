@@ -5,20 +5,26 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 APP_LAYER_DIR="${PLUMOS_V90S_APP_LAYER_DIR:-$ROOT_DIR/output/app-layer/v90s}"
 ADB_WRAPPER="${PLUMOS_V90S_ADB_WRAPPER:-$ROOT_DIR/scripts/v90s-adb.sh}"
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+CHUNK_FILES="${PLUMOS_DEPLOY_CHUNK_FILES:-128}"
+VERIFY_HOST="${PLUMOS_DEPLOY_VERIFY_HOST:-1}"
 RESTART_FRONTEND=1
+DEVICE_RUN_DIR=/run/plumos/app-layer-deploy
+device_quiesced=0
 
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [--no-restart]
 
 Deploys only files changed since the device's installed app-layer manifest.
-Payload files are transferred first; manifest.json and checksums.sha256 are
-installed last so the boot-time integrity contract describes one complete set.
+The helper keeps ADB and SSH available, quiesces other known p7 writers, and
+installs verified payload chunks before committing app-layer metadata.
 
 Environment:
   PLUMOS_V90S_APP_LAYER_DIR  App-layer build output.
   PLUMOS_V90S_ADB_WRAPPER    ADB wrapper; defaults to scripts/v90s-adb.sh.
   PLUMOS_ROOT                Device app-layer mount; default /mnt/plumos.
+  PLUMOS_DEPLOY_CHUNK_FILES  Files per synced payload chunk; default 128.
+  PLUMOS_DEPLOY_VERIFY_HOST  Verify the complete host artifact first; default 1.
 EOF
 }
 
@@ -30,6 +36,10 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+case "$CHUNK_FILES" in
+    ''|*[!0-9]*|0) printf 'error: invalid PLUMOS_DEPLOY_CHUNK_FILES: %s\n' "$CHUNK_FILES" >&2; exit 2 ;;
+esac
 
 for path in "$APP_LAYER_DIR/manifest.json" "$APP_LAYER_DIR/checksums.sha256"; do
     [ -f "$path" ] || {
@@ -43,12 +53,49 @@ done
 }
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/plumos-app-layer-adb.XXXXXX")"
-trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 device_checksums="$tmp_dir/device-checksums.sha256"
 changed_paths="$tmp_dir/changed-paths.txt"
-changed_checksums="$tmp_dir/changed-checksums.sha256"
 payload_paths="$tmp_dir/payload-paths.txt"
-payload_tar="$tmp_dir/app-layer-payload.tar"
+
+resume_device() {
+    $ADB_WRAPPER shell "
+state='$DEVICE_RUN_DIR/state'
+if [ -r \"\$state\" ]; then
+  if grep -qx hardware_keys \"\$state\" && [ -x '$PLUMOS_ROOT/bin/plumos-hardware-keys-service' ]; then
+    '$PLUMOS_ROOT/bin/plumos-hardware-keys-service' start >/dev/null 2>&1 || true
+  fi
+  if grep -qx ftp \"\$state\" && [ -x '$PLUMOS_ROOT/bin/plumos-network-services' ]; then
+    '$PLUMOS_ROOT/bin/plumos-network-services' start ftp >/dev/null 2>&1 || true
+  fi
+  if grep -qx samba \"\$state\" && [ -x '$PLUMOS_ROOT/bin/plumos-network-services' ]; then
+    '$PLUMOS_ROOT/bin/plumos-network-services' start samba >/dev/null 2>&1 || true
+  fi
+  if [ '$RESTART_FRONTEND' -eq 1 ] && grep -qx frontend \"\$state\" &&
+     [ -x '$PLUMOS_ROOT/bin/plumos-frontend-launch' ]; then
+    rm -f /run/plumos/app-layer-error
+    nohup '$PLUMOS_ROOT/bin/plumos-frontend-launch' >/dev/null 2>&1 &
+  fi
+fi
+rm -rf '$DEVICE_RUN_DIR'
+" >/dev/null 2>&1 || true
+}
+
+cleanup() {
+    rc=$?
+    trap - EXIT HUP INT TERM
+    if [ "$device_quiesced" -eq 1 ]; then
+        resume_device
+    fi
+    rm -rf "$tmp_dir"
+    exit "$rc"
+}
+trap cleanup EXIT HUP INT TERM
+
+if [ "$VERIFY_HOST" != 0 ]; then
+    printf 'host_verify=running\n'
+    (cd "$APP_LAYER_DIR" && sha256sum -c checksums.sha256 >/dev/null)
+    printf 'host_verify=ok\n'
+fi
 
 mount_line="$($ADB_WRAPPER shell "awk '\$2 == \"$PLUMOS_ROOT\" { print; exit }' /proc/mounts")"
 [ -n "$mount_line" ] || {
@@ -79,10 +126,6 @@ awk '
   }
 ' "$device_checksums" "$APP_LAYER_DIR/checksums.sha256" > "$changed_paths"
 
-awk '
-  NR == FNR { wanted[$0] = 1; next }
-  length($0) >= 67 && substr($0, 67) in wanted { print }
-' "$changed_paths" "$APP_LAYER_DIR/checksums.sha256" > "$changed_checksums"
 grep -v '^manifest\.json$' "$changed_paths" > "$payload_paths" || true
 
 changed_count="$(wc -l < "$changed_paths" | tr -d ' ')"
@@ -95,36 +138,133 @@ if [ "$changed_count" -eq 0 ]; then
     exit 0
 fi
 
-if [ "$payload_count" -gt 0 ]; then
-    tar -C "$APP_LAYER_DIR" -cf "$payload_tar" -T "$payload_paths"
-    $ADB_WRAPPER push "$payload_tar" /run/plumos/app-layer-payload.tar >/dev/null
+device_quiesced=1
+$ADB_WRAPPER shell "
+set -e
+run_dir='$DEVICE_RUN_DIR'
+state=\"\$run_dir/state\"
+rm -rf \"\$run_dir\"
+mkdir -p \"\$run_dir\"
+: > \"\$state\"
+
+record_state() {
+  grep -qx \"\$1\" \"\$state\" 2>/dev/null || printf '%s\\n' \"\$1\" >> \"\$state\"
+}
+
+if [ -x '$PLUMOS_ROOT/bin/plumos-frontend-stop' ] &&
+   '$PLUMOS_ROOT/bin/plumos-frontend-stop' status 2>/dev/null | grep -q 'pid='; then
+  record_state frontend
 fi
-$ADB_WRAPPER push "$APP_LAYER_DIR/manifest.json" /run/plumos/manifest.json.new >/dev/null
-$ADB_WRAPPER push "$APP_LAYER_DIR/checksums.sha256" /run/plumos/checksums.sha256.new >/dev/null
-$ADB_WRAPPER push "$changed_checksums" /run/plumos/app-layer-changed.sha256 >/dev/null
+if [ -x '$PLUMOS_ROOT/bin/plumos-hardware-keys-service' ] &&
+   '$PLUMOS_ROOT/bin/plumos-hardware-keys-service' status >/dev/null 2>&1; then
+  record_state hardware_keys
+fi
+
+for proc in /proc/[0-9]*; do
+  [ \"\${proc##*/}\" != \"\$\$\" ] || continue
+  [ -r \"\$proc/cmdline\" ] || continue
+  cmd=\$(tr '\\000' ' ' < \"\$proc/cmdline\" 2>/dev/null || true)
+  case \"\$cmd\" in
+    *'$PLUMOS_ROOT/bin/busybox tcpsvd '*|*'$PLUMOS_ROOT/bin/tcpsvd '*) record_state ftp ;;
+    *'$PLUMOS_ROOT/samba/sbin/smbd.bin'*|*'$PLUMOS_ROOT/samba/sbin/nmbd'*) record_state samba ;;
+  esac
+done
+
+[ ! -x '$PLUMOS_ROOT/bin/plumos-portmaster-port-stop' ] ||
+  '$PLUMOS_ROOT/bin/plumos-portmaster-port-stop' stop >/dev/null 2>&1 || true
+[ ! -x '$PLUMOS_ROOT/bin/plumos-portmaster-stop' ] ||
+  '$PLUMOS_ROOT/bin/plumos-portmaster-stop' >/dev/null 2>&1 || true
+[ ! -x '$PLUMOS_ROOT/bin/v90s-retroarch-stop' ] ||
+  '$PLUMOS_ROOT/bin/v90s-retroarch-stop' stop >/dev/null 2>&1 || true
+[ ! -x '$PLUMOS_ROOT/bin/plumos-picoarch-stop' ] ||
+  '$PLUMOS_ROOT/bin/plumos-picoarch-stop' >/dev/null 2>&1 || true
+if [ -x '$PLUMOS_ROOT/bin/plumos-standalone-stop' ]; then
+  for pid_file in /run/plumos/standalone/*.pid; do
+    [ -e \"\$pid_file\" ] || continue
+    id=\${pid_file##*/}
+    id=\${id%.pid}
+    '$PLUMOS_ROOT/bin/plumos-standalone-stop' \"\$id\" >/dev/null 2>&1 || true
+  done
+fi
+
+if [ -x '$PLUMOS_ROOT/bin/plumos-frontend-stop' ] &&
+   '$PLUMOS_ROOT/bin/plumos-frontend-stop' status 2>/dev/null | grep -q 'pid='; then
+  record_state frontend
+  '$PLUMOS_ROOT/bin/plumos-frontend-stop' stop >/dev/null 2>&1 || true
+fi
+[ ! -x '$PLUMOS_ROOT/bin/plumos-hardware-keys-service' ] ||
+  '$PLUMOS_ROOT/bin/plumos-hardware-keys-service' stop >/dev/null 2>&1 || true
+
+pids=''
+for proc in /proc/[0-9]*; do
+  pid=\${proc##*/}
+  [ \"\$pid\" != \"\$\$\" ] || continue
+  [ -r \"\$proc/cmdline\" ] || continue
+  cmd=\$(tr '\\000' ' ' < \"\$proc/cmdline\" 2>/dev/null || true)
+  case \"\$cmd\" in
+    *'$PLUMOS_ROOT/bin/busybox tcpsvd '*|*'$PLUMOS_ROOT/bin/tcpsvd '*|\
+    *'$PLUMOS_ROOT/samba/sbin/smbd.bin'*|*'$PLUMOS_ROOT/samba/sbin/nmbd'*)
+      pids=\"\${pids}\${pids:+ }\$pid\"
+      ;;
+  esac
+done
+for pid in \$pids; do kill -TERM \"\$pid\" 2>/dev/null || true; done
+sleep 1
+for pid in \$pids; do kill -0 \"\$pid\" 2>/dev/null && kill -KILL \"\$pid\" 2>/dev/null || true; done
+sync
+sleep 1
+sync
+awk '\$2 == \"$PLUMOS_ROOT\" && \$4 ~ /(^|,)rw(,|$)/ { ok=1 } END { exit !ok }' /proc/mounts
+"
+
+$ADB_WRAPPER push "$APP_LAYER_DIR/manifest.json" "$DEVICE_RUN_DIR/manifest.json.new" >/dev/null
+$ADB_WRAPPER push "$APP_LAYER_DIR/checksums.sha256" "$DEVICE_RUN_DIR/checksums.sha256.new" >/dev/null
+
+if [ "$payload_count" -gt 0 ]; then
+    split -l "$CHUNK_FILES" -a 4 "$payload_paths" "$tmp_dir/chunk."
+    chunk_number=0
+    for chunk_paths in "$tmp_dir"/chunk.*; do
+        chunk_number=$((chunk_number + 1))
+        chunk_tar="$tmp_dir/payload.$chunk_number.tar"
+        chunk_checksums="$tmp_dir/checksums.$chunk_number.sha256"
+        tar -C "$APP_LAYER_DIR" -cf "$chunk_tar" -T "$chunk_paths"
+        awk '
+          NR == FNR { wanted[$0] = 1; next }
+          length($0) >= 67 && substr($0, 67) in wanted { print }
+        ' "$chunk_paths" "$APP_LAYER_DIR/checksums.sha256" > "$chunk_checksums"
+        $ADB_WRAPPER push "$chunk_tar" "$DEVICE_RUN_DIR/payload.tar" >/dev/null
+        $ADB_WRAPPER push "$chunk_checksums" "$DEVICE_RUN_DIR/payload.sha256" >/dev/null
+        $ADB_WRAPPER shell "
+set -e
+awk '\$2 == \"$PLUMOS_ROOT\" && \$4 ~ /(^|,)rw(,|$)/ { ok=1 } END { exit !ok }' /proc/mounts
+tar -C '$PLUMOS_ROOT' -xf '$DEVICE_RUN_DIR/payload.tar'
+sync
+cd '$PLUMOS_ROOT'
+sha256sum -c '$DEVICE_RUN_DIR/payload.sha256'
+rm -f '$DEVICE_RUN_DIR/payload.tar' '$DEVICE_RUN_DIR/payload.sha256'
+"
+        rm -f "$chunk_tar" "$chunk_checksums"
+        printf 'chunk=%s verified\n' "$chunk_number"
+    done
+fi
 
 $ADB_WRAPPER shell "
 set -e
-if [ -x '$PLUMOS_ROOT/bin/plumos-frontend-stop' ]; then
-  '$PLUMOS_ROOT/bin/plumos-frontend-stop' stop >/dev/null 2>&1 || true
-fi
-if [ -s /run/plumos/app-layer-payload.tar ]; then
-  tar -C '$PLUMOS_ROOT' -xf /run/plumos/app-layer-payload.tar
-fi
-cp /run/plumos/manifest.json.new '$PLUMOS_ROOT/manifest.json'
-cp /run/plumos/checksums.sha256.new '$PLUMOS_ROOT/checksums.sha256'
+awk '\$2 == \"$PLUMOS_ROOT\" && \$4 ~ /(^|,)rw(,|$)/ { ok=1 } END { exit !ok }' /proc/mounts
+cp '$DEVICE_RUN_DIR/manifest.json.new' '$PLUMOS_ROOT/manifest.json.tmp.deploy'
+sync
+mv -f '$PLUMOS_ROOT/manifest.json.tmp.deploy' '$PLUMOS_ROOT/manifest.json'
+sync
+cp '$DEVICE_RUN_DIR/checksums.sha256.new' '$PLUMOS_ROOT/checksums.sha256.tmp.deploy'
+sync
+mv -f '$PLUMOS_ROOT/checksums.sha256.tmp.deploy' '$PLUMOS_ROOT/checksums.sha256'
 sync
 cd '$PLUMOS_ROOT'
-sha256sum -c /run/plumos/app-layer-changed.sha256
-rm -f /run/plumos/app-layer-payload.tar /run/plumos/manifest.json.new \
-  /run/plumos/checksums.sha256.new /run/plumos/app-layer-changed.sha256
+grep '  manifest.json\$' checksums.sha256 | sha256sum -c -
+awk '\$2 == \"$PLUMOS_ROOT\" && \$4 ~ /(^|,)rw(,|$)/ { ok=1 } END { exit !ok }' /proc/mounts
 "
 
-if [ "$RESTART_FRONTEND" -eq 1 ]; then
-    $ADB_WRAPPER shell "
-rm -f /run/plumos/app-layer-error
-nohup '$PLUMOS_ROOT/bin/plumos-frontend-launch' >/dev/null 2>&1 &
-"
-fi
+resume_device
+device_quiesced=0
 
-printf 'deploy=ok\nfrontend_restart=%s\n' "$RESTART_FRONTEND"
+printf 'deploy=ok\nchunks=%s\nfrontend_restart=%s\n' "${chunk_number:-0}" "$RESTART_FRONTEND"

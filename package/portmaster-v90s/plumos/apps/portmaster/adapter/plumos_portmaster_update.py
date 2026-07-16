@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -46,6 +47,35 @@ def read_json(path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def sync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    fd = os.open(path, flags)
+    try:
+        try:
+            os.fsync(fd)
+        except OSError as error:
+            if error.errno != errno.EINVAL:
+                raise
+            os.sync()
+    finally:
+        os.close(fd)
+
+
+def write_json_durable(path: Path, value: dict) -> None:
+    temp_path = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+    try:
+        with temp_path.open("w", encoding="utf-8") as output:
+            json.dump(value, output, indent=2, sort_keys=True)
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+        temp_path.replace(path)
+        sync_directory(path.parent)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
 
 
 def fetch_json(url: str) -> dict:
@@ -156,14 +186,19 @@ def install(channel: str, force: bool) -> None:
             shutil.rmtree(stage)
             fail(f"archive version mismatch: expected {version}, got {staged_version}")
 
+        os.sync()
+
         current_dir = APP_ROOT / "upstream"
         previous_dir = APP_ROOT / "upstream.previous"
         if previous_dir.exists():
             shutil.rmtree(previous_dir)
+            sync_directory(APP_ROOT)
         if current_dir.exists():
             current_dir.rename(previous_dir)
+            sync_directory(APP_ROOT)
         try:
             stage.rename(current_dir)
+            sync_directory(APP_ROOT)
         except OSError as error:
             fail(
                 "staged switch failed; current payload was preserved as "
@@ -178,11 +213,7 @@ def install(channel: str, force: bool) -> None:
             "source_url": url,
             "version": version,
         }
-        metadata_tmp = APP_ROOT / f"installed.json.tmp.{os.getpid()}"
-        metadata_tmp.write_text(
-            json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        metadata_tmp.replace(APP_ROOT / "installed.json")
+        write_json_durable(APP_ROOT / "installed.json", metadata)
         os.sync()
         print(f"Installed PortMaster {version} ({actual_sha256})")
         print(f"Previous payload: {previous_dir if previous_dir.exists() else 'none'}")

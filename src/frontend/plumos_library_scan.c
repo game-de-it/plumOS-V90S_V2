@@ -83,6 +83,44 @@ struct scanned_dir {
   ino_t inode;
 };
 
+static int sync_parent_dir(const char *path) {
+  char dir[PATH_MAX];
+  char *slash;
+  int fd;
+  int rc;
+  int sync_errno = 0;
+
+  if (!path || snprintf(dir, sizeof(dir), "%s", path) >= (int)sizeof(dir)) {
+    return 0;
+  }
+  slash = strrchr(dir, '/');
+  if (!slash) {
+    snprintf(dir, sizeof(dir), ".");
+  } else if (slash == dir) {
+    dir[1] = '\0';
+  } else {
+    *slash = '\0';
+  }
+  fd = open(dir, O_RDONLY);
+  if (fd < 0) {
+    return 0;
+  }
+  rc = fsync(fd);
+  if (rc != 0) {
+    sync_errno = errno;
+  }
+  if (close(fd) != 0) {
+    return 0;
+  }
+  if (rc != 0 && sync_errno != EINVAL) {
+    return 0;
+  }
+  if (rc != 0) {
+    sync();
+  }
+  return 1;
+}
+
 struct scan_ctx {
   const char *sdcard_root;
   const char *plumos_root;
@@ -1313,6 +1351,8 @@ static int write_library_index(const struct scan_ctx *ctx, const char *output_pa
   char parent[PATH_MAX];
   char tmp_path[PATH_MAX];
   FILE *f;
+  int fd;
+  int write_ok = 1;
   size_t s;
   int first_system = 1;
 
@@ -1453,7 +1493,14 @@ static int write_library_index(const struct scan_ctx *ctx, const char *output_pa
   fprintf(f, "  }\n");
   fprintf(f, "}\n");
 
+  fd = fileno(f);
+  if (fflush(f) != 0 || fd < 0 || fsync(fd) != 0) {
+    write_ok = 0;
+  }
   if (fclose(f) != 0) {
+    write_ok = 0;
+  }
+  if (!write_ok) {
     unlink(tmp_path);
     return 0;
   }
@@ -1462,7 +1509,7 @@ static int write_library_index(const struct scan_ctx *ctx, const char *output_pa
     unlink(tmp_path);
     return 0;
   }
-  return 1;
+  return sync_parent_dir(output_path);
 }
 
 static long long now_ms(void) {

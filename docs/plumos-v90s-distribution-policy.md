@@ -329,6 +329,47 @@ For that reason, low-level vendor libraries should stay in the system squashfs
 or vendor runtime area. FAT32 should hold plumOS-built applications and private
 runtime libraries that are packaged to avoid symlink-dependent layouts.
 
+### FAT32 Write-Safety Contract
+
+The normal release-update path remains an offline copy from Windows or macOS
+while V90S is powered off. Live ADB deployment and network-based application
+updates are development/runtime exceptions and must use a stricter write
+contract:
+
+- verify the complete source artifact before touching p7
+- calculate the changed-file set before stopping the frontend
+- keep ADB and SSH alive as recovery paths
+- quiesce known p7 writers, including the frontend, hardware-key daemon,
+  emulator sessions, FTP, and Samba
+- stage transfer archives and metadata under `/run`, not on FAT32
+- write payloads in bounded chunks, then `sync` and SHA-256 verify every chunk
+- commit `manifest.json` and `checksums.sha256` only after all payload chunks
+  have verified
+- restore only services that were running before the deployment
+- abort immediately if `/mnt/plumos` is absent or has become read-only
+
+Frequent frontend state replacements, such as favorites, recent games, resume
+state, core overrides, and the ROM library index, must use a temporary sibling
+file followed by this durability sequence:
+
+```text
+write -> fflush -> fsync(file) -> close -> rename -> fsync(parent directory)
+```
+
+If the vendor FAT implementation rejects directory `fsync` with `EINVAL`, the
+implementation may use a full `sync` as the compatibility fallback. Failure at
+any other stage must be reported rather than silently accepting the new state.
+
+Large in-device installers such as PortMaster must fully stage and sync the new
+tree before switching `upstream`, preserve the previous tree until the switch is
+complete, sync the parent directory after each rename/removal, and durably write
+their installed-version metadata. The PortMaster GUI launch boundary must also
+`sync` completed game installations before control returns to the frontend.
+
+Filesystem repair is not part of a live deployment. Never run `fsck.fat` against
+mounted p7; repair belongs to the bounded pre-mount boot path or an offline host
+workflow.
+
 Launch wrappers in the squashfs should define the app-layer environment
 explicitly, including:
 

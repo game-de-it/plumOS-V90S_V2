@@ -48,6 +48,9 @@ cleanup() {
   if [ -n "$child_pid" ] && [ "$recorded" = "$child_pid" ]; then
     rm -f "$PID_FILE"
   fi
+  # Port installs can replace thousands of FAT32 entries. Finish that write
+  # boundary before returning control to the frontend or accepting a reboot.
+  sync
   if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
     nohup "${PLUMOS_ROOT}/bin/plumos-frontend-launch" >/dev/null 2>&1 &
   fi
@@ -139,6 +142,7 @@ printf '\n[%s] launch version=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   "$(cat "${PM_DIR}/version" 2>/dev/null || printf unknown)" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
 
+sync
 python3 "${ADAPTER_DIR}/plumos_portmaster_bootstrap.py" "$@" >> "$LOG_FILE" 2>&1 &
 child_pid=$!
 printf '%s\n' "$child_pid" > "$PID_FILE"

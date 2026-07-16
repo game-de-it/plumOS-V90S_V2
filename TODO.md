@@ -695,6 +695,17 @@ Build plumOS V90S as a V90S-specific distribution:
   and confirm FE Reboot no longer leaves p7 `PLUMOS` with the FAT dirty
   warning on the next boot.
 - [x] Validate SD2 auto-mount from a clean reboot with SD2 inserted.
+- [x] Make frequently replaced frontend JSON and ROM-library indexes durable
+  with file `fsync`, atomic rename, and parent-directory `fsync`.
+- [x] Harden live ADB app-layer deployment by verifying the host artifact,
+  quiescing p7 writers while preserving SSH/ADB, transferring bounded chunks,
+  syncing and verifying each chunk, and committing metadata last.
+- [x] Make PortMaster payload switching, dependency extraction,
+  installed-version metadata, and completed GUI game installations durable
+  across large FAT32 updates.
+- [x] Live-validate the hardened deployment with three two-file chunks, then
+  stress p7 with 64 state replacements and five full library-index rebuilds
+  without a FAT/MMC error or read-only remount.
 
 ## Milestone 5: SD Image Layout
 

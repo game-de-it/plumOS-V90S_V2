@@ -972,6 +972,69 @@ static int ensure_parent_dir(const char *path) {
   return mkdir_p(dir);
 }
 
+static int sync_parent_dir(const char *path) {
+  char dir[PATH_MAX];
+  char *slash;
+  int fd;
+  int rc;
+  int sync_errno = 0;
+
+  if (!copy_string(dir, sizeof(dir), path)) {
+    return 0;
+  }
+  slash = strrchr(dir, '/');
+  if (!slash) {
+    copy_string(dir, sizeof(dir), ".");
+  } else if (slash == dir) {
+    dir[1] = '\0';
+  } else {
+    *slash = '\0';
+  }
+  fd = open(dir, O_RDONLY);
+  if (fd < 0) {
+    return 0;
+  }
+  rc = fsync(fd);
+  if (rc != 0) {
+    sync_errno = errno;
+  }
+  if (close(fd) != 0) {
+    return 0;
+  }
+  if (rc != 0 && sync_errno != EINVAL) {
+    return 0;
+  }
+  if (rc != 0) {
+    sync();
+  }
+  return 1;
+}
+
+static int commit_temp_file(FILE *f, const char *tmp_path, const char *path) {
+  int fd;
+  int ok = 1;
+
+  if (!f || !tmp_path || !path) {
+    return 0;
+  }
+  fd = fileno(f);
+  if (fflush(f) != 0 || fd < 0 || fsync(fd) != 0) {
+    ok = 0;
+  }
+  if (fclose(f) != 0) {
+    ok = 0;
+  }
+  if (!ok) {
+    unlink(tmp_path);
+    return 0;
+  }
+  if (rename(tmp_path, path) != 0) {
+    unlink(tmp_path);
+    return 0;
+  }
+  return sync_parent_dir(path);
+}
+
 static int run_scanner(const char *plumos_root, const char *sdcard_root, const char *system_id,
                        int full_refresh) {
   char scanner[PATH_MAX];
@@ -1670,15 +1733,7 @@ static int save_core_overrides(const char *path, const struct core_override_stat
   fprintf(f, "  ]\n");
   fprintf(f, "}\n");
 
-  if (fclose(f) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  if (rename(tmp_path, path) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  return 1;
+  return commit_temp_file(f, tmp_path, path);
 }
 
 static int find_system_core_override(const struct core_override_state *state,
@@ -2387,15 +2442,7 @@ static int save_favorites(const char *path, const struct favorite_state *state) 
   fprintf(f, "  ]\n");
   fprintf(f, "}\n");
 
-  if (fclose(f) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  if (rename(tmp_path, path) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  return 1;
+  return commit_temp_file(f, tmp_path, path);
 }
 
 static int set_favorite_from_rom(struct favorite_state *state, const char *system_id,
@@ -2567,15 +2614,7 @@ static int save_recent(const char *path, const struct recent_state *state) {
   fprintf(f, "  ]\n");
   fprintf(f, "}\n");
 
-  if (fclose(f) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  if (rename(tmp_path, path) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  return 1;
+  return commit_temp_file(f, tmp_path, path);
 }
 
 static void recent_entry_from_rom(struct recent_entry *entry, const char *system_id,
@@ -2692,15 +2731,7 @@ static int save_resume_session(const char *path, const struct resume_session *se
   fprintf(f, ",\n  \"auto_state_load\": %s\n", session->auto_state_load ? "true" : "false");
   fprintf(f, "}\n");
 
-  if (fclose(f) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  if (rename(tmp_path, path) != 0) {
-    unlink(tmp_path);
-    return 0;
-  }
-  return 1;
+  return commit_temp_file(f, tmp_path, path);
 }
 
 static void resume_session_from_rom(struct resume_session *session, const char *system_id,

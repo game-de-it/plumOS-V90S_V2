@@ -36,10 +36,18 @@ def safe_extract_pylibs() -> None:
             if target.exists():
                 shutil.rmtree(target)
         zf.extractall(PORTMASTER_DIR)
+        os.sync()
 
     digest = hashlib.md5(archive.read_bytes()).hexdigest()
-    (PORTMASTER_DIR / "pylibs.zip.md5").write_text(digest + "\n", encoding="ascii")
+    digest_path = PORTMASTER_DIR / "pylibs.zip.md5"
+    temp_digest = digest_path.with_name(f"{digest_path.name}.tmp.{os.getpid()}")
+    with temp_digest.open("w", encoding="ascii") as output:
+        output.write(digest + "\n")
+        output.flush()
+        os.fsync(output.fileno())
+    temp_digest.replace(digest_path)
     archive.unlink()
+    os.sync()
 
 
 def install_v90s_contract() -> None:
