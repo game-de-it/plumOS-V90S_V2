@@ -2,6 +2,7 @@
 #define PLUMOS_FBDEV_RENDERER_H
 
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -1842,25 +1843,100 @@ static int plumos_fbdev_read_first_line(const char *path, char *out,
   return out[0] != '\0';
 }
 
+static int plumos_fbdev_find_battery_path(char *out, size_t out_size) {
+  static const char *const candidates[] = {
+      "/sys/class/power_supply/battery",
+      "/sys/class/power_supply/axp2202-battery",
+  };
+  DIR *dir;
+  struct dirent *entry;
+  char path[256];
+  char type[32];
+  char capacity[32];
+  size_t i;
+
+  if (!out || out_size == 0) {
+    return 0;
+  }
+  out[0] = '\0';
+  for (i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+    snprintf(path, sizeof(path), "%s/type", candidates[i]);
+    if (!plumos_fbdev_read_first_line(path, type, sizeof(type)) ||
+        strcmp(type, "Battery") != 0) {
+      continue;
+    }
+    snprintf(path, sizeof(path), "%s/capacity", candidates[i]);
+    if (!plumos_fbdev_read_first_line(path, capacity, sizeof(capacity))) {
+      continue;
+    }
+    plumos_fbdev_copy_text(out, out_size, candidates[i]);
+    return 1;
+  }
+
+  dir = opendir("/sys/class/power_supply");
+  if (!dir) {
+    return 0;
+  }
+  while ((entry = readdir(dir)) != NULL) {
+    if (entry->d_name[0] == '.') {
+      continue;
+    }
+    snprintf(path, sizeof(path), "/sys/class/power_supply/%.128s/type",
+             entry->d_name);
+    if (!plumos_fbdev_read_first_line(path, type, sizeof(type)) ||
+        strcmp(type, "Battery") != 0) {
+      continue;
+    }
+    snprintf(path, sizeof(path), "/sys/class/power_supply/%.128s/capacity",
+             entry->d_name);
+    if (!plumos_fbdev_read_first_line(path, capacity, sizeof(capacity))) {
+      continue;
+    }
+    snprintf(out, out_size, "/sys/class/power_supply/%.128s", entry->d_name);
+    closedir(dir);
+    return 1;
+  }
+  closedir(dir);
+  return 0;
+}
+
 static void plumos_fbdev_battery_label(char *out, size_t out_size) {
+  char battery_path[256];
+  char path[320];
   char capacity[32];
   char status[32];
+  char *end;
+  long percent;
   const char *prefix = "BAT";
 
   if (!out || out_size == 0) {
     return;
   }
-  if (!plumos_fbdev_read_first_line("/sys/class/power_supply/battery/capacity",
-                                    capacity, sizeof(capacity))) {
+  if (!plumos_fbdev_find_battery_path(battery_path, sizeof(battery_path))) {
     plumos_fbdev_copy_text(out, out_size, "BAT --");
     return;
   }
-  if (plumos_fbdev_read_first_line("/sys/class/power_supply/battery/status",
-                                   status, sizeof(status)) &&
+  snprintf(path, sizeof(path), "%s/capacity", battery_path);
+  if (!plumos_fbdev_read_first_line(path, capacity, sizeof(capacity))) {
+    plumos_fbdev_copy_text(out, out_size, "BAT --");
+    return;
+  }
+  percent = strtol(capacity, &end, 10);
+  if (end == capacity) {
+    plumos_fbdev_copy_text(out, out_size, "BAT --");
+    return;
+  }
+  if (percent < 0) {
+    percent = 0;
+  } else if (percent > 100) {
+    percent = 100;
+  }
+  snprintf(path, sizeof(path), "%s/status", battery_path);
+  if (plumos_fbdev_read_first_line(path, status, sizeof(status)) &&
       (strcmp(status, "Charging") == 0 || strcmp(status, "Full") == 0)) {
     prefix = "CHG";
   }
-  snprintf(out, out_size, "%s %.3s", prefix, capacity);
+  snprintf(out, out_size, "%s %ld", prefix, percent);
 }
 
 static void plumos_fbdev_draw_graphic_top_bar(

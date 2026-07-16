@@ -239,6 +239,7 @@ struct input_event {
 #define UI_USB_DISK_POLL_INTERVAL_MS 250
 #define UI_USB_DISK_RESULT_FILE "/tmp/plumos-usb-disk-mode.ui.result"
 #define UI_TOP_REFRESH_MIN_VISIBLE_MS 1000
+#define UI_TOP_STATUS_REFRESH_MS 5000
 #define UI_THUMBNAIL_RESULT_WINDOW 11
 #define UI_SCRAPING_FIELD_COUNT 3
 #define UI_SCRAPING_FIELD_IMAGE 0
@@ -14389,6 +14390,9 @@ static int ui_needs_periodic_refresh(const struct ui_state *ui) {
     if (ui_uses_graphic_mode(ui) && ui_is_rom_list_screen(ui)) {
       return 1;
     }
+    if (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_TOP) {
+      return 1;
+    }
     return ui->rescue_network || ui->rom_scan_refresh_pid > 0;
   }
   if (ui->rescue_network) {
@@ -14429,6 +14433,9 @@ static int ui_periodic_refresh_interval_ms(const struct ui_state *ui) {
     }
     if (ui_uses_graphic_mode(ui) && ui_is_rom_list_screen(ui)) {
       return UI_GRAPHIC_SCROLL_REFRESH_MS;
+    }
+    if (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_TOP) {
+      return UI_TOP_STATUS_REFRESH_MS;
     }
     return ui->rescue_network ? 1000 : 0;
   }

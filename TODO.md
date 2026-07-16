@@ -475,6 +475,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Align the V90S TOP status contract with MMF: keep the 3x2 system grid,
   logos, header indicators, selection frame, and left accent, but never draw
   transient/debug `status:` text along the bottom of TOP.
+- [x] Drive the V90S TOP battery label from the StockOS AXP2202 power-supply
+  sysfs instead of the missing generic `battery` path. Validate `CHG 100`
+  against the live `Full` / `100` state and refresh TOP status every 5 seconds.
 - [x] Align the SELECT/Core Settings menu with the MMF-style settings layout
   and validate the V90S framebuffer render on the live device.
 - [x] Expose `Network Settings` from the V90S START menu so Wi-Fi and network
