@@ -34,6 +34,7 @@ REQUIRED_FILES = {
     "PortMaster/funcs.txt",
     "PortMaster/version",
 }
+ADAPTER_VERSION = 2
 
 
 def fail(message: str) -> NoReturn:
@@ -170,7 +171,7 @@ def install(channel: str, force: bool) -> None:
             )
 
         metadata = {
-            "adapter_version": 1,
+            "adapter_version": ADAPTER_VERSION,
             "channel": channel,
             "official_md5": actual_md5,
             "official_sha256": actual_sha256,

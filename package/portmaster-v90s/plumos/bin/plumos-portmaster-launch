@@ -139,7 +139,7 @@ printf '\n[%s] launch version=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   "$(cat "${PM_DIR}/version" 2>/dev/null || printf unknown)" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
 
-python3 "${ADAPTER_DIR}/plumos_portmaster_bootstrap.py" --no-check "$@" >> "$LOG_FILE" 2>&1 &
+python3 "${ADAPTER_DIR}/plumos_portmaster_bootstrap.py" "$@" >> "$LOG_FILE" 2>&1 &
 child_pid=$!
 printf '%s\n' "$child_pid" > "$PID_FILE"
 wait "$child_pid"

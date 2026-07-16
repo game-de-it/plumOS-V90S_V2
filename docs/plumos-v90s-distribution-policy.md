@@ -1360,8 +1360,12 @@ files without patching them in place. Hardware identification, PowerVR SDL2,
 ALSA routing, V90S controls, FAT32 SONAME aliases, and process ownership remain
 in the external plumOS adapter so an upstream update cannot replace them.
 
-Online updates must use `/mnt/plumos/bin/plumos-portmaster-update`. The official
-GUI runs with its in-place self-update check disabled. The plumOS updater:
+Online updates must use `/mnt/plumos/bin/plumos-portmaster-update`. The V90S
+adapter disables only the official GUI's in-place payload self-update call;
+catalog metadata, thumbnails, runtimes, and port downloads remain enabled and
+persist below `/mnt/plumos/state/portmaster/config`. The broad upstream
+`--no-check` option must not be used because it also disables those catalog
+updates. The plumOS updater:
 
 1. reads the selected official stable/beta/alpha release metadata
 2. downloads into a sibling staging directory on p7

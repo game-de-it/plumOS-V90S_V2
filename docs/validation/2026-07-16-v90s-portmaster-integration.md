@@ -54,9 +54,11 @@ kept the original test payload as `upstream.previous`. This test used temporary
 paths only and did not modify the V90S installation. A future real upstream
 release should be used to repeat the network switch itself.
 
-The GUI always launches with `--no-check`; only the plumOS-owned staged updater
-may replace the official payload. Port catalog, runtime, and game downloads
-inside the GUI remain enabled.
+The GUI runs with normal online checks enabled so source metadata, catalog
+images, runtimes, and ports can update. The V90S bootstrap replaces only the
+single upstream self-update call with a plumOS no-op. Therefore only the
+plumOS-owned staged updater may replace the official payload; `--no-check` must
+not be used because upstream also applies it to source metadata and images.
 
 ## GUI Runtime Evidence
 
@@ -103,6 +105,31 @@ SHA-256: 6a8d4852f82e84eae54858f2abd18220ab2ba505e27afc98c7b4427d59269fab
 ```
 
 It shows the correctly framed official PortMaster disclaimer at 640x480.
+
+The initial V90S launch incorrectly used `--no-check`. PortMaster interprets
+that option broadly: both payload self-update and `images.zip` source refresh
+were disabled, leaving `last_checked` null and catalog entries on the bundled
+`no-image.jpg`. Adapter version 2 removes that argument and suppresses only the
+payload self-update call. Source images remain in the persistent bind-mounted
+`config/images_*` directories.
+
+The repaired live launch downloaded the official PortMaster and Multiverse
+source metadata plus image archives. Both source files received a non-null
+`last_checked` value, and the persistent cache contained 1,386 PNG/JPEG files
+using 100.1 MiB. A second launch reached the main menu in about two seconds,
+performed no image download, and retained the same image count. The official
+payload stayed at `2026.06.23-0015`, and no `upstream.previous` directory was
+created, proving that the catalog refresh did not invoke payload replacement.
+
+The ignored post-relaunch framebuffer capture is:
+
+```text
+output/validation/portmaster-v90s-thumbnails/catalog-thumbnail.png
+SHA-256: 435d25003260a2c07242708abcfcdf7787d29d9627a7a74b60efb4f5172d9743
+```
+
+It shows the `-SPROUT-` catalog entry using its downloaded screenshot rather
+than the bundled no-image placeholder.
 
 ## Ready-to-Run Port Evidence
 

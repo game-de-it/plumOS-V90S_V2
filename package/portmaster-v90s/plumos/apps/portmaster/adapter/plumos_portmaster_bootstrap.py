@@ -15,6 +15,8 @@ from pathlib import Path, PurePosixPath
 
 APP_ROOT = Path(os.environ.get("PLUMOS_PORTMASTER_APP_ROOT", "/mnt/plumos/apps/portmaster"))
 PORTMASTER_DIR = APP_ROOT / "upstream" / "PortMaster"
+SELF_UPDATE_CALL = b"            if portmaster_check_update(pm, config, temp_dir):"
+PLUMOS_SELF_UPDATE_CALL = b"            if plumos_portmaster_check_update(pm, config, temp_dir):"
 
 
 def safe_extract_pylibs() -> None:
@@ -78,6 +80,17 @@ def install_v90s_contract() -> None:
     harbourmaster.HM_PLATFORMS["plumos"] = platform.PlatformBase
 
 
+def disable_upstream_self_update(source: bytes) -> bytes:
+    """Keep catalog checks enabled while plumOS owns payload replacement."""
+    if source.count(SELF_UPDATE_CALL) != 1:
+        raise RuntimeError("unsupported PortMaster self-update call layout")
+    return source.replace(SELF_UPDATE_CALL, PLUMOS_SELF_UPDATE_CALL, 1)
+
+
+def plumos_portmaster_check_update(*_args, **_kwargs) -> bool:
+    return False
+
+
 def main() -> int:
     if not (PORTMASTER_DIR / "pugwash").is_file():
         raise SystemExit(f"PortMaster payload is incomplete: {PORTMASTER_DIR}")
@@ -91,8 +104,10 @@ def main() -> int:
         "__file__": str(pugwash),
         "__name__": "__main__",
         "__package__": None,
+        "plumos_portmaster_check_update": plumos_portmaster_check_update,
     }
-    exec(compile(pugwash.read_bytes(), str(pugwash), "exec"), globals_dict)
+    source = disable_upstream_self_update(pugwash.read_bytes())
+    exec(compile(source, str(pugwash), "exec"), globals_dict)
     return 0
 
 

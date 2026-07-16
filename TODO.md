@@ -625,6 +625,9 @@ Build plumOS V90S as a V90S-specific distribution:
     validate the official stable metadata refresh, GUI rendering, controller
     discovery, and single-frontend restoration. A future newer upstream release
     still needs one real network switch test.
+  - [x] Keep upstream catalog checks enabled while suppressing only payload
+    self-update. Persist 1,386 downloaded catalog images under p7 and confirm
+    thumbnail rendering survives a PortMaster restart without another download.
   - [x] Validate one lightweight AArch64 Ready-to-Run SDL2/GLES port before
     enabling wider catalog classes.
     Apotris rendered and used the normal internal audio route; its owned process
