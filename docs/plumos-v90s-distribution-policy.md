@@ -1301,11 +1301,18 @@ The system squashfs owns the Bookworm Python 3 interpreter and the standard
 baked into the squashfs. They are installed into the p7 app/data layer:
 
 ```text
-requirements: /mnt/plumos/roms/pyxel/requirements.txt
-venv:         /mnt/plumos/venvs/pyxel
-wheel cache:  /mnt/plumos/cache/pip
-temporary:    /mnt/plumos/cache/pip-tmp
+project requirements: /mnt/plumos/roms/pyxel/requirements.txt
+default requirements: /mnt/plumos/share/pyxel/requirements.txt
+venv:                /mnt/plumos/venvs/pyxel
+wheel cache:         /mnt/plumos/cache/pip
+temporary:           /mnt/plumos/cache/pip-tmp
 ```
+
+The project requirements file takes precedence when present. If it is absent,
+the installer uses the plumOS-owned default requirements so Pyxel setup remains
+available when SD2 is mounted over `/mnt/plumos/roms` or a new SD2 does not yet
+contain a requirements file. An explicit `PLUMOS_PYXEL_REQUIREMENTS` override
+takes precedence over both paths.
 
 `Apps -> Pyxel Setup` is the user-facing installer. It must return a bounded
 failure when Python, `requirements.txt`, networking, or a compatible wheel is
@@ -1324,6 +1331,8 @@ Rationale:
 Keeping Python itself read-only makes the interpreter and standard library
 stable across resets. Keeping pip-installed modules on p7 preserves the normal
 Windows/macOS copy-over workflow and allows a project's `requirements.txt` to
-change independently of the OS image. The FAT-safe venv creator skips only
+change independently of the OS image. The packaged default prevents the
+optional SD2 content partition from becoming a prerequisite for the base Pyxel
+runtime. The FAT-safe venv creator skips only
 CPython's optional `lib64` symlink and otherwise uses the standard copied-file
 venv layout.

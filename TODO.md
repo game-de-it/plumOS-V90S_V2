@@ -581,14 +581,18 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
   release-system squashfs while keeping pip-installed modules on p7.
 - [x] Add `Apps -> Pyxel Setup` to install
-  `/mnt/plumos/roms/pyxel/requirements.txt` into the FAT-safe copied venv at
-  `/mnt/plumos/venvs/pyxel`, preserve the previous venv on failure, and show
-  the complete result in the frontend.
+  `/mnt/plumos/roms/pyxel/requirements.txt`, or the packaged default when SD2
+  does not provide it, into the FAT-safe copied venv at
+  `/mnt/plumos/venvs/pyxel`. Preserve the previous venv on failure and show the
+  complete result in the frontend.
 - [x] Replace the inherited `pyxel:mmf` V90S default with the device-owned
   `pyxel:v90s` launcher contract.
-- [ ] Boot the Pyxel-enabled system image on V90S, run Pyxel Setup through the
-  physical FE controls, and validate a `.py` and `.pyxapp` launch including
-  video, audio, controls, and clean return to FE.
+- [ ] Complete Pyxel real-device validation through the physical FE controls.
+  - [x] Boot the Pyxel-enabled system image, install the p7 venv, and run a
+    `.pyxapp` long enough to prove PowerVR video and ALSA audio initialization.
+  - [x] Restore exactly one frontend process after the bounded runtime test.
+  - [ ] Confirm visible video, audible audio, gamepad controls, game-owned exit,
+    and a `.py` title whose project requirements are present.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.

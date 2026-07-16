@@ -100,6 +100,14 @@ pcm.plumos_output {
     type plug
     slave.pcm "plumos_hotplug"
 }
+
+# Pyxel 2.9 requests 22.05 kHz mono and does not permit SDL to alter the
+# obtained format. Keep a named interface for that contract; the router
+# duplicates mono input into its stereo physical stream.
+pcm.plumos_pyxel {
+    type plug
+    slave.pcm "plumos_hotplug"
+}
 EOF
   chmod 0644 "$config_tmp"
   mv -f "$config_tmp" "$ASOUND_CONFIG"

@@ -4,7 +4,18 @@ set -u
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 ROM_DIR="${PLUMOS_PYXEL_ROM_DIR:-$PLUMOS_ROOT/roms/pyxel}"
-REQUIREMENTS="${PLUMOS_PYXEL_REQUIREMENTS:-$ROM_DIR/requirements.txt}"
+PROJECT_REQUIREMENTS="$ROM_DIR/requirements.txt"
+DEFAULT_REQUIREMENTS="${PLUMOS_PYXEL_DEFAULT_REQUIREMENTS:-$PLUMOS_ROOT/share/pyxel/requirements.txt}"
+if [ -n "${PLUMOS_PYXEL_REQUIREMENTS:-}" ]; then
+  REQUIREMENTS="$PLUMOS_PYXEL_REQUIREMENTS"
+  REQUIREMENTS_SOURCE="override"
+elif [ -r "$PROJECT_REQUIREMENTS" ]; then
+  REQUIREMENTS="$PROJECT_REQUIREMENTS"
+  REQUIREMENTS_SOURCE="project"
+else
+  REQUIREMENTS="$DEFAULT_REQUIREMENTS"
+  REQUIREMENTS_SOURCE="plumos-default"
+fi
 VENV_DIR="${PLUMOS_PYXEL_VENV:-$PLUMOS_ROOT/venvs/pyxel}"
 CACHE_DIR="${PLUMOS_PYXEL_PIP_CACHE:-$PLUMOS_ROOT/cache/pip}"
 TMP_DIR="${PLUMOS_PYXEL_PIP_TMP:-$PLUMOS_ROOT/cache/pip-tmp}"
@@ -125,6 +136,8 @@ run_pip_install() {
 print_status() {
   log "Pyxel Setup status"
   log "requirements=$REQUIREMENTS"
+  log "requirements_source=$REQUIREMENTS_SOURCE"
+  log "project_requirements=$PROJECT_REQUIREMENTS"
   log "venv=$VENV_DIR"
   if ! command -v python3 >/dev/null 2>&1; then
     log "runtime=missing (python3 is not in the system squashfs)"
@@ -170,6 +183,7 @@ install_environment() {
   log "Pyxel Setup"
   log "runtime=$(python3 --version 2>&1)"
   log "requirements=$REQUIREMENTS"
+  log "requirements_source=$REQUIREMENTS_SOURCE"
   log "requirements_sha256=$(sha256sum "$REQUIREMENTS" | awk '{print $1}')"
   log "venv=$VENV_DIR"
   log "pip_policy=$([ "$ONLY_BINARY" = "0" ] && printf source-allowed || printf binary-wheels-only)"

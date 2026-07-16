@@ -2,6 +2,13 @@
 
 Date: 2026-07-16
 
+Runtime follow-up: the first real-device boot found that SD2 can hide the
+user-owned requirements path. The current installer therefore falls back to a
+packaged default. See
+`docs/validation/2026-07-16-v90s-pyxel-runtime-bringup.md` for the live Pyxel,
+PowerVR, and mono-audio result. The sections below preserve the original
+pre-hardware build validation.
+
 ## Goal
 
 Prepare the first V90S Pyxel runtime boundary:

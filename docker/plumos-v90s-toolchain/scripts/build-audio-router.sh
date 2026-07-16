@@ -33,6 +33,7 @@ architecture=arm64
 implementation=alsa-ioplug
 plugin=libasound_module_pcm_plumos_hotplug.so
 logical_pcm=plumos_output
+input_channels=mono,stereo
 internal_route=hw:0,0-mono-mix
 usb_route=first-usb-playback-card-stereo
 background_processes=none
