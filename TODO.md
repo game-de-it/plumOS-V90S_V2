@@ -731,7 +731,7 @@ Build plumOS V90S as a V90S-specific distribution:
   manifest/checksums, bounded SD2 fsck/mount, and the single-FE `exec` chain.
 - [x] Generate and structurally verify the compact candidate image
   `plumos-v90s-four-partition-20260718-6.img`.
-- [ ] Boot the four-partition candidate on a physical V90S and verify p3/p4
+- [x] Boot the four-partition candidate on a physical V90S and verify p3/p4
   geometry, labels, provisioning markers, mounts, and exactly one FE process.
   - [x] The first physical boot expanded p3 to 8192 MiB and created and seeded p4
     through the SD-card tail. FUSE-T inspection found handoff stopped because
@@ -745,6 +745,9 @@ Build plumOS V90S as a V90S-specific distribution:
     initramfs framebuffer progress/error screen.
   - [x] Generated `plumos-v90s-four-partition-20260718-8.img` with explicit
     framebuffer handoff diagnostics and a clean 1 MiB-aligned p4.
+  - [x] Physical boot completed through system init and FE. ADB proved p3 at
+    exactly 8192 MiB, aligned p4 through the SD tail, all expected mounts and
+    markers, clean kernel storage logs, and one framebuffer FE process.
   - [ ] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,

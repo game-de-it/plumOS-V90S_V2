@@ -111,3 +111,51 @@ verification=PASS
 The generated progress frames are 640x960 BGRA buffers containing identical
 pages for the V90S double-buffered fb0 layout. This avoids a dependency on SDL,
 the PowerVR userspace, fonts, or the system SquashFS during early boot.
+
+## Third physical boot result
+
+The third candidate completed first boot and displayed the frontend. ADB was
+enabled from the FE and provided the following live evidence:
+
+```text
+mmcblk0p1 start=41984    sectors=2097152   PLUMBOOT   vfat
+mmcblk0p2 start=2139136  sectors=131072    boot       raw
+mmcblk0p3 start=2270208  sectors=16777216  PLUMOS_SYS ext4
+mmcblk0p4 start=19048448 sectors=222609408 PLUMOS     vfat
+```
+
+`19048448 % 2048 == 0`, so p4 begins on the required 1 MiB boundary. Runtime
+mount ownership was:
+
+```text
+/dev/mmcblk0p1 /mnt/plumos-boot ro vfat
+/dev/mmcblk0p3 /mnt/plumos      rw ext4 noatime
+/dev/mmcblk0p4 /mnt/plumos-user rw vfat
+/dev/mmcblk1p1 /mnt/plumos/roms rw vfat bind
+/dev/mmcblk1p1 /mnt/plumos/bios rw vfat bind
+```
+
+p3 had approximately 6.8 GiB free and p4 approximately 106.1 GiB free. Every
+provisioning marker, including `complete`, existed. Identical complete handoff
+logs were present on p3 and p4 and ended with:
+
+```text
+system-a hash verification passed
+handoff: attaching system SquashFS loop
+handoff: mounting system SquashFS
+handoff: moving persistent mounts into system root
+handoff: executing system init
+```
+
+The system root identified itself as Debian bookworm `release-system` with
+vendor runtime `v90s-stockos-r1`. The app-layer manifest was complete with all
+118 required libretro cores. Exactly one FE renderer was running:
+
+```text
+/mnt/plumos/bin/plumos-controller-ui-fbdev --renderer fbdev
+```
+
+SD2 `GAME` mounted after a bounded FAT check returned `rc=0`. The 364
+`FSCK*.REC` files on SD2 have 1980 timestamps and are already present in its
+macOS Spotlight index, so they predate this boot. No current MMC I/O error,
+filesystem error, or read-only remount appeared in the kernel log.
