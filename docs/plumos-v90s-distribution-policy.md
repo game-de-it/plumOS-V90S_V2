@@ -249,18 +249,25 @@ The agreed candidate partition target is deliberately smaller than the current
 StockOS-compatible layout:
 
 ```text
-raw boot area              vendor-compatible boot0 and boot_package offsets
-p1 PLUMBOOT     FAT        boot assets and signed A/B system SquashFS files
-p2 BOOT         raw        Android boot image: kernel, DTB, initramfs
-p3 PLUMOS_SYS   ext4       device-managed runtime and persistent Linux data
-p4 PLUMOS       FAT32      portable user content and interchange area
+raw boot area                  vendor-compatible boot0 and boot_package offsets
+p1 PLUMBOOT    FAT    1024 MiB       boot assets and signed A/B system SquashFS
+p2 BOOT        raw      64 MiB       kernel, DTB, and plumOS initramfs
+p3 PLUMOS_SYS  ext4   1536 MiB seed  expand to 8192 MiB on first boot
+p4 PLUMOS      FAT32  not in seed    create through the final usable SD sector
 ```
 
 The candidate removes external `env`/`env-redund`, raw p5 SquashFS, and p6
 BATOCERA partitions. The boot package supplies an immutable default environment
 that loads p2, while the p2 initramfs verifies and loop-mounts a system image
-from p1. Exact partition capacities remain an explicit open decision. Windows
-and macOS should mount only `PLUMBOOT` and `PLUMOS`.
+from p1. Capacity units are exact: `1 GiB` means `1024 MiB` and the final p3 is
+`8192 MiB`. The compact release seed is about 2.58 GiB and contains only p1-p3.
+On the first V90S boot, the p2 initramfs relocates the backup GPT, expands p3,
+creates p4, formats it as FAT32, and installs the portable user-data tree. The
+minimum supported physical SD card is 16 GB. This process must be idempotent,
+resume safely after power loss, and never blindly format an existing p4 with
+unknown or user data. Before provisioning, a host sees only `PLUMBOOT`; after a
+successful V90S boot, Windows and macOS should mount only `PLUMBOOT` and
+`PLUMOS`. Whether p1 uses FAT16 or FAT32 remains a compatibility-spike decision.
 
 The boot-critical SD-card layout should continue to follow the
 StockOS/Batocera contract until there is real-device evidence that a partition

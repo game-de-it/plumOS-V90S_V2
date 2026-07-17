@@ -76,17 +76,17 @@ offsets before the GPT partitions. They are not exposed as partitions.
 The agreed candidate SD1 layout is:
 
 ```text
-raw boot area             boot0 and boot_package at vendor-compatible offsets
-p1  boot-resource PLUMBOOT    FAT   boot assets and versioned system SquashFS
-p2  boot          BOOT        raw   Android boot image: kernel, DTB, initramfs
-p3  runtime       PLUMOS_SYS  ext4  releases and persistent Linux-managed data
-p4  userdata      PLUMOS      FAT32 portable user content and interchange area
+raw boot area                  observed about 20.5 MiB before p1
+p1  PLUMBOOT    FAT    1024 MiB       boot assets and versioned system SquashFS
+p2  BOOT        raw      64 MiB       Android boot image: kernel, DTB, initramfs
+p3  PLUMOS_SYS  ext4   1536 MiB seed  expand to 8192 MiB on first boot
+p4  PLUMOS      FAT32  not in seed    create through the final usable SD sector
 ```
 
-The exact capacities are intentionally not fixed in this section. Partition
-sizing is the next design decision and must use measured SquashFS, runtime,
-rollback, PortMaster, and user-content requirements rather than inherited
-StockOS sizes.
+`1 GiB` and `8 GiB` in release tooling mean exactly `1024 MiB` and `8192 MiB`.
+The compact seed image contains only p1-p3. Its expected logical size is about
+2.58 GiB including the raw boot area, alignment, and GPT metadata. p4 is absent
+until first-boot provisioning succeeds.
 
 ### PLUMBOOT
 
@@ -107,11 +107,24 @@ The filesystem may remain FAT16 for the first compatibility spike or move to
 FAT32 after bootlogo and boot-package validation. Windows and macOS must mount
 it as `PLUMBOOT`. A normal update writes only the inactive SquashFS slot.
 
+The current system SquashFS is about 92.05 MiB, so two slots consume about
+184.1 MiB before manifests and signatures. The 1024 MiB allocation deliberately
+leaves substantial growth and recovery-package space. The image builder must
+calculate both signed slot sizes and reject a release that cannot fit without
+the required free-space margin.
+
 ### BOOT
 
 p2 is the raw Android boot image and contains the vendor kernel, matching DTB,
 and a plumOS-owned initramfs. It keeps the kernel payload outside FAT so an
 ordinary host-side file operation cannot accidentally replace it.
+
+The captured Android boot header describes about 12.49 MiB of kernel and
+2.99 MiB of ramdisk, or about 15.48 MiB including page alignment and the boot
+header. p2 remains 64 MiB so the initramfs can add GPT, ext4, FAT, signature,
+framebuffer, input, and recovery tooling without immediately changing the
+partition contract. The build must fail when the complete generated Android
+boot image exceeds 64 MiB.
 
 The current separate `env` and `env-redund` partitions are not carried into the
 candidate layout. Their current values include a hard-coded
@@ -127,18 +140,25 @@ p3 is the Linux-native device-managed area. It contains application releases,
 configuration, active saves and states, update staging, rollback metadata,
 PortMaster, Python environments, and other data that requires POSIX semantics.
 
-The release image may contain a payload-sized initial p3 and expand it before
-creating p4 on first boot. This avoids making the downloadable and flashed raw
-image as large as the final ext4 runtime allocation.
+The current runtime payload is about 1.11 GiB. The release image carries a
+1536 MiB ext4 p3 and the image build must verify that at least 256 MiB remains
+free after seeding it. p3 is expanded to exactly 8192 MiB in the p2 initramfs
+before p4 is created. This avoids making the downloadable and flashed raw image
+as large as the final ext4 runtime allocation.
 
 ### PLUMOS
 
-p4 is the final partition and consumes the remaining SD-card capacity after
-first-boot provisioning. It is the user-managed FAT32 area for ROMs, BIOS,
-artwork, themes, screenshots, media, updates, imports, and exports.
+p4 does not exist in the distributed seed image. First-boot provisioning
+creates it as the final GPT partition, formats it as FAT32, and extends it to
+the final usable sector of the physical SD card. It is the user-managed area
+for ROMs, BIOS, artwork, themes, screenshots, media, updates, imports, and
+exports.
 
 Windows and macOS should see only `PLUMBOOT` and `PLUMOS`. p2 is raw and p3 uses
-a Linux filesystem, so neither should receive a host drive letter.
+a Linux filesystem, so neither should receive a host drive letter. Before the
+first successful device boot, only `PLUMBOOT` exists as a host-mountable volume;
+release instructions must require one V90S provisioning boot before the user
+copies ROMs from a PC.
 
 ### Removed StockOS Partitions
 
@@ -165,6 +185,7 @@ The candidate boot flow is:
 boot0
   -> boot_package / U-Boot fixed environment
   -> p2 BOOT kernel and initramfs
+  -> provision or resume physical-card layout when incomplete
   -> mount p1 PLUMBOOT read-only
   -> verify selected SquashFS manifest and signature
   -> loop-mount system-a or system-b
@@ -182,6 +203,72 @@ slot fails verification or readiness, the previous verified slot is tried.
 The p2 initramfs must contain enough framebuffer, input, storage, signature,
 and diagnostic support to show a recovery screen when neither SquashFS slot can
 boot. It must not depend on frontend or emulator files from p3.
+
+## First-Boot Provisioning Contract
+
+The compact release image contains only p1-p3. The minimum supported physical
+SD-card capacity is 16 GB. Provisioning runs from the p2 initramfs before p1,
+p3, or a system SquashFS is mounted for normal operation.
+
+On every boot, the initramfs inspects the physical parent device and the actual
+GPT/filesystem geometry. A completion marker is advisory; geometry is the
+source of truth. When provisioning is incomplete, the initramfs performs or
+resumes these operations in order:
+
+1. Resolve the physical SD device without assuming it is `mmcblk0` and verify
+   that it is at least 16 GB.
+2. Validate the expected p1-p3 identities, starts, sizes, and seed-image
+   manifest. Stop in recovery if an unexpected layout could contain user data.
+3. Relocate the backup GPT header and table from the end of the seed image to
+   the final usable sectors of the physical SD card.
+4. Grow the p3 partition entry from 1536 MiB to exactly 8192 MiB without
+   changing its start sector.
+5. Ask the kernel to reread the partition table while no seed partition is
+   mounted, and stop in recovery if the new geometry is not visible.
+6. Run `e2fsck` on p3 and then `resize2fs` so the ext4 filesystem fills the
+   8192 MiB partition.
+7. Create p4 on the next 1 MiB-aligned sector and extend it through the final
+   usable GPT sector.
+8. Format a newly created p4 as FAT32 with filesystem label `PLUMOS`.
+9. Mount p1 read-only, verify and loop-mount the selected system SquashFS, then
+   mount p3 and p4. Create the portable user-data tree and copy any signed seed
+   content that is absent from p4.
+10. Flush file contents, filesystem metadata, and block-device state before
+    recording completion.
+11. Revalidate all four partitions, labels, target sizes, and seed-manifest
+    hashes before continuing the normal boot flow.
+
+The read-only system SquashFS provides the versioned seed at:
+
+```text
+/usr/share/plumos/userdata-seed/
+```
+
+It creates the exact p4 top-level directories documented below, including
+`roms`, `bios`, `Images`, `Themes`, `updates`, `imports`, and `exports`. The
+seed has its own manifest so provisioning can copy only missing distribution
+files and never replace user content during a resume.
+
+Durable progress is recorded on p3 after ext4 is available:
+
+```text
+/mnt/plumos/provision/state
+/mnt/plumos/provision/gpt-expanded
+/mnt/plumos/provision/ext4-resized
+/mnt/plumos/provision/p4-formatted
+/mnt/plumos/provision/userdata-seeded
+/mnt/plumos/provision/complete
+```
+
+While p4 is being initialized it contains `/.plumos-provisioning`. That marker
+is replaced by `/.plumos-ready` only after the directory tree, copied files,
+and FAT metadata have been flushed successfully.
+
+Every operation must be idempotent and safe to repeat after power loss. If p4
+already exists, provisioning runs FAT filesystem repair and resumes from the
+observed geometry and manifests. It must never blindly format an existing p4
+that contains an unknown layout or user files. An ambiguous or failed step
+shows the initramfs recovery screen and must not partially launch the frontend.
 
 ## Mount and Path Contract
 
@@ -579,6 +666,26 @@ BATOCERA partitions. It must fail if the boot package still contains the old
 `mmc_root=/dev/mmcblk0p6` contract or if the generated p1 cannot contain both
 signed system slots within the selected capacity.
 
+The `sd-image` output is a compact provisioning seed with p1 exactly 1024 MiB,
+p2 exactly 64 MiB, p3 exactly 1536 MiB, and no p4 partition. Its build manifest
+records at least:
+
+```text
+p1_seed_mib=1024
+p2_mib=64
+p3_seed_mib=1536
+p3_target_mib=8192
+p3_minimum_free_mib=256
+minimum_sd_gb=16
+```
+
+Assembly must fail if the complete Android boot image exceeds p2, both signed
+SquashFS slots and their metadata do not fit p1, or seeded p3 free space is less
+than 256 MiB. The p2 initramfs includes the provisioning tools, while the
+signed system root supplies the user-data seed and manifest. p4 is created only
+on the physical V90S and therefore is not represented as an empty partition in
+the downloadable image.
+
 Development ADB deployment should exercise the same staging and current-switch
 contract as the release updater rather than restoring an unrelated in-place
 overwrite path.
@@ -606,31 +713,39 @@ video, audio, input, networking, update, rollback, and shutdown validation.
 
 The first spike should prove only the new boot and storage contract:
 
-1. Build a four-partition image while preserving known-good boot0 and hardware
-   initialization inputs.
-2. Boot p2 with a fixed environment that has no p6 or external-env dependency.
-3. Mount p1 and loop-mount a signed test SquashFS from `System/`.
-4. Mount p3 at `/mnt/plumos` and start the existing frontend through `current`.
-5. Create or mount p4 at `/mnt/plumos-user` without changing p1-p3 offsets.
-6. Launch one RetroArch game and verify save/config persistence on ext4.
-7. Boot once from each signed SquashFS slot.
-8. Corrupt the inactive slot and confirm the active slot still boots.
-9. Fail the pending-slot readiness check and confirm rollback.
-10. Damage or remove p4 and confirm p2 plus a verified system slot reaches a
+1. Build a compact p1-p3 seed while preserving known-good boot0 and hardware
+   initialization inputs, and verify exact 1024/64/1536 MiB capacities.
+2. Insert the seed into a 16 GB or larger card and boot p2 with a fixed
+   environment that has no p6 or external-env dependency.
+3. Verify first boot relocates the backup GPT, expands p3 to exactly 8192 MiB,
+   and creates p4 through the physical card's final usable sector.
+4. Verify p4 is FAT32 label `PLUMOS`, contains the complete seed tree, and has a
+   durable `/.plumos-ready` marker.
+5. Interrupt power separately after GPT relocation, p3 partition growth, ext4
+   resize, p4 format, and user-data seeding; confirm each image resumes without
+   reformatting user content.
+6. Mount p1 and loop-mount a signed test SquashFS from `System/`.
+7. Mount p3 at `/mnt/plumos`, mount p4 at `/mnt/plumos-user`, and start the
+   existing frontend through `current`.
+8. Launch one RetroArch game and verify save/config persistence on ext4.
+9. Boot once from each signed SquashFS slot.
+10. Corrupt the inactive slot and confirm the active slot still boots.
+11. Fail the pending-slot readiness check and confirm rollback.
+12. Damage or remove p4 and confirm p2 plus a verified system slot reaches a
     recovery screen without rewriting the user partition.
-11. Insert the card into Windows and macOS and confirm that only `PLUMBOOT` and
-    `PLUMOS` mount, recording enumeration time on both hosts.
+13. Insert an unprovisioned seed into Windows and macOS and confirm that only
+    `PLUMBOOT` mounts. After one successful V90S boot, confirm that only
+    `PLUMBOOT` and `PLUMOS` mount and record enumeration time on both hosts.
 
 Only after the spike passes should the Distribution Policy, TODO, release
 workflow, image assembler, and normal app-layer target be changed.
 
 ## Open Decisions
 
-- Exact p1 `PLUMBOOT` capacity and whether its first validated format remains
-  FAT16 or moves to FAT32.
-- Exact initial and final p3 `PLUMOS_SYS` capacities.
-- How first boot expands p3 and creates final p4 without risking the boot GPT.
-- Minimum supported SD-card capacity and p3 sizing policy by card size.
+- Whether p1 `PLUMBOOT` remains FAT16 or moves to FAT32 after the compatibility
+  spike.
+- Which initramfs GPT/FAT/ext4 tool implementations are included to satisfy the
+  fixed first-boot provisioning contract.
 - Whether SD2 overrides p4 ROM/BIOS, merges with it, or is selected in FE.
 - Whether update packages use gzip, zstd, or a plumOS-specific container.
 - Which signing algorithm and key-rotation policy plumOS uses.
