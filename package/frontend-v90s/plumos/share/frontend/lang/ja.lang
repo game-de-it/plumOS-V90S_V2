@@ -31,6 +31,14 @@ menu.status.apps_ready=アプリ準備完了
 menu.status.apps_load_failed=アプリメニューを読み込めません
 menu.status.back_to_start=START に戻りました
 
+power_action.reboot.title=再起動しています
+power_action.shutdown.title=シャットダウンしています
+power_action.running=しばらくお待ちください
+power_action.saving=データを安全に保存しています
+power_action.controls_disabled=操作は無効になっています
+power_action.no_remove=SDカードを抜かないでください
+power_action.wait=処理が完了するまでお待ちください。
+
 app.scraping.name=スクレイピング
 app.file_manager.name=ファイルマネージャー
 app.music_player.name=音楽プレイヤー

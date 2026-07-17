@@ -536,7 +536,8 @@ enum ui_screen {
   SCREEN_THUMBNAIL_RUNNING = 14,
   SCREEN_SCRAPING = 15,
   SCREEN_GALLERY = 16,
-  SCREEN_TOP_REFRESH_RUNNING = 17
+  SCREEN_TOP_REFRESH_RUNNING = 17,
+  SCREEN_POWER_ACTION_RUNNING = 18
 };
 
 enum wifi_connect_stage {
@@ -637,6 +638,7 @@ struct ui_state {
   int settings_blink_direction;
   long long settings_blink_until_ms;
   size_t power_cursor;
+  char power_action[16];
   struct top_entry top_entries[UI_MAX_TOP];
   size_t top_count;
   struct rom_entry *rom_entries;
@@ -7818,6 +7820,7 @@ static int ui_fbdev_uses_settings_family_layout(const struct ui_state *ui) {
   case SCREEN_THUMBNAIL_RUNNING:
   case SCREEN_SCRAPING:
   case SCREEN_TOP_REFRESH_RUNNING:
+  case SCREEN_POWER_ACTION_RUNNING:
     return 1;
   default:
     return 0;
@@ -7839,6 +7842,7 @@ static int ui_fbdev_reserves_footer_space(const struct ui_state *ui) {
   case SCREEN_THUMBNAIL_RUNNING:
   case SCREEN_SCRAPING:
   case SCREEN_TOP_REFRESH_RUNNING:
+  case SCREEN_POWER_ACTION_RUNNING:
     return 1;
   default:
     return 0;
@@ -9710,6 +9714,30 @@ static void render_top_refresh_running(struct ui_state *ui) {
   }
 }
 
+static void render_power_action_running(struct ui_state *ui) {
+  int rebooting = strcmp(ui->power_action, "reboot") == 0;
+  const char *title = rebooting
+                          ? tr(ui, "power_action.reboot.title", "Restarting")
+                          : tr(ui, "power_action.shutdown.title", "Shutting Down");
+
+  ui_printf(ui, "plumOS controller UI - %s\n", title);
+  ui_printf(ui, "power_action_running=1\n");
+  ui_printf(ui, "power_action=%s\n", rebooting ? "reboot" : "shutdown");
+  ui_printf(ui, "entries=4 cursor=0\n");
+  ui_printf(ui, "\n");
+  ui_printf(ui, "    1  %s\n",
+            tr(ui, "power_action.running", "PLEASE WAIT"));
+  ui_printf(ui, "    2  %s\n",
+            tr(ui, "power_action.saving", "Saving data safely"));
+  ui_printf(ui, "    3  %s\n",
+            tr(ui, "power_action.controls_disabled", "Controls are disabled"));
+  ui_printf(ui, "    4  %s\n",
+            tr(ui, "power_action.no_remove", "Do not remove the SD card"));
+  ui_printf(ui, "footer1=%s\n", title);
+  ui_printf(ui, "footer2=%s\n",
+            tr(ui, "power_action.wait", "Wait until the device finishes."));
+}
+
 static void render_ui(struct ui_state *ui) {
   clear_screen(ui);
   if (ui->screen != SCREEN_TOP) {
@@ -9753,6 +9781,8 @@ static void render_ui(struct ui_state *ui) {
     render_usb_disk_starting(ui);
   } else if (ui->screen == SCREEN_TOP_REFRESH_RUNNING) {
     render_top_refresh_running(ui);
+  } else if (ui->screen == SCREEN_POWER_ACTION_RUNNING) {
+    render_power_action_running(ui);
   } else {
     render_top(ui);
   }
@@ -11267,6 +11297,9 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
   const char *power_backend;
   size_t pos = 0;
   int rc;
+  int terminal_action;
+  int dry_run_enabled;
+  enum ui_screen previous_screen;
 
   if (!action || (strcmp(action, "shutdown") != 0 &&
                   strcmp(action, "reboot") != 0 &&
@@ -11311,6 +11344,10 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
   if (!power_backend || !power_backend[0]) {
     power_backend = "auto";
   }
+  terminal_action = strcmp(action, "reboot") == 0 ||
+                    (strcmp(action, "shutdown") == 0 && poweroff);
+  dry_run_enabled = dry_run && dry_run[0] && strcmp(dry_run, "0") != 0 &&
+                    strcmp(dry_run, "false") != 0 && strcmp(dry_run, "off") != 0;
 
   cmd[0] = '\0';
   if (!append_string(cmd, sizeof(cmd), &pos, "mkdir -p ") ||
@@ -11355,9 +11392,7 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
     set_status(ui, "power action command too long");
     return 0;
   }
-  if (dry_run && dry_run[0] && strcmp(dry_run, "0") != 0 &&
-      strcmp(dry_run, "false") != 0 && strcmp(dry_run, "off") != 0 &&
-      !append_string(cmd, sizeof(cmd), &pos, " --dry-run")) {
+  if (dry_run_enabled && !append_string(cmd, sizeof(cmd), &pos, " --dry-run")) {
     set_status(ui, "power action command too long");
     return 0;
   }
@@ -11368,10 +11403,24 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
     return 0;
   }
 
-  snprintf(ui->status, sizeof(ui->status), "power %s running", action);
+  previous_screen = ui->screen;
+  if (terminal_action) {
+    copy_string(ui->power_action, sizeof(ui->power_action), action);
+    ui->screen = SCREEN_POWER_ACTION_RUNNING;
+    ui->repeat_action = ACTION_NONE;
+    ui->repeat_key_code = 0;
+    ui->repeat_next_ms = 0;
+    set_status(ui, "");
+  } else {
+    snprintf(ui->status, sizeof(ui->status), "power %s running", action);
+  }
   render_ui(ui);
   rc = system(cmd);
   if (rc == -1) {
+    if (terminal_action) {
+      ui->screen = previous_screen;
+      ui->power_action[0] = '\0';
+    }
     set_status(ui, "power action system call failed");
     return 0;
   }
@@ -11384,7 +11433,15 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
       snprintf(ui->status, sizeof(ui->status), "shutdown complete%s",
                poweroff ? " poweroff" : " (no poweroff)");
     }
+    if (terminal_action && dry_run_enabled) {
+      ui->screen = previous_screen;
+      ui->power_action[0] = '\0';
+    }
     return 1;
+  }
+  if (terminal_action) {
+    ui->screen = previous_screen;
+    ui->power_action[0] = '\0';
   }
   set_status(ui, "power action returned non-zero; see frontend-power-action.log");
   return 0;
@@ -13250,6 +13307,9 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
   if (action == ACTION_NONE) {
     return;
   }
+  if (ui->screen == SCREEN_POWER_ACTION_RUNNING) {
+    return;
+  }
   if (action == ACTION_VOLUME_DOWN || action == ACTION_VOLUME_UP) {
     change_system_volume(ui, action == ACTION_VOLUME_UP ? 1 : -1);
     return;
@@ -13309,8 +13369,10 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
         }
         return;
       }
-      run_power_action(ui, entry->id, strcmp(entry->id, "shutdown") == 0);
-      ui->screen = ui->power_back_screen;
+      if (run_power_action(ui, entry->id, strcmp(entry->id, "shutdown") == 0) &&
+          strcmp(entry->id, "sleep") == 0) {
+        ui->screen = ui->power_back_screen;
+      }
       if (ui->power_overlay) {
         ui->exit_requested = 1;
       }

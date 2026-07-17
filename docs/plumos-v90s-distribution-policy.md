@@ -419,6 +419,11 @@ under the vendor PID 1 or move noticeable latency into frontend startup.
 Power actions are a special case. The frontend may expose a compatibility
 entry point in the FAT32 app layer, but the final Reboot/Shutdown implementation
 must live in the system squashfs and run without depending on `/mnt/plumos`.
+After the user confirms Reboot or Shutdown, the frontend must immediately
+switch to a non-interactive power-action screen. Normal navigation, volume,
+power, and quit input must not change that screen while filesystems are being
+quiesced. If the power-action command fails synchronously before it is
+scheduled, the frontend may restore the previous menu and report the failure.
 For the same reason, the system squashfs/rootfs owns the first writable mount of
 p7 `PLUMOS`: before mounting p7 read-write, init should run a bounded
 `fsck.fat -a`/`dosfsck -a` pass when the target is FAT32/vfat and the tool is

@@ -31,6 +31,14 @@ menu.status.apps_ready=Aplicativos prontos
 menu.status.apps_load_failed=não foi possível carregar Aplicativos
 menu.status.back_to_start=voltou para START
 
+power_action.reboot.title=Reiniciando
+power_action.shutdown.title=Desligando
+power_action.running=AGUARDE
+power_action.saving=Salvando dados com segurança
+power_action.controls_disabled=Os controles estão desativados
+power_action.no_remove=Não remova o cartão SD
+power_action.wait=Aguarde o dispositivo concluir.
+
 app.scraping.name=Scraping
 app.file_manager.name=Gerenciador de arquivos
 app.music_player.name=Reprodutor de música

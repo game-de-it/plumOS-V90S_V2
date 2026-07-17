@@ -31,6 +31,14 @@ menu.status.apps_ready=应用已就绪
 menu.status.apps_load_failed=无法载入应用菜单
 menu.status.back_to_start=已返回 START
 
+power_action.reboot.title=正在重启
+power_action.shutdown.title=正在关机
+power_action.running=请稍候
+power_action.saving=正在安全保存数据
+power_action.controls_disabled=操作已禁用
+power_action.no_remove=请勿取出SD卡
+power_action.wait=请等待设备完成操作。
+
 app.scraping.name=媒体抓取
 app.file_manager.name=文件管理器
 app.music_player.name=音乐播放器

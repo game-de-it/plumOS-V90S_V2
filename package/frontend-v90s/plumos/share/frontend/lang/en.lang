@@ -31,6 +31,14 @@ menu.status.apps_ready=Apps ready
 menu.status.apps_load_failed=cannot load Apps menu
 menu.status.back_to_start=back to START
 
+power_action.reboot.title=Restarting
+power_action.shutdown.title=Shutting Down
+power_action.running=PLEASE WAIT
+power_action.saving=Saving data safely
+power_action.controls_disabled=Controls are disabled
+power_action.no_remove=Do not remove the SD card
+power_action.wait=Wait until the device finishes.
+
 app.scraping.name=Scraping
 app.file_manager.name=File Manager
 app.music_player.name=Music Player
