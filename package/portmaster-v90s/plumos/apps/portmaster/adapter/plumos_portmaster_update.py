@@ -11,6 +11,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -35,7 +36,7 @@ REQUIRED_FILES = {
     "PortMaster/funcs.txt",
     "PortMaster/version",
 }
-ADAPTER_VERSION = 4
+ADAPTER_VERSION = 5
 
 
 def fail(message: str) -> NoReturn:
@@ -80,8 +81,11 @@ def write_json_durable(path: Path, value: dict) -> None:
 
 def fetch_json(url: str) -> dict:
     request = urllib.request.Request(url, headers={"User-Agent": "plumOS-V90S-PortMaster/1"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        fail(f"release metadata download failed: {error}")
 
 
 def release_record(channel: str) -> tuple[str, str, str]:
@@ -149,8 +153,12 @@ def hash_file(path: Path, algorithm: str) -> str:
 
 def download(url: str, destination: Path) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": "plumOS-V90S-PortMaster/1"})
-    with urllib.request.urlopen(request, timeout=60) as response, destination.open("wb") as output:
-        shutil.copyfileobj(response, output, 1024 * 1024)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response, destination.open("wb") as output:
+            shutil.copyfileobj(response, output, 1024 * 1024)
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        destination.unlink(missing_ok=True)
+        fail(f"release archive download failed: {error}")
 
 
 def install(channel: str, force: bool) -> None:

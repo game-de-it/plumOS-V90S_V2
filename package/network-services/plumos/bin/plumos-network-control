@@ -24,6 +24,7 @@ UDHCPC_SCRIPT="${PLUMOS_UDHCPC_SCRIPT:-${PLUMOS_ROOT}/bin/plumos-udhcpc-script}"
 WPA_PID_FILE="${RUN_DIR}/wpa_supplicant.pid"
 ENSURE_WIFI_STAGE_FILE="${RUN_DIR}/ensure-wifi-stage.$$"
 NETWORK_SERVICES="${PLUMOS_ROOT}/bin/plumos-network-services"
+TIME_SYNC="${PLUMOS_ROOT}/bin/plumos-time-sync"
 
 ACTION=status
 CONNECT_FILE=
@@ -581,6 +582,12 @@ start_enabled_network_services() {
   fi
 }
 
+start_time_sync() {
+  [ -x "$TIME_SYNC" ] || return 0
+  PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+    "$TIME_SYNC" sync >> "$LOG_FILE" 2>&1 &
+}
+
 wifi_on() {
   if ! iface="$(ensure_wifi_iface "$WIFI_IFACE_WAIT_SECONDS")"; then
     stage="$(last_ensure_wifi_stage)"
@@ -604,6 +611,7 @@ wifi_on() {
     ip_addr="$(get_iface_ip "$iface" || true)"
     write_runtime_status_current "$iface"
     log "wifi_on preserve existing iface=${iface} ip=${ip_addr:-none}"
+    start_time_sync
     start_enabled_network_services
     echo "result=connected"
     echo "ip=${ip_addr:-none}"
@@ -622,6 +630,7 @@ wifi_on() {
       return 1
     fi
     log "wifi_on DHCP renewed iface=${iface} ip=${ip_addr}"
+    start_time_sync
     start_enabled_network_services
     echo "result=connected"
     echo "ip=${ip_addr}"
@@ -653,6 +662,7 @@ wifi_on() {
   fi
 
   log "wifi_on success iface=${iface} ip=${ip_addr}"
+  start_time_sync
   start_enabled_network_services
   echo "result=connected"
   echo "ip=${ip_addr}"
@@ -981,6 +991,7 @@ connect_wifi_from_file() {
   gateway_status="$(gateway_ping "$gateway")"
   write_runtime_status_current "$iface"
   log "connect success iface=${iface} ip=${ip_addr} gateway=${gateway:-none} gateway_ping=${gateway_status}"
+  start_time_sync
   echo "result=connected"
   echo "ip=${ip_addr}"
   echo "gateway=${gateway:-none}"

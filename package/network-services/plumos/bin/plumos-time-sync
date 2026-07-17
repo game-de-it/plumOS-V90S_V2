@@ -1,0 +1,117 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_TIME_SYNC_RUN_DIR:-${RUNTIME_ROOT}/time-sync}"
+LOG_DIR="${PLUMOS_ROOT}/Logs"
+LOG_FILE="${LOG_DIR}/time-sync.log"
+STATUS_FILE="${RUN_DIR}/status"
+LOCK_DIR="${RUN_DIR}/lock"
+TIME_SERVER="${PLUMOS_TIME_SERVER:-time.nist.gov}"
+TIMEOUT_SECONDS="${PLUMOS_TIME_SYNC_TIMEOUT:-8}"
+PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
+
+usage() {
+  cat <<'EOF'
+Usage: plumos-time-sync [sync|status]
+
+Synchronizes the V90S system clock once using an RFC 868 time server.
+The operation is bounded and never leaves a background daemon running.
+EOF
+}
+
+run_limited() {
+  seconds="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$seconds" "$@"
+    return $?
+  fi
+  "$@"
+}
+
+write_status() {
+  state="$1"
+  detail="$2"
+  temp="${STATUS_FILE}.tmp.$$"
+
+  {
+    printf 'state=%s\n' "$state"
+    printf 'detail=%s\n' "$detail"
+    printf 'epoch=%s\n' "$(date +%s 2>/dev/null || printf unknown)"
+    printf 'utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)"
+  } > "$temp"
+  mv "$temp" "$STATUS_FILE"
+}
+
+log() {
+  printf '%s %s\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown-time)" \
+    "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+sync_clock() {
+  wait_count=0
+  mkdir -p "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
+
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    while [ -d "$LOCK_DIR" ] && [ "$wait_count" -lt "$TIMEOUT_SECONDS" ]; do
+      sleep 1
+      wait_count=$((wait_count + 1))
+    done
+    if [ ! -d "$LOCK_DIR" ] && grep -q '^state=synced$' "$STATUS_FILE" 2>/dev/null; then
+      printf 'System time was synchronized by another process.\n'
+      return 0
+    fi
+    printf 'Time synchronization failed: another attempt did not finish within %ss.\n' \
+      "$TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT HUP INT TERM
+
+  if ! command -v rdate >/dev/null 2>&1; then
+    write_status failed rdate-missing
+    log "sync failed reason=rdate-missing"
+    printf 'Time synchronization failed: rdate is unavailable.\n' >&2
+    return 1
+  fi
+
+  if run_limited "$TIMEOUT_SECONDS" rdate -s "$TIME_SERVER" >/dev/null 2>&1; then
+    write_status synced "$TIME_SERVER"
+    log "sync success server=${TIME_SERVER}"
+    printf 'System time synchronized: %s\n' \
+      "$(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || printf unknown)"
+    return 0
+  fi
+
+  write_status failed "server-${TIME_SERVER}"
+  log "sync failed server=${TIME_SERVER} timeout=${TIMEOUT_SECONDS}s"
+  printf 'Time synchronization failed: %s did not respond within %ss.\n' \
+    "$TIME_SERVER" "$TIMEOUT_SECONDS" >&2
+  return 1
+}
+
+mkdir -p "$RUN_DIR" 2>/dev/null || true
+
+case "${1:-sync}" in
+  sync)
+    sync_clock
+    ;;
+  status)
+    if [ -r "$STATUS_FILE" ]; then
+      cat "$STATUS_FILE"
+    else
+      printf 'state=never\n'
+    fi
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'error: unknown command: %s\n' "$1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
