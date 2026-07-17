@@ -1,5 +1,10 @@
 # plumOS V90S Update Workflow
 
+> This is the current FAT32 copy-over workflow. A candidate archive-inbox plus
+> ext4 transactional update design is documented in
+> `docs/v90s-ext4-runtime-fat32-userdata-update-design.md`. The candidate is
+> still under discussion and has not replaced this workflow.
+
 This document describes the intended copy-over update flow for the FAT32 app
 layer.
 

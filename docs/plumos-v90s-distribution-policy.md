@@ -227,6 +227,16 @@ names instead.
 
 ## Distribution Shape
 
+A candidate ext4-runtime plus FAT32-userdata replacement is under discussion:
+
+```text
+docs/v90s-ext4-runtime-fat32-userdata-update-design.md
+```
+
+It is a draft and does not supersede the current FAT32 app-layer policy until
+its partition, update, rollback, and real-device validation boundaries are
+explicitly accepted.
+
 The boot-critical SD-card layout should continue to follow the
 StockOS/Batocera contract until there is real-device evidence that a partition
 can be removed safely:
