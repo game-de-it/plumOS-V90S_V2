@@ -1926,7 +1926,7 @@ static int apply_scraping_cpu_policy(struct cpu_policy_snapshot *snapshot) {
                          snapshot->cpuinfo_max_freq);
   }
   write_text_file_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
-                       "interactive");
+                       "ondemand");
   return snapshot->saved;
 }
 
@@ -8966,7 +8966,7 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line2, line2_size, "Values are saved as plumOS core overrides.");
     } else if (strcmp(id, "performance_cpu_policy") == 0) {
       copy_string(line1, line1_size, "Select the CPU governor for this system.");
-      copy_string(line2, line2_size, "Interactive is recommended; Performance is available.");
+      copy_string(line2, line2_size, "Ondemand is the default; Performance is available.");
     } else if (strcmp(id, "performance_clear_cpu_override") == 0) {
       copy_string(line1, line1_size, "Reset this system to the plumOS default.");
       copy_string(line2, line2_size, "Default comes from the system profile.");
@@ -14767,8 +14767,8 @@ static void usage(const char *argv0) {
   printf("  PLUMOS_SYSTEM_SETTINGS_JSON  Default: $PLUMOS_ROOT/config/system/settings.json\n");
   printf("  PLUMOS_WPA_STATUS   Default: /run/plumos/network-control/wpa_status.txt\n");
   printf("  PLUMOS_A30_WPA_STATUS   Legacy status-path override\n");
-  printf("  PLUMOS_CONTROLLER_CPU_DEFAULT  Ondemand/2-core FE default; set 0 to skip\n");
-  printf("  PLUMOS_CPU_BASELINE_GOVERNOR  ondemand, powersave, performance, or userspace\n");
+  printf("  PLUMOS_CONTROLLER_CPU_DEFAULT  Ondemand/all-core FE default; set 0 to skip\n");
+  printf("  PLUMOS_CPU_BASELINE_GOVERNOR  interactive, performance, ondemand, schedutil, or conservative\n");
 }
 
 static int run_boot_resume_if_needed(struct ui_state *ui,

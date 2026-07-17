@@ -22,7 +22,7 @@
       },
       "launch_profiles": ["retroarch:quicknes"],
       "default_launch_profile": "retroarch:quicknes",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -52,7 +52,7 @@
       },
       "launch_profiles": ["retroarch:fceumm", "retroarch:nestopia", "picoarch:fceumm", "picoarch:nestopia"],
       "default_launch_profile": "retroarch:fceumm",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -82,7 +82,7 @@
       },
       "launch_profiles": ["retroarch:snes9x2005", "retroarch:snes9x", "retroarch:chimerasnes", "retroarch:mednafen_supafaust", "retroarch:snes9x2002", "retroarch:snes9x2005_plus", "retroarch:snes9x2010", "picoarch:snes9x2005", "picoarch:snes9x", "picoarch:chimerasnes", "picoarch:mednafen_supafaust", "picoarch:snes9x2002", "picoarch:snes9x2005_plus", "picoarch:snes9x2010"],
       "default_launch_profile": "retroarch:snes9x2005",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -111,7 +111,7 @@
       },
       "launch_profiles": ["retroarch:gambatte", "retroarch:mgba", "retroarch:gearboy", "retroarch:tgbdual", "retroarch:vbam", "picoarch:gambatte", "picoarch:gearboy", "picoarch:vbam"],
       "default_launch_profile": "retroarch:gambatte",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -141,7 +141,7 @@
       },
       "launch_profiles": ["retroarch:gambatte", "retroarch:mgba", "retroarch:gearboy", "retroarch:tgbdual", "retroarch:vbam", "picoarch:gambatte", "picoarch:gearboy", "picoarch:vbam"],
       "default_launch_profile": "retroarch:gambatte",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -170,7 +170,7 @@
       },
       "launch_profiles": ["retroarch:gpsp", "retroarch:mgba", "retroarch:mednafen_gba", "retroarch:meteor", "retroarch:vba_next", "picoarch:gpsp", "picoarch:mgba"],
       "default_launch_profile": "retroarch:gpsp",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -200,7 +200,7 @@
       },
       "launch_profiles": ["retroarch:genesis_plus_gx", "retroarch:picodrive", "picoarch:genesis_plus_gx", "picoarch:picodrive"],
       "default_launch_profile": "retroarch:genesis_plus_gx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -230,7 +230,7 @@
       },
       "launch_profiles": ["retroarch:genesis_plus_gx", "retroarch:picodrive", "retroarch:gearsystem", "picoarch:genesis_plus_gx", "picoarch:picodrive", "picoarch:gearsystem"],
       "default_launch_profile": "retroarch:genesis_plus_gx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -261,7 +261,7 @@
       },
       "launch_profiles": ["retroarch:genesis_plus_gx", "retroarch:picodrive", "retroarch:gearsystem", "picoarch:genesis_plus_gx", "picoarch:picodrive", "picoarch:gearsystem"],
       "default_launch_profile": "retroarch:genesis_plus_gx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -291,7 +291,7 @@
       },
       "launch_profiles": ["retroarch:picodrive", "picoarch:picodrive"],
       "default_launch_profile": "retroarch:picodrive",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -321,7 +321,7 @@
       },
       "launch_profiles": ["retroarch:genesis_plus_gx", "retroarch:picodrive", "picoarch:genesis_plus_gx", "picoarch:picodrive"],
       "default_launch_profile": "retroarch:genesis_plus_gx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -348,7 +348,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_pce_fast", "retroarch:mednafen_pce", "retroarch:mednafen_supergrafx", "picoarch:mednafen_pce_fast", "picoarch:mednafen_supergrafx"],
       "default_launch_profile": "retroarch:mednafen_pce_fast",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -378,7 +378,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_supergrafx", "retroarch:mednafen_pce_fast", "picoarch:mednafen_supergrafx", "picoarch:mednafen_pce_fast"],
       "default_launch_profile": "retroarch:mednafen_supergrafx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -408,7 +408,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_pce_fast", "picoarch:mednafen_pce_fast"],
       "default_launch_profile": "retroarch:mednafen_pce_fast",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -435,7 +435,7 @@
       },
       "launch_profiles": ["standalone:pcsx_rearmed", "retroarch:pcsx_rearmed", "retroarch:km_duckswanstation_xtreme_amped"],
       "default_launch_profile": "standalone:pcsx_rearmed",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -462,7 +462,7 @@
       },
       "launch_profiles": ["standalone:ppsspp"],
       "default_launch_profile": "standalone:ppsspp",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -488,7 +488,7 @@
       },
       "launch_profiles": ["retroarch:parallel_n64", "standalone:mupen64plus", "retroarch:mupen64plus_next"],
       "default_launch_profile": "standalone:mupen64plus",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_disabled"
@@ -514,7 +514,7 @@
       },
       "launch_profiles": ["retroarch:flycast_xtreme", "retroarch:flycast"],
       "default_launch_profile": "retroarch:flycast_xtreme",
-      "default_cpu_policy": "performance",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -540,7 +540,7 @@
       },
       "launch_profiles": ["standalone:yabasanshiro", "retroarch:yabasanshiro"],
       "default_launch_profile": "standalone:yabasanshiro",
-      "default_cpu_policy": "performance",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -566,7 +566,7 @@
       },
       "launch_profiles": ["retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:fbalpha2012_neogeo"],
       "default_launch_profile": "retroarch:fbneo",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -592,7 +592,7 @@
       },
       "launch_profiles": ["retroarch:neocd"],
       "default_launch_profile": "retroarch:neocd",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -618,7 +618,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_ngp"],
       "default_launch_profile": "retroarch:mednafen_ngp",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -648,7 +648,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_ngp"],
       "default_launch_profile": "retroarch:mednafen_ngp",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -678,7 +678,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_wswan"],
       "default_launch_profile": "retroarch:mednafen_wswan",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -707,7 +707,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_wswan"],
       "default_launch_profile": "retroarch:mednafen_wswan",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -736,7 +736,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_lynx", "retroarch:handy"],
       "default_launch_profile": "retroarch:mednafen_lynx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -765,7 +765,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_vb"],
       "default_launch_profile": "retroarch:mednafen_vb",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -794,7 +794,7 @@
       },
       "launch_profiles": ["retroarch:mame2003_plus", "retroarch:km_mame2003_xtreme", "retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:mame2000", "retroarch:mba_mini"],
       "default_launch_profile": "retroarch:mame2003_plus",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -821,7 +821,7 @@
       },
       "launch_profiles": ["retroarch:fbneo"],
       "default_launch_profile": "retroarch:fbneo",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -848,7 +848,7 @@
       },
       "launch_profiles": ["retroarch:mame2003_plus"],
       "default_launch_profile": "retroarch:mame2003_plus",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -875,7 +875,7 @@
       },
       "launch_profiles": ["retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:fbalpha2012_cps1"],
       "default_launch_profile": "retroarch:fbneo",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -902,7 +902,7 @@
       },
       "launch_profiles": ["retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:fbalpha2012_cps2"],
       "default_launch_profile": "retroarch:fbneo",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -929,7 +929,7 @@
       },
       "launch_profiles": ["retroarch:fbneo", "retroarch:fbalpha2012", "retroarch:fbalpha2012_cps3"],
       "default_launch_profile": "retroarch:fbneo",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "arcade_romset_policy_pending"
@@ -955,7 +955,7 @@
       },
       "launch_profiles": ["standalone:dosbox-staging", "retroarch:dosbox_pure", "retroarch:dosbox_pure_0.9.7"],
       "default_launch_profile": "standalone:dosbox-staging",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -982,7 +982,7 @@
       },
       "launch_profiles": ["standalone:easyrpg", "retroarch:easyrpg"],
       "default_launch_profile": "standalone:easyrpg",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1009,7 +1009,7 @@
       },
       "launch_profiles": ["retroarch:fake08", "retroarch:retro8"],
       "default_launch_profile": "retroarch:fake08",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1036,7 +1036,7 @@
       },
       "launch_profiles": ["standalone:scummvm", "retroarch:scummvm"],
       "default_launch_profile": "standalone:scummvm",
-      "default_cpu_policy": "performance",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1062,7 +1062,7 @@
       },
       "launch_profiles": ["standalone:openbor"],
       "default_launch_profile": "standalone:openbor",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1089,7 +1089,7 @@
       },
       "launch_profiles": ["external:port"],
       "default_launch_profile": "external:port",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1115,7 +1115,7 @@
       },
       "launch_profiles": ["retroarch:bluemsx", "retroarch:fmsx"],
       "default_launch_profile": "retroarch:bluemsx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1144,7 +1144,7 @@
       },
       "launch_profiles": ["retroarch:quasi88"],
       "default_launch_profile": "retroarch:quasi88",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1170,7 +1170,7 @@
       },
       "launch_profiles": ["retroarch:np2kai", "retroarch:nekop2"],
       "default_launch_profile": "retroarch:np2kai",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1196,7 +1196,7 @@
       },
       "launch_profiles": ["retroarch:px68k"],
       "default_launch_profile": "retroarch:px68k",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1222,7 +1222,7 @@
       },
       "launch_profiles": ["retroarch:tic80"],
       "default_launch_profile": "retroarch:tic80",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1248,7 +1248,7 @@
       },
       "launch_profiles": ["retroarch:stella2014"],
       "default_launch_profile": "retroarch:stella2014",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1277,7 +1277,7 @@
       },
       "launch_profiles": ["retroarch:prosystem"],
       "default_launch_profile": "retroarch:prosystem",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1306,7 +1306,7 @@
       },
       "launch_profiles": ["retroarch:vecx"],
       "default_launch_profile": "retroarch:vecx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1335,7 +1335,7 @@
       },
       "launch_profiles": ["retroarch:potator"],
       "default_launch_profile": "retroarch:potator",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1365,7 +1365,7 @@
       },
       "launch_profiles": ["retroarch:o2em"],
       "default_launch_profile": "retroarch:o2em",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1395,7 +1395,7 @@
       },
       "launch_profiles": ["retroarch:gw"],
       "default_launch_profile": "retroarch:gw",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1421,7 +1421,7 @@
       },
       "launch_profiles": ["retroarch:pokemini"],
       "default_launch_profile": "retroarch:pokemini",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1450,7 +1450,7 @@
       },
       "launch_profiles": ["retroarch:prboom"],
       "default_launch_profile": "retroarch:prboom",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
@@ -1476,7 +1476,7 @@
       },
       "launch_profiles": ["pyxel:v90s"],
       "default_launch_profile": "pyxel:v90s",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "app_runtime"
@@ -1501,7 +1501,7 @@
       },
       "launch_profiles": ["retroarch:2048"],
       "default_launch_profile": "retroarch:2048",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "contentless_core"
@@ -1527,7 +1527,7 @@
       },
       "launch_profiles": ["retroarch:opera"],
       "default_launch_profile": "retroarch:opera",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -1553,7 +1553,7 @@
       },
       "launch_profiles": ["retroarch:puae", "retroarch:puae2021", "retroarch:uae4arm", "retroarch:km_puae_xtreme_amped"],
       "default_launch_profile": "retroarch:puae",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1579,7 +1579,7 @@
       },
       "launch_profiles": ["retroarch:atari800", "retroarch:a5200"],
       "default_launch_profile": "retroarch:atari800",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1608,7 +1608,7 @@
       },
       "launch_profiles": ["retroarch:atari800"],
       "default_launch_profile": "retroarch:atari800",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1634,7 +1634,7 @@
       },
       "launch_profiles": ["retroarch:hatari"],
       "default_launch_profile": "retroarch:hatari",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1660,7 +1660,7 @@
       },
       "launch_profiles": ["retroarch:bk"],
       "default_launch_profile": "retroarch:bk",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1686,7 +1686,7 @@
       },
       "launch_profiles": ["retroarch:frodo", "retroarch:vice_x64"],
       "default_launch_profile": "retroarch:vice_x64",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1712,7 +1712,7 @@
       },
       "launch_profiles": ["retroarch:cannonball"],
       "default_launch_profile": "retroarch:cannonball",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -1738,7 +1738,7 @@
       },
       "launch_profiles": ["standalone:nxengine-evo", "retroarch:nxengine"],
       "default_launch_profile": "standalone:nxengine-evo",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -1764,7 +1764,7 @@
       },
       "launch_profiles": ["retroarch:chailove"],
       "default_launch_profile": "retroarch:chailove",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -1790,7 +1790,7 @@
       },
       "launch_profiles": ["retroarch:freechaf"],
       "default_launch_profile": "retroarch:freechaf",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1819,7 +1819,7 @@
       },
       "launch_profiles": ["retroarch:bluemsx"],
       "default_launch_profile": "retroarch:bluemsx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1848,7 +1848,7 @@
       },
       "launch_profiles": ["retroarch:cap32", "retroarch:crocods"],
       "default_launch_profile": "retroarch:crocods",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -1874,7 +1874,7 @@
       },
       "launch_profiles": ["retroarch:daphne"],
       "default_launch_profile": "retroarch:daphne",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -1900,7 +1900,7 @@
       },
       "launch_profiles": ["retroarch:dinothawr"],
       "default_launch_profile": "retroarch:dinothawr",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -1926,7 +1926,7 @@
       },
       "launch_profiles": ["retroarch:reminiscence"],
       "default_launch_profile": "retroarch:reminiscence",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -1952,7 +1952,7 @@
       },
       "launch_profiles": ["retroarch:freeintv"],
       "default_launch_profile": "retroarch:freeintv",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -1981,7 +1981,7 @@
       },
       "launch_profiles": ["retroarch:squirreljme"],
       "default_launch_profile": "retroarch:squirreljme",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_policy_pending"
@@ -2007,7 +2007,7 @@
       },
       "launch_profiles": ["retroarch:virtualjaguar"],
       "default_launch_profile": "retroarch:virtualjaguar",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_disabled",
@@ -2036,7 +2036,7 @@
       },
       "launch_profiles": ["retroarch:lowresnx"],
       "default_launch_profile": "retroarch:lowresnx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2062,7 +2062,7 @@
       },
       "launch_profiles": ["retroarch:lutro"],
       "default_launch_profile": "retroarch:lutro",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2088,7 +2088,7 @@
       },
       "launch_profiles": ["retroarch:uw8"],
       "default_launch_profile": "retroarch:uw8",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2114,7 +2114,7 @@
       },
       "launch_profiles": ["retroarch:mrboom"],
       "default_launch_profile": "retroarch:mrboom",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2140,7 +2140,7 @@
       },
       "launch_profiles": ["retroarch:gme"],
       "default_launch_profile": "retroarch:gme",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_policy_pending"
@@ -2166,7 +2166,7 @@
       },
       "launch_profiles": ["retroarch:mu"],
       "default_launch_profile": "retroarch:mu",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_policy_pending"
@@ -2192,7 +2192,7 @@
       },
       "launch_profiles": ["retroarch:mednafen_pcfx"],
       "default_launch_profile": "retroarch:mednafen_pcfx",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "cd_media_crc_expensive"
@@ -2218,7 +2218,7 @@
       },
       "launch_profiles": ["retroarch:tyrquake"],
       "default_launch_profile": "retroarch:tyrquake",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2244,7 +2244,7 @@
       },
       "launch_profiles": ["retroarch:xrick"],
       "default_launch_profile": "retroarch:xrick",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2270,7 +2270,7 @@
       },
       "launch_profiles": ["retroarch:bluemsx", "retroarch:gearsystem", "retroarch:genesis_plus_gx", "retroarch:picodrive"],
       "default_launch_profile": "retroarch:gearsystem",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": true,
         "reason": "simple_rom_crc",
@@ -2299,7 +2299,7 @@
       },
       "launch_profiles": ["retroarch:x1"],
       "default_launch_profile": "retroarch:x1",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -2325,7 +2325,7 @@
       },
       "launch_profiles": ["retroarch:theodore"],
       "default_launch_profile": "retroarch:theodore",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -2351,7 +2351,7 @@
       },
       "launch_profiles": ["retroarch:numero"],
       "default_launch_profile": "retroarch:numero",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_policy_pending"
@@ -2377,7 +2377,7 @@
       },
       "launch_profiles": ["retroarch:uzem"],
       "default_launch_profile": "retroarch:uzem",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "scraper_source_pending"
@@ -2403,7 +2403,7 @@
       },
       "launch_profiles": ["retroarch:vice_xvic"],
       "default_launch_profile": "retroarch:vice_xvic",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -2429,7 +2429,7 @@
       },
       "launch_profiles": ["retroarch:vemulator"],
       "default_launch_profile": "retroarch:vemulator",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "frontend_policy_pending"
@@ -2455,7 +2455,7 @@
       },
       "launch_profiles": ["retroarch:ecwolf"],
       "default_launch_profile": "retroarch:ecwolf",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "data_layout_policy_pending"
@@ -2481,7 +2481,7 @@
       },
       "launch_profiles": ["retroarch:81"],
       "default_launch_profile": "retroarch:81",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"
@@ -2507,7 +2507,7 @@
       },
       "launch_profiles": ["retroarch:fuse"],
       "default_launch_profile": "retroarch:fuse",
-      "default_cpu_policy": "interactive",
+      "default_cpu_policy": "ondemand",
       "scraper": {
         "enabled": false,
         "reason": "pc_disk_image_policy_pending"

@@ -640,7 +640,7 @@ while [ "${cpu_index}" -le 3 ]; do
   cpu_index=$((cpu_index + 1))
 done
 
-cpu_policy=${PLUMOS_STANDALONE_CPU_POLICY:-}
+cpu_policy=${PLUMOS_STANDALONE_CPU_POLICY:-ondemand}
 case "${cpu_policy}" in
   interactive|performance|ondemand|schedutil|conservative)
     for cpufreq in /sys/devices/system/cpu/cpufreq/policy*; do

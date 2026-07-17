@@ -43,7 +43,8 @@ standard selectable GPU governor is exposed.
 
 ## Result
 
-- Use Interactive as the game default.
+- Interactive was the game default during this validation; the 2026-07-17
+  policy update below supersedes it with Ondemand.
 - Keep Performance selectable for demanding emulators and diagnostics.
 - Return the frontend browsing baseline to Ondemand.
 - Keep all four CPU cores online in every plumOS-owned runtime path.
@@ -70,3 +71,14 @@ The deployed text UI saved both Interactive and Performance overrides and
 rejected the removed `fixed` policy. The frontend was then restarted through
 the PID-validated launcher/stop contract. Its live process was
 `plumos-controller-ui-fbdev`, and the browsing baseline returned to Ondemand.
+
+## 2026-07-17 Default Policy Update
+
+The distribution default was changed from Interactive to Ondemand for the
+frontend and every system. All 92 packaged system definitions now declare
+`default_cpu_policy=ondemand`. Direct RetroArch, PicoArch, and standalone
+launcher calls also use Ondemand when no explicit policy is supplied.
+
+Interactive, Performance, Schedutil, and Conservative remain selectable.
+Existing per-system and per-ROM user overrides are intentionally preserved;
+the change affects only unresolved defaults.

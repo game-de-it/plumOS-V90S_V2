@@ -1290,16 +1290,18 @@ Use dynamic CPU governors rather than user-selectable fixed frequencies. The
 frontend exposes these V90S-supported choices:
 
 ```text
-Interactive   recommended default for games
+Interactive   optional latency-sensitive policy
 Performance   explicit maximum-performance option
-Ondemand      general-purpose compatibility option
+Ondemand      frontend and all-system default
 Schedutil     scheduler-driven option
 Conservative  slower-ramping power-conscious option
 ```
 
-Every system profile defaults to `interactive`. The frontend itself returns to
-`ondemand` while browsing menus. Before applying a selected game governor, the
-launcher restores `scaling_min_freq` and `scaling_max_freq` to the hardware
+The frontend and every system profile default to `ondemand`. RetroArch,
+PicoArch, and standalone launchers also apply `ondemand` when invoked without
+an explicit CPU policy. Saved per-system and per-ROM overrides remain valid and
+may select another exposed governor. Before applying a selected game governor,
+the launcher restores `scaling_min_freq` and `scaling_max_freq` to the hardware
 `cpuinfo_min_freq` and `cpuinfo_max_freq` range. This prevents an old fixed-MHz
 override from surviving a governor change.
 

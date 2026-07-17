@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -783,9 +783,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Keep Pulse/PipeWire out of the normal path; direct hardware playback is an
   explicit diagnostic only.
 - [x] Replace fixed/OC CPU-frequency presets with dynamic V90S governors:
-  Interactive (game default), Performance, Ondemand, Schedutil, and
-  Conservative. Restore the full hardware frequency range before applying a
-  governor.
+  Ondemand (FE and all-system default), Interactive, Performance, Schedutil,
+  and Conservative. Restore the full hardware frequency range before applying
+  a governor while retaining explicit per-system and per-ROM overrides.
 - [x] Verify that the vendor PowerVR runtime exposes no standard devfreq GPU
   governor; keep GPU governor controls out of the FE.
 - [x] Remove per-system and per-ROM CPU core-count limits. Keep CPU0-CPU3

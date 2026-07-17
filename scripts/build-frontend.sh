@@ -258,7 +258,7 @@ export PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 system_id=""
 core=""
 rom=""
-cpu_policy=""
+cpu_policy="${PLUMOS_RETROARCH_CPU_POLICY:-ondemand}"
 audio_driver_override=""
 audio_latency_override=""
 
