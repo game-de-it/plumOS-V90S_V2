@@ -25,13 +25,21 @@ log() {
     printf '%s\n' "$*" | tee -a "$LOG"
 }
 
-recovery() {
-    log "recovery: $*"
+copy_boot_log() {
     if [ -d "$P3_MOUNT" ] && grep -q " $P3_MOUNT " /proc/mounts 2>/dev/null; then
         mkdir -p "$P3_MOUNT/provision"
         cp "$LOG" "$P3_MOUNT/provision/first-boot.log" 2>/dev/null || true
-        sync
     fi
+    if [ -d "$P4_MOUNT" ] && grep -q " $P4_MOUNT " /proc/mounts 2>/dev/null; then
+        mkdir -p "$P4_MOUNT/Logs/boot"
+        cp "$LOG" "$P4_MOUNT/Logs/boot/first-boot.log" 2>/dev/null || true
+    fi
+}
+
+recovery() {
+    log "recovery: $*"
+    copy_boot_log
+    sync
     if [ -n "$TEST_BOOT_PARTITION" ]; then
         exit 1
     fi
@@ -115,8 +123,27 @@ persist_progress() {
     marker="$1"
     mkdir -p "$P3_MOUNT/provision"
     touch "$P3_MOUNT/provision/$marker"
-    cp "$LOG" "$P3_MOUNT/provision/first-boot.log" 2>/dev/null || true
+    copy_boot_log
     sync
+}
+
+verify_sha256() {
+    payload="$1"
+    checksum_file="$2"
+    expected=""
+    ignored=""
+    IFS=' ' read -r expected ignored < "$checksum_file" || return 1
+    case "$expected" in
+        ''|*[!0-9a-f]*) return 1 ;;
+    esac
+    [ "${#expected}" -eq 64 ] || return 1
+    actual_line="$(sha256sum "$payload" 2>> "$LOG")" || return 1
+    actual="${actual_line%% *}"
+    if [ "$actual" != "$expected" ]; then
+        log "sha256 mismatch expected=$expected actual=$actual payload=$payload"
+        return 1
+    fi
+    return 0
 }
 
 mount_runtime() {
@@ -300,8 +327,9 @@ SYSTEM_IMAGE="$P1_MOUNT/System/system-a.squashfs"
 SYSTEM_HASH="$P1_MOUNT/System/system-a.sha256"
 [ -f "$SYSTEM_IMAGE" ] || recovery "system-a.squashfs is missing"
 [ -f "$SYSTEM_HASH" ] || recovery "system-a.sha256 is missing"
-(cd "$P1_MOUNT/System" && sha256sum -c system-a.sha256) >> "$LOG" 2>&1 ||
+verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
     recovery "system-a hash verification failed"
+log "system-a hash verification passed"
 
 [ -b /dev/loop0 ] || mknod /dev/loop0 b 7 0
 losetup -d /dev/loop0 2>/dev/null || true
@@ -324,6 +352,9 @@ mount --move /tmp "$SYSTEM_ROOT/tmp"
 touch "$SYSTEM_ROOT/mnt/plumos/provision/complete"
 cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
     "$SYSTEM_ROOT/mnt/plumos/provision/first-boot.log" 2>/dev/null || true
+mkdir -p "$SYSTEM_ROOT/mnt/plumos-user/Logs/boot"
+cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
+    "$SYSTEM_ROOT/mnt/plumos-user/Logs/boot/first-boot.log" 2>/dev/null || true
 sync
 exec switch_root "$SYSTEM_ROOT" /sbin/init
 

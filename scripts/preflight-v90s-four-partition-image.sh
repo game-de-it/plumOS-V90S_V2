@@ -72,6 +72,13 @@ grep -Fq 'cmdline = console=ttyS0,115200 rootwait init=/init' "$tmp_dir/bootimg.
     fail "boot image cmdline does not enter provisioning init"
 cmp -s scripts/v90s-four-partition-init "$tmp_dir/ramdisk/init" ||
     fail "boot image /init differs from repository provisioning init"
+grep -Fq 'verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH"' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not use BusyBox-compatible system hash verification"
+if grep -Fq 'sha256sum -c' "$tmp_dir/ramdisk/init"; then
+    fail "initramfs uses unsupported BusyBox sha256sum -c"
+fi
+grep -Fq '"$P4_MOUNT/Logs/boot/first-boot.log"' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not mirror boot diagnostics to PLUMOS FAT32"
 for file in tools/bin/parted tools/bin/e2fsck tools/bin/resize2fs tools/bin/mkfs.fat \
     tools/bin/fsck.fat tools/lib/ld-linux-aarch64.so.1; do
     [ -x "$tmp_dir/ramdisk/$file" ] || fail "initramfs tool missing: $file"

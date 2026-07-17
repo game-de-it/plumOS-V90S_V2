@@ -733,6 +733,13 @@ Build plumOS V90S as a V90S-specific distribution:
   `plumos-v90s-four-partition-20260718-6.img`.
 - [ ] Boot the four-partition candidate on a physical V90S and verify p3/p4
   geometry, labels, provisioning markers, mounts, and exactly one FE process.
+  - [x] The first physical boot expanded p3 to 8192 MiB and created and seeded p4
+    through the SD-card tail. FUSE-T inspection found handoff stopped because
+    the initramfs BusyBox `sha256sum` does not implement `-c`.
+  - [x] Rebuilt `plumos-v90s-four-partition-20260718-7.img` with
+    BusyBox-compatible system hash verification and FAT32 boot-log mirroring.
+  - [ ] Confirm SquashFS handoff, FE startup, and one frontend process on
+    hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
   controls, FPS/scrolling/audio pitch, clean exit, and persistence.
 - [ ] Run the remaining power-interruption, A/B update, rollback, recovery,
