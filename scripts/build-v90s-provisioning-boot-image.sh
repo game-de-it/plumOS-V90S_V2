@@ -4,6 +4,7 @@ set -euo pipefail
 source_boot="${PLUMOS_V90S_SOURCE_BOOT_IMAGE:-output/vendor/v90s-stockos-r1/raw-partitions/mmcblk0p4-boot.bin}"
 out_dir="${PLUMOS_V90S_BOOT_IMAGE_OUT:-output/boot-image/v90s-four-partition}"
 init_script="scripts/v90s-four-partition-init"
+progress_generator="scripts/generate-v90s-init-progress.py"
 cmdline="console=ttyS0,115200 rootwait init=/init loglevel=4 cma=32M gpt=1"
 
 usage() {
@@ -29,7 +30,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-for tool in abootimg cpio gzip ldd sha256sum; do
+for tool in abootimg cpio gzip ldd python3 sha256sum; do
     command -v "$tool" >/dev/null 2>&1 || {
         printf 'error: required tool is unavailable: %s\n' "$tool" >&2
         exit 1
@@ -37,6 +38,7 @@ for tool in abootimg cpio gzip ldd sha256sum; do
 done
 [ -f "$source_boot" ] || { printf 'error: source boot image missing: %s\n' "$source_boot" >&2; exit 1; }
 [ -x "$init_script" ] || { printf 'error: provisioning init missing: %s\n' "$init_script" >&2; exit 1; }
+[ -x "$progress_generator" ] || { printf 'error: progress generator missing: %s\n' "$progress_generator" >&2; exit 1; }
 source_boot_abs="$(realpath "$source_boot")"
 
 work_dir="$out_dir/.work"
@@ -54,6 +56,7 @@ ramdisk_dir_abs="$(realpath "$ramdisk_dir")"
 )
 
 install -m 0755 "$init_script" "$ramdisk_dir/init"
+python3 "$progress_generator" --output-dir "$ramdisk_dir/progress"
 mkdir -p "$ramdisk_dir/tools/bin" "$ramdisk_dir/tools/lib"
 
 copy_tool() {

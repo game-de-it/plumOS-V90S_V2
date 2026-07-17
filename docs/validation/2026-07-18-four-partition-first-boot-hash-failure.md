@@ -64,3 +64,50 @@ verification=PASS
 Structural verification reconfirmed the 1024 MiB p1, 64 MiB p2, 1536 MiB p3
 seed, absent p4, fixed boot package, provisioning Android boot image, A/B system
 SquashFS files, and complete frontend payload.
+
+## Second physical boot
+
+The corrected p2 on the written SD matched the generated boot image byte for
+byte. Both system SquashFS files also matched their expected SHA-256 digest, and
+the extracted initramfs BusyBox successfully calculated that digest without
+`-c`. The second stall was therefore not media corruption or the previous hash
+verifier bug.
+
+The system SquashFS inventory exposed the next handoff defect. It contained
+`/mnt/plumos` but omitted `/mnt/plumos-boot` and `/mnt/plumos-user`. The
+initramfs mounted the SquashFS read-only and then attempted to create those
+directories. `mkdir` failed on the read-only filesystem, and global `set -e`
+ended PID 1 before a recovery message could be persisted.
+
+The system-rootfs builder now creates all three persistent mountpoints before
+SquashFS packing. Initramfs verifies that every handoff mountpoint exists,
+wraps each mount move with a named recovery failure, and mirrors additional
+handoff checkpoints to p3 and p4.
+
+The same log exposed an unaligned p4 start (`19047424 % 2048 != 0`) and reuse of
+the previous test run's stale FAT signature. Provisioning now rounds p4 up to
+the next 1 MiB boundary and always formats a p4 that it has just created. A p4
+already present in the active GPT remains preserved on ordinary subsequent
+boots.
+
+To distinguish slow first-boot work from a stall, the initramfs now writes
+simple 640x480 progress frames directly to both fb0 pages. It displays storage
+preparation, p3 resize, p4 creation, system verification, SquashFS mount, and
+system-init handoff stages. Recovery displays a persistent `STARTUP FAILED`
+screen directing the tester to the PLUMOS logs.
+
+## Third candidate
+
+The system rootfs, progress-enabled initramfs, and compact SD image were rebuilt
+and passed preflight plus structural verification:
+
+```text
+image=output/images/plumos-v90s-four-partition-20260718-8.img
+sha256=e1ddfa494a93ee7ea2828d7bf787968d35c081755620e44c1a0883062a95d4dc
+preflight=PASS
+verification=PASS
+```
+
+The generated progress frames are 640x960 BGRA buffers containing identical
+pages for the V90S double-buffered fb0 layout. This avoids a dependency on SDL,
+the PowerVR userspace, fonts, or the system SquashFS during early boot.

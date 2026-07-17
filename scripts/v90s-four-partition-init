@@ -11,6 +11,7 @@ P4_MOUNT=/mnt/plumos-user
 SYSTEM_ROOT=/new_root
 P3_TARGET_MIB=8192
 P3_TARGET_SECTORS=$((P3_TARGET_MIB * 2048))
+P4_ALIGNMENT_SECTORS=2048
 P1_EXPECTED_START=41984
 P1_EXPECTED_SECTORS=$((1024 * 2048))
 P2_EXPECTED_START=$((P1_EXPECTED_START + P1_EXPECTED_SECTORS))
@@ -25,19 +26,38 @@ log() {
     printf '%s\n' "$*" | tee -a "$LOG"
 }
 
+show_progress() {
+    stage="$1"
+    frame="/progress/$stage.raw"
+    [ -c /dev/fb0 ] || {
+        [ -d /sys/class/graphics/fb0 ] && mknod /dev/fb0 c 29 0 2>/dev/null || true
+    }
+    [ -w /sys/class/graphics/fb0/blank ] &&
+        printf '0\n' > /sys/class/graphics/fb0/blank 2>/dev/null || true
+    [ -c /dev/fb0 ] && [ -r "$frame" ] || return 0
+    dd if="$frame" of=/dev/fb0 bs=4096 count=600 conv=notrunc 2>/dev/null || true
+}
+
 copy_boot_log() {
-    if [ -d "$P3_MOUNT" ] && grep -q " $P3_MOUNT " /proc/mounts 2>/dev/null; then
-        mkdir -p "$P3_MOUNT/provision"
-        cp "$LOG" "$P3_MOUNT/provision/first-boot.log" 2>/dev/null || true
-    fi
-    if [ -d "$P4_MOUNT" ] && grep -q " $P4_MOUNT " /proc/mounts 2>/dev/null; then
-        mkdir -p "$P4_MOUNT/Logs/boot"
-        cp "$LOG" "$P4_MOUNT/Logs/boot/first-boot.log" 2>/dev/null || true
-    fi
+    mounts_file=/proc/mounts
+    [ -r "$mounts_file" ] || mounts_file="$SYSTEM_ROOT/proc/mounts"
+    for target in "$P3_MOUNT" "$SYSTEM_ROOT/mnt/plumos"; do
+        if [ -d "$target" ] && grep -q " $target " "$mounts_file" 2>/dev/null; then
+            mkdir -p "$target/provision"
+            cp "$LOG" "$target/provision/first-boot.log" 2>/dev/null || true
+        fi
+    done
+    for target in "$P4_MOUNT" "$SYSTEM_ROOT/mnt/plumos-user"; do
+        if [ -d "$target" ] && grep -q " $target " "$mounts_file" 2>/dev/null; then
+            mkdir -p "$target/Logs/boot"
+            cp "$LOG" "$target/Logs/boot/first-boot.log" 2>/dev/null || true
+        fi
+    done
 }
 
 recovery() {
     log "recovery: $*"
+    show_progress error
     copy_boot_log
     sync
     if [ -n "$TEST_BOOT_PARTITION" ]; then
@@ -174,6 +194,7 @@ fi
 
 set -e
 log "plumOS V90S four-partition initramfs entered"
+show_progress prepare
 
 if [ -n "$TEST_BOOT_PARTITION" ]; then
     P2="$TEST_BOOT_PARTITION"
@@ -248,6 +269,7 @@ else
     P4=""
 fi
 if [ "$p3_sectors" -lt "$P3_TARGET_SECTORS" ]; then
+    show_progress resize
     [ -z "$P4" ] || recovery "p4 exists while p3 is undersized"
     log "provision: relocating backup GPT"
     parted -s -f "$DISK" unit s print >> "$LOG" 2>&1 || recovery "GPT relocation failed"
@@ -278,21 +300,28 @@ elif [ -b "${DISK}p4" ]; then
 else
     P4=""
 fi
+P4_CREATED=0
 if [ -z "$P4" ]; then
-    p4_start=$((p3_target_end + 1))
+    show_progress userdata
+    p4_start_unaligned=$((p3_target_end + 1))
+    p4_start=$((((p4_start_unaligned + P4_ALIGNMENT_SECTORS - 1) / P4_ALIGNMENT_SECTORS) * P4_ALIGNMENT_SECTORS))
+    [ "$p4_start" -lt "$disk_sectors" ] || recovery "aligned p4 start does not fit"
     log "provision: creating p4 start=$p4_start end=100%"
     parted -s -a optimal "$DISK" unit s mkpart userdata fat32 "${p4_start}s" 100% \
         >> "$LOG" 2>&1 || recovery "p4 creation failed"
     partprobe "$DISK" >> "$LOG" 2>&1 || true
     P4="${DISK}p4"
     wait_for_block "$P4" || recovery "p4 did not appear"
+    P4_CREATED=1
 fi
 
 [ "$(partition_number "$P4")" = 4 ] || recovery "userdata is not p4"
 p4_type="$(blkid_value TYPE "$P4")"
-if [ -z "$p4_type" ]; then
+if [ "$P4_CREATED" = 1 ]; then
     log "provision: formatting new p4 as FAT32"
     mkfs.fat -F 32 -n PLUMOS "$P4" >> "$LOG" 2>&1 || recovery "p4 format failed"
+elif [ -z "$p4_type" ]; then
+    recovery "existing p4 has no filesystem"
 elif [ "$p4_type" != vfat ]; then
     recovery "existing p4 has unexpected filesystem: $p4_type"
 fi
@@ -327,27 +356,39 @@ SYSTEM_IMAGE="$P1_MOUNT/System/system-a.squashfs"
 SYSTEM_HASH="$P1_MOUNT/System/system-a.sha256"
 [ -f "$SYSTEM_IMAGE" ] || recovery "system-a.squashfs is missing"
 [ -f "$SYSTEM_HASH" ] || recovery "system-a.sha256 is missing"
+show_progress verify
 verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
     recovery "system-a hash verification failed"
 log "system-a hash verification passed"
+copy_boot_log
+sync
 
 [ -b /dev/loop0 ] || mknod /dev/loop0 b 7 0
 losetup -d /dev/loop0 2>/dev/null || true
+log "handoff: attaching system SquashFS loop"
 losetup /dev/loop0 "$SYSTEM_IMAGE" >> "$LOG" 2>&1 || recovery "system loop setup failed"
+log "handoff: mounting system SquashFS"
+show_progress mount
 mount -t squashfs -o ro /dev/loop0 "$SYSTEM_ROOT" >> "$LOG" 2>&1 ||
     recovery "system SquashFS mount failed"
 
-mkdir -p "$SYSTEM_ROOT/mnt/plumos-boot" "$SYSTEM_ROOT/mnt/plumos" \
-    "$SYSTEM_ROOT/mnt/plumos-user" "$SYSTEM_ROOT/proc" "$SYSTEM_ROOT/sys" \
-    "$SYSTEM_ROOT/dev" "$SYSTEM_ROOT/run" "$SYSTEM_ROOT/tmp"
-mount --move "$P1_MOUNT" "$SYSTEM_ROOT/mnt/plumos-boot"
-mount --move "$P3_MOUNT" "$SYSTEM_ROOT/mnt/plumos"
-mount --move "$P4_MOUNT" "$SYSTEM_ROOT/mnt/plumos-user"
-mount --move /proc "$SYSTEM_ROOT/proc"
-mount --move /sys "$SYSTEM_ROOT/sys"
-mount --move /dev "$SYSTEM_ROOT/dev"
-mount --move /run "$SYSTEM_ROOT/run"
-mount --move /tmp "$SYSTEM_ROOT/tmp"
+for target in mnt/plumos-boot mnt/plumos mnt/plumos-user proc sys dev run tmp; do
+    [ -d "$SYSTEM_ROOT/$target" ] || recovery "system SquashFS mountpoint is missing: /$target"
+done
+log "handoff: moving persistent mounts into system root"
+copy_boot_log
+sync
+mount --move "$P1_MOUNT" "$SYSTEM_ROOT/mnt/plumos-boot" ||
+    recovery "cannot move PLUMBOOT into system root"
+mount --move "$P3_MOUNT" "$SYSTEM_ROOT/mnt/plumos" ||
+    recovery "cannot move PLUMOS_SYS into system root"
+mount --move "$P4_MOUNT" "$SYSTEM_ROOT/mnt/plumos-user" ||
+    recovery "cannot move PLUMOS into system root"
+mount --move /proc "$SYSTEM_ROOT/proc" || recovery "cannot move proc into system root"
+mount --move /sys "$SYSTEM_ROOT/sys" || recovery "cannot move sysfs into system root"
+mount --move /dev "$SYSTEM_ROOT/dev" || recovery "cannot move devtmpfs into system root"
+mount --move /tmp "$SYSTEM_ROOT/tmp" || recovery "cannot move tmpfs into system root"
+mount --move /run "$SYSTEM_ROOT/run" || recovery "cannot move run tmpfs into system root"
 
 touch "$SYSTEM_ROOT/mnt/plumos/provision/complete"
 cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
@@ -355,6 +396,10 @@ cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
 mkdir -p "$SYSTEM_ROOT/mnt/plumos-user/Logs/boot"
 cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
     "$SYSTEM_ROOT/mnt/plumos-user/Logs/boot/first-boot.log" 2>/dev/null || true
+LOG="$SYSTEM_ROOT/run/plumos-first-boot.log"
+log "handoff: executing system init"
+show_progress start
+copy_boot_log
 sync
 exec switch_root "$SYSTEM_ROOT" /sbin/init
 

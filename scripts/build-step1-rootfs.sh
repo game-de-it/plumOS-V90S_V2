@@ -1201,7 +1201,7 @@ build_release_system() {
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" \
         "$root/boot" "$root/overlay" "$root/mnt/share" "$root/mnt/plumos" \
-        "$root/root"
+        "$root/mnt/plumos-boot" "$root/mnt/plumos-user" "$root/root"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
     install_app_layer_bootstrap "$root"

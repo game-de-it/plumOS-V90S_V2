@@ -77,18 +77,38 @@ grep -Fq 'verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH"' "$tmp_dir/ramdisk/init" 
 if grep -Fq 'sha256sum -c' "$tmp_dir/ramdisk/init"; then
     fail "initramfs uses unsupported BusyBox sha256sum -c"
 fi
-grep -Fq '"$P4_MOUNT/Logs/boot/first-boot.log"' "$tmp_dir/ramdisk/init" ||
+grep -Fq '"$target/Logs/boot/first-boot.log"' "$tmp_dir/ramdisk/init" ||
     fail "initramfs does not mirror boot diagnostics to PLUMOS FAT32"
 for file in tools/bin/parted tools/bin/e2fsck tools/bin/resize2fs tools/bin/mkfs.fat \
     tools/bin/fsck.fat tools/lib/ld-linux-aarch64.so.1; do
     [ -x "$tmp_dir/ramdisk/$file" ] || fail "initramfs tool missing: $file"
 done
+for file in progress/prepare.raw progress/resize.raw progress/userdata.raw \
+    progress/verify.raw progress/mount.raw progress/start.raw progress/error.raw; do
+    [ -f "$tmp_dir/ramdisk/$file" ] || fail "initramfs progress frame missing: $file"
+done
+for frame in "$tmp_dir"/ramdisk/progress/*.raw; do
+    [ "$(wc -c < "$frame" | tr -d ' ')" -eq 2457600 ] ||
+        fail "initramfs progress frame has unexpected size: $frame"
+done
+grep -Fq 'show_progress error' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs recovery progress screen is missing"
+p3_start=2270208
+p3_target_sectors=$((8192 * 2048))
+p4_alignment_sectors=2048
+p4_unaligned=$((p3_start + p3_target_sectors))
+p4_aligned=$((((p4_unaligned + p4_alignment_sectors - 1) / p4_alignment_sectors) * p4_alignment_sectors))
+[ $((p4_aligned % p4_alignment_sectors)) -eq 0 ] ||
+    fail "calculated p4 start is not 1 MiB aligned"
+grep -Fq 'if [ "$P4_CREATED" = 1 ]' "$tmp_dir/ramdisk/init" ||
+    fail "newly created p4 is not forced through clean FAT32 formatting"
+pass "initramfs progress screens and aligned clean p4 provisioning"
 pass "p2 provisioning initramfs and storage tools"
 
 rootfs_listing="$tmp_dir/system-rootfs.list"
 unsquashfs -ll "$system_squashfs" > "$rootfs_listing"
 for path in sbin usr/sbin/init usr/sbin/plumos-app-layer-bootstrap \
-    etc/plumos-v90s-vendor-id mnt/plumos; do
+    etc/plumos-v90s-vendor-id mnt/plumos mnt/plumos-boot mnt/plumos-user; do
     grep -Eq "squashfs-root/$path( -> .*)?$" "$rootfs_listing" ||
         fail "system SquashFS path missing: /$path"
 done

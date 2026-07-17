@@ -738,6 +738,13 @@ Build plumOS V90S as a V90S-specific distribution:
     the initramfs BusyBox `sha256sum` does not implement `-c`.
   - [x] Rebuilt `plumos-v90s-four-partition-20260718-7.img` with
     BusyBox-compatible system hash verification and FAT32 boot-log mirroring.
+  - [x] Diagnosed the second physical boot stall: the read-only system
+    SquashFS omitted `/mnt/plumos-boot` and `/mnt/plumos-user`, so initramfs
+    exited while attempting to create those mountpoints after mounting it.
+  - [x] Rebuilt the system SquashFS with all handoff mountpoints and added an
+    initramfs framebuffer progress/error screen.
+  - [x] Generated `plumos-v90s-four-partition-20260718-8.img` with explicit
+    framebuffer handoff diagnostics and a clean 1 MiB-aligned p4.
   - [ ] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
