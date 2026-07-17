@@ -237,6 +237,14 @@ It is a draft and does not supersede the current FAT32 app-layer policy until
 its partition, update, rollback, and real-device validation boundaries are
 explicitly accepted.
 
+Within that candidate, the agreed storage direction is to reserve ext4 for the
+device-managed runtime, Linux-specific state, configuration, active saves, and
+save states. FAT32 is the user-managed interchange area for ROMs, BIOS,
+scraped images, user themes, screenshots, media, custom content, update
+packages, and explicit import/export directories. Active saves stay on ext4;
+the frontend provides confirmed save export and import flows, including manual
+ROM selection when an imported save filename does not match a ROM.
+
 The boot-critical SD-card layout should continue to follow the
 StockOS/Batocera contract until there is real-device evidence that a partition
 can be removed safely:

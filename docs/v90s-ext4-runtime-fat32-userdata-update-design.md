@@ -1,6 +1,6 @@
 # plumOS V90S ext4 Runtime and FAT32 User-Data Update Design
 
-Date: 2026-07-17
+Date: 2026-07-18
 Status: Draft for discussion; not yet adopted by the Distribution Policy
 
 ## Purpose
@@ -70,7 +70,7 @@ p4  boot                        raw     Android boot image
 p5  system          PLUMSYS     squashfs read-only Linux system
 p6  rootfs          BATOCERA    ext4    existing small /boot partition, read-only
 p7  runtime         PLUMOS_SYS  ext4    plumOS releases and persistent Linux data
-p8  userdata        PLUMOS      FAT32   ROM, BIOS, update inbox, and exports
+p8  userdata        PLUMOS      FAT32   portable content and interchange area
 ```
 
 p6 must not be reused as the general plumOS runtime. On the current image it is
@@ -105,7 +105,9 @@ Proposed mounts:
 /dev/mmcblk0p8  -> /mnt/plumos-user  vfat
 ```
 
-The ext4 runtime layout is:
+The ext4 runtime is the device-managed area. It contains data that users do not
+normally manipulate from Windows or macOS, including executable payloads,
+Linux-specific state, active saves, and update metadata:
 
 ```text
 /mnt/plumos/releases/VERSION/    immutable installed release payload
@@ -116,10 +118,33 @@ The ext4 runtime layout is:
 /mnt/plumos/data/state/          FE state, favorites, recent, and resume data
 /mnt/plumos/data/Saves/          game saves
 /mnt/plumos/data/States/         save states
+/mnt/plumos/data/Saves-backup/   automatic pre-import save backups
 /mnt/plumos/data/venvs/          user-installed Python environments
 /mnt/plumos/data/portmaster/     PortMaster persistent state and installed ports
+/mnt/plumos/data/cache/          runtime caches that require Linux semantics
+/mnt/plumos/data/logs/           persistent diagnostics when explicitly retained
 /mnt/plumos/update-state/        installed package hashes and health markers
 ```
+
+The ext4 area should also hold:
+
+- frontend, RetroArch, libretro cores, PicoArch, standalone emulators, and their
+  private libraries
+- the minimal fallback theme, font, and assets required to reach a
+  recovery-capable frontend without the FAT32 partition
+- RetroArch configuration, core options, remaps, overrides, and generated
+  playlists
+- Wi-Fi credentials, SSH keys, network-service configuration, and other
+  security-sensitive state
+- PortMaster itself and installed ports that rely on executable bits, symlinks,
+  case-sensitive paths, or many small files
+- Python virtual environments and installed modules
+- frontend ROM indexes, scraper databases, favorites, recent-game state, and
+  other frequently rewritten metadata
+
+Transient logs and caches should remain under `/run` where persistence is not
+required. Persistent logs are kept on ext4 and copied to FAT32 only through an
+explicit diagnostic export action.
 
 Stable compatibility paths may be symlinks or bind mounts on ext4:
 
@@ -133,22 +158,62 @@ Stable compatibility paths may be symlinks or bind mounts on ext4:
 /mnt/plumos/States    -> data/States
 ```
 
-The FAT32 user-data layout is:
+The FAT32 user-data partition is the user-managed interchange area. Its exact
+top-level directory names are:
 
 ```text
 /mnt/plumos-user/roms/
 /mnt/plumos-user/bios/
+/mnt/plumos-user/Images/
+/mnt/plumos-user/Themes/
+/mnt/plumos-user/Screenshots/
+/mnt/plumos-user/Music/
+/mnt/plumos-user/Manuals/
+/mnt/plumos-user/Cheats/
+/mnt/plumos-user/Patches/
+/mnt/plumos-user/Shaders/
 /mnt/plumos-user/updates/
+/mnt/plumos-user/imports/
 /mnt/plumos-user/exports/
-/mnt/plumos-user/screenshots/    optional user-visible output
 ```
+
+These directories have the following responsibilities:
+
+| Directory | User-visible content |
+| --- | --- |
+| `roms/` | ROMs, disc images, multidisc playlists, and data-only game projects |
+| `bios/` | BIOS and firmware supplied by the user |
+| `Images/` | Scraped box art and other game artwork shared with A30/MMF layouts |
+| `Themes/` | Portable bundled themes, user themes, artwork, and theme fonts |
+| `Screenshots/` | Screenshots and user-requested captures |
+| `Music/` | Music Player content |
+| `Manuals/` | Manuals and other user-managed game documents |
+| `Cheats/` | User-installed cheat databases and per-game cheats |
+| `Patches/` | IPS, BPS, xdelta, translation, and other ROM patches |
+| `Shaders/` | User-installed shader presets, overlays, borders, and bezels |
+| `updates/` | Signed plumOS application update packages |
+| `imports/` | Files staged by the user for an explicit FE import operation |
+| `exports/` | Saves, settings, states, and diagnostics exported by plumOS |
+
+Only the minimal assets required for recovery remain on ext4. Normal bundled
+themes and user themes live together in FAT32 `Themes/` so they can be reused
+across plumOS devices. The frontend may merge FAT32 `Shaders/` and similar user
+additions over read-only runtime defaults, but a missing or damaged FAT32
+partition must not prevent the recovery UI from starting.
 
 The normal runtime may bind the FAT32 content into existing application paths:
 
 ```text
 /mnt/plumos-user/roms  -> /mnt/plumos/roms
 /mnt/plumos-user/bios  -> /mnt/plumos/bios
+/mnt/plumos-user/Images -> /mnt/plumos/Images
+/mnt/plumos-user/Themes -> /mnt/plumos/themes-user
 ```
+
+Compatibility paths must be created by the mount/runtime policy rather than by
+duplicating files across filesystems. The canonical ROM and BIOS directory
+names remain lowercase. Capitalized names above intentionally follow the
+portable A30/MMF user-content convention.
 
 Using `roms/plumos/update.tar.gz` is not preferred because it can collide with
 ROM scanning and system-directory rules. A dedicated FAT32-root update inbox is
@@ -160,6 +225,67 @@ clearer:
 
 SD2 may continue to override or provide ROM and BIOS content. It must not be
 required to locate the application runtime or the update state database.
+
+## Save Import and Export Contract
+
+Active game saves live on ext4 so that normal emulator writes receive native
+Linux filesystem durability. FAT32 is used only as the interchange surface:
+
+```text
+active saves:  /mnt/plumos/data/Saves/SYSTEM_ID/
+active states: /mnt/plumos/data/States/SYSTEM_ID/
+save imports:  /mnt/plumos-user/imports/Saves/SYSTEM_ID/
+save exports:  /mnt/plumos-user/exports/Saves/SYSTEM_ID/
+state exports: /mnt/plumos-user/exports/States/SYSTEM_ID/
+```
+
+`SYSTEM_ID` is the lowercase frontend system ID, not one of its ROM-directory
+aliases. For SNES/Super Famicom the ID is `sfc`, even when the ROM is stored in
+`roms/SFC`, `roms/sfc`, or `roms/snes`.
+
+For example:
+
+```text
+ROM on FAT32:
+/mnt/plumos-user/roms/SFC/Super Mario World (Japan).sfc
+
+User-provided import on FAT32:
+/mnt/plumos-user/imports/Saves/sfc/Super Mario World (Japan).srm
+
+Installed active save on ext4:
+/mnt/plumos/data/Saves/sfc/Super Mario World (Japan).srm
+```
+
+An exact system ID and ROM basename match may be offered as the default import
+target. It must still pass a confirmation screen before replacing an active
+save. A fuzzy filename match may order candidates but must never authorize an
+automatic replacement.
+
+If the save filename does not match a ROM basename, the frontend should reuse
+its normal ROM browser in `Import Destination` mode:
+
+1. The user selects an unmatched save in the Save Import app.
+2. The frontend opens the ROM list for that `SYSTEM_ID` with the most likely
+   candidates first and the normal thumbnail/list presentation.
+3. `A` selects a destination instead of launching the game; `B` cancels.
+4. The confirmation screen shows source save, selected game, final filename,
+   existing-save size/date, and backup behavior.
+5. The importer copies the source into an ext4 sibling temporary file, verifies
+   its hash and expected size, flushes it, backs up an existing target, and
+   atomically renames the new save into place.
+6. The FAT32 source remains unchanged. Its hash is recorded on ext4 to prevent
+   accidental repeated imports; the user may remove it later from a PC.
+
+The target emulator session must not be running during import. Exported saves
+should include a small manifest containing system ID, ROM path and hash,
+emulator/profile, save type, filename, size, and checksum. Imports from another
+device may omit that manifest and fall back to exact-name or manual ROM
+selection.
+
+The first implementation should support ordinary battery/SRAM saves such as
+SNES `.srm`. Save states are a separate import operation because they are often
+specific to an emulator core and version; they must never be treated as
+portable merely because their filename matches.
 
 ## Application Update Package
 
@@ -330,7 +456,7 @@ candidate design needs distinct outputs:
 ```text
 app-runtime       build one versioned ext4 release payload
 update-package    build and sign the archive copied to FAT32
-user-data-seed    build the initial FAT32 roms/bios/updates directory tree
+user-data-seed    build the initial FAT32 portable-content directory tree
 sd-image          assemble p7 ext4 plus final p8 FAT32
 release           publish full image, update package, signatures, and hashes
 ```
@@ -352,14 +478,9 @@ It should not attempt an in-place filesystem conversion on a user's only card.
 Migration guidance must explicitly back up and restore:
 
 ```text
-roms
-bios
-config
-Saves
-States
-screenshots
-PortMaster installations
-Pyxel requirements and user environments when portable
+FAT32: roms, bios, Images, Themes, Screenshots, Music, custom content
+ext4:  config, Saves, States, frontend state, and update state
+ext4:  PortMaster installations and Pyxel environments when portable
 ```
 
 The current FAT32 app-layer build and deploy path should remain available as a
@@ -389,8 +510,6 @@ workflow, image assembler, and normal app-layer target be changed.
 
 - Whether p7 should be 4, 6, or 8 GiB by default.
 - How the final p8 FAT32 partition expands to the SD card's remaining capacity.
-- Whether screenshots and save exports live directly on FAT32 or require an
-  explicit export action.
 - Whether SD2 overrides p8 ROM/BIOS, merges with it, or is selected in FE.
 - Whether update packages use gzip, zstd, or a plumOS-specific container.
 - Which signing algorithm and key-rotation policy plumOS uses.
@@ -401,4 +520,3 @@ workflow, image assembler, and normal app-layer target be changed.
 - How p5 SquashFS updates are delivered after the first release.
 - Whether a p8 partition is accepted by the complete StockOS boot chain on real
   hardware without side effects.
-
