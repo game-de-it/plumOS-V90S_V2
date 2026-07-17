@@ -159,3 +159,37 @@ SD2 `GAME` mounted after a bounded FAT check returned `rc=0`. The 364
 `FSCK*.REC` files on SD2 have 1980 timestamps and are already present in its
 macOS Spotlight index, so they predate this boot. No current MMC I/O error,
 filesystem error, or read-only remount appeared in the kernel log.
+
+## SD2 FE game runtime
+
+The user launched SD2 `nes/Baseball.nes` from the frontend and confirmed both
+visible gameplay and physical controls. Live ADB process arguments proved the
+complete intended launch path:
+
+```text
+plumos-retroarch-launch --system nes \
+  --core /mnt/plumos/cores/quicknes_libretro.so \
+  --rom /mnt/plumos/roms/nes/Baseball.nes --cpu ondemand
+v90s-retroarch-launch
+retroarch --config /mnt/plumos/config/retroarch/retroarch-v90s.cfg \
+  --appendconfig /run/plumos/retroarch/retroarch-launch-2872.cfg \
+  -L /mnt/plumos/cores/quicknes_libretro.so \
+  /mnt/plumos/roms/nes/Baseball.nes
+```
+
+RetroArch owned `/dev/input/event4`, `/dev/dri/renderD128`, and
+`/dev/snd/pcmC0D0p`. The framebuffer remained `640x480p-60` with the expected
+double-height virtual buffer. CPU policy remained `ondemand` rather than a
+forced fixed frequency.
+
+The frontend process remained asleep for post-game return. Its CPU tick count
+did not change during a two-second sample while RetroArch's count advanced, so
+there was no active duplicate FE workload. ALSA reported `RUNNING`, owned by
+RetroArch, at signed 16-bit stereo/48 kHz with no XRUN. The internal DAC mixer
+and plumOS software-volume backend agreed on the expected `170,170` DAC target.
+
+All p1, p3, p4, ROM, and BIOS mounts remained intact and writable according to
+their policy. The kernel log contained no new segfault, OOM, MMC I/O,
+filesystem, or read-only-remount error. Audible audio quality and pitch,
+FPS/scrolling, normal game exit, FE return, and persistence remain physical
+follow-up checks.

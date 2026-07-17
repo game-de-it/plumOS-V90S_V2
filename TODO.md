@@ -748,10 +748,15 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Physical boot completed through system init and FE. ADB proved p3 at
     exactly 8192 MiB, aligned p4 through the SD tail, all expected mounts and
     markers, clean kernel storage logs, and one framebuffer FE process.
-  - [ ] Confirm SquashFS handoff, FE startup, and one frontend process on
+  - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
   controls, FPS/scrolling/audio pitch, clean exit, and persistence.
+  - [x] Launch SD2 `nes/Baseball.nes` from the FE with QuickNES and confirm
+    visible gameplay plus physical controls. ADB proved the intended wrapper,
+    core, ROM, input, video, and ALSA ownership with no duplicate active FE.
+  - [ ] Confirm audible audio quality/pitch, FPS and scrolling, then exit the
+    game normally and verify FE return plus save/config persistence.
 - [ ] Run the remaining power-interruption, A/B update, rollback, recovery,
   and Windows/macOS enumeration tests before promoting the candidate to the
   release default.
