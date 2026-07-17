@@ -50,8 +50,9 @@ neutral value succeeds.
 - `Display Color -> Saturation`: writes `enhance_saturation`.
 - `Factory Reset`: shows only installed default sets. The current app layer
   installs `ra`, so only `RetroArch Settings` is shown.
-- `Manual Time`: now has a V90S app-layer `plumos-stock-services ntp-stop`
-  helper.
+- `Time Settings`: the initial manual-time-only implementation was superseded
+  by the RTC-aware automatic, immediate, and manual time behavior documented in
+  `docs/validation/2026-07-17-v90s-rtc-time-settings.md`.
 
 ## Live Checks
 

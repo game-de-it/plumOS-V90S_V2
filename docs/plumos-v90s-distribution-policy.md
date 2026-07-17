@@ -905,6 +905,38 @@ Policy:
 - diagnostics and fallback experiments must be explicit, not hidden inside normal
   launch paths
 
+### Time and RTC Policy
+
+The StockOS-derived kernel exposes the V90S hardware clock as `sunxi-rtc` on
+`/dev/rtc0`. plumOS treats that RTC as UTC and uses it to provide a useful
+offline boot time, but network time is authoritative whenever it is available.
+
+- `automatic_time` defaults to enabled in
+  `/mnt/plumos/config/system/settings.json`.
+- After Wi-Fi obtains IPv4, `plumos-time-sync sync` performs one bounded RFC
+  868 synchronization. It does not leave an NTP daemon or periodic writer
+  running.
+- A successful network synchronization writes the corrected system time back
+  to `/dev/rtc0` in UTC.
+- `TIME SETTINGS -> Sync Now` performs the same bounded synchronization once,
+  even when automatic time is disabled.
+- Applying manual time disables automatic time and writes the selected system
+  time to RTC. Re-enabling automatic time immediately attempts a network
+  synchronization.
+- `RTC Status` reports the observed difference between system time and RTC. It
+  must not imply that the vendor RTC is precision timekeeping hardware.
+- The selected timezone is a plumOS process environment setting. The RTC and
+  underlying system clock remain UTC; the frontend renders local time using the
+  selected timezone.
+- Failure to reach the time server must not block frontend startup, Wi-Fi
+  control, or boot. The existing RTC/system time is retained and the failure is
+  reported in the time-sync log.
+
+Real-device validation found that the RTC survives a safe reboot and is used
+by the kernel at boot, but can lose seconds relative to the system clock over a
+short interval. Automatic synchronization after Wi-Fi connection is therefore
+the normal correction path rather than an optional cosmetic feature.
+
 ### Audio Output Policy
 
 Normal plumOS applications must open the logical ALSA PCM `plumos_output`, not

@@ -454,6 +454,7 @@ struct device_settings {
   int wpa_loaded;
   int wifi_enabled;
   int wifi_runtime_enabled;
+  int automatic_time_enabled;
   long volume;
   long brightness;
   long lumination;
@@ -4136,6 +4137,7 @@ static void init_device_settings(struct device_settings *device) {
   memset(device, 0, sizeof(*device));
   device->volume = 14;
   device->wifi_enabled = 1;
+  device->automatic_time_enabled = 1;
   device->brightness = 10;
   device->lumination = 5;
   device->contrast = 10;
@@ -4320,6 +4322,9 @@ static int load_device_settings(struct ui_state *ui) {
   ui->device.loaded = 1;
   ui->device.wifi_enabled = json_get_bool(json, json_end, "wifi_enabled",
                                           ui->device.wifi_enabled);
+  ui->device.automatic_time_enabled =
+      json_get_bool(json, json_end, "automatic_time",
+                    ui->device.automatic_time_enabled);
   ui->device.volume = json_get_long(json, json_end, "volume", ui->device.volume);
   {
     long stored_brightness = json_get_long(json, json_end, "brightness",
@@ -5195,6 +5200,7 @@ static enum setting_control_type setting_control_type_for_id(const char *id) {
       strcmp(id, "ui_theme_settings") == 0 ||
       strcmp(id, "system_display_color") == 0 ||
       strcmp(id, "system_time_settings") == 0 ||
+      strcmp(id, "system_sync_now") == 0 ||
       strcmp(id, "system_manual_time") == 0 ||
       strcmp(id, "system_manual_time_apply") == 0 ||
       strcmp(id, "system_information") == 0 ||
@@ -5212,6 +5218,7 @@ static enum setting_control_type setting_control_type_for_id(const char *id) {
       strcmp(id, "show_recent_on_top") == 0 ||
       strcmp(id, "rom_cursor_wrap") == 0 ||
       strcmp(id, "rom_scan_policy") == 0 ||
+      strcmp(id, "system_automatic_time") == 0 ||
       strcmp(id, "network_wifi_enabled") == 0 ||
       strcmp(id, "network_ssh_enabled") == 0 ||
       strcmp(id, "network_ftp_enabled") == 0 ||
@@ -5275,6 +5282,7 @@ static int setting_is_writable(const char *id) {
                 strcmp(id, "system_saturation") == 0 ||
                 strcmp(id, "system_language") == 0 ||
                 strcmp(id, "system_timezone") == 0 ||
+                strcmp(id, "system_automatic_time") == 0 ||
                 strcmp(id, "system_manual_time_year") == 0 ||
                 strcmp(id, "system_manual_time_month") == 0 ||
                 strcmp(id, "system_manual_time_day") == 0 ||
@@ -5459,9 +5467,43 @@ static void format_manual_time_value(const struct ui_state *ui,
 static void add_system_time_entries(struct ui_state *ui) {
   char value[256];
   const struct device_settings *device = &ui->device;
+  time_t now;
+  char rtc_epoch_text[64];
+  long long rtc_epoch;
+  long long delta;
+  long long magnitude;
+  const char *direction;
 
   format_current_time_local(value, sizeof(value));
   add_setting_entry(ui, "system_current_time", "Current Time", value);
+  add_bool_setting_entry(ui, "system_automatic_time", "Automatic Time",
+                         device->automatic_time_enabled);
+  add_setting_entry(ui, "system_sync_now", "Sync Now", "");
+  value[0] = '\0';
+  if (read_first_line_file("/sys/class/rtc/rtc0/since_epoch",
+                           rtc_epoch_text, sizeof(rtc_epoch_text))) {
+    rtc_epoch = strtoll(rtc_epoch_text, NULL, 10);
+    now = time(NULL);
+    delta = (long long)now - rtc_epoch;
+    if (delta >= -5 && delta <= 5) {
+      copy_string(value, sizeof(value), "Synced");
+    } else {
+      direction = delta > 0 ? "Behind" : "Ahead";
+      magnitude = delta > 0 ? delta : -delta;
+      if (magnitude < 60) {
+        snprintf(value, sizeof(value), "%s %llds", direction, magnitude);
+      } else if (magnitude < 3600) {
+        snprintf(value, sizeof(value), "%s %lldm", direction, magnitude / 60);
+      } else if (magnitude < 86400) {
+        snprintf(value, sizeof(value), "%s %lldh", direction, magnitude / 3600);
+      } else {
+        snprintf(value, sizeof(value), "%s %lldd", direction, magnitude / 86400);
+      }
+    }
+  } else {
+    copy_string(value, sizeof(value), "Unavailable");
+  }
+  add_setting_entry(ui, "system_rtc_status", "RTC Status", value);
   add_setting_entry(ui, "system_timezone", "Timezone",
                     setting_choice_display_value("system_timezone", device->timezone));
   if (!ui->manual_time_initialized) {
@@ -8992,10 +9034,20 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line2, line2_size, "Contrast, color temperature, and saturation are changed inside.");
     } else if (strcmp(id, "system_time_settings") == 0) {
       copy_string(line1, line1_size, "Open OS time and timezone settings.");
-      copy_string(line2, line2_size, "Timezone is saved in plumOS and applied to /etc/TZ.");
+      copy_string(line2, line2_size, "Timezone is saved for plumOS processes.");
     } else if (strcmp(id, "system_current_time") == 0) {
       copy_string(line1, line1_size, "Current OS time in the selected timezone.");
-      copy_string(line2, line2_size, "NTP normally keeps the underlying clock correct.");
+      copy_string(line2, line2_size, "Automatic Time synchronizes it after Wi-Fi connects.");
+    } else if (strcmp(id, "system_automatic_time") == 0) {
+      copy_string(line1, line1_size, "Synchronize time when Wi-Fi connects.");
+      copy_string(line2, line2_size, "A toggles it; enabling also updates RTC now.");
+    } else if (strcmp(id, "system_sync_now") == 0) {
+      copy_string(line1, line1_size, "Synchronize system time and RTC now.");
+      copy_string(line2, line2_size, "Works once even when Automatic Time is OFF.");
+    } else if (strcmp(id, "system_rtc_status") == 0) {
+      copy_string(line1, line1_size, "Difference between RTC and system time.");
+      copy_string(line2, line2_size,
+                  "Synced means the clocks differ by at most five seconds.");
     } else if (strcmp(id, "system_timezone") == 0) {
       copy_string(line1, line1_size, "OS runtime timezone.");
       copy_string(line2, line2_size, "LEFT/RIGHT saves and applies it immediately.");
@@ -9004,7 +9056,8 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line2, line2_size, "Values are interpreted in the selected timezone.");
     } else if (strcmp(id, "system_manual_time_apply") == 0) {
       copy_string(line1, line1_size, "Apply the manual OS time.");
-      copy_string(line2, line2_size, "A stops plumOS NTP for this session, then sets time.");
+      copy_string(line2, line2_size,
+                  "A disables Automatic Time and saves system time to RTC.");
     } else if (strncmp(id, "system_manual_time_", 19) == 0) {
       copy_string(line1, line1_size, "Manual time field.");
       copy_string(line2, line2_size, "LEFT/RIGHT changes the value; A applies at bottom.");
@@ -10893,6 +10946,43 @@ static void stop_ntp_for_manual_time(struct ui_state *ui) {
   system(cmd);
 }
 
+static int run_time_sync_helper(struct ui_state *ui, const char *action) {
+  char script[PATH_MAX];
+  char cmd[UI_COMMAND_MAX];
+  size_t pos = 0;
+  int rc;
+
+  if (!ui || !action || !action[0] ||
+      !join_path(script, sizeof(script), ui->plumos_root, "bin/plumos-time-sync") ||
+      !file_exists(script)) {
+    return 0;
+  }
+  cmd[0] = '\0';
+  if (!append_string(cmd, sizeof(cmd), &pos, "PLUMOS_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
+      !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_SYSTEM_SETTINGS_JSON=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->system_config_path) ||
+      !append_string(cmd, sizeof(cmd), &pos, " ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, script) ||
+      !append_string(cmd, sizeof(cmd), &pos, " ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, action) ||
+      !append_string(cmd, sizeof(cmd), &pos,
+                     " >/run/plumos/time-sync/frontend-action.log 2>&1")) {
+    return 0;
+  }
+  rc = system(cmd);
+  return rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 0;
+}
+
+static int sync_time_now(struct ui_state *ui) {
+  int ok = run_time_sync_helper(ui, "force-sync");
+
+  update_settings_entries_after_save(ui);
+  set_status(ui, ok ? "system time and RTC synchronized"
+                    : "time synchronization failed; see time-sync log");
+  return ok;
+}
+
 static int apply_manual_system_time(struct ui_state *ui) {
   struct tm local_tm;
   struct tm check_tm;
@@ -10929,6 +11019,11 @@ static int apply_manual_system_time(struct ui_state *ui) {
   }
 
   stop_ntp_for_manual_time(ui);
+  if (!save_system_config_bool(ui, "automatic_time", 0)) {
+    set_status(ui, "automatic time setting write failed");
+    return 0;
+  }
+  ui->device.automatic_time_enabled = 0;
   tv.tv_sec = epoch;
   tv.tv_usec = 0;
   if (settimeofday(&tv, NULL) != 0) {
@@ -10937,10 +11032,15 @@ static int apply_manual_system_time(struct ui_state *ui) {
     return 0;
   }
   apply_system_timezone_runtime(ui, ui->device.timezone, NULL, 0);
+  if (!run_time_sync_helper(ui, "store-rtc")) {
+    set_status(ui, "system time set; RTC update failed");
+    return 0;
+  }
   ui->manual_time_initialized = 0;
   update_settings_entries_after_save(ui);
   format_current_time_local(value, sizeof(value));
-  snprintf(ui->status, sizeof(ui->status), "manual time set: %s; NTP stopped", value);
+  snprintf(ui->status, sizeof(ui->status),
+           "manual time set: %s; automatic time OFF; RTC saved", value);
   return 1;
 }
 
@@ -12201,6 +12301,26 @@ static int clear_performance_cpu_override(struct ui_state *ui) {
 
 static int save_setting_bool(struct ui_state *ui, const char *id, int value) {
   struct frontend_settings settings;
+
+  if (strcmp(id, "system_automatic_time") == 0) {
+    int sync_ok = 1;
+    if (!save_system_config_bool(ui, "automatic_time", value ? 1 : 0)) {
+      set_status(ui, "automatic time setting write failed");
+      return 0;
+    }
+    ui->device.automatic_time_enabled = value ? 1 : 0;
+    if (value) {
+      sync_ok = run_time_sync_helper(ui, "force-sync");
+    }
+    update_settings_entries_after_save(ui);
+    if (value && !sync_ok) {
+      set_status(ui, "automatic time ON; initial sync failed");
+      return 1;
+    }
+    set_status(ui, value ? "automatic time ON; system and RTC synchronized"
+                         : "automatic time OFF; manual clock preserved");
+    return 1;
+  }
 
   if (!load_settings(ui->settings_path, &settings)) {
     set_status(ui, "settings read failed");
@@ -13731,6 +13851,10 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
       }
       if (is_system_time_entry(entry)) {
         open_settings_screen(ui, SETTINGS_CATEGORY_SYSTEM_TIME);
+        return;
+      }
+      if (strcmp(entry->id, "system_sync_now") == 0) {
+        sync_time_now(ui);
         return;
       }
       if (is_system_manual_time_entry(entry)) {

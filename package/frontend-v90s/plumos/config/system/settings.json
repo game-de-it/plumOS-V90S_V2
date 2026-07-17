@@ -1,6 +1,7 @@
 {
   "version": 1,
   "wifi_enabled": true,
+  "automatic_time": true,
   "volume": 14,
   "brightness": 10,
   "lumination": 5,

@@ -8,6 +8,9 @@ LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${LOG_DIR}/time-sync.log"
 STATUS_FILE="${RUN_DIR}/status"
 LOCK_DIR="${RUN_DIR}/lock"
+SETTINGS_FILE="${PLUMOS_SYSTEM_SETTINGS_JSON:-${PLUMOS_ROOT}/config/system/settings.json}"
+RTC_DEVICE="${PLUMOS_RTC_DEVICE:-/dev/rtc0}"
+RTC_SYSFS="${PLUMOS_RTC_SYSFS:-/sys/class/rtc/rtc0}"
 TIME_SERVER="${PLUMOS_TIME_SERVER:-time.nist.gov}"
 TIMEOUT_SECONDS="${PLUMOS_TIME_SYNC_TIMEOUT:-8}"
 PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -15,11 +18,29 @@ export PATH
 
 usage() {
   cat <<'EOF'
-Usage: plumos-time-sync [sync|status]
+Usage: plumos-time-sync [sync|force-sync|store-rtc|status]
 
 Synchronizes the V90S system clock once using an RFC 868 time server.
+Successful synchronization and manual store operations also update RTC in UTC.
 The operation is bounded and never leaves a background daemon running.
 EOF
+}
+
+automatic_time_enabled() {
+  if [ -r "$SETTINGS_FILE" ] &&
+      grep -Eq '"automatic_time"[[:space:]]*:[[:space:]]*(false|0)' \
+        "$SETTINGS_FILE" 2>/dev/null; then
+    return 1
+  fi
+  return 0
+}
+
+automatic_time_value() {
+  if automatic_time_enabled; then
+    printf 'on'
+  else
+    printf 'off'
+  fi
 }
 
 run_limited() {
@@ -42,6 +63,12 @@ write_status() {
     printf 'detail=%s\n' "$detail"
     printf 'epoch=%s\n' "$(date +%s 2>/dev/null || printf unknown)"
     printf 'utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)"
+    printf 'automatic_time=%s\n' "$(automatic_time_value)"
+    if [ -r "${RTC_SYSFS}/since_epoch" ]; then
+      printf 'rtc_epoch=%s\n' "$(cat "${RTC_SYSFS}/since_epoch" 2>/dev/null || printf unknown)"
+    else
+      printf 'rtc_epoch=unavailable\n'
+    fi
   } > "$temp"
   mv "$temp" "$STATUS_FILE"
 }
@@ -52,9 +79,38 @@ log() {
     "$*" >> "$LOG_FILE" 2>/dev/null || true
 }
 
+store_rtc() {
+  if [ ! -e "$RTC_DEVICE" ]; then
+    log "RTC store failed reason=device-missing device=${RTC_DEVICE}"
+    printf 'RTC store failed: %s is unavailable.\n' "$RTC_DEVICE" >&2
+    return 1
+  fi
+  if ! command -v hwclock >/dev/null 2>&1; then
+    log "RTC store failed reason=hwclock-missing"
+    printf 'RTC store failed: hwclock is unavailable.\n' >&2
+    return 1
+  fi
+  if hwclock -u -f "$RTC_DEVICE" -w >/dev/null 2>&1; then
+    log "RTC store success device=${RTC_DEVICE} mode=UTC"
+    printf 'RTC updated from system time: %s\n' \
+      "$(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || printf unknown)"
+    return 0
+  fi
+  log "RTC store failed reason=hwclock-write device=${RTC_DEVICE}"
+  printf 'RTC store failed: hwclock could not update %s.\n' "$RTC_DEVICE" >&2
+  return 1
+}
+
 sync_clock() {
+  force="${1:-0}"
   wait_count=0
   mkdir -p "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
+
+  if [ "$force" != 1 ] && ! automatic_time_enabled; then
+    write_status disabled automatic-time-off
+    printf 'Automatic time is disabled; keeping the current system and RTC time.\n'
+    return 0
+  fi
 
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     while [ -d "$LOCK_DIR" ] && [ "$wait_count" -lt "$TIMEOUT_SECONDS" ]; do
@@ -79,8 +135,14 @@ sync_clock() {
   fi
 
   if run_limited "$TIMEOUT_SECONDS" rdate -s "$TIME_SERVER" >/dev/null 2>&1; then
+    if ! store_rtc; then
+      write_status synced-rtc-failed "$TIME_SERVER"
+      log "sync partial server=${TIME_SERVER} reason=rtc-store-failed"
+      printf 'System time synchronized, but RTC update failed.\n' >&2
+      return 1
+    fi
     write_status synced "$TIME_SERVER"
-    log "sync success server=${TIME_SERVER}"
+    log "sync success server=${TIME_SERVER} rtc=stored"
     printf 'System time synchronized: %s\n' \
       "$(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || printf unknown)"
     return 0
@@ -97,13 +159,39 @@ mkdir -p "$RUN_DIR" 2>/dev/null || true
 
 case "${1:-sync}" in
   sync)
-    sync_clock
+    sync_clock 0
+    ;;
+  force-sync)
+    sync_clock 1
+    ;;
+  store-rtc)
+    mkdir -p "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
+    if store_rtc; then
+      write_status rtc-stored manual-time
+    else
+      write_status rtc-store-failed manual-time
+      exit 1
+    fi
     ;;
   status)
+    printf 'automatic_time=%s\n' "$(automatic_time_value)"
     if [ -r "$STATUS_FILE" ]; then
-      cat "$STATUS_FILE"
+      sed '/^automatic_time=/d; /^rtc_epoch=/d' "$STATUS_FILE"
     else
       printf 'state=never\n'
+    fi
+    printf 'system_epoch=%s\n' "$(date +%s 2>/dev/null || printf unknown)"
+    printf 'system_utc=%s\n' \
+      "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)"
+    if [ -r "${RTC_SYSFS}/since_epoch" ]; then
+      rtc_epoch="$(cat "${RTC_SYSFS}/since_epoch" 2>/dev/null || true)"
+      system_epoch="$(date +%s 2>/dev/null || true)"
+      printf 'rtc_epoch=%s\n' "${rtc_epoch:-unknown}"
+      if [ -n "$rtc_epoch" ] && [ -n "$system_epoch" ]; then
+        printf 'rtc_offset_seconds=%s\n' "$((system_epoch - rtc_epoch))"
+      fi
+    else
+      printf 'rtc_epoch=unavailable\n'
     fi
     ;;
   -h|--help|help)
