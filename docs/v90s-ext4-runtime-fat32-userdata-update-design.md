@@ -5,9 +5,11 @@ Status: Draft for discussion; not yet adopted by the Distribution Policy
 
 ## Purpose
 
-This document records a candidate replacement for the current FAT32 app-layer
-design. It is intended to preserve easy Windows/macOS updates while moving
-frequently changed plumOS applications and persistent state onto ext4.
+This document records a candidate four-partition replacement for the current
+StockOS-compatible seven-partition layout and FAT32 app layer. It is intended
+to preserve easy Windows/macOS updates, reduce removable-media enumeration
+overhead, and move frequently changed plumOS applications and persistent state
+onto ext4.
 
 The user-facing update flow should remain simple:
 
@@ -27,83 +29,174 @@ This is a design proposal, not the current release contract.
 The current implementation still uses:
 
 ```text
+p1  FAT16     PLUMBOOT boot resources
+p2  raw       env
+p3  raw       env-redund
+p4  raw       Android boot image
 p5  squashfs  read-only Linux system
-p6  ext4      BATOCERA, about 33 MiB, mounted read-only at /boot
+p6  ext4      BATOCERA, mounted read-only at /boot
 p7  FAT32     PLUMOS app, update, configuration, and data layer
 ```
 
-The current FAT32 design remains supported until this proposal is explicitly
-accepted, implemented on a separate development path, and validated on V90S
-hardware.
+The current FAT32 design remains supported until this proposal is implemented
+on a separate development path and validated on V90S hardware.
 
 ## Goals
 
 - Keep ROM, BIOS, and update transfer accessible from Windows and macOS.
+- Expose only `PLUMBOOT` and `PLUMOS` as mountable host volumes.
+- Reduce the GPT layout from seven StockOS-compatible partitions to four
+  plumOS-owned partitions.
 - Store executable files, libraries, symlinks, permissions, settings, and saves
   on a native Linux filesystem.
 - Make an interrupted application update leave the previous release bootable.
 - Keep user settings and saves separate from replaceable release payloads.
 - Allow one-step frontend updates with progress and an input-locked screen.
-- Keep the StockOS-derived bootloader, kernel, GPU, audio, and input contract.
-- Avoid writing to the mounted p5 SquashFS backing partition.
+- Keep the StockOS-derived kernel, GPU, audio, input, boot0, and boot-package
+  hardware contract while simplifying its partition policy.
+- Keep the Android boot payload raw and independent of the FAT filesystems.
 - Retain a recovery path when either the application update or FAT32 user area
   is damaged.
 
 ## Non-Goals
 
-- This proposal does not replace the vendor kernel or bootloader.
+- This proposal does not replace the vendor kernel or low-level boot0 hardware
+  initialization.
 - It does not make arbitrary power loss harmless to a file actively being
   written.
-- It does not define a live in-place update of the mounted p5 SquashFS.
+- It does not permit overwriting the active SquashFS while it is mounted.
 - It does not require online updates or a permanent package-manager daemon.
 - It does not make SD2 mandatory for normal SD1-only operation.
 
 ## Proposed Partition Layout
 
-The candidate SD1 layout is:
+The low-level Allwinner boot0 and boot package remain at their required raw
+offsets before the GPT partitions. They are not exposed as partitions.
+
+The agreed candidate SD1 layout is:
 
 ```text
-p1  boot-resource  PLUMBOOT    FAT16   existing vendor boot contract
-p2  env                         raw     existing vendor boot contract
-p3  env-redund                  raw     existing vendor boot contract
-p4  boot                        raw     Android boot image
-p5  system          PLUMSYS     squashfs read-only Linux system
-p6  rootfs          BATOCERA    ext4    existing small /boot partition, read-only
-p7  runtime         PLUMOS_SYS  ext4    plumOS releases and persistent Linux data
-p8  userdata        PLUMOS      FAT32   portable content and interchange area
+raw boot area             boot0 and boot_package at vendor-compatible offsets
+p1  boot-resource PLUMBOOT    FAT   boot assets and versioned system SquashFS
+p2  boot          BOOT        raw   Android boot image: kernel, DTB, initramfs
+p3  runtime       PLUMOS_SYS  ext4  releases and persistent Linux-managed data
+p4  userdata      PLUMOS      FAT32 portable user content and interchange area
 ```
 
-p6 must not be reused as the general plumOS runtime. On the current image it is
-small, boot-related, and mounted read-only at `/boot`. Mixing high-churn
-application data into that boot-critical filesystem would create a new failure
-boundary.
+The exact capacities are intentionally not fixed in this section. Partition
+sizing is the next design decision and must use measured SquashFS, runtime,
+rollback, PortMaster, and user-content requirements rather than inherited
+StockOS sizes.
 
-p7 returns `rootfs_data` to a Linux-native filesystem, which also resembles the
-original StockOS observation more closely than the current development FAT32
-format. p8 is added after p7 so it can be the final expandable partition on
-larger SD cards.
+### PLUMBOOT
 
-Candidate sizes:
+p1 keeps the bootloader-visible boot resources and adds versioned system images:
 
 ```text
-p7 ext4: minimum 4 GiB, target 8 GiB pending payload and rollback sizing
-p8 FAT32: small image-build minimum, then expand to the remaining card capacity
+/bootlogo.bmp
+/System/system-a.squashfs
+/System/system-a.manifest
+/System/system-a.sig
+/System/system-b.squashfs
+/System/system-b.manifest
+/System/system-b.sig
+/Logs/                         bounded early-boot diagnostics when required
 ```
 
-The current generated app layer is about 1.1 GiB. p7 must have room for the
-active release, one previous release, staging overhead, persistent settings,
-Pyxel environments, PortMaster state, and filesystem reserve. Exact sizing is
-an open decision because a larger fixed p7 also increases the minimum image
-size and SD flashing time.
+The filesystem may remain FAT16 for the first compatibility spike or move to
+FAT32 after bootlogo and boot-package validation. Windows and macOS must mount
+it as `PLUMBOOT`. A normal update writes only the inactive SquashFS slot.
+
+### BOOT
+
+p2 is the raw Android boot image and contains the vendor kernel, matching DTB,
+and a plumOS-owned initramfs. It keeps the kernel payload outside FAT so an
+ordinary host-side file operation cannot accidentally replace it.
+
+The current separate `env` and `env-redund` partitions are not carried into the
+candidate layout. Their current values include a hard-coded
+`mmc_root=/dev/mmcblk0p6`, so deleting them without changing the boot package
+would not work. The candidate boot package must provide a fixed default
+environment that loads the GPT partition named `boot` and lets the initramfs
+select the system root by label and signed metadata. User settings must never
+require U-Boot `saveenv`.
+
+### PLUMOS_SYS
+
+p3 is the Linux-native device-managed area. It contains application releases,
+configuration, active saves and states, update staging, rollback metadata,
+PortMaster, Python environments, and other data that requires POSIX semantics.
+
+The release image may contain a payload-sized initial p3 and expand it before
+creating p4 on first boot. This avoids making the downloadable and flashed raw
+image as large as the final ext4 runtime allocation.
+
+### PLUMOS
+
+p4 is the final partition and consumes the remaining SD-card capacity after
+first-boot provisioning. It is the user-managed FAT32 area for ROMs, BIOS,
+artwork, themes, screenshots, media, updates, imports, and exports.
+
+Windows and macOS should see only `PLUMBOOT` and `PLUMOS`. p2 is raw and p3 uses
+a Linux filesystem, so neither should receive a host drive letter.
+
+### Removed StockOS Partitions
+
+The old p6 `BATOCERA` partition is not the Linux system root despite its
+StockOS `rootfs` name. The validated runtime mounts it read-only at `/boot`,
+while the old p5 SquashFS is mounted at `/overlay/base`. Its captured payload is
+approximately 48 KiB and contains only Batocera boot configuration, board/vendor
+identifiers, preinstall defaults, and small boot hook scripts.
+
+The four-partition design moves any still-required early defaults into the
+initramfs or signed system root and removes the hard-coded p6 dependency. The
+old p5 raw SquashFS partition is also removed because the system SquashFS files
+now live under p1 `PLUMBOOT`.
+
+The old p2/p3 environment redundancy is replaced by an immutable boot-package
+default. This saves little space, but removes two GPT entries and avoids a
+writable bootloader policy that plumOS does not need.
+
+## Boot Flow and Recovery Contract
+
+The candidate boot flow is:
+
+```text
+boot0
+  -> boot_package / U-Boot fixed environment
+  -> p2 BOOT kernel and initramfs
+  -> mount p1 PLUMBOOT read-only
+  -> verify selected SquashFS manifest and signature
+  -> loop-mount system-a or system-b
+  -> mount p3 PLUMOS_SYS
+  -> construct required tmpfs/overlay mounts
+  -> switch_root
+  -> start plumOS runtime and frontend
+```
+
+Slot choice and boot-health state should be recorded on ext4. If p3 cannot be
+mounted, the initramfs uses a documented default slot and enters recovery
+rather than modifying either FAT filesystem blindly. If the selected system
+slot fails verification or readiness, the previous verified slot is tried.
+
+The p2 initramfs must contain enough framebuffer, input, storage, signature,
+and diagnostic support to show a recovery screen when neither SquashFS slot can
+boot. It must not depend on frontend or emulator files from p3.
 
 ## Mount and Path Contract
 
 Proposed mounts:
 
 ```text
-/dev/mmcblk0p7  -> /mnt/plumos       ext4
-/dev/mmcblk0p8  -> /mnt/plumos-user  vfat
+/dev/mmcblk0p1  -> /mnt/plumos-boot  vfat, normally read-only on device
+/dev/mmcblk0p3  -> /mnt/plumos       ext4
+/dev/mmcblk0p4  -> /mnt/plumos-user  vfat
 ```
+
+p2 is consumed as an Android boot image and is not mounted by the running
+system. Runtime code must resolve partitions by GPT name, filesystem label,
+UUID, or signed metadata rather than assuming that the device is always
+`mmcblk0`.
 
 The ext4 runtime is the device-managed area. It contains data that users do not
 normally manipulate from Windows or macOS, including executable payloads,
@@ -224,7 +317,7 @@ clearer:
 ```
 
 SD2 may continue to override or provide ROM and BIOS content. It must not be
-required to locate the application runtime or the update state database.
+required to locate the application runtime, boot slot, or update state database.
 
 ## Save Import and Export Contract
 
@@ -427,26 +520,39 @@ Transient logs and caches should remain under `/run` whenever persistence is
 not required. User-requested exports can be copied to FAT32 through a dedicated
 frontend action.
 
-## SquashFS Update Boundary
+## System SquashFS Update Contract
 
-p5 is currently a raw SquashFS partition, not a normal file on a FAT32 volume.
-Windows Explorer and macOS Finder cannot replace it by copying a file.
+The current release image uses a raw p5 SquashFS partition. The candidate
+layout replaces it with signed A/B SquashFS files on p1 `PLUMBOOT` so Windows
+Explorer and macOS Finder can install a base-system update without rewriting a
+raw partition or the entire SD image.
 
-The mounted p5 backing partition must not be overwritten from the running OS.
-Safe system-rootfs update options are:
+A normal host-side system update must use a versioned inactive-slot package:
 
-1. Distribute a complete SD image for infrequent base-system releases.
-2. Provide a PC-side partition updater that writes only p5 with strict device,
-   partition, size, and hash checks.
-3. Add an A/B SquashFS partition scheme and switch only after verifying the
-   inactive image.
-4. Add an updater to an earlier boot stage that writes p5 before p5 is mounted.
+```text
+/System/system-b.squashfs
+/System/system-b.manifest
+/System/system-b.sig
+```
 
-For the first implementation, normal application updates should change only
-the ext4 runtime. The p5 SquashFS can remain fixed and be updated through a new
-full SD image when the kernel-facing or base-system contract changes. A safer
-partial p5 updater can be designed later; it is not required to validate the
-ext4/FAT32 application update model.
+when slot A is active, or the corresponding slot A files when B is active. The
+user must never be instructed to overwrite the currently active file.
+
+The p2 initramfs owns the trust and rollback boundary:
+
+1. Mount `PLUMBOOT` read-only.
+2. Read the requested slot from durable ext4 boot state when available.
+3. Verify device ID, system ABI, complete image hash, and release signature.
+4. Reject an incomplete or oversized FAT file before loop attachment.
+5. Loop-mount the verified SquashFS read-only.
+6. Boot it with a pending-health marker.
+7. Mark it healthy only after the expected runtime/frontend readiness proof.
+8. Select the previous verified slot after a failed readiness check.
+
+FAT32 is only the container for immutable signed images. The active image must
+not be modified from the running device. A kernel, DTB, initramfs, boot0, or
+boot-package update remains outside this ordinary file-copy flow and requires a
+full image or a separately validated boot updater.
 
 ## Build-System Impact
 
@@ -454,16 +560,24 @@ The current `app-layer` target builds a directly copyable FAT32 tree. The
 candidate design needs distinct outputs:
 
 ```text
-app-runtime       build one versioned ext4 release payload
-update-package    build and sign the archive copied to FAT32
-user-data-seed    build the initial FAT32 portable-content directory tree
-sd-image          assemble p7 ext4 plus final p8 FAT32
-release           publish full image, update package, signatures, and hashes
+boot-package      prepare the fixed U-Boot environment for the four-part layout
+boot-image        build p2 kernel/DTB/initramfs Android boot payload
+system-rootfs     build and sign the p1 A/B SquashFS payload
+app-runtime       build one versioned p3 ext4 release payload
+update-package    build and sign the app archive copied to p4
+user-data-seed    build the initial p4 portable-content directory tree
+sd-image          assemble the compact p1/p2/p3 provisioning image
+release           publish full image, update packages, signatures, and hashes
 ```
 
 Existing component build targets remain unchanged. `frontend`, `retroarch`,
 `cores`, `picoarch`, `standalone`, `userland`, and `network-services` feed the
 new `app-runtime` output instead of a directly overwritten FAT32 tree.
+
+The image assembler must not inherit the old p2/p3 env, p5 raw SquashFS, or p6
+BATOCERA partitions. It must fail if the boot package still contains the old
+`mmc_root=/dev/mmcblk0p6` contract or if the generated p1 cannot contain both
+signed system slots within the selected capacity.
 
 Development ADB deployment should exercise the same staging and current-switch
 contract as the release updater rather than restoring an unrelated in-place
@@ -471,8 +585,9 @@ overwrite path.
 
 ## Migration From Current Development Images
 
-Changing current p7 from FAT32 to ext4 and adding p8 changes the partition and
-mount contract. The first implementation should require a new SD image.
+Changing from the current seven-partition StockOS layout to the four-partition
+plumOS layout changes bootloader environment, initramfs, partition numbering,
+filesystems, and mount contracts. It requires a new full SD image.
 
 It should not attempt an in-place filesystem conversion on a user's only card.
 Migration guidance must explicitly back up and restore:
@@ -489,34 +604,39 @@ video, audio, input, networking, update, rollback, and shutdown validation.
 
 ## Validation Plan
 
-The first spike should prove only the storage and update contract:
+The first spike should prove only the new boot and storage contract:
 
-1. Build a test image with p7 ext4 and p8 FAT32.
-2. Boot with p7 at `/mnt/plumos` and p8 at `/mnt/plumos-user`.
-3. Start the existing frontend through a `current` release symlink.
-4. Launch one RetroArch game and verify save/config persistence on ext4.
-5. Copy a signed test update archive to FAT32 from macOS.
-6. Install it through a rootfs-owned updater and atomically switch releases.
-7. Confirm FE restart and previous-release retention.
-8. Interrupt extraction and confirm the active release remains unchanged.
-9. Interrupt immediately after the release switch and confirm boot rollback.
-10. Damage or remove p8 and confirm the ext4 runtime still reaches a recovery
-    screen without rewriting the user partition.
+1. Build a four-partition image while preserving known-good boot0 and hardware
+   initialization inputs.
+2. Boot p2 with a fixed environment that has no p6 or external-env dependency.
+3. Mount p1 and loop-mount a signed test SquashFS from `System/`.
+4. Mount p3 at `/mnt/plumos` and start the existing frontend through `current`.
+5. Create or mount p4 at `/mnt/plumos-user` without changing p1-p3 offsets.
+6. Launch one RetroArch game and verify save/config persistence on ext4.
+7. Boot once from each signed SquashFS slot.
+8. Corrupt the inactive slot and confirm the active slot still boots.
+9. Fail the pending-slot readiness check and confirm rollback.
+10. Damage or remove p4 and confirm p2 plus a verified system slot reaches a
+    recovery screen without rewriting the user partition.
+11. Insert the card into Windows and macOS and confirm that only `PLUMBOOT` and
+    `PLUMOS` mount, recording enumeration time on both hosts.
 
 Only after the spike passes should the Distribution Policy, TODO, release
 workflow, image assembler, and normal app-layer target be changed.
 
 ## Open Decisions
 
-- Whether p7 should be 4, 6, or 8 GiB by default.
-- How the final p8 FAT32 partition expands to the SD card's remaining capacity.
-- Whether SD2 overrides p8 ROM/BIOS, merges with it, or is selected in FE.
+- Exact p1 `PLUMBOOT` capacity and whether its first validated format remains
+  FAT16 or moves to FAT32.
+- Exact initial and final p3 `PLUMOS_SYS` capacities.
+- How first boot expands p3 and creates final p4 without risking the boot GPT.
+- Minimum supported SD-card capacity and p3 sizing policy by card size.
+- Whether SD2 overrides p4 ROM/BIOS, merges with it, or is selected in FE.
 - Whether update packages use gzip, zstd, or a plumOS-specific container.
 - Which signing algorithm and key-rotation policy plumOS uses.
 - Whether successful app updates restart only FE or always reboot.
 - How many previous releases are retained.
 - Whether failed boot health triggers automatic rollback or a recovery menu.
 - Which configuration migrations are safe to roll back.
-- How p5 SquashFS updates are delivered after the first release.
-- Whether a p8 partition is accepted by the complete StockOS boot chain on real
-  hardware without side effects.
+- Whether p2 boot updates are full-image-only or receive a separate signed
+  updater after the four-partition baseline is stable.

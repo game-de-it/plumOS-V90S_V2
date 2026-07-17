@@ -234,8 +234,8 @@ docs/v90s-ext4-runtime-fat32-userdata-update-design.md
 ```
 
 It is a draft and does not supersede the current FAT32 app-layer policy until
-its partition, update, rollback, and real-device validation boundaries are
-explicitly accepted.
+its boot, partition, update, rollback, and real-device validation boundaries
+have passed the candidate spike.
 
 Within that candidate, the agreed storage direction is to reserve ext4 for the
 device-managed runtime, Linux-specific state, configuration, active saves, and
@@ -244,6 +244,23 @@ scraped images, user themes, screenshots, media, custom content, update
 packages, and explicit import/export directories. Active saves stay on ext4;
 the frontend provides confirmed save export and import flows, including manual
 ROM selection when an imported save filename does not match a ROM.
+
+The agreed candidate partition target is deliberately smaller than the current
+StockOS-compatible layout:
+
+```text
+raw boot area              vendor-compatible boot0 and boot_package offsets
+p1 PLUMBOOT     FAT        boot assets and signed A/B system SquashFS files
+p2 BOOT         raw        Android boot image: kernel, DTB, initramfs
+p3 PLUMOS_SYS   ext4       device-managed runtime and persistent Linux data
+p4 PLUMOS       FAT32      portable user content and interchange area
+```
+
+The candidate removes external `env`/`env-redund`, raw p5 SquashFS, and p6
+BATOCERA partitions. The boot package supplies an immutable default environment
+that loads p2, while the p2 initramfs verifies and loop-mounts a system image
+from p1. Exact partition capacities remain an explicit open decision. Windows
+and macOS should mount only `PLUMBOOT` and `PLUMOS`.
 
 The boot-critical SD-card layout should continue to follow the
 StockOS/Batocera contract until there is real-device evidence that a partition
