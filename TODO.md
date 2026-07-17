@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -710,21 +710,42 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Milestone 5: SD Image Layout
 
-- [ ] Keep p1 through p4 compatible with the StockOS boot contract:
-  - p1 boot-resource / PLUMBOOT
-  - p2 env
-  - p3 env-redund
-  - p4 Android boot image
-- [ ] Keep p1 small and reserved for boot-resource compatibility.
-- [ ] Use p5 as the plumOS system squashfs.
+- [x] Preserve the seven-partition StockOS layout behind the explicit
+  `stockos-image` compatibility target while the four-partition candidate is
+  validated.
+- [x] Implement the candidate seed layout on
+  `codex/four-partition-provisioning`:
+  - raw vendor-compatible `boot0` and `boot_package` offsets
+  - p1 `boot-resource` / `PLUMBOOT` FAT16, exactly 1024 MiB
+  - p2 `boot` Android boot image, exactly 64 MiB
+  - p3 `runtime` / `PLUMOS_SYS` ext4, exactly 1536 MiB in the seed
+  - no p4 in the downloadable seed
+- [x] Build a fixed-default boot package that loads GPT partition `boot`
+  without the old external `env` / `env-redund` partitions.
+- [x] Add a p2 provisioning initramfs that validates the known seed geometry,
+  relocates backup GPT, expands p3 to exactly 8192 MiB, and creates p4 FAT32
+  `PLUMOS` through the final usable SD sector.
+- [x] Make provisioning resumable and idempotent. A 16 GB simulation retained
+  the same p4 UUID across a second provisioning run.
+- [x] Add preflight checks for the boot chain, system SquashFS, complete app
+  manifest/checksums, bounded SD2 fsck/mount, and the single-FE `exec` chain.
+- [x] Generate and structurally verify the compact candidate image
+  `plumos-v90s-four-partition-20260718-6.img`.
+- [ ] Boot the four-partition candidate on a physical V90S and verify p3/p4
+  geometry, labels, provisioning markers, mounts, and exactly one FE process.
+- [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
+  controls, FPS/scrolling/audio pitch, clean exit, and persistence.
+- [ ] Run the remaining power-interruption, A/B update, rollback, recovery,
+  and Windows/macOS enumeration tests before promoting the candidate to the
+  release default.
 - [x] Use p7 `rootfs_data` / `PLUMOS` as the current development FAT32
   app/update/data partition.
 - [ ] Validate the chosen p6/p7 FAT32 layout on real hardware.
 - [x] Increase the development FAT32 app-layer capacity to 4096MB so the full
   generated app-layer can be included without exceeding the current payload
   size.
-- [ ] Keep an explicit development compatibility mode for the current p6/p7
-  shape until the FAT32 app-layer partition is validated.
+- [x] Keep an explicit development compatibility mode for the current p6/p7
+  shape until the four-partition candidate is validated.
 - [x] Stop treating ext4 `SHARE` as the current app-layer development design.
 - [x] Include app-layer manifest hash in the SD image manifest.
 - [x] Add `--app-layer-dir` support to the StockOS-compatible image assembler

@@ -2,6 +2,7 @@
 set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+USERDATA_ROOT="${PLUMOS_USERDATA_ROOT:-/mnt/plumos-user}"
 SD2_MOUNT="${PLUMOS_SD2_MOUNT:-/run/plumos/sd2}"
 SD2_DEVICE="${PLUMOS_SD2_DEVICE:-}"
 FSCK_MODE="${PLUMOS_SD2_FSCK:-auto}"
@@ -18,6 +19,11 @@ log() {
 
 is_mounted() {
     grep -q "[[:space:]]$1[[:space:]]" /proc/mounts 2>/dev/null
+}
+
+mount_source() {
+    target="$1"
+    awk -v target="$target" '$2 == target { print $1; exit }' /proc/mounts 2>/dev/null
 }
 
 print_status() {
@@ -121,12 +127,31 @@ bind_content_dir() {
     [ -d "$src" ] || return 1
     mkdir -p "$dst" 2>/dev/null || return 1
     if is_mounted "$dst"; then
-        log "bind: $dst already mounted; keeping current mount"
-        return 0
+        current_source="$(mount_source "$dst")"
+        sd2_source="$(mount_source "$SD2_MOUNT")"
+        if [ -n "$sd2_source" ] && [ "$current_source" = "$sd2_source" ]; then
+            log "bind: $dst already uses current SD2 source=$current_source"
+            return 0
+        fi
+        umount "$dst" >> "$LOG_FILE" 2>&1 || return 1
+        log "bind: removed base content mount target=$dst source=$current_source"
     fi
     mount --bind "$src" "$dst" >> "$LOG_FILE" 2>&1 || return 1
     log "bind: $label $src -> $dst"
     return 0
+}
+
+restore_userdata_dir() {
+    source_dir="$1"
+    target_dir="$2"
+    label="$3"
+
+    [ -f "$USERDATA_ROOT/.plumos-ready" ] || return 0
+    [ -d "$source_dir" ] || return 0
+    mkdir -p "$target_dir" 2>/dev/null || return 1
+    is_mounted "$target_dir" && return 0
+    mount --bind "$source_dir" "$target_dir" >> "$LOG_FILE" 2>&1 || return 1
+    log "bind: restored $label $source_dir -> $target_dir"
 }
 
 candidate_devices() {
@@ -194,6 +219,8 @@ stop_sd2() {
         umount "$SD2_MOUNT" >> "$LOG_FILE" 2>&1 || true
         log "stop: unmounted $SD2_MOUNT"
     fi
+    restore_userdata_dir "$USERDATA_ROOT/roms" "$PLUMOS_ROOT/roms" roms || true
+    restore_userdata_dir "$USERDATA_ROOT/bios" "$PLUMOS_ROOT/bios" bios || true
 }
 
 case "${1:-start}" in

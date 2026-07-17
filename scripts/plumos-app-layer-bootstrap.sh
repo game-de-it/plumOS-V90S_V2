@@ -2,6 +2,7 @@
 set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+USERDATA_ROOT="${PLUMOS_USERDATA_ROOT:-/mnt/plumos-user}"
 RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 EXPECTED_VENDOR_FILE="${PLUMOS_VENDOR_ID_FILE:-/etc/plumos-v90s-vendor-id}"
 LOG_FILE="${PLUMOS_BOOTSTRAP_LOG:-${RUNTIME_ROOT}/app-layer-bootstrap.log}"
@@ -41,8 +42,33 @@ report_error() {
 }
 
 is_mounted() {
-  awk -v target="$PLUMOS_ROOT" '$2 == target { found = 1 } END { exit !found }' \
+  target="${1:-$PLUMOS_ROOT}"
+  awk -v target="$target" '$2 == target { found = 1 } END { exit !found }' \
     /proc/mounts 2>/dev/null
+}
+
+bind_userdata_dir() {
+  source_dir="$1"
+  target_dir="$2"
+
+  [ -d "$source_dir" ] || return 1
+  mkdir -p "$target_dir" 2>/dev/null || return 1
+  is_mounted "$target_dir" && return 0
+  mount --bind "$source_dir" "$target_dir" >> "$LOG_FILE" 2>&1 || return 1
+  log "userdata bind source=$source_dir target=$target_dir"
+}
+
+prepare_userdata_bindings() {
+  is_mounted "$USERDATA_ROOT" || return 0
+  [ -f "$USERDATA_ROOT/.plumos-ready" ] || {
+    report_error "$USERDATA_ROOT is mounted without .plumos-ready"
+    return 1
+  }
+
+  bind_userdata_dir "$USERDATA_ROOT/roms" "$PLUMOS_ROOT/roms" || return 1
+  bind_userdata_dir "$USERDATA_ROOT/bios" "$PLUMOS_ROOT/bios" || return 1
+  bind_userdata_dir "$USERDATA_ROOT/Images" "$PLUMOS_ROOT/Images" || return 1
+  bind_userdata_dir "$USERDATA_ROOT/Themes" "$PLUMOS_ROOT/themes-user" || return 1
 }
 
 checksum_file() {
@@ -58,6 +84,10 @@ validate_app_layer() {
   rm -f "$ERROR_FILE" 2>/dev/null || true
 
   is_mounted || { report_error "${PLUMOS_ROOT} is not mounted"; return 1; }
+  prepare_userdata_bindings || {
+    report_error "portable userdata bind setup failed"
+    return 1
+  }
   [ -r "$PLUMOS_ROOT/manifest.json" ] || { report_error "manifest.json is missing"; return 1; }
   [ -r "$PLUMOS_ROOT/checksums.sha256" ] || { report_error "checksums.sha256 is missing"; return 1; }
   [ -r "$PLUMOS_ROOT/COMPAT_VENDOR" ] || { report_error "COMPAT_VENDOR is missing"; return 1; }

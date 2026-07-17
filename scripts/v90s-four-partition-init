@@ -1,0 +1,330 @@
+#!/bin/ash
+set -u
+
+BB=/bin/busybox
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+LOG=/run/plumos-first-boot.log
+P1_MOUNT=/mnt/plumos-boot
+P3_MOUNT=/mnt/plumos
+P4_MOUNT=/mnt/plumos-user
+SYSTEM_ROOT=/new_root
+P3_TARGET_MIB=8192
+P3_TARGET_SECTORS=$((P3_TARGET_MIB * 2048))
+P1_EXPECTED_START=41984
+P1_EXPECTED_SECTORS=$((1024 * 2048))
+P2_EXPECTED_START=$((P1_EXPECTED_START + P1_EXPECTED_SECTORS))
+P2_EXPECTED_SECTORS=$((64 * 2048))
+P3_EXPECTED_START=$((P2_EXPECTED_START + P2_EXPECTED_SECTORS))
+P3_SEED_SECTORS=$((1536 * 2048))
+MINIMUM_DISK_SECTORS=31250000
+TEST_BOOT_PARTITION="${PLUMOS_INITRAMFS_TEST_BOOT_PARTITION:-}"
+PROVISION_ONLY="${PLUMOS_INITRAMFS_PROVISION_ONLY:-0}"
+
+log() {
+    printf '%s\n' "$*" | tee -a "$LOG"
+}
+
+recovery() {
+    log "recovery: $*"
+    if [ -d "$P3_MOUNT" ] && grep -q " $P3_MOUNT " /proc/mounts 2>/dev/null; then
+        mkdir -p "$P3_MOUNT/provision"
+        cp "$LOG" "$P3_MOUNT/provision/first-boot.log" 2>/dev/null || true
+        sync
+    fi
+    if [ -n "$TEST_BOOT_PARTITION" ]; then
+        exit 1
+    fi
+    log "recovery: dropping to initramfs shell"
+    exec /bin/ash
+}
+
+wait_for_block() {
+    dev="$1"
+    attempt=0
+    while [ "$attempt" -lt 50 ]; do
+        [ -b "$dev" ] && return 0
+        sleep 0.1
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
+blkid_value() {
+    key="$1"
+    dev="$2"
+    blkid "$dev" 2>/dev/null |
+        sed -n "s/.* ${key}=\"\([^\"]*\)\".*/\1/p" |
+        head -n 1
+}
+
+find_boot_partition() {
+    for candidate in /dev/mmcblk*p2; do
+        [ -b "$candidate" ] || continue
+        candidate_disk="$(parent_disk "$candidate" || true)"
+        [ -n "$candidate_disk" ] || continue
+        p1_label="$(blkid_value LABEL "${candidate_disk}p1")"
+        p3_label="$(blkid_value LABEL "${candidate_disk}p3")"
+        if [ "$p1_label" = PLUMBOOT ] && [ "$p3_label" = PLUMOS_SYS ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+parent_disk() {
+    part="${1#/dev/}"
+    case "$part" in
+        mmcblk*p[0-9]*) printf '/dev/%s\n' "${part%p[0-9]*}" ;;
+        loop*p[0-9]*) printf '/dev/%s\n' "${part%p[0-9]*}" ;;
+        *) return 1 ;;
+    esac
+}
+
+partition_number() {
+    part="${1#/dev/}"
+    printf '%s\n' "${part##*p}"
+}
+
+fsck_ext4() {
+    dev="$1"
+    set +e
+    e2fsck -pf "$dev" >> "$LOG" 2>&1
+    rc=$?
+    set -e
+    case "$rc" in
+        0|1) return 0 ;;
+        *) recovery "e2fsck failed dev=$dev rc=$rc" ;;
+    esac
+}
+
+fsck_fat() {
+    dev="$1"
+    set +e
+    fsck.fat -a "$dev" >> "$LOG" 2>&1
+    rc=$?
+    set -e
+    case "$rc" in
+        0|1) return 0 ;;
+        *) recovery "fsck.fat failed dev=$dev rc=$rc" ;;
+    esac
+}
+
+persist_progress() {
+    marker="$1"
+    mkdir -p "$P3_MOUNT/provision"
+    touch "$P3_MOUNT/provision/$marker"
+    cp "$LOG" "$P3_MOUNT/provision/first-boot.log" 2>/dev/null || true
+    sync
+}
+
+mount_runtime() {
+    mkdir -p "$P1_MOUNT" "$P3_MOUNT" "$P4_MOUNT" "$SYSTEM_ROOT"
+    grep -q " $P1_MOUNT " /proc/mounts 2>/dev/null ||
+        mount -t vfat -o ro,utf8,shortname=mixed "$P1" "$P1_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot mount PLUMBOOT read-only"
+    grep -q " $P3_MOUNT " /proc/mounts 2>/dev/null ||
+        mount -t ext4 -o rw,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot mount PLUMOS_SYS"
+    grep -q " $P4_MOUNT " /proc/mounts 2>/dev/null ||
+        mount -t vfat -o rw,utf8,shortname=mixed,fmask=0022,dmask=0022,errors=remount-ro \
+            "$P4" "$P4_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot mount PLUMOS"
+}
+
+mkdir -p /dev /proc /sys /run /tmp /mnt "$SYSTEM_ROOT"
+mount -t proc proc /proc 2>/dev/null || true
+mount -t sysfs sysfs /sys 2>/dev/null || true
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+mkdir -p /dev/pts /dev/shm
+mount -t devpts devpts /dev/pts 2>/dev/null || true
+mount -t tmpfs tmpfs /run 2>/dev/null || true
+mount -t tmpfs tmpfs /tmp 2>/dev/null || true
+if [ -z "$TEST_BOOT_PARTITION" ]; then
+    exec </dev/console >/dev/console 2>&1
+fi
+
+set -e
+log "plumOS V90S four-partition initramfs entered"
+
+if [ -n "$TEST_BOOT_PARTITION" ]; then
+    P2="$TEST_BOOT_PARTITION"
+    wait_for_block "$P2" || recovery "test boot partition is unavailable: $P2"
+else
+    P2="$(find_boot_partition || true)"
+fi
+[ -n "$P2" ] || recovery "GPT partition named boot was not found"
+DISK="$(parent_disk "$P2" || true)"
+[ -n "$DISK" ] || recovery "cannot resolve parent disk for $P2"
+P2_NUMBER="$(partition_number "$P2")"
+[ "$P2_NUMBER" = 2 ] || recovery "boot partition is p$P2_NUMBER, expected p2"
+
+if [ -n "$TEST_BOOT_PARTITION" ]; then
+    P1="${DISK}p1"
+    P3="${DISK}p3"
+else
+    P1="${DISK}p1"
+    P3="${DISK}p3"
+fi
+[ -n "$P1" ] || recovery "GPT partition named boot-resource was not found"
+[ -n "$P3" ] || recovery "GPT partition named runtime was not found"
+[ "$(partition_number "$P1")" = 1 ] || recovery "PLUMBOOT is not p1"
+[ "$(partition_number "$P3")" = 3 ] || recovery "PLUMOS_SYS is not p3"
+p1_label="$(blkid_value LABEL "$P1")"
+p3_label="$(blkid_value LABEL "$P3")"
+[ "$p1_label" = PLUMBOOT ] || recovery "p1 filesystem label is not PLUMBOOT: $p1_label"
+[ "$p3_label" = PLUMOS_SYS ] || recovery "p3 filesystem label is not PLUMOS_SYS: $p3_label"
+
+disk_name="${DISK#/dev/}"
+disk_sectors="$(cat "/sys/class/block/$disk_name/size" 2>/dev/null || echo 0)"
+case "$disk_sectors" in ''|*[!0-9]*) recovery "invalid disk size" ;; esac
+[ "$disk_sectors" -ge "$MINIMUM_DISK_SECTORS" ] ||
+    recovery "SD card is smaller than supported minimum sectors=$disk_sectors"
+
+p1_name="${P1#/dev/}"
+p2_name="${P2#/dev/}"
+p3_name="${P3#/dev/}"
+p1_start="$(cat "/sys/class/block/$p1_name/start" 2>/dev/null || echo 0)"
+p1_sectors="$(cat "/sys/class/block/$p1_name/size" 2>/dev/null || echo 0)"
+p2_start="$(cat "/sys/class/block/$p2_name/start" 2>/dev/null || echo 0)"
+p2_sectors="$(cat "/sys/class/block/$p2_name/size" 2>/dev/null || echo 0)"
+p3_start="$(cat "/sys/class/block/$p3_name/start" 2>/dev/null || echo 0)"
+p3_sectors="$(cat "/sys/class/block/$p3_name/size" 2>/dev/null || echo 0)"
+case "$p1_start:$p1_sectors:$p2_start:$p2_sectors:$p3_start:$p3_sectors" in
+    *[!0-9:]*) recovery "invalid seed partition geometry" ;;
+esac
+[ "$p1_start" -eq "$P1_EXPECTED_START" ] ||
+    recovery "unexpected p1 start=$p1_start expected=$P1_EXPECTED_START"
+[ "$p1_sectors" -eq "$P1_EXPECTED_SECTORS" ] ||
+    recovery "unexpected p1 sectors=$p1_sectors expected=$P1_EXPECTED_SECTORS"
+[ "$p2_start" -eq "$P2_EXPECTED_START" ] ||
+    recovery "unexpected p2 start=$p2_start expected=$P2_EXPECTED_START"
+[ "$p2_sectors" -eq "$P2_EXPECTED_SECTORS" ] ||
+    recovery "unexpected p2 sectors=$p2_sectors expected=$P2_EXPECTED_SECTORS"
+[ "$p3_start" -eq "$P3_EXPECTED_START" ] ||
+    recovery "unexpected p3 start=$p3_start expected=$P3_EXPECTED_START"
+case "$p3_sectors" in
+    "$P3_SEED_SECTORS"|"$P3_TARGET_SECTORS") ;;
+    *) recovery "unexpected p3 sectors=$p3_sectors" ;;
+esac
+p3_target_end=$((p3_start + P3_TARGET_SECTORS - 1))
+[ "$p3_target_end" -lt "$disk_sectors" ] || recovery "8192 MiB p3 does not fit"
+
+log "geometry disk=$DISK sectors=$disk_sectors p3_start=$p3_start p3_sectors=$p3_sectors"
+
+if [ -n "$TEST_BOOT_PARTITION" ] && [ -b "${DISK}p4" ]; then
+    P4="${DISK}p4"
+elif [ -b "${DISK}p4" ]; then
+    P4="${DISK}p4"
+else
+    P4=""
+fi
+if [ "$p3_sectors" -lt "$P3_TARGET_SECTORS" ]; then
+    [ -z "$P4" ] || recovery "p4 exists while p3 is undersized"
+    log "provision: relocating backup GPT"
+    parted -s -f "$DISK" unit s print >> "$LOG" 2>&1 || recovery "GPT relocation failed"
+    log "provision: growing p3 partition to ${P3_TARGET_MIB} MiB"
+    parted -s "$DISK" unit s resizepart 3 "${p3_target_end}s" >> "$LOG" 2>&1 ||
+        recovery "p3 partition growth failed"
+    partprobe "$DISK" >> "$LOG" 2>&1 || true
+    wait_for_block "$P3" || recovery "p3 did not reappear"
+    attempt=0
+    while [ "$attempt" -lt 50 ]; do
+        p3_sectors="$(cat "/sys/class/block/$p3_name/size" 2>/dev/null || echo 0)"
+        [ "$p3_sectors" -ge "$P3_TARGET_SECTORS" ] && break
+        sleep 0.1
+        attempt=$((attempt + 1))
+    done
+    [ "$p3_sectors" -eq "$P3_TARGET_SECTORS" ] ||
+        recovery "kernel did not accept exact p3 geometry sectors=$p3_sectors"
+fi
+
+fsck_ext4 "$P3"
+log "provision: resizing p3 ext4"
+resize2fs "$P3" >> "$LOG" 2>&1 || recovery "resize2fs failed"
+
+if [ -n "$TEST_BOOT_PARTITION" ] && [ -b "${DISK}p4" ]; then
+    P4="${DISK}p4"
+elif [ -b "${DISK}p4" ]; then
+    P4="${DISK}p4"
+else
+    P4=""
+fi
+if [ -z "$P4" ]; then
+    p4_start=$((p3_target_end + 1))
+    log "provision: creating p4 start=$p4_start end=100%"
+    parted -s -a optimal "$DISK" unit s mkpart userdata fat32 "${p4_start}s" 100% \
+        >> "$LOG" 2>&1 || recovery "p4 creation failed"
+    partprobe "$DISK" >> "$LOG" 2>&1 || true
+    P4="${DISK}p4"
+    wait_for_block "$P4" || recovery "p4 did not appear"
+fi
+
+[ "$(partition_number "$P4")" = 4 ] || recovery "userdata is not p4"
+p4_type="$(blkid_value TYPE "$P4")"
+if [ -z "$p4_type" ]; then
+    log "provision: formatting new p4 as FAT32"
+    mkfs.fat -F 32 -n PLUMOS "$P4" >> "$LOG" 2>&1 || recovery "p4 format failed"
+elif [ "$p4_type" != vfat ]; then
+    recovery "existing p4 has unexpected filesystem: $p4_type"
+fi
+p4_label="$(blkid_value LABEL "$P4")"
+[ "$p4_label" = PLUMOS ] || recovery "p4 filesystem label is not PLUMOS: $p4_label"
+fsck_fat "$P4"
+
+mount_runtime
+persist_progress gpt-expanded
+persist_progress ext4-resized
+persist_progress p4-formatted
+
+touch "$P4_MOUNT/.plumos-provisioning"
+for dir in roms bios Images Themes Screenshots Music Manuals Cheats Patches Shaders updates imports exports; do
+    mkdir -p "$P4_MOUNT/$dir"
+done
+sync
+rm -f "$P4_MOUNT/.plumos-provisioning"
+touch "$P4_MOUNT/.plumos-ready"
+persist_progress userdata-seeded
+
+if [ "$PROVISION_ONLY" = 1 ]; then
+    log "provision: test-only stop before system handoff"
+    sync
+    umount "$P4_MOUNT" 2>/dev/null || true
+    umount "$P3_MOUNT" 2>/dev/null || true
+    umount "$P1_MOUNT" 2>/dev/null || true
+    exit 0
+fi
+
+SYSTEM_IMAGE="$P1_MOUNT/System/system-a.squashfs"
+SYSTEM_HASH="$P1_MOUNT/System/system-a.sha256"
+[ -f "$SYSTEM_IMAGE" ] || recovery "system-a.squashfs is missing"
+[ -f "$SYSTEM_HASH" ] || recovery "system-a.sha256 is missing"
+(cd "$P1_MOUNT/System" && sha256sum -c system-a.sha256) >> "$LOG" 2>&1 ||
+    recovery "system-a hash verification failed"
+
+[ -b /dev/loop0 ] || mknod /dev/loop0 b 7 0
+losetup -d /dev/loop0 2>/dev/null || true
+losetup /dev/loop0 "$SYSTEM_IMAGE" >> "$LOG" 2>&1 || recovery "system loop setup failed"
+mount -t squashfs -o ro /dev/loop0 "$SYSTEM_ROOT" >> "$LOG" 2>&1 ||
+    recovery "system SquashFS mount failed"
+
+mkdir -p "$SYSTEM_ROOT/mnt/plumos-boot" "$SYSTEM_ROOT/mnt/plumos" \
+    "$SYSTEM_ROOT/mnt/plumos-user" "$SYSTEM_ROOT/proc" "$SYSTEM_ROOT/sys" \
+    "$SYSTEM_ROOT/dev" "$SYSTEM_ROOT/run" "$SYSTEM_ROOT/tmp"
+mount --move "$P1_MOUNT" "$SYSTEM_ROOT/mnt/plumos-boot"
+mount --move "$P3_MOUNT" "$SYSTEM_ROOT/mnt/plumos"
+mount --move "$P4_MOUNT" "$SYSTEM_ROOT/mnt/plumos-user"
+mount --move /proc "$SYSTEM_ROOT/proc"
+mount --move /sys "$SYSTEM_ROOT/sys"
+mount --move /dev "$SYSTEM_ROOT/dev"
+mount --move /run "$SYSTEM_ROOT/run"
+mount --move /tmp "$SYSTEM_ROOT/tmp"
+
+touch "$SYSTEM_ROOT/mnt/plumos/provision/complete"
+cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
+    "$SYSTEM_ROOT/mnt/plumos/provision/first-boot.log" 2>/dev/null || true
+sync
+exec switch_root "$SYSTEM_ROOT" /sbin/init
+
+recovery "switch_root returned"

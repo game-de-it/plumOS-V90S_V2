@@ -16,6 +16,10 @@ Commands:
   shell            Open a shell in the V90S toolchain image.
   run CMD...       Run an arbitrary command in the V90S toolchain image.
   vendor-runtime   Prepare artifacts/vendor/v90s-stockos-r1 into output/vendor/v90s-stockos-r1.
+  boot-package     Build the fixed-env four-partition V90S boot package.
+  boot-image       Build the p2 Android boot image with provisioning initramfs.
+  preflight        Verify boot, SD2, frontend, checksums, and seed capacity.
+  verify-image     Verify a completed four-partition seed image.
   stockos-runtime  Deprecated alias for vendor-runtime.
   sdl2-powervr     Build the patched SDL2 PowerVR runtime.
   sdl2-mali        Deprecated alias for sdl2-powervr.
@@ -33,8 +37,8 @@ Commands:
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
   app-layer        Assemble the FAT32 plumOS app/update/data layer.
-  sd-image         Assemble a StockOS/Batocera-compatible V90S SD-card image.
-  stockos-image    Transitional alias for sd-image.
+  sd-image         Assemble the compact four-partition provisioning seed image.
+  stockos-image    Assemble the legacy StockOS/Batocera-compatible image.
   knulli-image     Assemble a legacy KNULLI-layout V90S SD-card image.
   picoarch         Build the AArch64 V90S PicoArch runtime.
   standalone [ID...] Build all standalone emulators, only selected IDs, or launcher-only.
@@ -174,6 +178,41 @@ case "$cmd" in
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/scripts/prepare-stockos-runtime.sh "$@"
         ;;
+    boot-package)
+        need_docker
+        boot_tools_image="${PLUMOS_V90S_BOOT_TOOLS_IMAGE:-plumos-v90s-boot-package-tools:dev}"
+        boot_tools_platform="${PLUMOS_V90S_BOOT_TOOLS_PLATFORM:-linux/amd64}"
+        if ! docker image inspect "$boot_tools_image" >/dev/null 2>&1; then
+            docker build \
+                --platform "$boot_tools_platform" \
+                -t "$boot_tools_image" \
+                -f "$ROOT_DIR/docker/v90s-boot-package-tools/Dockerfile" \
+                "$ROOT_DIR"
+        fi
+        docker run --rm \
+            --platform "$boot_tools_platform" \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "$ROOT_DIR:/workspace" \
+            -w /workspace \
+            "$boot_tools_image" \
+            /workspace/scripts/build-v90s-fixed-boot-package.sh "$@"
+        ;;
+    boot-image)
+        ensure_image
+        docker run "${docker_run_root[@]}" \
+            /workspace/scripts/build-v90s-provisioning-boot-image.sh "$@"
+        ;;
+    preflight)
+        ensure_image
+        docker run "${docker_run_root[@]}" \
+            /workspace/scripts/preflight-v90s-four-partition-image.sh "$@"
+        ;;
+    verify-image)
+        ensure_image
+        docker run "${docker_run_root[@]}" \
+            /workspace/scripts/verify-v90s-four-partition-image.sh "$@"
+        ;;
     stockos-runtime)
         echo "warning: stockos-runtime is deprecated; use vendor-runtime" >&2
         ensure_image
@@ -251,10 +290,12 @@ case "$cmd" in
         ;;
     sd-image)
         ensure_image
-        docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-stockos-image.sh "$@"
+        docker run "${docker_run_root[@]}" \
+            /workspace/scripts/preflight-v90s-four-partition-image.sh
+        docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-four-partition-image.sh "$@"
         ;;
     stockos-image|stockos-sd-image|image-assemble)
-        echo "warning: stockos-image is a transitional alias; use sd-image" >&2
+        echo "warning: stockos-image uses the legacy seven-partition development layout" >&2
         ensure_image
         docker run "${docker_run_root[@]}" /workspace/scripts/assemble-v90s-stockos-image.sh "$@"
         ;;
