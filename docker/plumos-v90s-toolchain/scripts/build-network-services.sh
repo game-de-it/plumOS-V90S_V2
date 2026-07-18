@@ -203,6 +203,7 @@ assemble_base() {
   chmod 0755 "${BIN_DIR}/plumos-time-sync"
   chmod 0755 "${BIN_DIR}/plumos-usb-disk-mode"
   chmod 0755 "${BIN_DIR}/plumos-adbd"
+  chmod 0755 "${BIN_DIR}/plumos-ssh-password"
   chmod 0755 "${PLUMOS_DIR}/ssh/start-ssh.sh" "${PLUMOS_DIR}/ssh/stop-ssh.sh"
   : > "$MANIFEST"
   {

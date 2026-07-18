@@ -14,6 +14,7 @@ SSHD_BIN="${PLUMOS_SSHD_BIN:-/usr/sbin/sshd}"
 PID_FILE="${RUN_DIR}/sshd.pid"
 LOG_FILE="${LOG_DIR}/sshd.log"
 SSHD_CONFIG="${ETC_DIR}/sshd_config"
+PASSWORD_CONTROL="${PLUMOS_SSH_PASSWORD_CONTROL:-$PLUMOS_ROOT/bin/plumos-ssh-password}"
 ENV_PATH="${PLUMOS_SSH_PATH:-${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
 
 PATH="$ENV_PATH"
@@ -135,6 +136,12 @@ host_key_args() {
 }
 
 install_login_environment
+if [ -x "$PASSWORD_CONTROL" ]; then
+  if ! "$PASSWORD_CONTROL" apply >> "$LOG_FILE" 2>&1; then
+    log "persistent SSH password setup failed"
+    exit 1
+  fi
+fi
 install_sshd_config
 
 if [ -s "$PID_FILE" ]; then

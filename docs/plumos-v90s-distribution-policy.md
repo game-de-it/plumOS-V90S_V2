@@ -920,6 +920,13 @@ Secrets and private content must not be baked into normal release artifacts:
 - SSH keys and root passwords are development-profile inputs only
 - commercial ROMs are development/test inputs only and stay under `artifacts/`
 
+A password explicitly configured on a running device is device-local state,
+not a release credential. `plumos-ssh-password` stores only its generated
+shadow entry under `/mnt/plumos/config/ssh/` on the p3 ext4 system partition.
+The app-layer bootstrap and SSH launcher bind that file over the read-only
+SquashFS `/etc/shadow` before password authentication is used. The generated
+file must not be copied into app-layer releases, seed images, or git.
+
 Current implementation gaps to close:
 
 - change default vendor-runtime paths from the date-based StockOS extraction
