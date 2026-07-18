@@ -501,6 +501,15 @@ executor during power loss-sensitive operations. If the rootfs helper is absent
 on an old development image, that should be treated as a compatibility gap, not
 as the release design.
 
+The active p1 FAT must not be remounted read-write and updated while a running
+system uses one of its SquashFS files as the backing file for the root loop
+device. Sync alone does not make replacement of the active payload and its
+separate hash file transaction-safe on FAT. System-image maintenance must use
+an offline host update with a clean unmount, or a future tested inactive-slot
+transaction that verifies payload and metadata before changing the active-slot
+record. Direct live replacement of active p1 files is not a supported update
+path.
+
 The FAT32 app layer should include release metadata:
 
 ```text

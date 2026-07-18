@@ -764,6 +764,11 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Generate and verify
     `plumos-v90s-four-partition-20260718-9.img` with the normal-boot and safe
     power-action fixes.
+  - [x] Diagnose the first `-9` live-update boot failure. Updating the active
+    p1 FAT while its system SquashFS was loop-mounted corrupted both SHA-256
+    directory entries; the SquashFS payloads themselves remained intact.
+    Repair p1 offline, restore both hash files, and prohibit this live-update
+    procedure.
   - [ ] Confirm the updated p2/SquashFS reaches FE, then complete one FE menu
     shutdown and cold-power-on cycle without setup frames, journal recovery,
     or a FAT dirty bit.

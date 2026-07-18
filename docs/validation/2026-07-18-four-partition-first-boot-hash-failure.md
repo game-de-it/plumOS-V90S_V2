@@ -250,6 +250,35 @@ verification=PASS
 ```
 
 Both corrected SquashFS slots and p2 were also transferred to the existing
-physical card and verified byte-for-byte before reboot. Final confirmation of
-the updated normal-boot screen, FE startup, and a complete menu-shutdown/cold-
-boot cycle remains pending live display or transport access.
+physical card before reboot. The SquashFS payload and p2 hashes matched their
+host artifacts, but the separate p1 hash files were not read back after the
+active-file replacement. That omission caused the next failure described
+below. Final confirmation of the updated normal-boot screen, FE startup, and a
+complete menu-shutdown/cold-boot cycle remains pending.
+
+## Active p1 live-update failure
+
+The next boot displayed `STARTUP FAILED`. The new normal-boot path itself
+worked: `last-boot.log` reported complete p3 and userdata provisioning, with no
+ext4 journal recovery and no FAT dirty bit. Recovery was triggered by the
+system integrity check:
+
+```text
+sha256 mismatch
+expected=5781f1247e4eb15ff729b3715a8a81b36f4574e148c7ee3af703c7c429cac3cb
+actual=6772b9a5eb77f1148436bfda713c153c2ca5fd1a8c13cc27579a85c530cdc8e4
+recovery: system-a hash verification failed
+```
+
+The live deployment had remounted p1 read-write while the running root used
+`system-a.squashfs` through loop0. Both new SquashFS payloads were intact and
+matched `6772b9...c8e4`, but macOS FAT repair found both `.sha256` entries
+starting at free clusters and truncated them. This was a deployment-procedure
+defect, not candidate image corruption.
+
+`diskutil repairVolume` repaired p1, both 84-byte hash files were recreated,
+and the A/B payload and metadata hashes were read back successfully. A second
+p1 repair and the p4 repair both completed with exit code 0 and no remaining
+filesystem modification. The complete SD device was then cleanly unmounted.
+Future p1 updates must be offline or use a tested inactive-slot transaction;
+active p1 live replacement is prohibited.
