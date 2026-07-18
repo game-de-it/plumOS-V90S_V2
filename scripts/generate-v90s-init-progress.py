@@ -115,6 +115,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     stages = {
+        "boot": ("BOOTING PLUMOS", 5, False),
         "prepare": ("PREPARING STORAGE", 10, False),
         "resize": ("RESIZING SYSTEM", 30, False),
         "userdata": ("CREATING USER STORAGE", 50, False),

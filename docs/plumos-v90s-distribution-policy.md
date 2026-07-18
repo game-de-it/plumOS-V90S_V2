@@ -478,11 +478,15 @@ Before the final sysrq reboot or poweroff, that rootfs-owned helper should:
 - stop SD2 bind mounts under `/mnt/plumos/roms` and `/mnt/plumos/bios`
 - stop app-layer writers such as the frontend, FTP, Samba, RetroArch, and
   app-layer launch wrappers
-- avoid killing SSH/dropbear diagnostic sessions by process name
+- stop remaining processes only when their executable, working directory, or
+  open file actually holds p3 or p4; an unrelated SSH diagnostic session must
+  not be selected merely by process name
 - write final transient logs under `/run`, not into the FAT32 app layer
 - sync filesystems
-- unmount `/mnt/plumos` completely when possible
-- unmount `/boot` too when it is a writable FAT boot-resource mount
+- unmount p4 aliases such as `/boot`, `/mnt/plumos/Images`, and user themes
+  before `/mnt/plumos-user`, then unmount p3 `/mnt/plumos`
+- ask SysRq to sync and remount remaining filesystems read-only after explicit
+  unmount attempts
 - only then trigger sysrq reboot or poweroff
 
 The FAT32 app-layer helper should therefore be a thin compatibility wrapper

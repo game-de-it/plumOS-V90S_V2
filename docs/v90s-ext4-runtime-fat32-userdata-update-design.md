@@ -270,6 +270,14 @@ observed geometry and manifests. It must never blindly format an existing p4
 that contains an unknown layout or user files. An ambiguous or failed step
 shows the initramfs recovery screen and must not partially launch the frontend.
 
+After geometry, filesystem state, `/mnt/plumos/provision/complete`, and
+`/.plumos-ready` agree that provisioning is complete, the normal boot path must
+not rerun `resize2fs`, rewrite provisioning markers, or reseed the p4 directory
+tree. It may still perform bounded filesystem checks and verify the selected
+system SquashFS. Normal boot uses a normal boot screen and `last-boot.log`; the
+original `first-boot.log` is immutable diagnostic evidence and must not be
+replaced on later boots.
+
 ## Mount and Path Contract
 
 Proposed mounts:

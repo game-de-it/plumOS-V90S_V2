@@ -193,3 +193,63 @@ their policy. The kernel log contained no new segfault, OOM, MMC I/O,
 filesystem, or read-only-remount error. Audible audio quality and pitch,
 FPS/scrolling, normal game exit, FE return, and persistence remain physical
 follow-up checks.
+
+## Second-boot setup and shutdown defect
+
+After the user selected Shutdown from the FE start menu and powered the V90S
+on again, the storage setup screen appeared a second time. The partition layout
+and durable markers were still correct, so provisioning had not actually
+recreated p3 or p4. The old initramfs nevertheless executed these operations on
+every boot:
+
+```text
+provision: resizing p3 ext4
+resize2fs: Nothing to do
+fsck.fat
+userdata directory seeding
+PREPARING STORAGE / VERIFYING SYSTEM progress frames
+```
+
+It also replaced `first-boot.log` with the latest boot log. The completion
+marker existed but was never consulted to distinguish provisioning from normal
+boot.
+
+The same boot log showed that this was not a forced-power-loss event. The FE
+power-action log proved a normal menu shutdown request, but the previous
+SquashFS helper stopped only SD2 and selected app-layer processes. It did not
+unmount p4 at `/mnt/plumos-user`, its `/boot`, `Images`, and theme mounts, or
+processes such as hardware keys and ADB that retained executables on p3. It then
+issued immediate SysRq poweroff. The next boot consequently reported:
+
+```text
+PLUMOS_SYS: recovering journal
+Dirty bit is set. Fs was not properly unmounted
+```
+
+The initramfs now validates geometry on every boot but uses the completed
+provisioning state to skip `resize2fs`, progress-marker writes, and userdata
+seeding. Normal boots display `BOOTING PLUMOS`, write `last-boot.log`, and
+preserve the original `first-boot.log`.
+
+The SquashFS power helper now stops every process holding p3/p4 paths, unmounts
+SD2 and p4 child mounts before p4 and p3, and sends SysRq sync plus read-only
+remount before the final reboot or poweroff action. A live reboot with this
+helper produced a clean next boot: ext4 did not recover its journal and FAT32
+did not report or clear a dirty bit.
+
+The corrected system rootfs and p2 were built and passed the extended
+preflight. The generated full candidate also passed structural verification:
+
+```text
+image=output/images/plumos-v90s-four-partition-20260718-9.img
+sha256=22bcfdc7229c4dbfe6e4038bd9f4145cfdfe9def2911422f3573681b9384adb8
+system_squashfs_sha256=6772b9a5eb77f1148436bfda713c153c2ca5fd1a8c13cc27579a85c530cdc8e4
+p2_boot_image_sha256=020cca7b42a03a56205f3b6fa96b36f1c58caf1b623e9b84bdee4fb395a131a9
+preflight=PASS
+verification=PASS
+```
+
+Both corrected SquashFS slots and p2 were also transferred to the existing
+physical card and verified byte-for-byte before reboot. Final confirmation of
+the updated normal-boot screen, FE startup, and a complete menu-shutdown/cold-
+boot cycle remains pending live display or transport access.

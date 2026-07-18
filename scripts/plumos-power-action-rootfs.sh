@@ -3,6 +3,8 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+PLUMOS_USER_ROOT="${PLUMOS_USER_ROOT:-/mnt/plumos-user}"
+PLUMOS_BOOT_ROOT="${PLUMOS_BOOT_ROOT:-/mnt/plumos-boot}"
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
 cd / 2>/dev/null || true
@@ -37,8 +39,8 @@ Options:
   --no-hold-resume       Accepted for compatibility; no-op.
   --dry-run              Log actions without rebooting, sleeping, powering off, or unmounting.
   --wait-sec N           Small delay after sync before final action. Default: 1.
-  --unmount              Unmount /mnt/plumos before final sysrq. Default.
-  --no-unmount           Skip final /mnt/plumos unmount for diagnostics.
+  --unmount              Unmount all persistent plumOS filesystems before final sysrq. Default.
+  --no-unmount           Skip final persistent-storage unmount for diagnostics.
   --quiesce              Compatibility alias for --unmount.
   --no-quiesce           Compatibility alias for --no-unmount.
   -h, --help             Show this help.
@@ -272,6 +274,60 @@ log_plumos_blockers() {
   [ "$count" -gt 0 ] || log "quiesce: no /mnt/plumos blockers found"
 }
 
+pid_uses_persistent_storage() {
+  pid="$1"
+  for link in "/proc/$pid/cwd" "/proc/$pid/root" "/proc/$pid/exe" "/proc/$pid"/fd/*; do
+    target="$(readlink "$link" 2>/dev/null || true)"
+    case "$target" in
+      "$PLUMOS_ROOT"|"$PLUMOS_ROOT"/*|\
+      "$PLUMOS_USER_ROOT"|"$PLUMOS_USER_ROOT"/*|\
+      "$PLUMOS_BOOT_ROOT"|"$PLUMOS_BOOT_ROOT"/*|\
+      /boot|/boot/*|/run/plumos/sd2|/run/plumos/sd2/*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+stop_persistent_storage_users() {
+  pids=""
+  for proc in /proc/[0-9]*; do
+    pid="${proc##*/}"
+    [ "$pid" != 1 ] || continue
+    [ "$pid" != "$$" ] || continue
+    [ -d "$proc" ] || continue
+    if pid_uses_persistent_storage "$pid"; then
+      pids="${pids}${pids:+ }$pid"
+    fi
+  done
+
+  if [ -z "$pids" ]; then
+    log "quiesce: no persistent-storage users found"
+    return 0
+  fi
+
+  log "quiesce: persistent TERM pids=$pids"
+  for pid in $pids; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 1 2>/dev/null || true
+
+  still_alive=""
+  for pid in $pids; do
+    if kill -0 "$pid" 2>/dev/null; then
+      still_alive="${still_alive}${still_alive:+ }$pid"
+    fi
+  done
+  if [ -n "$still_alive" ]; then
+    log "quiesce: persistent KILL pids=$still_alive"
+    for pid in $still_alive; do
+      kill -KILL "$pid" 2>/dev/null || true
+    done
+    sleep 1 2>/dev/null || true
+  fi
+}
+
 unmount_if_mounted() {
   target="$1"
   if ! is_mounted_path "$target"; then
@@ -296,8 +352,12 @@ stop_sd2_mounts() {
 
 mirror_log_to_app_layer() {
   [ "$MIRROR_LOG" = "1" ] || return 0
-  [ -d "$PLUMOS_ROOT/Logs" ] || return 0
-  cp "$LOG_FILE" "$PLUMOS_ROOT/Logs/power-action-rootfs.log" 2>/dev/null || true
+  if [ -d "$PLUMOS_ROOT/Logs" ]; then
+    cp "$LOG_FILE" "$PLUMOS_ROOT/Logs/power-action-rootfs.log" 2>/dev/null || true
+  fi
+  if [ -d "$PLUMOS_USER_ROOT/Logs" ]; then
+    cp "$LOG_FILE" "$PLUMOS_USER_ROOT/Logs/power-action-rootfs.log" 2>/dev/null || true
+  fi
 }
 
 remount_app_layer_ro() {
@@ -311,7 +371,7 @@ remount_app_layer_ro() {
   return 1
 }
 
-unmount_app_layer_for_final_action() {
+unmount_persistent_storage_for_final_action() {
   [ "$FINAL_UNMOUNT" = "1" ] || { log "quiesce: unmount disabled"; return 0; }
   [ "$DRY_RUN" -eq 0 ] || { log "quiesce: dry-run"; return 0; }
 
@@ -321,34 +381,37 @@ unmount_app_layer_for_final_action() {
   safe_sync
   mirror_log_to_app_layer
   sync 2>/dev/null || true
-
-  if unmount_if_mounted "$PLUMOS_ROOT"; then
-    return 0
-  fi
-
-  log_plumos_blockers
+  stop_persistent_storage_users
   safe_sync
-  if unmount_if_mounted "$PLUMOS_ROOT"; then
-    return 0
-  fi
 
-  remount_app_layer_ro || true
+  unmount_if_mounted "$PLUMOS_ROOT/themes-user" || true
+  unmount_if_mounted "$PLUMOS_ROOT/Images" || true
+  unmount_if_mounted "$PLUMOS_ROOT/bios" || true
+  unmount_if_mounted "$PLUMOS_ROOT/roms" || true
+  unmount_if_mounted /boot || true
+  mirror_log_to_app_layer
+  sync 2>/dev/null || true
+  unmount_if_mounted "$PLUMOS_USER_ROOT" || true
+
+  if ! unmount_if_mounted "$PLUMOS_ROOT"; then
+    log_plumos_blockers
+    safe_sync
+    unmount_if_mounted "$PLUMOS_ROOT" || remount_app_layer_ro || true
+  fi
+  unmount_if_mounted "$PLUMOS_BOOT_ROOT" || true
+  safe_sync
 }
 
-unmount_boot_fat_for_final_action() {
-  [ "$FINAL_UNMOUNT" = "1" ] || return 0
+prepare_sysrq_final_action() {
   [ "$DRY_RUN" -eq 0 ] || return 0
-
-  info="$(mount_source_for_path /boot || true)"
-  [ -n "$info" ] || return 0
-  set -- $info
-  fstype="${2:-}"
-  case "$fstype" in
-    vfat|msdos|exfat)
-      safe_sync
-      unmount_if_mounted /boot || true
-      ;;
-  esac
+  [ -w /proc/sysrq-trigger ] || return 0
+  log "sysrq: syncing filesystems"
+  echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
+  echo s >/proc/sysrq-trigger 2>/dev/null || true
+  sleep 1 2>/dev/null || true
+  log "sysrq: remounting filesystems read-only"
+  echo u >/proc/sysrq-trigger 2>/dev/null || true
+  sleep 1 2>/dev/null || true
 }
 
 set_wakealarm() {
@@ -418,8 +481,8 @@ reboot_action() {
     echo "result=dry_run_reboot"
     return 0
   fi
-  unmount_app_layer_for_final_action
-  unmount_boot_fat_for_final_action
+  unmount_persistent_storage_for_final_action
+  prepare_sysrq_final_action
   trigger_sysrq b reboot
 }
 
@@ -435,8 +498,8 @@ shutdown_action() {
     echo "result=dry_run_poweroff"
     return 0
   fi
-  unmount_app_layer_for_final_action
-  unmount_boot_fat_for_final_action
+  unmount_persistent_storage_for_final_action
+  prepare_sysrq_final_action
   trigger_sysrq o poweroff
 }
 

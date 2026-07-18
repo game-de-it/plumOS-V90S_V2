@@ -77,13 +77,17 @@ grep -Fq 'verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH"' "$tmp_dir/ramdisk/init" 
 if grep -Fq 'sha256sum -c' "$tmp_dir/ramdisk/init"; then
     fail "initramfs uses unsupported BusyBox sha256sum -c"
 fi
-grep -Fq '"$target/Logs/boot/first-boot.log"' "$tmp_dir/ramdisk/init" ||
+grep -Fq '"$target/Logs/boot/$BOOT_LOG_NAME"' "$tmp_dir/ramdisk/init" ||
     fail "initramfs does not mirror boot diagnostics to PLUMOS FAT32"
+grep -Fq 'BOOT_LOG_NAME=last-boot.log' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not preserve first-boot diagnostics on normal boots"
+grep -Fq 'normal boot: userdata provisioning is complete' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not have a completed-provisioning fast path"
 for file in tools/bin/parted tools/bin/e2fsck tools/bin/resize2fs tools/bin/mkfs.fat \
     tools/bin/fsck.fat tools/lib/ld-linux-aarch64.so.1; do
     [ -x "$tmp_dir/ramdisk/$file" ] || fail "initramfs tool missing: $file"
 done
-for file in progress/prepare.raw progress/resize.raw progress/userdata.raw \
+for file in progress/boot.raw progress/prepare.raw progress/resize.raw progress/userdata.raw \
     progress/verify.raw progress/mount.raw progress/start.raw progress/error.raw; do
     [ -f "$tmp_dir/ramdisk/$file" ] || fail "initramfs progress frame missing: $file"
 done
@@ -116,7 +120,17 @@ unsquashfs -cat "$system_squashfs" usr/sbin/plumos-app-layer-bootstrap \
     > "$tmp_dir/system-app-layer-bootstrap"
 cmp -s scripts/plumos-app-layer-bootstrap.sh "$tmp_dir/system-app-layer-bootstrap" ||
     fail "system SquashFS app-layer bootstrap differs from repository source"
-pass "system SquashFS init and app-runtime bootstrap"
+unsquashfs -cat "$system_squashfs" usr/sbin/plumos-power-action \
+    > "$tmp_dir/system-power-action"
+cmp -s scripts/plumos-power-action-rootfs.sh "$tmp_dir/system-power-action" ||
+    fail "system SquashFS power action differs from repository source"
+grep -Fq 'stop_persistent_storage_users' "$tmp_dir/system-power-action" ||
+    fail "system power action does not stop p3/p4 users"
+grep -Fq 'unmount_if_mounted "$PLUMOS_USER_ROOT"' "$tmp_dir/system-power-action" ||
+    fail "system power action does not unmount p4"
+grep -Fq 'prepare_sysrq_final_action' "$tmp_dir/system-power-action" ||
+    fail "system power action does not sync and remount filesystems read-only"
+pass "system SquashFS init, app bootstrap, and four-partition power action"
 
 python3 - "$app_runtime/manifest.json" <<'PY'
 import json

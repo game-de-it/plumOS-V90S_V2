@@ -4,7 +4,8 @@ set -u
 BB=/bin/busybox
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
-LOG=/run/plumos-first-boot.log
+LOG=/run/plumos-boot.log
+BOOT_LOG_NAME=last-boot.log
 P1_MOUNT=/mnt/plumos-boot
 P3_MOUNT=/mnt/plumos
 P4_MOUNT=/mnt/plumos-user
@@ -21,6 +22,8 @@ P3_SEED_SECTORS=$((1536 * 2048))
 MINIMUM_DISK_SECTORS=31250000
 TEST_BOOT_PARTITION="${PLUMOS_INITRAMFS_TEST_BOOT_PARTITION:-}"
 PROVISION_ONLY="${PLUMOS_INITRAMFS_PROVISION_ONLY:-0}"
+PROVISIONING=0
+P3_RESIZE_REQUIRED=0
 
 log() {
     printf '%s\n' "$*" | tee -a "$LOG"
@@ -44,13 +47,13 @@ copy_boot_log() {
     for target in "$P3_MOUNT" "$SYSTEM_ROOT/mnt/plumos"; do
         if [ -d "$target" ] && grep -q " $target " "$mounts_file" 2>/dev/null; then
             mkdir -p "$target/provision"
-            cp "$LOG" "$target/provision/first-boot.log" 2>/dev/null || true
+            cp "$LOG" "$target/provision/$BOOT_LOG_NAME" 2>/dev/null || true
         fi
     done
     for target in "$P4_MOUNT" "$SYSTEM_ROOT/mnt/plumos-user"; do
         if [ -d "$target" ] && grep -q " $target " "$mounts_file" 2>/dev/null; then
             mkdir -p "$target/Logs/boot"
-            cp "$LOG" "$target/Logs/boot/first-boot.log" 2>/dev/null || true
+            cp "$LOG" "$target/Logs/boot/$BOOT_LOG_NAME" 2>/dev/null || true
         fi
     done
 }
@@ -194,7 +197,7 @@ fi
 
 set -e
 log "plumOS V90S four-partition initramfs entered"
-show_progress prepare
+show_progress boot
 
 if [ -n "$TEST_BOOT_PARTITION" ]; then
     P2="$TEST_BOOT_PARTITION"
@@ -269,6 +272,10 @@ else
     P4=""
 fi
 if [ "$p3_sectors" -lt "$P3_TARGET_SECTORS" ]; then
+    PROVISIONING=1
+    P3_RESIZE_REQUIRED=1
+    BOOT_LOG_NAME=first-boot.log
+    show_progress prepare
     show_progress resize
     [ -z "$P4" ] || recovery "p4 exists while p3 is undersized"
     log "provision: relocating backup GPT"
@@ -290,8 +297,25 @@ if [ "$p3_sectors" -lt "$P3_TARGET_SECTORS" ]; then
 fi
 
 fsck_ext4 "$P3"
-log "provision: resizing p3 ext4"
-resize2fs "$P3" >> "$LOG" 2>&1 || recovery "resize2fs failed"
+if [ "$P3_RESIZE_REQUIRED" = 0 ]; then
+    mkdir -p "$P3_MOUNT"
+    mount -t ext4 -o ro,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot inspect PLUMOS_SYS completion state"
+    if [ ! -f "$P3_MOUNT/provision/complete" ]; then
+        PROVISIONING=1
+        P3_RESIZE_REQUIRED=1
+        BOOT_LOG_NAME=first-boot.log
+    fi
+    umount "$P3_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot unmount inspected PLUMOS_SYS"
+fi
+if [ "$P3_RESIZE_REQUIRED" = 1 ]; then
+    show_progress prepare
+    log "provision: resizing p3 ext4"
+    resize2fs "$P3" >> "$LOG" 2>&1 || recovery "resize2fs failed"
+else
+    log "normal boot: p3 provisioning is complete"
+fi
 
 if [ -n "$TEST_BOOT_PARTITION" ] && [ -b "${DISK}p4" ]; then
     P4="${DISK}p4"
@@ -302,6 +326,9 @@ else
 fi
 P4_CREATED=0
 if [ -z "$P4" ]; then
+    PROVISIONING=1
+    BOOT_LOG_NAME=first-boot.log
+    show_progress prepare
     show_progress userdata
     p4_start_unaligned=$((p3_target_end + 1))
     p4_start=$((((p4_start_unaligned + P4_ALIGNMENT_SECTORS - 1) / P4_ALIGNMENT_SECTORS) * P4_ALIGNMENT_SECTORS))
@@ -330,18 +357,30 @@ p4_label="$(blkid_value LABEL "$P4")"
 fsck_fat "$P4"
 
 mount_runtime
-persist_progress gpt-expanded
-persist_progress ext4-resized
-persist_progress p4-formatted
+if [ ! -f "$P3_MOUNT/provision/complete" ] ||
+    [ ! -f "$P4_MOUNT/.plumos-ready" ] ||
+    [ -e "$P4_MOUNT/.plumos-provisioning" ]; then
+    PROVISIONING=1
+    BOOT_LOG_NAME=first-boot.log
+    show_progress prepare
+fi
 
-touch "$P4_MOUNT/.plumos-provisioning"
-for dir in roms bios Images Themes Screenshots Music Manuals Cheats Patches Shaders updates imports exports; do
-    mkdir -p "$P4_MOUNT/$dir"
-done
-sync
-rm -f "$P4_MOUNT/.plumos-provisioning"
-touch "$P4_MOUNT/.plumos-ready"
-persist_progress userdata-seeded
+if [ "$PROVISIONING" = 1 ]; then
+    persist_progress gpt-expanded
+    persist_progress ext4-resized
+    persist_progress p4-formatted
+
+    touch "$P4_MOUNT/.plumos-provisioning"
+    for dir in roms bios Images Themes Screenshots Music Manuals Cheats Patches Shaders updates imports exports; do
+        mkdir -p "$P4_MOUNT/$dir"
+    done
+    sync
+    rm -f "$P4_MOUNT/.plumos-provisioning"
+    touch "$P4_MOUNT/.plumos-ready"
+    persist_progress userdata-seeded
+else
+    log "normal boot: userdata provisioning is complete"
+fi
 
 if [ "$PROVISION_ONLY" = 1 ]; then
     log "provision: test-only stop before system handoff"
@@ -356,7 +395,7 @@ SYSTEM_IMAGE="$P1_MOUNT/System/system-a.squashfs"
 SYSTEM_HASH="$P1_MOUNT/System/system-a.sha256"
 [ -f "$SYSTEM_IMAGE" ] || recovery "system-a.squashfs is missing"
 [ -f "$SYSTEM_HASH" ] || recovery "system-a.sha256 is missing"
-show_progress verify
+[ "$PROVISIONING" = 1 ] && show_progress verify
 verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
     recovery "system-a hash verification failed"
 log "system-a hash verification passed"
@@ -368,7 +407,7 @@ losetup -d /dev/loop0 2>/dev/null || true
 log "handoff: attaching system SquashFS loop"
 losetup /dev/loop0 "$SYSTEM_IMAGE" >> "$LOG" 2>&1 || recovery "system loop setup failed"
 log "handoff: mounting system SquashFS"
-show_progress mount
+[ "$PROVISIONING" = 1 ] && show_progress mount
 mount -t squashfs -o ro /dev/loop0 "$SYSTEM_ROOT" >> "$LOG" 2>&1 ||
     recovery "system SquashFS mount failed"
 
@@ -390,13 +429,10 @@ mount --move /dev "$SYSTEM_ROOT/dev" || recovery "cannot move devtmpfs into syst
 mount --move /tmp "$SYSTEM_ROOT/tmp" || recovery "cannot move tmpfs into system root"
 mount --move /run "$SYSTEM_ROOT/run" || recovery "cannot move run tmpfs into system root"
 
-touch "$SYSTEM_ROOT/mnt/plumos/provision/complete"
-cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
-    "$SYSTEM_ROOT/mnt/plumos/provision/first-boot.log" 2>/dev/null || true
-mkdir -p "$SYSTEM_ROOT/mnt/plumos-user/Logs/boot"
-cp "$SYSTEM_ROOT/run/plumos-first-boot.log" \
-    "$SYSTEM_ROOT/mnt/plumos-user/Logs/boot/first-boot.log" 2>/dev/null || true
-LOG="$SYSTEM_ROOT/run/plumos-first-boot.log"
+if [ "$PROVISIONING" = 1 ]; then
+    touch "$SYSTEM_ROOT/mnt/plumos/provision/complete"
+fi
+LOG="$SYSTEM_ROOT/run/plumos-boot.log"
 log "handoff: executing system init"
 show_progress start
 copy_boot_log

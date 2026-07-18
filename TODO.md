@@ -748,6 +748,25 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Physical boot completed through system init and FE. ADB proved p3 at
     exactly 8192 MiB, aligned p4 through the SD tail, all expected mounts and
     markers, clean kernel storage logs, and one framebuffer FE process.
+  - [x] Diagnose the apparent second-boot setup rerun. The old initramfs ran
+    `resize2fs`, userdata seeding, setup progress frames, and overwrote
+    `first-boot.log` on every boot despite a valid completion marker.
+  - [x] Add a completed-provisioning normal path that preserves the original
+    first-boot log, writes `last-boot.log`, skips resize/seeding writes, and
+    shows a normal `BOOTING PLUMOS` frame.
+  - [x] Update the SquashFS power action for the four-partition mounts. It now
+    stops all p3/p4 users, unmounts p4 aliases and persistent filesystems in
+    child-first order, then issues SysRq sync and read-only remount before the
+    final reboot or poweroff.
+  - [x] Reproduce the old FE shutdown defect and validate the new sequence on
+    hardware: the old path caused p3 journal recovery and a p4 dirty bit after
+    menu shutdown; a patched reboot produced neither condition.
+  - [x] Generate and verify
+    `plumos-v90s-four-partition-20260718-9.img` with the normal-boot and safe
+    power-action fixes.
+  - [ ] Confirm the updated p2/SquashFS reaches FE, then complete one FE menu
+    shutdown and cold-power-on cycle without setup frames, journal recovery,
+    or a FAT dirty bit.
   - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
