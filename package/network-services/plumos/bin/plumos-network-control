@@ -25,6 +25,7 @@ WPA_PID_FILE="${RUN_DIR}/wpa_supplicant.pid"
 ENSURE_WIFI_STAGE_FILE="${RUN_DIR}/ensure-wifi-stage.$$"
 NETWORK_SERVICES="${PLUMOS_ROOT}/bin/plumos-network-services"
 TIME_SYNC="${PLUMOS_ROOT}/bin/plumos-time-sync"
+DNS_RUNTIME="${PLUMOS_ROOT}/bin/plumos-dns-runtime"
 
 ACTION=status
 CONNECT_FILE=
@@ -584,6 +585,13 @@ start_enabled_network_services() {
 
 start_time_sync() {
   [ -x "$TIME_SYNC" ] || return 0
+  if [ -x "$DNS_RUNTIME" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+      "$DNS_RUNTIME" prepare >> "$LOG_FILE" 2>&1 || {
+        log "runtime DNS preparation failed before time sync"
+        return 0
+      }
+  fi
   PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
     "$TIME_SYNC" sync >> "$LOG_FILE" 2>&1 &
 }

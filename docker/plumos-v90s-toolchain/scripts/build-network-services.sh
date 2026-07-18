@@ -199,6 +199,7 @@ assemble_base() {
   cp -a "${PACKAGE_DIR}/." "$PLUMOS_DIR/"
   chmod 0755 "${BIN_DIR}/plumos-network-services"
   chmod 0755 "${BIN_DIR}/plumos-network-control"
+  chmod 0755 "${BIN_DIR}/plumos-dns-runtime"
   chmod 0755 "${BIN_DIR}/plumos-time-sync"
   chmod 0755 "${BIN_DIR}/plumos-usb-disk-mode"
   chmod 0755 "${BIN_DIR}/plumos-adbd"

@@ -513,6 +513,12 @@ Build plumOS V90S as a V90S-specific distribution:
   the app-owned DHCP hook in p7. Live validation found `example-wifi-2`, acquired
   `192.0.2.120`, installed the default route and DNS, and reached the
   gateway.
+- [x] Keep DNS writable with the read-only system SquashFS. Bind
+  `/run/plumos/network/resolv.conf` over `/etc/resolv.conf` before rootfs
+  Wi-Fi/DHCP, replace Docker's unreachable `192.168.65.7` resolver, and
+  prepare DNS before the bounded Wi-Fi time sync. Real-device validation
+  restored a 560-item PortMaster catalog, 1,386 images, network time, and the
+  UTC RTC writeback.
 - [x] Route SFTP through the app-layer subsystem, validate SFTP OFF/ON without
   stopping SSH, and restrict SSH process adoption to the real listener.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi

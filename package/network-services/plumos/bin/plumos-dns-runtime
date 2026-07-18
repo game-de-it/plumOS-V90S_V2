@@ -1,0 +1,134 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+RUN_DIR="${PLUMOS_DNS_RUN_DIR:-${RUNTIME_ROOT}/network}"
+RESOLV_FILE="${PLUMOS_RESOLV_FILE:-${RUN_DIR}/resolv.conf}"
+RESOLV_TARGET="${PLUMOS_RESOLV_TARGET:-/etc/resolv.conf}"
+LOG_FILE="${PLUMOS_ROOT}/Logs/network-control.log"
+FALLBACK_DNS="${PLUMOS_FALLBACK_DNS:-1.1.1.1}"
+
+log() {
+  mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+  printf '%s dns-runtime %s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || printf unknown-time)" \
+    "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+target_is_mounted() {
+  awk -v target="$RESOLV_TARGET" '$5 == target { found=1 } END { exit !found }' \
+    /proc/self/mountinfo 2>/dev/null
+}
+
+runtime_has_usable_dns() {
+  [ -r "$RESOLV_FILE" ] || return 1
+  awk '
+    $1 == "nameserver" && $2 != "192.168.65.7" { found=1 }
+    END { exit !found }
+  ' "$RESOLV_FILE" 2>/dev/null
+}
+
+default_gateway() {
+  if command -v ip >/dev/null 2>&1; then
+    ip route show default 2>/dev/null | awk '{ print $3; exit }'
+  else
+    route -n 2>/dev/null | awk '$1 == "0.0.0.0" { print $2; exit }'
+  fi
+}
+
+append_server() {
+  output="$1"
+  server="$2"
+  [ -n "$server" ] || return 0
+  grep -Fqx "nameserver $server" "$output" 2>/dev/null ||
+    printf 'nameserver %s\n' "$server" >> "$output"
+}
+
+write_resolver() {
+  mode="$1"
+  shift
+  temp="${RESOLV_FILE}.tmp.$$"
+  domain_value="${domain:-}"
+
+  mkdir -p "$RUN_DIR" 2>/dev/null || return 1
+  : > "$temp" || return 1
+  printf '# plumOS runtime DNS mode=%s\n' "$mode" >> "$temp"
+  for server in "$@"; do
+    append_server "$temp" "$server"
+  done
+  append_server "$temp" "$FALLBACK_DNS"
+  if [ -n "$domain_value" ]; then
+    printf 'search %s\n' "$domain_value" >> "$temp"
+  fi
+  printf 'options timeout:2 attempts:2\n' >> "$temp"
+
+  if [ -e "$RESOLV_FILE" ]; then
+    cat "$temp" > "$RESOLV_FILE"
+    rm -f "$temp"
+  else
+    mv "$temp" "$RESOLV_FILE"
+  fi
+  chmod 0644 "$RESOLV_FILE" 2>/dev/null || true
+}
+
+ensure_target() {
+  [ -e "$RESOLV_TARGET" ] || {
+    log "target missing path=${RESOLV_TARGET}"
+    return 1
+  }
+  if [ -L "$RESOLV_TARGET" ] || target_is_mounted; then
+    return 0
+  fi
+  if mount --bind "$RESOLV_FILE" "$RESOLV_TARGET"; then
+    log "mounted source=${RESOLV_FILE} target=${RESOLV_TARGET}"
+    return 0
+  fi
+  log "mount failed source=${RESOLV_FILE} target=${RESOLV_TARGET}"
+  return 1
+}
+
+prepare_runtime_dns() {
+  mkdir -p "$RUN_DIR" 2>/dev/null || return 1
+  if ! runtime_has_usable_dns; then
+    gateway="$(default_gateway || true)"
+    write_resolver fallback "$gateway" || return 1
+    log "prepared fallback gateway=${gateway:-none} fallback=${FALLBACK_DNS}"
+  fi
+  ensure_target
+}
+
+apply_dhcp_dns() {
+  servers="${dns:-}"
+  if [ -z "$servers" ]; then
+    servers="${router:-}"
+  fi
+  # DHCP values are word-separated IPv4/IPv6 addresses.
+  # shellcheck disable=SC2086
+  write_resolver dhcp $servers || return 1
+  ensure_target || return 1
+  log "applied DHCP DNS servers=${servers:-none}"
+}
+
+case "${1:-prepare}" in
+  prepare)
+    prepare_runtime_dns
+    ;;
+  dhcp)
+    apply_dhcp_dns
+    ;;
+  status)
+    printf 'runtime=%s\n' "$RESOLV_FILE"
+    printf 'target=%s\n' "$RESOLV_TARGET"
+    if target_is_mounted; then
+      printf 'mounted=yes\n'
+    else
+      printf 'mounted=no\n'
+    fi
+    cat "$RESOLV_FILE" 2>/dev/null || true
+    ;;
+  *)
+    printf 'usage: plumOS-dns-runtime [prepare|dhcp|status]\n' >&2
+    exit 2
+    ;;
+esac

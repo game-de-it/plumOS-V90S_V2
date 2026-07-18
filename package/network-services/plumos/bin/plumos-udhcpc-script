@@ -3,6 +3,8 @@ set -u
 
 interface="${interface:-}"
 action="${1:-}"
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+DNS_RUNTIME="${PLUMOS_DNS_RUNTIME:-${PLUMOS_ROOT}/bin/plumos-dns-runtime}"
 
 [ -n "$interface" ] || exit 1
 
@@ -25,14 +27,14 @@ case "$action" in
       break
     done
 
-    if [ -n "${dns:-}" ]; then
+    if [ -x "$DNS_RUNTIME" ]; then
+      dns="${dns:-}" domain="${domain:-}" router="${router:-}" \
+        "$DNS_RUNTIME" dhcp
+    elif [ -n "${dns:-}" ]; then
       : > /etc/resolv.conf
       for server in $dns; do
         printf 'nameserver %s\n' "$server" >> /etc/resolv.conf
       done
-      if [ -n "${domain:-}" ]; then
-        printf 'search %s\n' "$domain" >> /etc/resolv.conf
-      fi
     fi
     ;;
 esac

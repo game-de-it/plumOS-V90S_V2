@@ -785,6 +785,28 @@ start_plumos_network_services_bg() {
     ) &
 }
 
+prepare_runtime_resolver() {
+    resolver_dir=/run/plumos/network
+    resolver_file="$resolver_dir/resolv.conf"
+
+    mkdir -p "$resolver_dir" 2>/dev/null || return 0
+    if [ ! -s "$resolver_file" ]; then
+        {
+            printf '%s\n' '# plumOS early runtime DNS'
+            printf '%s\n' 'nameserver 1.1.1.1'
+            printf '%s\n' 'options timeout:2 attempts:2'
+        } > "$resolver_file" 2>/dev/null || return 0
+    fi
+    if ! awk '$5 == "/etc/resolv.conf" { found=1 } END { exit !found }' \
+        /proc/self/mountinfo 2>/dev/null; then
+        if mount --bind "$resolver_file" /etc/resolv.conf 2>/dev/null; then
+            log "debian-init: runtime resolver mounted source=$resolver_file"
+        else
+            log "debian-init: runtime resolver mount failed source=$resolver_file"
+        fi
+    fi
+}
+
 retry_plumos_network_services_after_network() {
     network_rc="$1"
     [ "$network_rc" -eq 0 ] 2>/dev/null || return 0
@@ -822,6 +844,7 @@ mount -t devpts devpts /dev/pts 2>/dev/null || true
 chmod 1777 /tmp
 mkdir -p /run/plumos /run/plumos/frontend /run/plumos/network-services \
     /run/plumos/picoarch /run/plumos/retroarch /run/plumos/standalone
+prepare_runtime_resolver
 prepare_fat_logs
 
 log "debian-init: init entered before tty setup"

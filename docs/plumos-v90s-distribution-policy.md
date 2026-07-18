@@ -976,6 +976,15 @@ offline boot time, but network time is authoritative whenever it is available.
 - After Wi-Fi obtains IPv4, `plumos-time-sync sync` performs one bounded RFC
   868 synchronization. It does not leave an NTP daemon or periodic writer
   running.
+- The read-only system SquashFS must not retain the Docker build host's
+  `/etc/resolv.conf`. plumOS owns a writable resolver at
+  `/run/plumos/network/resolv.conf` and bind-mounts it over
+  `/etc/resolv.conf` before rootfs Wi-Fi/DHCP starts. The app-layer DHCP hook
+  replaces it with lease-provided DNS servers; an existing connection without
+  DHCP state uses the current default gateway plus a bounded public fallback.
+- Wi-Fi connection paths prepare this writable resolver before starting time
+  synchronization. DNS failure must be reported separately from clock or RTC
+  failure.
 - A successful network synchronization writes the corrected system time back
   to `/dev/rtc0` in UTC.
 - `TIME SETTINGS -> Sync Now` performs the same bounded synchronization once,
