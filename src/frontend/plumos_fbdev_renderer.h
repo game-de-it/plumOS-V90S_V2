@@ -2222,13 +2222,10 @@ static const struct plumos_fbdev_entry *plumos_fbdev_selected_entry(
                           : NULL;
 }
 
-static int plumos_fbdev_render_top_refresh_running(
-    struct plumos_fbdev_renderer *r,
-    const struct plumos_fbdev_palette *p) {
-  const char *line1 = "REFRESH TOP";
-  const char *line2 = "PLEASE WAIT";
-  const char *line3 = "SCANNING SYSTEMS";
-  const char *line4 = "RELOADING TOP LIST";
+static int plumos_fbdev_render_centered_progress(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const char *line1, const char *line2, const char *line3,
+    const char *line4) {
   int w = (int)r->var.xres;
   int h = (int)r->var.yres;
   int y1 = h / 2 - 112;
@@ -2247,6 +2244,46 @@ static int plumos_fbdev_render_top_refresh_running(
   plumos_fbdev_draw_text_center(r, 0, y3, w, line3, 2, text_color);
   plumos_fbdev_draw_text_center(r, 0, y4, w, line4, 2, text_color);
   return 1;
+}
+
+static int plumos_fbdev_render_top_refresh_running(
+    struct plumos_fbdev_renderer *r,
+    const struct plumos_fbdev_palette *p) {
+  return plumos_fbdev_render_centered_progress(
+      r, p, "REFRESH TOP", "PLEASE WAIT", "SCANNING SYSTEMS",
+      "RELOADING TOP LIST");
+}
+
+static int plumos_fbdev_render_power_action_running(
+    struct plumos_fbdev_renderer *r,
+    char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
+    const struct plumos_fbdev_palette *p) {
+  const char *title =
+      plumos_fbdev_find_value(lines, line_count, "power_action_title=");
+  const char *wait =
+      plumos_fbdev_find_value(lines, line_count, "power_action_wait=");
+  const char *saving =
+      plumos_fbdev_find_value(lines, line_count, "power_action_saving=");
+  const char *no_remove =
+      plumos_fbdev_find_value(lines, line_count, "power_action_no_remove=");
+  const char *action =
+      plumos_fbdev_find_value(lines, line_count, "power_action=");
+
+  if (!title || !title[0]) {
+    title = action && strcmp(action, "reboot") == 0 ? "RESTARTING"
+                                                     : "SHUTTING DOWN";
+  }
+  if (!wait || !wait[0]) {
+    wait = "PLEASE WAIT";
+  }
+  if (!saving || !saving[0]) {
+    saving = "SAVING DATA SAFELY";
+  }
+  if (!no_remove || !no_remove[0]) {
+    no_remove = "DO NOT REMOVE THE SD CARD";
+  }
+  return plumos_fbdev_render_centered_progress(r, p, title, wait, saving,
+                                                no_remove);
 }
 
 static void plumos_fbdev_entry_badge(char *out, size_t out_size,
@@ -3008,6 +3045,7 @@ static int plumos_fbdev_is_hidden_line(const char *line) {
       strncmp(line, "thumbnail_results_screen=", 25) == 0 ||
       strncmp(line, "thumbnail_running", 17) == 0 ||
       strncmp(line, "top_refresh_running=", 20) == 0 ||
+      strncmp(line, "power_action", 12) == 0 ||
       strncmp(line, "usb_disk_starting=", 18) == 0 ||
       strncmp(line, "brightness_test=", 16) == 0 ||
       strncmp(line, "wifi_keyboard_cursor=", 21) == 0 ||
@@ -3370,7 +3408,11 @@ static int plumos_fbdev_render_lines(struct plumos_fbdev_renderer *r,
   plumos_fbdev_load_palette(r, &palette, lines, line_count);
   mode = plumos_fbdev_find_value(lines, line_count, "graphic_mode=");
   if (plumos_fbdev_has_prefixed_line(lines, line_count,
-                                     "top_refresh_running=1")) {
+                                     "power_action_running=1")) {
+    ok = plumos_fbdev_render_power_action_running(r, lines, line_count,
+                                                   &palette);
+  } else if (plumos_fbdev_has_prefixed_line(lines, line_count,
+                                            "top_refresh_running=1")) {
     ok = plumos_fbdev_render_top_refresh_running(r, &palette);
   } else if (mode && strcmp(mode, "top") == 0) {
     ok = plumos_fbdev_render_top(r, lines, line_count, &palette);

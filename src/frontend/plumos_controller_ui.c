@@ -9723,6 +9723,13 @@ static void render_power_action_running(struct ui_state *ui) {
   ui_printf(ui, "plumOS controller UI - %s\n", title);
   ui_printf(ui, "power_action_running=1\n");
   ui_printf(ui, "power_action=%s\n", rebooting ? "reboot" : "shutdown");
+  ui_printf(ui, "power_action_title=%s\n", title);
+  ui_printf(ui, "power_action_wait=%s\n",
+            tr(ui, "power_action.running", "PLEASE WAIT"));
+  ui_printf(ui, "power_action_saving=%s\n",
+            tr(ui, "power_action.saving", "Saving data safely"));
+  ui_printf(ui, "power_action_no_remove=%s\n",
+            tr(ui, "power_action.no_remove", "Do not remove the SD card"));
   ui_printf(ui, "entries=4 cursor=0\n");
   ui_printf(ui, "\n");
   ui_printf(ui, "    1  %s\n",

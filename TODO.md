@@ -679,6 +679,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Expose FE reboot and shutdown actions through
   `/mnt/plumos/bin/plumos-safe-shutdown`, with SD2 content mounts stopped and
   filesystem sync performed before reboot or poweroff.
+- [x] Render FE reboot and shutdown with the same centered progress-screen
+  language as Refresh TOP: top status bar, left accent, large action/wait
+  labels, smaller safe-save/SD-card warnings, and no interactive cursor.
+- [ ] Visually confirm the new reboot and shutdown progress screens on the
+  physical V90S after the 2026-07-18 frontend deployment.
 - [x] Add a final-action watchdog so a hung `reboot -f` or `poweroff -f` cannot
   block the already-synced FE Reboot/Shutdown path before reaching sysrq.
 - [x] Change the normal FE Reboot/Shutdown path to direct sysrq after SD2 stop
