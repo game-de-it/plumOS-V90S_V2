@@ -443,6 +443,21 @@ patch_core_source() {
     printf '\n[plumOS] patched ScummVM libretro continuous audio and fractional refresh clock\n' >> "$log"
   fi
 
+  if [ "$id" = "neocd" ]; then
+    local unibios_drive_patch="$patch_dir/neocd-unibios-toploader-drive.patch"
+
+    if [ ! -f "$unibios_drive_patch" ]; then
+      printf '\n[plumOS] missing required NeoCD UniBIOS drive patch\n' >> "$log"
+      return 1
+    fi
+    if ! patch --dry-run -d "$src" -p1 < "$unibios_drive_patch" >/dev/null 2>> "$log"; then
+      printf '\n[plumOS] required NeoCD UniBIOS drive patch does not apply\n' >> "$log"
+      return 1
+    fi
+    patch -d "$src" -p1 < "$unibios_drive_patch" >> "$log" 2>&1
+    printf '\n[plumOS] patched NeoCD UniBIOS 3.3 to use the V90S-compatible top-loader drive path\n' >> "$log"
+  fi
+
   if [ "$id" = "mupen64plus_next" ]; then
     local powervr_buffer_patch="$patch_dir/mupen64plus-next-powervr-buffer-storage.patch"
 

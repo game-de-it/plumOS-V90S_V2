@@ -49,6 +49,11 @@ snes9x2010 squirreljme stella2014 tgbdual theodore tyrquake uae4arm uw8 uzem
 vba_next vbam vemulator vice_x64 vice_xvic virtualjaguar yabasanshiro
 ```
 
+For NeoCD, this was only a process/framebuffer smoke pass and did not prove
+that the selected disc reached gameplay. The later ROM-integrity, BIOS-family,
+and real game-boot validation is recorded in
+`docs/validation/2026-07-19-v90s-neocd-unibios-33.md`.
+
 The newly enabled content-bearing systems are 3DO, Dreamcast, Saturn, N64,
 PC-FX, MicroW8, Uzebox, Atari Jaguar, and Dreamcast VMU. VMU scanning now
 accepts `.vmi` content.
