@@ -310,13 +310,28 @@ if [ "$p3_sectors" -eq "$P3_TARGET_SECTORS" ] && [ -n "$P4" ]; then
     mount -t vfat -o ro,utf8,shortname=mixed "$P4" "$P4_MOUNT" >> "$LOG" 2>&1 ||
         recovery "cannot inspect PLUMOS fast-boot state"
     verified_system="$(cat "$P3_MOUNT/$VERIFIED_SYSTEM_REL" 2>/dev/null || true)"
-    if [ -f "$P3_MOUNT/provision/complete" ] &&
-        [ -f "$P3_MOUNT/$CLEAN_P3_REL" ] &&
-        [ -f "$P4_MOUNT/.plumos-ready" ] &&
-        [ -f "$P4_MOUNT/$CLEAN_P4_REL" ] &&
-        [ "${#fast_expected}" -eq 64 ] &&
-        [ "$verified_system" = "$fast_expected" ]; then
+    fast_p3_complete=0
+    fast_p3_clean=0
+    fast_p4_ready=0
+    fast_p4_clean=0
+    fast_expected_valid=0
+    fast_hash_match=0
+    [ -f "$P3_MOUNT/provision/complete" ] && fast_p3_complete=1
+    [ -f "$P3_MOUNT/$CLEAN_P3_REL" ] && fast_p3_clean=1
+    [ -f "$P4_MOUNT/.plumos-ready" ] && fast_p4_ready=1
+    [ -f "$P4_MOUNT/$CLEAN_P4_REL" ] && fast_p4_clean=1
+    [ "${#fast_expected}" -eq 64 ] && fast_expected_valid=1
+    [ "$fast_expected_valid" -eq 1 ] &&
+        [ "$verified_system" = "$fast_expected" ] && fast_hash_match=1
+    if [ "$fast_p3_complete" -eq 1 ] &&
+        [ "$fast_p3_clean" -eq 1 ] &&
+        [ "$fast_p4_ready" -eq 1 ] &&
+        [ "$fast_p4_clean" -eq 1 ] &&
+        [ "$fast_expected_valid" -eq 1 ] &&
+        [ "$fast_hash_match" -eq 1 ]; then
         FAST_BOOT=1
+    else
+        log "fast boot rejected: p3_complete=$fast_p3_complete p3_clean=$fast_p3_clean p4_ready=$fast_p4_ready p4_clean=$fast_p4_clean hash_metadata=$fast_expected_valid hash_match=$fast_hash_match"
     fi
     umount "$P4_MOUNT" >> "$LOG" 2>&1 ||
         recovery "cannot unmount inspected PLUMOS"

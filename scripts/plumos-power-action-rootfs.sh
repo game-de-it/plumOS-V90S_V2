@@ -22,6 +22,7 @@ WAIT_SEC="${PLUMOS_POWER_ACTION_WAIT_SEC:-${PLUMOS_SAFE_SHUTDOWN_WAIT_SEC:-1}}"
 FINAL_UNMOUNT="${PLUMOS_POWER_ACTION_FINAL_UNMOUNT:-${PLUMOS_SAFE_SHUTDOWN_FINAL_UNMOUNT:-1}}"
 MIRROR_LOG="${PLUMOS_POWER_ACTION_MIRROR_LOG:-1}"
 QUIESCE_CLEAN=0
+CLEAN_MARKERS_RECORDED=0
 
 usage() {
   cat <<'USAGE'
@@ -406,9 +407,25 @@ record_clean_shutdown() {
     log "quiesce: clean-shutdown marker skipped reason=runtime_not_verified"
     return 0
   fi
-  log "quiesce: recording clean shutdown"
-  : > "$PLUMOS_ROOT/provision/clean-shutdown"
-  : > "$PLUMOS_USER_ROOT/.plumos-clean-shutdown"
+  if ! : > "$PLUMOS_ROOT/provision/clean-shutdown"; then
+    log "quiesce: clean-shutdown marker failed target=p3"
+    return 0
+  fi
+  if ! : > "$PLUMOS_USER_ROOT/.plumos-clean-shutdown"; then
+    log "quiesce: clean-shutdown marker failed target=p4"
+    rm -f "$PLUMOS_ROOT/provision/clean-shutdown" 2>/dev/null || true
+    return 0
+  fi
+  CLEAN_MARKERS_RECORDED=1
+  log "quiesce: clean-shutdown markers recorded p3=1 p4=1"
+}
+
+retry_persistent_unmount() {
+  target="$1"
+  log "umount: retry target=$target after refreshing persistent users"
+  stop_persistent_storage_users
+  sleep 0.2 2>/dev/null || true
+  unmount_if_mounted "$target"
 }
 
 remount_app_layer_ro() {
@@ -449,20 +466,28 @@ unmount_persistent_storage_for_final_action() {
   unmount_if_mounted /boot || true
   mirror_log_to_app_layer
   if ! unmount_if_mounted "$PLUMOS_USER_ROOT"; then
-    p4_clean=0
-    rm -f "$PLUMOS_USER_ROOT/.plumos-clean-shutdown" 2>/dev/null || true
-    sync 2>/dev/null || true
+    if ! retry_persistent_unmount "$PLUMOS_USER_ROOT"; then
+      p4_clean=0
+      rm -f "$PLUMOS_USER_ROOT/.plumos-clean-shutdown" 2>/dev/null || true
+      sync 2>/dev/null || true
+    fi
   fi
 
   if ! unmount_if_mounted "$PLUMOS_ROOT"; then
-    p3_clean=0
-    rm -f "$PLUMOS_ROOT/provision/clean-shutdown" 2>/dev/null || true
-    sync 2>/dev/null || true
     log_plumos_blockers
-    unmount_if_mounted "$PLUMOS_ROOT" || remount_app_layer_ro || true
+    mirror_log_to_app_layer
+    if ! retry_persistent_unmount "$PLUMOS_ROOT"; then
+      p3_clean=0
+      rm -f "$PLUMOS_ROOT/provision/clean-shutdown" 2>/dev/null || true
+      sync 2>/dev/null || true
+      log_plumos_blockers
+      mirror_log_to_app_layer
+      remount_app_layer_ro || true
+    fi
   fi
   unmount_if_mounted "$PLUMOS_BOOT_ROOT" || true
-  if [ "$p4_clean" -eq 1 ] && [ "$p3_clean" -eq 1 ]; then
+  if [ "$CLEAN_MARKERS_RECORDED" -eq 1 ] &&
+     [ "$p4_clean" -eq 1 ] && [ "$p3_clean" -eq 1 ]; then
     QUIESCE_CLEAN=1
     log "quiesce: clean unmount complete"
   else

@@ -818,6 +818,20 @@ Build plumOS V90S as a V90S-specific distribution:
     action and sanitized rootfs-helper loader environment.
   - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
+  - [x] Diagnose the 2026-07-19 regression where a normal FE reboot displayed
+    the checked-boot progress screen. Initramfs evidence isolated the rejection
+    to the missing p3 clean-shutdown marker; p4 readiness/clean state and the
+    cached p1 system hash all remained valid, so the boot-logo replacement was
+    not involved.
+  - [x] Keep clean-shutdown markers through a transient p3/p4 unmount failure:
+    refresh persistent-storage users and retry before invalidating either
+    marker, and log every rejected fast-boot predicate in initramfs.
+  - [x] Deploy the fixed p2 and system SquashFS, then confirm two consecutive
+    hardware reboots through the installed FE power-action path report
+    `fast boot: clean p3/p4 and cached system verification accepted` with p1
+    mounted read-only and one frontend process.
+  - [x] Generate and structurally verify
+    `plumos-v90s-four-partition-20260719-2.img` with the fast-boot retry fix.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
   controls, FPS/scrolling/audio pitch, clean exit, and persistence.
   - [x] Launch SD2 `nes/Baseball.nes` from the FE with QuickNES and confirm
