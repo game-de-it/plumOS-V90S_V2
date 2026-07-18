@@ -292,3 +292,29 @@ Physical GUI navigation and game-control confirmation remain for the user. SDL
 opened the real `adc_gamepad` with the V90S mapping in both paths, but process
 and framebuffer evidence do not replace a physical button test. ARMHF and
 heavier runtime classes remain unadvertised pending separate validation.
+
+## Payload Retention Check (2026-07-19)
+
+The updater does not accumulate every historical PortMaster release. Before a
+successful switch it deletes the existing `upstream.previous`, renames the
+current `upstream` to that one rollback slot, and promotes the validated
+`upstream.next.<pid>` directory to `upstream`. Normal retention is therefore at
+most the current and immediately previous payloads.
+
+Live device `plumos-v90s-b8a3a508` contained:
+
+```text
+/mnt/plumos/apps/portmaster/upstream
+  version: 2026.06.23-0015
+  size:    39.6 MiB
+
+upstream.previous:       absent
+upstream.next.*:          absent
+portmaster-download-*:   absent
+```
+
+`installed.json` also reported stable version `2026.06.23-0015` with the
+expected official MD5 and plumOS-recorded SHA-256. An interrupted extraction or
+power loss can still leave `upstream.next.*` or `portmaster-download-*`; those
+are incomplete temporary paths, not retained version history. Automatic stale
+temporary-path cleanup remains a follow-up task.

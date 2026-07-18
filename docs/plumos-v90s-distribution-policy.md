@@ -1555,6 +1555,22 @@ updates. The plumOS updater:
 5. renames the current payload to `upstream.previous` and atomically renames the
    validated stage to `upstream`
 
+PortMaster payload retention is limited to two generations during a normal
+update:
+
+```text
+upstream           current payload
+upstream.previous  immediately previous payload only
+```
+
+Before switching, the updater removes an existing `upstream.previous`, then
+moves the current `upstream` into that single rollback slot. It must not retain
+an unbounded history of old PortMaster payloads. Download and staging paths
+such as `portmaster-download-*` and `upstream.next.*` are temporary, not version
+history. An interrupted update or power loss can leave those temporary paths
+behind, so the updater should remove stale, non-active temporary paths before a
+future update after validating that no PortMaster process is running.
+
 Pre-switch failure leaves the current payload untouched. A switch failure is
 reported explicitly and leaves the previous payload named
 `upstream.previous`; plumOS must not silently launch that copy as a fallback.
