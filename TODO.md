@@ -769,9 +769,15 @@ Build plumOS V90S as a V90S-specific distribution:
     directory entries; the SquashFS payloads themselves remained intact.
     Repair p1 offline, restore both hash files, and prohibit this live-update
     procedure.
-  - [ ] Confirm the updated p2/SquashFS reaches FE, then complete one FE menu
-    shutdown and cold-power-on cycle without setup frames, journal recovery,
-    or a FAT dirty bit.
+  - [x] Confirm the repaired `-9` p2/SquashFS reaches FE through the normal
+    boot path with valid A/B hashes, one FE, ADB, SSH, and SD2 mounts.
+  - [x] Make initramfs recovery preserve its FAT-accessible log and then
+    unmount p3/p4, or remount them read-only, before holding the failure screen.
+  - [x] Generate and verify
+    `plumos-v90s-four-partition-20260718-10.img`, then deploy and read back its
+    recovery-safe p2 on the physical card.
+  - [ ] Complete one FE menu shutdown and cold-power-on cycle with p2 `-10`
+    without setup frames, journal recovery, or a FAT dirty bit.
   - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,

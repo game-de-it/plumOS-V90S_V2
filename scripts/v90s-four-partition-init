@@ -58,11 +58,24 @@ copy_boot_log() {
     done
 }
 
+make_recovery_storage_safe() {
+    sync
+    for target in \
+        "$SYSTEM_ROOT/mnt/plumos-user" "$P4_MOUNT" \
+        "$SYSTEM_ROOT/mnt/plumos" "$P3_MOUNT"; do
+        if grep -q " $target " /proc/mounts 2>/dev/null; then
+            umount "$target" 2>/dev/null ||
+                mount -o remount,ro "$target" 2>/dev/null || true
+        fi
+    done
+    sync
+}
+
 recovery() {
     log "recovery: $*"
     show_progress error
     copy_boot_log
-    sync
+    make_recovery_storage_safe
     if [ -n "$TEST_BOOT_PARTITION" ]; then
         exit 1
     fi

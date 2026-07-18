@@ -282,3 +282,37 @@ p1 repair and the p4 repair both completed with exit code 0 and no remaining
 filesystem modification. The complete SD device was then cleanly unmounted.
 Future p1 updates must be offline or use a tested inactive-slot transaction;
 active p1 live replacement is prohibited.
+
+## Repaired-card boot and recovery safety
+
+After restoring the A/B hash files offline, the physical V90S completed the
+normal boot path. ADB proved both payloads and both metadata files agreed on
+`6772b9...c8e4`. The system reached one FE process with the expected p1/p3/p4,
+SD2 ROM/BIOS, ADB, and SSH runtime state.
+
+That boot did repair an ext4 journal and p4 dirty bit. These were not a repeat
+of the FE shutdown defect: the preceding integrity failure had entered the
+initramfs recovery shell while p3 and p4 were still mounted read-write, after
+which the card was removed for host repair. The recovery path itself therefore
+needed to quiesce persistent storage.
+
+Recovery now writes its FAT-accessible diagnostic log, then attempts to
+unmount p4 and p3 at either their initramfs or moved system-root locations. If
+an unmount is blocked, it remounts that filesystem read-only before retaining
+the `STARTUP FAILED` screen and recovery shell.
+
+The recovery-safe p2 and complete candidate passed preflight and structural
+verification:
+
+```text
+image=output/images/plumos-v90s-four-partition-20260718-10.img
+sha256=adb966a3d3d49b0c2f7164325a664669fb07b2c39b09f371e9e0fb2bca957665
+p2_boot_image_sha256=423b8d577e6d3f157935d2a4d3e6c52a33e3b72228b8ab33ead90c954320b658
+preflight=PASS
+verification=PASS
+```
+
+Only p2, which is not mounted by the running system, was then updated on the
+physical card. Its full 64 MiB block-device readback matched
+`423b8d...b658`. No active p1 live update was performed. A final FE menu
+shutdown and cold-power-on cycle remains pending.

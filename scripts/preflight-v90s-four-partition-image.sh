@@ -97,6 +97,8 @@ for frame in "$tmp_dir"/ramdisk/progress/*.raw; do
 done
 grep -Fq 'show_progress error' "$tmp_dir/ramdisk/init" ||
     fail "initramfs recovery progress screen is missing"
+grep -Fq 'make_recovery_storage_safe' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs recovery does not quiesce p3/p4 before stopping"
 p3_start=2270208
 p3_target_sectors=$((8192 * 2048))
 p4_alignment_sectors=2048
