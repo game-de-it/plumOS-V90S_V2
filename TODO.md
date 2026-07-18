@@ -519,6 +519,9 @@ Build plumOS V90S as a V90S-specific distribution:
   prepare DNS before the bounded Wi-Fi time sync. Real-device validation
   restored a 560-item PortMaster catalog, 1,386 images, network time, and the
   UTC RTC writeback.
+- [x] Own the V90S boot logo in `package/boot-assets-v90s`, convert the
+  640x480 source PNG to the bootloader's 24-bit Windows BMP contract, and
+  verify that `sd-image` places the exact asset at `PLUMBOOT:/bootlogo.bmp`.
 - [x] Route SFTP through the app-layer subsystem, validate SFTP OFF/ON without
   stopping SSH, and restrict SSH process adoption to the real listener.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi

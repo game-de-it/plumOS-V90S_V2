@@ -7,6 +7,7 @@ boot_image="${PLUMOS_V90S_PROVISIONING_BOOT_IMAGE:-output/boot-image/v90s-four-p
 boot_image_manifest="${PLUMOS_V90S_BOOT_IMAGE_MANIFEST:-output/boot-image/v90s-four-partition/boot-image.manifest}"
 system_squashfs="${PLUMOS_V90S_SYSTEM_SQUASHFS:-output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs}"
 app_runtime="${PLUMOS_V90S_APP_RUNTIME:-output/app-layer/v90s}"
+boot_logo="${PLUMOS_V90S_BOOT_LOGO:-package/boot-assets-v90s/bootlogo.bmp}"
 report="${PLUMOS_V90S_PREFLIGHT_REPORT:-output/preflight/v90s-four-partition.txt}"
 
 fail() {
@@ -44,9 +45,12 @@ for tool in abootimg cpio gzip python3 sha256sum unsquashfs; do
 done
 for file in "$boot_package" "$boot_package_manifest" "$boot_image" \
     "$boot_image_manifest" "$system_squashfs" "$app_runtime/manifest.json" \
-    "$app_runtime/checksums.sha256"; do
+    "$app_runtime/checksums.sha256" "$boot_logo"; do
     [ -f "$file" ] || fail "required input missing: $file"
 done
+
+python3 scripts/verify-v90s-boot-logo.py "$boot_logo" >> "$report"
+pass "V90S boot logo format"
 
 verify_manifest_hash "$boot_package" "$boot_package_manifest" output_sha256
 [ "$(manifest_value external_env_required "$boot_package_manifest")" = no ] ||

@@ -7,6 +7,7 @@ boot_package="${PLUMOS_V90S_FIXED_BOOT_PACKAGE:-output/boot-package/v90s-four-pa
 boot_image="${PLUMOS_V90S_PROVISIONING_BOOT_IMAGE:-output/boot-image/v90s-four-partition/boot.img}"
 system_squashfs="${PLUMOS_V90S_SYSTEM_SQUASHFS:-output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs}"
 app_runtime="${PLUMOS_V90S_APP_RUNTIME:-output/app-layer/v90s}"
+boot_logo="${PLUMOS_V90S_BOOT_LOGO:-package/boot-assets-v90s/bootlogo.bmp}"
 report=""
 
 usage() {
@@ -31,7 +32,7 @@ done
 [ -f "$image" ] || { printf 'error: image missing: %s\n' "$image" >&2; exit 1; }
 [ -n "$report" ] || report="$image.verify.txt"
 
-for tool in parted dd cmp sha256sum e2fsck dumpe2fs debugfs mdir mcopy; do
+for tool in parted dd cmp sha256sum e2fsck dumpe2fs debugfs mdir mcopy python3; do
     command -v "$tool" >/dev/null 2>&1 || {
         printf 'error: required tool unavailable: %s\n' "$tool" >&2
         exit 1
@@ -51,6 +52,11 @@ fail() {
     printf 'FAIL %s\n' "$*" | tee -a "$report" >&2
     exit 1
 }
+
+[ -f "$boot_logo" ] || fail "boot logo source is missing: $boot_logo"
+python3 scripts/verify-v90s-boot-logo.py "$boot_logo" >> "$report" ||
+    fail "boot logo source format is invalid"
+pass "V90S boot logo source format"
 
 partition_table="$tmp_dir/parted.txt"
 parted -sm "$image" unit s print > "$partition_table"
@@ -106,6 +112,10 @@ pass "p2 provisioning Android boot image"
 
 p1_offset=$((p1_start * 512))
 mdir -i "$image@@$p1_offset" ::/System >> "$report" || fail "cannot read p1 System directory"
+mcopy -i "$image@@$p1_offset" ::/bootlogo.bmp "$tmp_dir/bootlogo.bmp" >/dev/null 2>&1 ||
+    fail "p1 bootlogo.bmp is missing"
+cmp -s "$boot_logo" "$tmp_dir/bootlogo.bmp" || fail "p1 bootlogo.bmp differs from source"
+pass "p1 V90S boot logo"
 for slot in a b; do
     slot_sha="$(mcopy -i "$image@@$p1_offset" "::/System/system-$slot.squashfs" - | sha256sum | awk '{print $1}')"
     expected_sha="$(sha256sum "$system_squashfs" | awk '{print $1}')"

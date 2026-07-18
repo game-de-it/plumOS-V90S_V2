@@ -256,6 +256,12 @@ p3 PLUMOS_SYS  ext4   1536 MiB seed  expand to 8192 MiB on first boot
 p4 PLUMOS      FAT32  not in seed    create through the final usable SD sector
 ```
 
+The V90S boot logo is a repository-owned release asset at
+`package/boot-assets-v90s/bootlogo.bmp`. It must remain a 640x480, 24-bit,
+uncompressed Windows 3.x BMP. The image assembler overwrites the vendor
+runtime copy with this asset and verifies the exact bytes in p1, so rebuilding
+the vendor runtime cannot restore an older logo.
+
 The candidate removes external `env`/`env-redund`, raw p5 SquashFS, and p6
 BATOCERA partitions. The boot package supplies an immutable default environment
 that loads p2, while the p2 initramfs verifies and loop-mounts a system image

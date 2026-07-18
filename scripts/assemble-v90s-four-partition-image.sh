@@ -6,6 +6,7 @@ boot_package="${PLUMOS_V90S_FIXED_BOOT_PACKAGE:-output/boot-package/v90s-four-pa
 boot_image="${PLUMOS_V90S_PROVISIONING_BOOT_IMAGE:-output/boot-image/v90s-four-partition/boot.img}"
 system_squashfs="${PLUMOS_V90S_SYSTEM_SQUASHFS:-output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs}"
 app_runtime="${PLUMOS_V90S_APP_RUNTIME:-output/app-layer/v90s}"
+boot_logo="${PLUMOS_V90S_BOOT_LOGO:-package/boot-assets-v90s/bootlogo.bmp}"
 out_dir="output/images"
 image_name="plumos-v90s-four-partition-seed.img"
 keep_work=0
@@ -50,7 +51,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-for tool in genimage rsync sha256sum du; do
+for tool in genimage rsync sha256sum du python3; do
     command -v "$tool" >/dev/null 2>&1 || {
         printf 'error: required tool is unavailable: %s\n' "$tool" >&2
         exit 1
@@ -59,9 +60,10 @@ done
 
 boot0="$vendor_runtime/raw-boot-chain/boot0-offset-131072.bin"
 volumn_src="$vendor_runtime/root/media/Volumn"
-for file in "$boot0" "$boot_package" "$boot_image" "$system_squashfs"; do
+for file in "$boot0" "$boot_package" "$boot_image" "$system_squashfs" "$boot_logo"; do
     [ -f "$file" ] || { printf 'error: required input missing: %s\n' "$file" >&2; exit 1; }
 done
+python3 scripts/verify-v90s-boot-logo.py "$boot_logo"
 for dir in "$volumn_src" "$app_runtime"; do
     [ -d "$dir" ] || { printf 'error: required input directory missing: %s\n' "$dir" >&2; exit 1; }
 done
@@ -94,6 +96,7 @@ mkdir -p "$root_dir/plumboot/System" "$root_dir/plumos-sys" "$input_dir"
 
 rsync -a "$volumn_src/" "$root_dir/plumboot/"
 rm -rf "$root_dir/plumboot/Logs"
+cp "$boot_logo" "$root_dir/plumboot/bootlogo.bmp"
 cp "$system_squashfs" "$root_dir/plumboot/System/system-a.squashfs"
 cp "$system_squashfs" "$root_dir/plumboot/System/system-b.squashfs"
 (
@@ -191,6 +194,7 @@ boot_package_sha256="$(sha256sum "$boot_package" | awk '{print $1}')"
 boot_image_sha256="$(sha256sum "$boot_image" | awk '{print $1}')"
 system_sha256="$(sha256sum "$system_squashfs" | awk '{print $1}')"
 app_manifest_sha256="$(sha256sum "$app_runtime/manifest.json" | awk '{print $1}')"
+boot_logo_sha256="$(sha256sum "$boot_logo" | awk '{print $1}')"
 image_size="$(wc -c < "$out_dir/$image_name" | tr -d ' ')"
 
 cat > "$manifest" <<EOF
@@ -210,6 +214,8 @@ system_squashfs=$system_squashfs
 system_squashfs_sha256=$system_sha256
 app_runtime=$app_runtime
 app_runtime_manifest_sha256=$app_manifest_sha256
+boot_logo=$boot_logo
+boot_logo_sha256=$boot_logo_sha256
 p1_name=boot-resource
 p1_label=PLUMBOOT
 p1_seed_mib=$P1_SIZE_MIB
