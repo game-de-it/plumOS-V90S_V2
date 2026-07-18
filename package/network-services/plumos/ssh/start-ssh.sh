@@ -14,6 +14,7 @@ SSHD_BIN="${PLUMOS_SSHD_BIN:-/usr/sbin/sshd}"
 PID_FILE="${RUN_DIR}/sshd.pid"
 LOG_FILE="${LOG_DIR}/sshd.log"
 SSHD_CONFIG="${ETC_DIR}/sshd_config"
+HOME_CONTROL="${PLUMOS_SSH_HOME_CONTROL:-$PLUMOS_ROOT/bin/plumos-ssh-home}"
 PASSWORD_CONTROL="${PLUMOS_SSH_PASSWORD_CONTROL:-$PLUMOS_ROOT/bin/plumos-ssh-password}"
 ENV_PATH="${PLUMOS_SSH_PATH:-${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
 
@@ -65,14 +66,15 @@ PATH=${ENV_PATH}
 EOF
   chmod 0600 /root/.ssh/environment 2>/dev/null || true
 
-  cat > /etc/profile.d/plumos-path.sh 2>/dev/null <<EOF || true
+  if [ ! -x "$HOME_CONTROL" ]; then
+    cat > /etc/profile.d/plumos-path.sh 2>/dev/null <<EOF || true
 export PLUMOS_ROOT="\${PLUMOS_ROOT:-${PLUMOS_ROOT}}"
 export PLUMOS_SDCARD_ROOT="\${PLUMOS_SDCARD_ROOT:-${PLUMOS_SDCARD_ROOT}}"
 export PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:\${PATH}"
 EOF
-  chmod 0644 /etc/profile.d/plumos-path.sh 2>/dev/null || true
+    chmod 0644 /etc/profile.d/plumos-path.sh 2>/dev/null || true
 
-  cat > /root/.profile 2>/dev/null <<'EOF' || true
+    cat > /root/.profile 2>/dev/null <<'EOF' || true
 if [ -f /etc/profile ]; then
   . /etc/profile
 fi
@@ -85,7 +87,7 @@ esac
 export PATH
 EOF
 
-  cat > /root/.bashrc 2>/dev/null <<'EOF' || true
+    cat > /root/.bashrc 2>/dev/null <<'EOF' || true
 export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
 case ":$PATH:" in
@@ -94,6 +96,7 @@ case ":$PATH:" in
 esac
 export PATH
 EOF
+  fi
 }
 
 install_sshd_config() {
@@ -135,6 +138,12 @@ host_key_args() {
   printf '%s\n' "$args"
 }
 
+if [ -x "$HOME_CONTROL" ]; then
+  if ! "$HOME_CONTROL" apply >> "$LOG_FILE" 2>&1; then
+    log "persistent SSH home setup failed"
+    exit 1
+  fi
+fi
 install_login_environment
 if [ -x "$PASSWORD_CONTROL" ]; then
   if ! "$PASSWORD_CONTROL" apply >> "$LOG_FILE" 2>&1; then

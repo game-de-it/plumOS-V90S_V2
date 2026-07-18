@@ -134,6 +134,12 @@ validate_app_layer() {
 
 start_frontend() {
   validate_app_layer >/dev/null || return 1
+  if [ -x "$PLUMOS_ROOT/bin/plumos-ssh-home" ]; then
+    "$PLUMOS_ROOT/bin/plumos-ssh-home" apply >> "$LOG_FILE" 2>&1 || {
+      report_error "persistent SSH home setup failed"
+      return 1
+    }
+  fi
   if [ -x "$PLUMOS_ROOT/bin/plumos-ssh-password" ]; then
     "$PLUMOS_ROOT/bin/plumos-ssh-password" apply >> "$LOG_FILE" 2>&1 || {
       report_error "persistent SSH password setup failed"

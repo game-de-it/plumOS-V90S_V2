@@ -927,6 +927,12 @@ The app-layer bootstrap and SSH launcher bind that file over the read-only
 SquashFS `/etc/shadow` before password authentication is used. The generated
 file must not be copied into app-layer releases, seed images, or git.
 
+Interactive root state follows the same device-local rule. The writable root
+home lives at `/mnt/plumos/config/ssh/root` on p3 ext4 and is bind mounted over
+the SquashFS `/root` before SSH login. Shell history, user profile changes, and
+authorized keys may persist there. This directory is runtime state and must not
+be copied into release artifacts or git.
+
 Current implementation gaps to close:
 
 - change default vendor-runtime paths from the date-based StockOS extraction

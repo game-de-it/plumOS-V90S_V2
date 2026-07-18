@@ -1,0 +1,108 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+STATE_DIR="${PLUMOS_SSH_HOME_STATE:-$PLUMOS_ROOT/config/ssh/root}"
+SYSTEM_HOME="${PLUMOS_ROOT_HOME:-/root}"
+MARKER="$STATE_DIR/.plumos-root-home"
+
+usage() {
+  cat <<EOF
+Usage: plumos-ssh-home apply|status
+
+Provides a writable, device-local root home from the p3 ext4 system partition.
+EOF
+}
+
+home_is_bound() {
+  awk -v target="$SYSTEM_HOME" '$2 == target { found = 1 } END { exit !found }' \
+    /proc/mounts 2>/dev/null
+}
+
+copy_initial_file() {
+  name="$1"
+  [ -e "$STATE_DIR/$name" ] && return 0
+  [ -e "$SYSTEM_HOME/$name" ] || return 0
+  cp -a "$SYSTEM_HOME/$name" "$STATE_DIR/$name"
+}
+
+append_once() {
+  file="$1"
+  marker="$2"
+  content="$3"
+  grep -Fq "$marker" "$file" 2>/dev/null && return 0
+  printf '\n%s\n' "$content" >> "$file"
+}
+
+prepare_home() {
+  mkdir -p "$STATE_DIR" || return 1
+  chmod 0700 "$STATE_DIR" 2>/dev/null || true
+  copy_initial_file .profile
+  copy_initial_file .bashrc
+  if [ -d "$SYSTEM_HOME/.ssh" ] && [ ! -e "$STATE_DIR/.ssh" ]; then
+    cp -a "$SYSTEM_HOME/.ssh" "$STATE_DIR/.ssh" || return 1
+  fi
+  mkdir -p "$STATE_DIR/.ssh" || return 1
+  chmod 0700 "$STATE_DIR/.ssh" 2>/dev/null || true
+  [ -f "$STATE_DIR/.profile" ] || : > "$STATE_DIR/.profile"
+  [ -f "$STATE_DIR/.bashrc" ] || : > "$STATE_DIR/.bashrc"
+
+  append_once "$STATE_DIR/.profile" '# plumOS persistent SSH environment' \
+'# plumOS persistent SSH environment
+export PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+export PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+case ":$PATH:" in
+  *":${PLUMOS_ROOT}/bin:"*) ;;
+  *) PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:${PATH}" ;;
+esac
+export PATH'
+
+  append_once "$STATE_DIR/.bashrc" '# plumOS persistent shell history' \
+'# plumOS persistent shell history
+export HISTFILE="${HOME:-/root}/.bash_history"
+export HISTSIZE=2000
+export HISTFILESIZE=4000
+export HISTCONTROL=ignoredups:erasedups
+shopt -s histappend 2>/dev/null || true
+case ";${PROMPT_COMMAND:-};" in
+  *";history -a;"*) ;;
+  *) PROMPT_COMMAND="history -a${PROMPT_COMMAND:+;${PROMPT_COMMAND}}" ;;
+esac'
+
+  chmod 0600 "$STATE_DIR/.profile" "$STATE_DIR/.bashrc" 2>/dev/null || true
+  : > "$MARKER"
+  chmod 0600 "$MARKER" 2>/dev/null || true
+}
+
+apply_home() {
+  prepare_home || return 1
+  if home_is_bound; then
+    return 0
+  fi
+  mount --bind "$STATE_DIR" "$SYSTEM_HOME"
+}
+
+case "${1:-}" in
+  apply)
+    apply_home
+    ;;
+  status)
+    if [ ! -f "$MARKER" ]; then
+      printf 'ssh_home=not_configured\n'
+      exit 1
+    fi
+    if home_is_bound; then
+      printf 'ssh_home=configured\nhome=bound\nstorage=%s\n' "$STATE_DIR"
+    else
+      printf 'ssh_home=configured\nhome=not_bound\nstorage=%s\n' "$STATE_DIR"
+      exit 2
+    fi
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
