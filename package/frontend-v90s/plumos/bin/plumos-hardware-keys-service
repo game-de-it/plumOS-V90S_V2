@@ -49,6 +49,8 @@ is_running() {
 }
 
 start_service() {
+  volume_control="$PLUMOS_ROOT/bin/plumos-volume-control"
+
   if is_running; then
     printf 'hardware_keys=running\npid=%s\n' "$(running_pid)"
     return 0
@@ -58,6 +60,13 @@ start_service() {
     return 1
   }
   mkdir -p "$RUN_DIR" || return 1
+  if [ -x "$volume_control" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+      "$volume_control" apply >/dev/null 2>&1 || {
+        printf 'plumos-hardware-keys-service: volume initialization failed\n' >&2
+        return 1
+      }
+  fi
   rm -f "$PID_FILE"
   PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
     "$DAEMON" >>"$LOG_FILE" 2>&1 </dev/null &

@@ -17,7 +17,9 @@
 #define INTERNAL_DAC_VOLUME 170
 #define MAX_CARD_INDEX 15
 #define USB_PROBE_INTERVAL 8
-#define VOLUME_PROBE_INTERVAL 16
+#define VOLUME_MAX 12
+#define VOLUME_DEFAULT 8
+#define VOLUME_PROBE_INTERVAL 0
 
 typedef struct {
     snd_pcm_ioplug_t io;
@@ -58,8 +60,8 @@ static int clamp_volume(int volume)
 {
     if (volume < 0)
         return 0;
-    if (volume > 20)
-        return 20;
+    if (volume > VOLUME_MAX)
+        return VOLUME_MAX;
     return volume;
 }
 
@@ -107,9 +109,9 @@ static int read_system_volume(void)
         root = "/mnt/plumos";
     if (snprintf(settings, sizeof(settings), "%s/config/system/settings.json",
                  root) >= (int)sizeof(settings))
-        return 14;
+        return VOLUME_DEFAULT;
     volume = read_volume_file(settings, 1);
-    return volume >= 0 ? volume : 14;
+    return volume >= 0 ? volume : VOLUME_DEFAULT;
 }
 
 static int16_t apply_software_volume(int16_t sample, int volume)
@@ -117,10 +119,10 @@ static int16_t apply_software_volume(int16_t sample, int volume)
     int32_t scaled;
 
     volume = clamp_volume(volume);
-    if (volume == 20)
+    if (volume == VOLUME_MAX)
         return sample;
     scaled = (int32_t)sample * volume;
-    return (int16_t)(scaled / 20);
+    return (int16_t)(scaled / VOLUME_MAX);
 }
 
 static int card_has_usb_id(int card)
@@ -541,7 +543,7 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
 
     output = input;
     if (io->channels == 1 || io->format != SND_PCM_FORMAT_S16_LE ||
-        !pcm->physical_is_usb || pcm->volume_level < 20) {
+        !pcm->physical_is_usb || pcm->volume_level < VOLUME_MAX) {
         err = ensure_output_buffer(pcm, size);
         if (err < 0)
             return err;
@@ -567,7 +569,7 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
         if (switch_route(pcm, 1) == 0) {
             if (io->channels == 1 || !pcm->physical_is_usb ||
                 io->format != SND_PCM_FORMAT_S16_LE ||
-                pcm->volume_level < 20) {
+                pcm->volume_level < VOLUME_MAX) {
                 err = ensure_output_buffer(pcm, size);
                 if (err < 0)
                     return err;

@@ -2,6 +2,12 @@
 
 Date: 2026-07-16
 
+> Update: the original 0..20 volume contract documented below was replaced by
+> the 0..12 low-latency contract on 2026-07-19. See
+> `2026-07-19-v90s-volume-response-12-step.md` for the current implementation
+> and real-device validation. The older values remain here as historical test
+> evidence.
+
 ## Goal
 
 Keep the physical V90S volume keys available independently of the frontend,

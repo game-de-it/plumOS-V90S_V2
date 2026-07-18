@@ -21,6 +21,8 @@
 #define REPEAT_INTERVAL_MS 120
 #define PERSIST_DELAY_MS 750
 #define PORTMASTER_EXIT_HOLD_MS 1000
+#define VOLUME_MAX 12
+#define VOLUME_DEFAULT 8
 
 struct input_source {
     const char *name;
@@ -106,15 +108,88 @@ static int run_helper(const char *helper_name, const char *action)
     return 0;
 }
 
-static int apply_key_action(int direction, int select_down)
+static int read_volume_state(const char *path)
+{
+    char buffer[32];
+    char *end;
+    long value;
+    int fd;
+    ssize_t length;
+
+    fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return VOLUME_DEFAULT;
+    length = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+    if (length <= 0)
+        return VOLUME_DEFAULT;
+    buffer[length] = '\0';
+    errno = 0;
+    value = strtol(buffer, &end, 10);
+    if (errno || end == buffer)
+        return VOLUME_DEFAULT;
+    if (value < 0)
+        return 0;
+    if (value > VOLUME_MAX)
+        return VOLUME_MAX;
+    return (int)value;
+}
+
+static int change_runtime_volume(const char *path, int direction)
+{
+    char temporary[512];
+    char value[32];
+    int current = read_volume_state(path);
+    int next = current + (direction > 0 ? 1 : -1);
+    int fd;
+    int length;
+
+    if (next < 0)
+        next = 0;
+    if (next > VOLUME_MAX)
+        next = VOLUME_MAX;
+    if (next == current)
+        return 0;
+    if (snprintf(temporary, sizeof(temporary), "%s.tmp.%ld", path,
+                 (long)getpid()) >= (int)sizeof(temporary))
+        return -ENAMETOOLONG;
+    length = snprintf(value, sizeof(value), "%d\n", next);
+    fd = open(temporary, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0644);
+    if (fd < 0)
+        return -errno;
+    if (write(fd, value, (size_t)length) != length) {
+        int error = errno ? -errno : -EIO;
+        close(fd);
+        unlink(temporary);
+        return error;
+    }
+    if (close(fd) < 0) {
+        int error = -errno;
+        unlink(temporary);
+        return error;
+    }
+    if (rename(temporary, path) < 0) {
+        int error = -errno;
+        unlink(temporary);
+        return error;
+    }
+    return 0;
+}
+
+static int apply_key_action(int direction, int select_down,
+                            const char *volume_state_path)
 {
     const char *helper;
     const char *action;
     int result;
 
-    helper = select_down ? "plumos-display-control" : "plumos-volume-control";
-    action = direction > 0 ? "runtime-up" : "runtime-down";
-    result = run_helper(helper, action);
+    if (select_down) {
+        helper = "plumos-display-control";
+        action = direction > 0 ? "runtime-up" : "runtime-down";
+        result = run_helper(helper, action);
+    } else {
+        result = change_runtime_volume(volume_state_path, direction);
+    }
     fprintf(stderr, "hardware-keys: action=%s direction=%s rc=%d\n",
             select_down ? "display-lumination" : "volume",
             direction > 0 ? "up" : "down", result);
@@ -155,6 +230,7 @@ int main(void)
     int display_pending = 0;
     const char *runtime_root = getenv("PLUMOS_RUNTIME_ROOT");
     char lock_path[512];
+    char volume_state_path[512];
     int lock_fd;
 
     if (!runtime_root || !runtime_root[0])
@@ -162,6 +238,12 @@ int main(void)
     if (snprintf(lock_path, sizeof(lock_path), "%s/hardware-keys/daemon.lock",
                  runtime_root) >= (int)sizeof(lock_path)) {
         fprintf(stderr, "hardware-keys: lock path is too long\n");
+        return 1;
+    }
+    if (snprintf(volume_state_path, sizeof(volume_state_path),
+                 "%s/volume/current", runtime_root) >=
+        (int)sizeof(volume_state_path)) {
+        fprintf(stderr, "hardware-keys: volume state path is too long\n");
         return 1;
     }
     lock_fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0644);
@@ -241,7 +323,8 @@ int main(void)
 
                             held_direction = direction;
                             held_is_display = select_down;
-                            result = apply_key_action(direction, held_is_display);
+                            result = apply_key_action(direction, held_is_display,
+                                                      volume_state_path);
                             if (result == 0) {
                                 if (held_is_display)
                                     display_pending = 1;
@@ -293,7 +376,8 @@ int main(void)
             portmaster_exit_latched = 1;
         }
         if (held_direction && repeat_due > 0 && now >= repeat_due) {
-            int result = apply_key_action(held_direction, held_is_display);
+            int result = apply_key_action(held_direction, held_is_display,
+                                          volume_state_path);
 
             if (result == 0) {
                 if (held_is_display)

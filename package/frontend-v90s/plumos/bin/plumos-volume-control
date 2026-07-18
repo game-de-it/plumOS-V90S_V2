@@ -8,6 +8,8 @@ RUNTIME_STATE="${PLUMOS_VOLUME_RUNTIME_STATE:-/run/plumos/volume/current}"
 HEADPHONE_MAX="${PLUMOS_V90S_HEADPHONE_VOLUME_MAX:-7}"
 DAC_VOLUME="${PLUMOS_V90S_DAC_VOLUME:-170}"
 AMIXER_CARD="${PLUMOS_V90S_AMIXER_CARD:-0}"
+VOLUME_MAX=12
+VOLUME_DEFAULT=8
 
 mkdir -p "${LOG%/*}" "${RUNTIME_STATE%/*}" 2>/dev/null || true
 
@@ -25,10 +27,10 @@ AMIXER="${PLUMOS_AMIXER:-$(find_cmd /usr/bin/amixer /bin/amixer /sbin/amixer 2>/
 
 usage() {
   cat <<USAGE
-Usage: plumos-volume-control init|apply [0..20]|up|down|step +/-N|get|status
+Usage: plumos-volume-control init|apply [0..12]|up|down|step +/-N|get|status
        plumos-volume-control runtime-up|runtime-down|runtime-step +/-N|persist-runtime
 
-Keeps the validated V90S internal DAC gain fixed and publishes the 0..20
+Keeps the validated V90S internal DAC gain fixed and publishes the 0..12
 software-volume state consumed by the plumOS ALSA hotplug plugin.
 USAGE
 }
@@ -40,7 +42,7 @@ normalize_volume() {
   esac
   value="$(printf '%s' "$value" | sed 's/^0*//')"
   [ -n "$value" ] || value=0
-  [ "$value" -gt 20 ] && value=20
+  [ "$value" -gt "$VOLUME_MAX" ] && value="$VOLUME_MAX"
   printf '%s\n' "$value"
 }
 
@@ -60,7 +62,7 @@ read_volume() {
   if [ -r "$SYSTEM_SETTINGS" ]; then
     value="$(sed -n 's/.*"volume"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$SYSTEM_SETTINGS" 2>/dev/null | head -n 1)"
   fi
-  normalize_volume "${value:-14}" || printf '%s\n' 14
+  normalize_volume "${value:-$VOLUME_DEFAULT}" || printf '%s\n' "$VOLUME_DEFAULT"
 }
 
 read_runtime_volume() {
@@ -92,10 +94,6 @@ write_runtime_volume_state() {
     echo "cannot replace runtime volume state" >"$LOG"
     return 1
   }
-}
-
-clear_runtime_volume_state() {
-  rm -f "$RUNTIME_STATE" 2>/dev/null || true
 }
 
 backend_available() {
@@ -145,6 +143,7 @@ apply_volume() {
     volume="$(read_runtime_volume)"
   fi
   init_backend || return 1
+  write_runtime_volume_state "$volume" || return 1
   headphone="$(fixed_headphone_gain)"
   # Keep the physical playback path running even at software volume zero.
   # Disabling HpSpeaker while a synchronized PCM stream is active stops its
@@ -192,9 +191,8 @@ change_volume() {
   delta="$1"
   next=$(( current + delta ))
   [ "$next" -lt 0 ] && next=0
-  [ "$next" -gt 20 ] && next=20
+  [ "$next" -gt "$VOLUME_MAX" ] && next="$VOLUME_MAX"
   write_volume_setting "$next" || return 1
-  clear_runtime_volume_state
   apply_volume "$next"
 }
 
@@ -203,9 +201,8 @@ change_runtime_volume() {
   delta="$1"
   next=$(( current + delta ))
   [ "$next" -lt 0 ] && next=0
-  [ "$next" -gt 20 ] && next=20
+  [ "$next" -gt "$VOLUME_MAX" ] && next="$VOLUME_MAX"
   write_runtime_volume_state "$next" || return 1
-  apply_volume "$next"
 }
 
 cmd="${1:-}"
@@ -246,8 +243,7 @@ case "$cmd" in
   persist-runtime)
     volume="$(read_runtime_volume)"
     write_volume_setting "$volume" || exit 1
-    clear_runtime_volume_state
-    apply_volume "$volume"
+    write_runtime_volume_state "$volume"
     ;;
   get)
     read_volume

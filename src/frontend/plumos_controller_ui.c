@@ -34,6 +34,9 @@
 #define PLUMOS_MALI_SETTING_FLASH_MARKER "@{F:"
 #endif
 
+#define PLUMOS_VOLUME_MAX 12
+#define PLUMOS_VOLUME_DEFAULT 8
+
 static volatile sig_atomic_t g_terminate_requested = 0;
 
 static void handle_terminate_signal(int signo) {
@@ -2307,7 +2310,8 @@ static int run_volume_control_command(const char *action, long volume,
     return 0;
   }
   if (include_volume) {
-    snprintf(volume_buf, sizeof(volume_buf), "%ld", clamp_long(volume, 0, 20));
+    snprintf(volume_buf, sizeof(volume_buf), "%ld",
+             clamp_long(volume, 0, PLUMOS_VOLUME_MAX));
   } else {
     volume_buf[0] = '\0';
   }
@@ -2535,7 +2539,7 @@ static int apply_runtime_volume(const struct device_settings *device) {
   if (!amixer_path) {
     return 0;
   }
-  mixer_value = scale_setting_to_runtime(device->volume, 20, 255);
+  mixer_value = scale_setting_to_runtime(device->volume, PLUMOS_VOLUME_MAX, 255);
   snprintf(cmd, sizeof(cmd),
            "%s cset iface=MIXER,name='Soft Volume Master' %ld "
            ">/tmp/.plumos_volume_set 2>&1",
@@ -4137,7 +4141,7 @@ static void init_device_settings(struct device_settings *device) {
   const char *device_name;
 
   memset(device, 0, sizeof(*device));
-  device->volume = 14;
+  device->volume = PLUMOS_VOLUME_DEFAULT;
   device->wifi_enabled = 1;
   device->automatic_time_enabled = 1;
   device->brightness = 10;
@@ -4327,7 +4331,14 @@ static int load_device_settings(struct ui_state *ui) {
   ui->device.automatic_time_enabled =
       json_get_bool(json, json_end, "automatic_time",
                     ui->device.automatic_time_enabled);
-  ui->device.volume = json_get_long(json, json_end, "volume", ui->device.volume);
+  {
+    long stored_volume = json_get_long(json, json_end, "volume",
+                                       ui->device.volume);
+    ui->device.volume = clamp_long(stored_volume, 0, PLUMOS_VOLUME_MAX);
+    if (stored_volume != ui->device.volume) {
+      save_system_config_number(ui, "volume", ui->device.volume);
+    }
+  }
   {
     long stored_brightness = json_get_long(json, json_end, "brightness",
                                            ui->device.brightness);
@@ -12654,7 +12665,7 @@ static int save_setting_number(struct ui_state *ui, const char *id,
   } else if (strcmp(id, "system_volume") == 0) {
     system_key = "volume";
     min_value = 0;
-    max_value = 20;
+    max_value = PLUMOS_VOLUME_MAX;
   } else if (strcmp(id, "system_brightness") == 0) {
     system_key = "brightness";
     min_value = 1;
@@ -12733,14 +12744,17 @@ static int change_system_volume(struct ui_state *ui, int direction) {
   if (!ui || direction == 0) {
     return 0;
   }
-  value = clamp_long(ui->device.volume + (direction > 0 ? 1 : -1), 0, 20);
+  value = clamp_long(ui->device.volume + (direction > 0 ? 1 : -1), 0,
+                     PLUMOS_VOLUME_MAX);
   if (value == ui->device.volume) {
     if (!apply_device_runtime_settings(&ui->device, "system_volume",
                                        runtime_status,
                                        sizeof(runtime_status))) {
-      snprintf(ui->status, sizeof(ui->status), "Volume %ld/20; apply failed", value);
+      snprintf(ui->status, sizeof(ui->status), "Volume %ld/%d; apply failed",
+               value, PLUMOS_VOLUME_MAX);
     } else {
-      snprintf(ui->status, sizeof(ui->status), "Volume %ld/20", value);
+      snprintf(ui->status, sizeof(ui->status), "Volume %ld/%d", value,
+               PLUMOS_VOLUME_MAX);
     }
     return 1;
   }
@@ -12751,9 +12765,11 @@ static int change_system_volume(struct ui_state *ui, int direction) {
   ui->device.volume = value;
   if (!apply_device_runtime_settings(&ui->device, "system_volume", runtime_status,
                                      sizeof(runtime_status))) {
-    snprintf(ui->status, sizeof(ui->status), "Volume %ld/20; apply failed", value);
+    snprintf(ui->status, sizeof(ui->status), "Volume %ld/%d; apply failed",
+             value, PLUMOS_VOLUME_MAX);
   } else {
-    snprintf(ui->status, sizeof(ui->status), "Volume %ld/20", value);
+    snprintf(ui->status, sizeof(ui->status), "Volume %ld/%d", value,
+             PLUMOS_VOLUME_MAX);
   }
   update_settings_entries_after_save(ui);
   return 1;

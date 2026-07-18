@@ -1022,10 +1022,12 @@ bind directly to a numbered hardware card.
   built-in speaker therefore receives all stereo content as mono without
   clipping the sum.
 - Internal card 0 uses fixed codec `DAC volume` `170,170`, the highest value
-  validated without distortion at software volume 20. The vendor PCM prepare
-  path resets this control to 160, so the plumOS ioplug must restore 170 after
-  each successful physical `snd_pcm_prepare()`. User volume remains the shared
-  0..20 software gain and USB-DAC output does not use this card-0 control.
+  validated without distortion at maximum software volume. The vendor PCM
+  prepare path resets this control to 160, so the plumOS ioplug must restore
+  170 after each successful physical `snd_pcm_prepare()`. User volume remains
+  the shared 0..12 software gain and USB-DAC output does not use this card-0
+  control. Physical-key changes update tmpfs immediately; persistent settings
+  are written only after the input becomes idle.
 - Software volume zero must emit silence through the shared software gain while
   leaving `HpSpeaker`, `Headphone`, and the physical PCM route enabled. Muting
   or disabling the hardware output stage during a synchronized stream stops

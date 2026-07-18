@@ -19,6 +19,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `/mnt/plumos`.
 - Normal updates are applied from Windows or macOS by copying update files onto
   the SD card.
+- Global volume uses 12 software-gain steps, with immediate tmpfs updates and
+  delayed persistence so physical-key feedback does not wait for mixer probes
+  or FAT32 writes.
 
 ## Working Rules
 
@@ -589,10 +592,11 @@ Build plumOS V90S as a V90S-specific distribution:
   `BTN_MODE` in addition to Select/Start, while the tested `Select+R2`
   sequence did not switch the D-pad away from `ABS_HAT0X/Y`.
 - [x] Add and live-validate the boot-persistent V90S hardware-key service:
-  physical Volume +/- changes the global 0..20 volume, while Select+Volume +/-
+  physical Volume +/- changes the global 0..12 volume, while Select+Volume +/-
   changes the V90S display-enhance luminance. Keep the daemon independent of
-  FE/emulator lifetime, rediscover evdev nodes by device name, debounce FAT32
-  setting writes, fix the validated internal codec DAC gain at `170,170`, and
+  FE/emulator lifetime, rediscover evdev nodes by device name, debounce
+  persistent setting writes, fix the validated internal codec DAC gain at
+  `170,170`, and
   route user volume for both speaker and USB-DAC through the ALSA hotplug
   plugin's software gain. Keep the physical PCM path enabled at software volume
   zero so RetroArch `audio_sync` cannot stall the emulation runloop.
