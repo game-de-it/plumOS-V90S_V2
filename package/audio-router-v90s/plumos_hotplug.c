@@ -361,21 +361,72 @@ static int16_t float_to_s16(float value)
     return (int16_t)(value * 32767.0f);
 }
 
+static int16_t read_input_sample(snd_pcm_format_t format, const void *input,
+                                 size_t index)
+{
+    switch (format) {
+    case SND_PCM_FORMAT_S8:
+        return (int16_t)((int16_t)((const int8_t *)input)[index] * 256);
+    case SND_PCM_FORMAT_U8:
+        return (int16_t)(((int)((const uint8_t *)input)[index] - 128) * 256);
+    case SND_PCM_FORMAT_S16_LE: {
+        int16_t value;
+        memcpy(&value, (const uint8_t *)input + index * sizeof(value),
+               sizeof(value));
+        return value;
+    }
+    case SND_PCM_FORMAT_U16_LE: {
+        uint16_t value;
+        memcpy(&value, (const uint8_t *)input + index * sizeof(value),
+               sizeof(value));
+        return (int16_t)((int32_t)value - 32768);
+    }
+    case SND_PCM_FORMAT_S24_LE: {
+        uint32_t packed;
+        int32_t value;
+        memcpy(&packed, (const uint8_t *)input + index * sizeof(packed),
+               sizeof(packed));
+        value = (int32_t)(packed & 0x00ffffffU);
+        if (value & 0x00800000)
+            value -= 0x01000000;
+        return (int16_t)(value / 256);
+    }
+    case SND_PCM_FORMAT_S24_3LE: {
+        const uint8_t *sample = (const uint8_t *)input + index * 3;
+        int32_t value = (int32_t)sample[0] |
+                        ((int32_t)sample[1] << 8) |
+                        ((int32_t)sample[2] << 16);
+        if (value & 0x00800000)
+            value -= 0x01000000;
+        return (int16_t)(value / 256);
+    }
+    case SND_PCM_FORMAT_S32_LE: {
+        int32_t value;
+        memcpy(&value, (const uint8_t *)input + index * sizeof(value),
+               sizeof(value));
+        return (int16_t)(value / 65536);
+    }
+    case SND_PCM_FORMAT_FLOAT_LE: {
+        float value;
+        memcpy(&value, (const uint8_t *)input + index * sizeof(value),
+               sizeof(value));
+        return float_to_s16(value);
+    }
+    default:
+        return 0;
+    }
+}
+
 static void read_input_frame(const snd_pcm_ioplug_t *io, const void *input,
                              snd_pcm_uframes_t frame, int16_t *left,
                              int16_t *right)
 {
     size_t index = (size_t)frame * io->channels;
 
-    if (io->format == SND_PCM_FORMAT_FLOAT_LE) {
-        const float *samples = input;
-        *left = float_to_s16(samples[index]);
-        *right = io->channels == 1 ? *left : float_to_s16(samples[index + 1]);
-    } else {
-        const int16_t *samples = input;
-        *left = samples[index];
-        *right = io->channels == 1 ? *left : samples[index + 1];
-    }
+    *left = read_input_sample(io->format, input, index);
+    *right = io->channels == 1
+                 ? *left
+                 : read_input_sample(io->format, input, index + 1);
 }
 
 static snd_pcm_sframes_t write_physical(plumos_pcm_t *pcm,
@@ -454,13 +505,13 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
     const int16_t *output;
     snd_pcm_sframes_t result;
     snd_pcm_uframes_t frame;
+    int physical_width;
     int err;
 
+    physical_width = snd_pcm_format_physical_width(io->format);
     if (!areas || io->channels < 1 || io->channels > 2 ||
-        (io->format == SND_PCM_FORMAT_S16_LE &&
-         areas[0].step != 16 * io->channels) ||
-        (io->format == SND_PCM_FORMAT_FLOAT_LE &&
-         areas[0].step != 32 * io->channels))
+        physical_width <= 0 ||
+        areas[0].step != (unsigned int)physical_width * io->channels)
         return -EINVAL;
     input = (const unsigned char *)areas[0].addr + areas[0].first / 8 +
             offset * areas[0].step / 8;
@@ -489,7 +540,7 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
     }
 
     output = input;
-    if (io->channels == 1 || io->format == SND_PCM_FORMAT_FLOAT_LE ||
+    if (io->channels == 1 || io->format != SND_PCM_FORMAT_S16_LE ||
         !pcm->physical_is_usb || pcm->volume_level < 20) {
         err = ensure_output_buffer(pcm, size);
         if (err < 0)
@@ -515,7 +566,7 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
     if (result < 0 && result != -EPIPE && result != -ESTRPIPE) {
         if (switch_route(pcm, 1) == 0) {
             if (io->channels == 1 || !pcm->physical_is_usb ||
-                io->format == SND_PCM_FORMAT_FLOAT_LE ||
+                io->format != SND_PCM_FORMAT_S16_LE ||
                 pcm->volume_level < 20) {
                 err = ensure_output_buffer(pcm, size);
                 if (err < 0)
@@ -686,7 +737,13 @@ static int set_constraints(snd_pcm_ioplug_t *io)
 {
     static const unsigned int access[] = { SND_PCM_ACCESS_RW_INTERLEAVED };
     static const unsigned int format[] = {
+        SND_PCM_FORMAT_S8,
+        SND_PCM_FORMAT_U8,
         SND_PCM_FORMAT_S16_LE,
+        SND_PCM_FORMAT_U16_LE,
+        SND_PCM_FORMAT_S24_LE,
+        SND_PCM_FORMAT_S24_3LE,
+        SND_PCM_FORMAT_S32_LE,
         SND_PCM_FORMAT_FLOAT_LE,
     };
     static const unsigned int channels[] = { 1, 2 };
@@ -695,7 +752,7 @@ static int set_constraints(snd_pcm_ioplug_t *io)
     if ((err = snd_pcm_ioplug_set_param_list(io, SND_PCM_IOPLUG_HW_ACCESS,
                                               1, access)) < 0 ||
         (err = snd_pcm_ioplug_set_param_list(io, SND_PCM_IOPLUG_HW_FORMAT,
-                                              2, format)) < 0 ||
+                                              8, format)) < 0 ||
         (err = snd_pcm_ioplug_set_param_list(io, SND_PCM_IOPLUG_HW_CHANNELS,
                                               2, channels)) < 0 ||
         (err = snd_pcm_ioplug_set_param_minmax(io, SND_PCM_IOPLUG_HW_RATE,

@@ -1044,6 +1044,14 @@ bind directly to a numbered hardware card.
   their playback loop from observing ioplug hardware-pointer progress. Named
   interfaces such as `plumos_output` and `plumos_pyxel` may retain their
   explicit format-conversion layer.
+- The direct default route must accept the common SDL/OpenAL application
+  contracts without per-game configuration: `S8`, `U8`, little-endian
+  `S16`, `U16`, `S24`, packed `S24_3`, `S32`, and `F32`; one or two channels;
+  and 8-192 kHz. The router converts these inputs to the physical
+  `S16_LE` stereo stream, then applies the shared software volume and the
+  internal-mono or USB-stereo output policy. Applications that bypass ALSA
+  `default` and explicitly open `hw:*` remain detectable compatibility
+  exceptions rather than a reason to add title-specific normal paths.
 - The ioplug must expose the currently selected physical PCM poll descriptors
   and calculate its playback pointer from submitted frames minus physical
   delay. An always-writable synthetic descriptor or a submitted-only pointer

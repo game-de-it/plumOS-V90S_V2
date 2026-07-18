@@ -659,6 +659,12 @@ Build plumOS V90S as a V90S-specific distribution:
     Balatro audio was subsequently validated through a direct ALSA `default`
     ioplug route: the physical PCM remained `RUNNING`, accepted continuing
     960-frame writes, and the user confirmed audible game audio.
+    The same default route now accepts the common SDL/OpenAL signed, unsigned,
+    integer, packed 24-bit, and float formats. This removed Kemono Rogue's
+    title-specific `11025 Hz / U8 / mono` startup failure without a per-port
+    override. Kemono Rogue's separately missing BGM was traced to the official
+    port ZIP omitting `title.*` and `stage.*`; restoring the upstream ADP assets
+    produced confirmed BGM without changing its audio route.
   - [x] Physically confirm PortMaster GUI navigation and game controls with the
     V90S buttons. On the ext4 runtime, repair official ZIP mode `0644` to
     `0755` for `gptokeyb`/`gptokeyb2`; Donut Dodo then ran with its owned
