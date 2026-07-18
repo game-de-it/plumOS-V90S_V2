@@ -47,6 +47,8 @@ delegate_to_rootfs_power_action() {
     PLUMOS_ROOT="$PLUMOS_ROOT" \
     PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}" \
     PLUMOS_POWER_ACTION_LOG="${PLUMOS_POWER_ACTION_ROOTFS_LOG:-/run/plumos/power-action.log}" \
+    LD_LIBRARY_PATH= \
+    LD_PRELOAD= \
       "$ROOTFS_POWER_ACTION" "$@" </dev/null >/dev/null 2>&1 &
     echo "result=power_action_scheduled"
     exit 0

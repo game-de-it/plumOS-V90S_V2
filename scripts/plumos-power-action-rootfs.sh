@@ -21,6 +21,7 @@ WAKEUP_SEC="${PLUMOS_POWER_ACTION_SLEEP_WAKEUP_SEC:-${PLUMOS_SAFE_SLEEP_WAKEUP_S
 WAIT_SEC="${PLUMOS_POWER_ACTION_WAIT_SEC:-${PLUMOS_SAFE_SHUTDOWN_WAIT_SEC:-1}}"
 FINAL_UNMOUNT="${PLUMOS_POWER_ACTION_FINAL_UNMOUNT:-${PLUMOS_SAFE_SHUTDOWN_FINAL_UNMOUNT:-1}}"
 MIRROR_LOG="${PLUMOS_POWER_ACTION_MIRROR_LOG:-1}"
+QUIESCE_CLEAN=0
 
 usage() {
   cat <<'USAGE'
@@ -165,8 +166,8 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
 mount_source_for_path() {
   wanted="$1"
-  while read -r source target fstype opts rest; do
-    [ "$target" = "$wanted" ] || continue
+  while read -r source mount_target fstype opts rest; do
+    [ "$mount_target" = "$wanted" ] || continue
     printf '%s %s %s\n' "$source" "$fstype" "$opts"
     return 0
   done < /proc/mounts
@@ -185,6 +186,30 @@ safe_sync() {
   fi
   sync 2>/dev/null || true
   log "sync: done"
+}
+
+sync_once() {
+  log "sync: begin"
+  sync 2>/dev/null || true
+  log "sync: done"
+}
+
+wait_pids_exit() {
+  WAIT_ALIVE="$1"
+  attempts="$2"
+  while [ "$attempts" -gt 0 ]; do
+    alive=""
+    for pid in $WAIT_ALIVE; do
+      if kill -0 "$pid" 2>/dev/null; then
+        alive="${alive}${alive:+ }$pid"
+      fi
+    done
+    WAIT_ALIVE="$alive"
+    [ -n "$WAIT_ALIVE" ] || return 0
+    sleep 0.1 2>/dev/null || true
+    attempts=$((attempts - 1))
+  done
+  return 1
 }
 
 pid_cmdline() {
@@ -219,6 +244,7 @@ stop_app_layer_writers() {
   for proc in /proc/[0-9]*; do
     pid="${proc##*/}"
     [ "$pid" != "$$" ] || continue
+    [ -e "$proc/exe" ] || continue
     [ -r "$proc/cmdline" ] || continue
     if pid_matches_app_layer_writer "$pid"; then
       pids="${pids}${pids:+ }$pid"
@@ -234,20 +260,14 @@ stop_app_layer_writers() {
   for pid in $pids; do
     kill -TERM "$pid" 2>/dev/null || true
   done
-  sleep 1 2>/dev/null || true
-
-  still_alive=""
-  for pid in $pids; do
-    if kill -0 "$pid" 2>/dev/null; then
-      still_alive="${still_alive}${still_alive:+ }$pid"
-    fi
-  done
+  wait_pids_exit "$pids" 10 || true
+  still_alive="$WAIT_ALIVE"
   if [ -n "$still_alive" ]; then
     log "quiesce: KILL pids=$still_alive"
     for pid in $still_alive; do
       kill -KILL "$pid" 2>/dev/null || true
     done
-    sleep 1 2>/dev/null || true
+    wait_pids_exit "$still_alive" 5 || true
   fi
 }
 
@@ -296,7 +316,7 @@ stop_persistent_storage_users() {
     pid="${proc##*/}"
     [ "$pid" != 1 ] || continue
     [ "$pid" != "$$" ] || continue
-    [ -d "$proc" ] || continue
+    [ -e "$proc/exe" ] || continue
     if pid_uses_persistent_storage "$pid"; then
       pids="${pids}${pids:+ }$pid"
     fi
@@ -311,20 +331,14 @@ stop_persistent_storage_users() {
   for pid in $pids; do
     kill -TERM "$pid" 2>/dev/null || true
   done
-  sleep 1 2>/dev/null || true
-
-  still_alive=""
-  for pid in $pids; do
-    if kill -0 "$pid" 2>/dev/null; then
-      still_alive="${still_alive}${still_alive:+ }$pid"
-    fi
-  done
+  wait_pids_exit "$pids" 10 || true
+  still_alive="$WAIT_ALIVE"
   if [ -n "$still_alive" ]; then
     log "quiesce: persistent KILL pids=$still_alive"
     for pid in $still_alive; do
       kill -KILL "$pid" 2>/dev/null || true
     done
-    sleep 1 2>/dev/null || true
+    wait_pids_exit "$still_alive" 5 || true
   fi
 }
 
@@ -360,6 +374,30 @@ mirror_log_to_app_layer() {
   fi
 }
 
+persist_final_log_to_user_storage() {
+  source="$1"
+  debug_mount=/run/plumos-power-log
+
+  [ "$MIRROR_LOG" = "1" ] || return 0
+  if is_mounted_path "$PLUMOS_USER_ROOT"; then
+    mkdir -p "$PLUMOS_USER_ROOT/Logs" 2>/dev/null || true
+    cp "$LOG_FILE" "$PLUMOS_USER_ROOT/Logs/power-action-rootfs-final.log" \
+      2>/dev/null || true
+    sync 2>/dev/null || true
+    return 0
+  fi
+  [ -n "$source" ] && [ -b "$source" ] || return 0
+  mkdir -p "$debug_mount" 2>/dev/null || true
+  if mount -t vfat -o rw,utf8,shortname=mixed "$source" "$debug_mount" \
+      2>> "$LOG_FILE"; then
+    mkdir -p "$debug_mount/Logs" 2>/dev/null || true
+    cp "$LOG_FILE" "$debug_mount/Logs/power-action-rootfs-final.log" \
+      2>/dev/null || true
+    sync 2>/dev/null || true
+    umount "$debug_mount" 2>> "$LOG_FILE" || true
+  fi
+}
+
 record_clean_shutdown() {
   verified="$PLUMOS_ROOT/provision/system-a.verified.sha256"
   complete="$PLUMOS_ROOT/provision/complete"
@@ -371,7 +409,6 @@ record_clean_shutdown() {
   log "quiesce: recording clean shutdown"
   : > "$PLUMOS_ROOT/provision/clean-shutdown"
   : > "$PLUMOS_USER_ROOT/.plumos-clean-shutdown"
-  sync 2>/dev/null || true
 }
 
 remount_app_layer_ro() {
@@ -386,18 +423,24 @@ remount_app_layer_ro() {
 }
 
 unmount_persistent_storage_for_final_action() {
+  p4_clean=1
+  p3_clean=1
+  user_storage_mount=""
+  user_storage_source=""
+
   [ "$FINAL_UNMOUNT" = "1" ] || { log "quiesce: unmount disabled"; return 0; }
   [ "$DRY_RUN" -eq 0 ] || { log "quiesce: dry-run"; return 0; }
 
+  QUIESCE_CLEAN=0
+  user_storage_mount="$(mount_source_for_path "$PLUMOS_USER_ROOT" || true)"
+  user_storage_source="${user_storage_mount%% *}"
   log "quiesce: begin root=$PLUMOS_ROOT"
   stop_sd2_mounts
   stop_app_layer_writers
-  safe_sync
-  mirror_log_to_app_layer
-  sync 2>/dev/null || true
   stop_persistent_storage_users
   record_clean_shutdown
-  safe_sync
+  mirror_log_to_app_layer
+  sync_once
 
   unmount_if_mounted "$PLUMOS_ROOT/themes-user" || true
   unmount_if_mounted "$PLUMOS_ROOT/Images" || true
@@ -405,21 +448,36 @@ unmount_persistent_storage_for_final_action() {
   unmount_if_mounted "$PLUMOS_ROOT/roms" || true
   unmount_if_mounted /boot || true
   mirror_log_to_app_layer
-  sync 2>/dev/null || true
-  unmount_if_mounted "$PLUMOS_USER_ROOT" || true
+  if ! unmount_if_mounted "$PLUMOS_USER_ROOT"; then
+    p4_clean=0
+    rm -f "$PLUMOS_USER_ROOT/.plumos-clean-shutdown" 2>/dev/null || true
+    sync 2>/dev/null || true
+  fi
 
   if ! unmount_if_mounted "$PLUMOS_ROOT"; then
+    p3_clean=0
+    rm -f "$PLUMOS_ROOT/provision/clean-shutdown" 2>/dev/null || true
+    sync 2>/dev/null || true
     log_plumos_blockers
-    safe_sync
     unmount_if_mounted "$PLUMOS_ROOT" || remount_app_layer_ro || true
   fi
   unmount_if_mounted "$PLUMOS_BOOT_ROOT" || true
-  safe_sync
+  if [ "$p4_clean" -eq 1 ] && [ "$p3_clean" -eq 1 ]; then
+    QUIESCE_CLEAN=1
+    log "quiesce: clean unmount complete"
+  else
+    log "quiesce: clean unmount failed p4=$p4_clean p3=$p3_clean"
+    persist_final_log_to_user_storage "$user_storage_source"
+  fi
 }
 
 prepare_sysrq_final_action() {
   [ "$DRY_RUN" -eq 0 ] || return 0
   [ -w /proc/sysrq-trigger ] || return 0
+  if [ "$QUIESCE_CLEAN" -eq 1 ]; then
+    log "sysrq: extra sync/remount skipped after clean unmount"
+    return 0
+  fi
   log "sysrq: syncing filesystems"
   echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true
   echo s >/proc/sysrq-trigger 2>/dev/null || true
@@ -490,7 +548,6 @@ sleep_action() {
 }
 
 reboot_action() {
-  safe_sync
   log "reboot: requested backend=$POWER_BACKEND"
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "result=dry_run_reboot"
@@ -502,8 +559,8 @@ reboot_action() {
 }
 
 shutdown_action() {
-  safe_sync
   if [ "$POWER_OFF" -eq 0 ]; then
+    safe_sync
     log "shutdown: sync-only no-poweroff"
     echo "result=shutdown_sync_only"
     return 0

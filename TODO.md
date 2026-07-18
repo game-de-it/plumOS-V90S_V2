@@ -682,8 +682,14 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Render FE reboot and shutdown with the same centered progress-screen
   language as Refresh TOP: top status bar, left accent, large action/wait
   labels, smaller safe-save/SD-card warnings, and no interactive cursor.
-- [ ] Visually confirm the new reboot and shutdown progress screens on the
+- [x] Visually confirm the new reboot and shutdown progress screens on the
   physical V90S after the 2026-07-18 frontend deployment.
+- [x] Shorten the four-partition reboot/poweroff path without weakening clean
+  unmounts: poll process exits instead of fixed waits, consolidate syncs,
+  skip redundant SysRq sync/remount after verified p3/p4 unmounts, and launch
+  the rootfs helper without app-layer loader paths. Hardware reboot testing
+  reduced ADB action-to-return from about 33-35 seconds to about 21 seconds
+  while retaining the clean fast-boot path.
 - [x] Add a final-action watchdog so a hung `reboot -f` or `poweroff -f` cannot
   block the already-synced FE Reboot/Shutdown path before reaching sysrq.
 - [x] Change the normal FE Reboot/Shutdown path to direct sysrq after SD2 stop
@@ -794,6 +800,9 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Complete FE menu reboot and shutdown/cold-power-on cycles with the
     complete `-11` image. Both returned through the clean fast path without
     setup frames, journal recovery, a FAT dirty bit, or storage I/O errors.
+  - [x] Generate and verify
+    `plumos-v90s-four-partition-20260718-13.img` with the shortened power
+    action and sanitized rootfs-helper loader environment.
   - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
