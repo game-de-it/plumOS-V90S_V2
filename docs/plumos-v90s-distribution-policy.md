@@ -1670,3 +1670,48 @@ Weston/GL4ES, Box64, Mono, Java, or other runtime classes until each class has a
 packaged V90S runtime and real-device video, audio, input, exit, save, and FE
 restoration evidence. A working GUI or successful download alone is not a port
 compatibility result.
+
+### 2026-07-19: RetroArch Factory Configuration Ownership
+
+Decision:
+
+The tracked V90S RetroArch factory configuration is:
+
+```text
+package/frontend-v90s/plumos/factory-defaults/ra/config/retroarch/retroarch-v90s.cfg
+```
+
+It is a snapshot of the current configuration validated on the physical V90S,
+not a hand-maintained minimal template. `scripts/docker-build.sh retroarch`
+must require this file, bundle it into the RetroArch build artifact at:
+
+```text
+plumos/factory-defaults/ra/config/retroarch/retroarch-v90s.cfg
+```
+
+and record its SHA-256 in the RetroArch manifest. App-layer assembly must reject
+a frontend factory copy that differs from the RetroArch build artifact. This
+keeps one reviewed configuration contract across the build, factory reset, and
+runtime paths.
+
+The writable user configuration remains:
+
+```text
+/mnt/plumos/config/retroarch/retroarch-v90s.cfg
+```
+
+The launcher copies the factory configuration atomically only when that user
+file does not exist. Normal application-layer updates and later launches must
+not replace it. RetroArch may persist user changes because
+`config_save_on_exit=true`. `plumos-factory-reset retroarch` is the explicit
+operation that backs up the current user configuration and restores the factory
+copy. If both the user configuration and factory copy are unavailable, startup
+must fail with a clear log entry instead of synthesizing another hidden default.
+
+Rationale:
+
+The hardware-validated configuration contains the complete current RetroArch
+state, including V90S PowerVR video timing, ALSA routing, controller mappings,
+and plumOS storage paths. Treating it as a versioned build input prevents a
+minimal generated cfg or stale frontend payload from silently changing device
+behavior, while preserving the user's freedom to modify and save settings.

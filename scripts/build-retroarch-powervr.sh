@@ -9,6 +9,7 @@ Usage:
   build-retroarch-powervr.sh [options]
 
 Builds the V90S RetroArch binary for the PowerVR GE8300 fbdev route.
+The build also validates and bundles the tracked V90S factory configuration.
 
 Defaults:
   output directory: output/retroarch-powervr
@@ -17,6 +18,7 @@ Defaults:
 
 The remaining options are passed through to build-retroarch-knulli.sh, which
 still contains the historical KNULLI reference-source integration.
+Use --factory-config PATH only when validating an alternate factory snapshot.
 USAGE
     exit 0
 fi

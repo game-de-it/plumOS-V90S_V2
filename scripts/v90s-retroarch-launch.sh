@@ -17,6 +17,7 @@ SYNC_LOGS="${PLUMOS_V90S_RETROARCH_SYNC_LOGS:-0}"
 RETROARCH_CONFIG_SRC="${PLUMOS_V90S_RETROARCH_CONFIG:-}"
 RETROARCH_CONFIG_DIR="${PLUMOS_V90S_RETROARCH_CONFIG_DIR:-/mnt/share/retroarch}"
 RETROARCH_CONFIG_PATH="${PLUMOS_V90S_RETROARCH_CONFIG_PATH:-}"
+RETROARCH_FACTORY_CONFIG="${PLUMOS_V90S_RETROARCH_FACTORY_CONFIG:-${PLUMOS_ROOT:-/mnt/plumos}/factory-defaults/ra/config/retroarch/retroarch-v90s.cfg}"
 RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 RUN_DIR="${PLUMOS_V90S_RUN_DIR:-$RUNTIME_ROOT/retroarch}"
 ROUTE_CONFIG="${PLUMOS_V90S_ROUTE_CONFIG:-/etc/plumos-v90s-retroarch-route}"
@@ -478,85 +479,18 @@ prepare_app_runtime_sonames() {
     log "retroarch-launch: app runtime prepared: $runtime_status"
 }
 
-write_config() {
+install_factory_config() {
     cfg="$1"
-    video_driver="$2"
-    input_driver="$3"
-    joypad_driver="$4"
-    audio_driver="$5"
-    video_context_driver="$6"
-    video_threaded="$7"
+    tmp_cfg="${cfg}.factory.$$"
 
-    cat > "$cfg" <<EOF
-config_save_on_exit = "true"
-core_options_path = "${PLUMOS_V90S_CORE_OPTIONS_PATH:-${PLUMOS_ROOT:-/mnt/plumos}/config/retroarch/retroarch-core-options.cfg}"
-libretro_directory = "${PLUMOS_V90S_LIBRETRO_DIR:-/usr/lib/aarch64-linux-gnu/libretro}"
-libretro_info_path = "${PLUMOS_V90S_LIBRETRO_INFO_DIR:-/usr/share/libretro/info}"
-assets_directory = "${PLUMOS_V90S_RETROARCH_ASSETS_DIR:-/usr/share/libretro/assets}"
-system_directory = "${PLUMOS_V90S_SYSTEM_DIR:-/root/.config/retroarch/system}"
-savefile_directory = "${PLUMOS_V90S_SAVEFILE_DIR:-/tmp}"
-savestate_directory = "${PLUMOS_V90S_SAVESTATE_DIR:-/tmp}"
-content_database_path = "${PLUMOS_V90S_CONTENT_DATABASE_DIR:-/usr/share/libretro/database/rdb}"
-
-log_verbosity = "true"
-libretro_log_level = "0"
-fps_show = "true"
-fps_update_interval = "256"
-video_font_enable = "true"
-video_font_size = "16.000000"
-
-menu_driver = "rgui"
-video_driver = "$video_driver"
-EOF
-    if [ -n "$video_context_driver" ]; then
-        printf 'video_context_driver = "%s"\n' "$video_context_driver" >> "$cfg"
+    [ -r "$RETROARCH_FACTORY_CONFIG" ] || return 1
+    if cp "$RETROARCH_FACTORY_CONFIG" "$tmp_cfg" 2>/dev/null &&
+        chmod 0644 "$tmp_cfg" 2>/dev/null &&
+        mv -f "$tmp_cfg" "$cfg" 2>/dev/null; then
+        return 0
     fi
-    cat >> "$cfg" <<EOF
-video_fullscreen = "true"
-video_windowed_fullscreen = "true"
-video_vsync = "true"
-video_refresh_rate = "${PLUMOS_V90S_VIDEO_REFRESH_RATE:-58.917103}"
-video_threaded = "$video_threaded"
-threaded_data_runloop_enable = "true"
-vrr_runloop_enable = "${PLUMOS_V90S_VRR_RUNLOOP_ENABLE:-true}"
-video_smooth = "false"
-video_scale_integer = "false"
-video_force_aspect = "true"
-video_aspect_ratio = "1.333333"
-
-audio_enable = "true"
-audio_driver = "$audio_driver"
-audio_device = "${PLUMOS_V90S_AUDIO_DEVICE:-plumos_output}"
-audio_sync = "true"
-audio_latency = "${PLUMOS_V90S_AUDIO_LATENCY:-64}"
-
-input_driver = "$input_driver"
-input_joypad_driver = "$joypad_driver"
-input_autodetect_enable = "true"
-input_player1_analog_dpad_mode = "1"
-input_player1_up = "up"
-input_player1_down = "down"
-input_player1_left = "left"
-input_player1_right = "right"
-input_player1_a = "x"
-input_player1_b = "z"
-input_player1_start = "enter"
-input_player1_select = "rshift"
-input_exit_emulator = "escape"
-input_enable_hotkey = "rshift"
-input_hotkey_block_delay = "5"
-input_menu_toggle = "enter"
-input_menu_toggle_gamepad_combo = "4"
-all_users_control_menu = "true"
-menu_pause_libretro = "true"
-rgui_show_start_screen = "false"
-
-pause_nonactive = "false"
-run_ahead_enabled = "false"
-rewind_enable = "false"
-cheevos_enable = "false"
-network_cmd_enable = "false"
-EOF
+    rm -f "$tmp_cfg" 2>/dev/null || true
+    return 1
 }
 
 prepare_config_path() {
@@ -1045,9 +979,13 @@ else
     if [ -f "$cfg" ]; then
         log "retroarch-launch: reusing persistent RetroArch config: $cfg"
     else
-        write_config "$cfg" "$video_driver" "$input_driver" "$joypad_driver" "$audio_driver" "$video_context_driver" "$video_threaded"
+        if ! install_factory_config "$cfg"; then
+            log "retroarch-launch: factory config missing or unreadable: $RETROARCH_FACTORY_CONFIG"
+            mirror_logs
+            exit 47
+        fi
         config_initialized=1
-        log "retroarch-launch: created RetroArch config: $cfg"
+        log "retroarch-launch: installed factory RetroArch config from $RETROARCH_FACTORY_CONFIG to $cfg"
     fi
 fi
 if [ "$config_initialized" = "1" ] || [ ! -f "$config_schema_marker" ]; then

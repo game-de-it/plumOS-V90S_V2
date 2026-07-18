@@ -7,6 +7,7 @@ compat_vendor="${PLUMOS_V90S_VENDOR_RUNTIME_ID:-v90s-stockos-r1}"
 mount_path="${PLUMOS_V90S_APP_LAYER_MOUNT:-/mnt/plumos}"
 retroarch_dir="${PLUMOS_V90S_RETROARCH_DIR:-output/retroarch-powervr}"
 retroarch_bin="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-powervr}"
+retroarch_factory_rel="factory-defaults/ra/config/retroarch/retroarch-v90s.cfg"
 cores_dir="${PLUMOS_V90S_CORES_DIR:-output/libretro-cores/v90s}"
 sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
 frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
@@ -143,6 +144,8 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+retroarch_factory_src="$retroarch_dir/plumos/$retroarch_factory_rel"
 
 case "$minimum_core_count" in
     ''|*[!0-9]*)
@@ -451,6 +454,20 @@ if require_or_note_missing "$frontend_root/bin/plumos-frontend-launch" "frontend
     if [ -f "$frontend_dir/frontend.manifest" ]; then
         copy_file "$frontend_dir/frontend.manifest" "$out_dir/licenses/frontend-manifest.txt"
         record_file "licenses/frontend-manifest.txt" "frontend" "$frontend_dir/frontend.manifest"
+    fi
+fi
+
+if require_or_note_missing "$retroarch_factory_src" "retroarch:factory-config"; then
+    retroarch_factory_dst="$out_dir/$retroarch_factory_rel"
+    if [ -f "$retroarch_factory_dst" ]; then
+        if ! cmp -s "$retroarch_factory_src" "$retroarch_factory_dst"; then
+            printf 'error: frontend and RetroArch factory configs do not match:\n  %s\n  %s\n' \
+                "$retroarch_factory_src" "$retroarch_factory_dst" >&2
+            exit 1
+        fi
+    else
+        copy_file "$retroarch_factory_src" "$retroarch_factory_dst"
+        record_file "$retroarch_factory_rel" "retroarch-factory-config" "$retroarch_factory_src"
     fi
 fi
 

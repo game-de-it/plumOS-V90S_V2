@@ -227,7 +227,7 @@ if [ "$payload_count" -gt 0 ]; then
         chunk_number=$((chunk_number + 1))
         chunk_tar="$tmp_dir/payload.$chunk_number.tar"
         chunk_checksums="$tmp_dir/checksums.$chunk_number.sha256"
-        tar -C "$APP_LAYER_DIR" -cf "$chunk_tar" -T "$chunk_paths"
+        COPYFILE_DISABLE=1 tar -C "$APP_LAYER_DIR" -cf "$chunk_tar" -T "$chunk_paths"
         awk '
           NR == FNR { wanted[$0] = 1; next }
           length($0) >= 67 && substr($0, 67) in wanted { print }

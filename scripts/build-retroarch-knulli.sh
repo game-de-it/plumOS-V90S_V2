@@ -8,6 +8,7 @@ knulli_src=".cache/knulli-linux"
 pvr_dir=".cache/ge8300-drivers"
 sdl2_powervr_dir="output/sdl2-powervr"
 local_patch_dir="patches/retroarch"
+factory_config="${PLUMOS_V90S_RETROARCH_FACTORY_CONFIG:-package/frontend-v90s/plumos/factory-defaults/ra/config/retroarch/retroarch-v90s.cfg}"
 docker_image="${PLUMOS_V90S_RETROARCH_DOCKER_IMAGE:-debian:bookworm}"
 binary_name="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-knulli}"
 compat_out="${PLUMOS_V90S_RETROARCH_COMPAT_OUT:-}"
@@ -31,6 +32,9 @@ Options:
   --sdl2-mali-dir PATH  deprecated alias for --sdl2-powervr-dir
   --local-patch-dir PATH
                         local RetroArch patches; default patches/retroarch
+  --factory-config PATH V90S factory RetroArch config bundled with the build;
+                        default package/frontend-v90s/plumos/factory-defaults/
+                        ra/config/retroarch/retroarch-v90s.cfg
   --apply-patches       also replay KNULLI package patches before building
   --skip-patches        accepted for compatibility; this is the default
 USAGE
@@ -75,6 +79,10 @@ while [ "$#" -gt 0 ]; do
             local_patch_dir="$2"
             shift 2
             ;;
+        --factory-config)
+            factory_config="$2"
+            shift 2
+            ;;
         --skip-patches)
             apply_patches=0
             shift
@@ -116,6 +124,10 @@ fi
 if [ ! -f "$sdl2_lib_dir/libSDL2-2.0.so.0" ]; then
     printf 'error: patched SDL2/PowerVR library not found under: %s\n' "$sdl2_lib_dir" >&2
     printf 'hint: run ./scripts/docker-build.sh sdl2-powervr first\n' >&2
+    exit 1
+fi
+if [ ! -f "$factory_config" ]; then
+    printf 'error: V90S RetroArch factory config not found: %s\n' "$factory_config" >&2
     exit 1
 fi
 
@@ -267,10 +279,16 @@ if [ -d "$work_dir/.stage/usr/share/retroarch" ]; then
     cp -a "$work_dir/.stage/usr/share/retroarch" "$out_dir/usr/local/share/retroarch"
 fi
 
+factory_config_rel="plumos/factory-defaults/ra/config/retroarch/retroarch-v90s.cfg"
+factory_config_out="$out_dir/$factory_config_rel"
+mkdir -p "$(dirname "$factory_config_out")"
+install -m 0644 "$factory_config" "$factory_config_out"
+
 sha256sum "$out_dir/usr/local/bin/$binary_name" > "$out_dir/$binary_name.sha256"
 if [ "$binary_name" != "retroarch-knulli" ]; then
     sha256sum "$out_dir/usr/local/bin/retroarch-knulli" > "$out_dir/retroarch-knulli.sha256"
 fi
+sha256sum "$factory_config_out" > "$out_dir/retroarch-v90s-factory.cfg.sha256"
 
 compat_note=none
 if [ -n "$compat_out" ] && [ "$compat_out" != "$out_dir" ]; then
@@ -309,6 +327,9 @@ compat_binary=retroarch-knulli
 compat_output=$compat_note
 output=$out_dir/usr/local/bin/$binary_name
 sha256=$(awk '{print $1}' "$out_dir/$binary_name.sha256")
+factory_config_source=$factory_config
+factory_config_output=$factory_config_rel
+factory_config_sha256=$(awk '{print $1}' "$out_dir/retroarch-v90s-factory.cfg.sha256")
 EOF
 
 printf 'created: %s/usr/local/bin/%s\n' "$out_dir" "$binary_name"

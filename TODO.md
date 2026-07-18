@@ -885,9 +885,11 @@ Build plumOS V90S as a V90S-specific distribution:
   - `audio_latency = "64"`
   - `input_driver = "sdl2"`
   - `input_joypad_driver = "sdl2"`
-- [ ] Ensure users can save RetroArch settings.
-- [ ] Ensure frontend/config tooling does not overwrite user settings on every
-  launch.
+- [x] Ensure users can save RetroArch settings. The live 2026-07-19 V90S cfg
+  keeps `config_save_on_exit=true` and is the tracked factory snapshot.
+- [x] Ensure frontend/config tooling does not overwrite user settings on every
+  launch. The launcher installs the factory cfg only when the persistent cfg is
+  absent; normal builds, deploys, and launches preserve the user copy.
 - [x] Migrate RetroArch's unset/default `/root/.config/retroarch` directory
   values to the V90S `/mnt/plumos` layout while preserving explicit user paths
   and keeping disposable cache under `/run/plumos`.
