@@ -83,6 +83,12 @@ grep -Fq 'BOOT_LOG_NAME=last-boot.log' "$tmp_dir/ramdisk/init" ||
     fail "initramfs does not preserve first-boot diagnostics on normal boots"
 grep -Fq 'normal boot: userdata provisioning is complete' "$tmp_dir/ramdisk/init" ||
     fail "initramfs does not have a completed-provisioning fast path"
+grep -Fq 'fast boot: clean p3/p4 and cached system verification accepted' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not recognize a clean verified fast boot"
+grep -Fq '[ "$FAST_BOOT" = 1 ] || show_progress start' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs still displays the startup progress frame on fast boot"
+grep -Fq 'rm -f "$P3_MOUNT/$CLEAN_P3_REL" "$P4_MOUNT/$CLEAN_P4_REL"' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not consume clean-shutdown markers before handoff"
 for file in tools/bin/parted tools/bin/e2fsck tools/bin/resize2fs tools/bin/mkfs.fat \
     tools/bin/fsck.fat tools/lib/ld-linux-aarch64.so.1; do
     [ -x "$tmp_dir/ramdisk/$file" ] || fail "initramfs tool missing: $file"
@@ -132,6 +138,10 @@ grep -Fq 'unmount_if_mounted "$PLUMOS_USER_ROOT"' "$tmp_dir/system-power-action"
     fail "system power action does not unmount p4"
 grep -Fq 'prepare_sysrq_final_action' "$tmp_dir/system-power-action" ||
     fail "system power action does not sync and remount filesystems read-only"
+grep -Fq 'record_clean_shutdown' "$tmp_dir/system-power-action" ||
+    fail "system power action does not record a clean shutdown"
+grep -Fq 'system-a.verified.sha256' "$tmp_dir/system-power-action" ||
+    fail "system power action does not require a verified system cache"
 pass "system SquashFS init, app bootstrap, and four-partition power action"
 
 python3 - "$app_runtime/manifest.json" <<'PY'

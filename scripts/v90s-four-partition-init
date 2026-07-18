@@ -24,6 +24,10 @@ TEST_BOOT_PARTITION="${PLUMOS_INITRAMFS_TEST_BOOT_PARTITION:-}"
 PROVISION_ONLY="${PLUMOS_INITRAMFS_PROVISION_ONLY:-0}"
 PROVISIONING=0
 P3_RESIZE_REQUIRED=0
+FAST_BOOT=0
+CLEAN_P3_REL=provision/clean-shutdown
+CLEAN_P4_REL=.plumos-clean-shutdown
+VERIFIED_SYSTEM_REL=provision/system-a.verified.sha256
 
 log() {
     printf '%s\n' "$*" | tee -a "$LOG"
@@ -210,7 +214,6 @@ fi
 
 set -e
 log "plumOS V90S four-partition initramfs entered"
-show_progress boot
 
 if [ -n "$TEST_BOOT_PARTITION" ]; then
     P2="$TEST_BOOT_PARTITION"
@@ -284,6 +287,48 @@ elif [ -b "${DISK}p4" ]; then
 else
     P4=""
 fi
+
+if [ "$p3_sectors" -eq "$P3_TARGET_SECTORS" ] && [ -n "$P4" ]; then
+    [ "$(partition_number "$P4")" = 4 ] || recovery "userdata is not p4"
+    p4_type="$(blkid_value TYPE "$P4")"
+    p4_label="$(blkid_value LABEL "$P4")"
+    [ "$p4_type" = vfat ] || recovery "existing p4 has unexpected filesystem: $p4_type"
+    [ "$p4_label" = PLUMOS ] || recovery "p4 filesystem label is not PLUMOS: $p4_label"
+
+    mkdir -p "$P1_MOUNT" "$P3_MOUNT" "$P4_MOUNT"
+    mount -t vfat -o ro,utf8,shortname=mixed "$P1" "$P1_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot mount PLUMBOOT for fast-boot inspection"
+    fast_hash_file="$P1_MOUNT/System/system-a.sha256"
+    fast_expected=""
+    fast_ignored=""
+    if [ -f "$fast_hash_file" ]; then
+        IFS=' ' read -r fast_expected fast_ignored < "$fast_hash_file" || fast_expected=""
+    fi
+
+    mount -t ext4 -o ro,noload,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot inspect PLUMOS_SYS fast-boot state"
+    mount -t vfat -o ro,utf8,shortname=mixed "$P4" "$P4_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot inspect PLUMOS fast-boot state"
+    verified_system="$(cat "$P3_MOUNT/$VERIFIED_SYSTEM_REL" 2>/dev/null || true)"
+    if [ -f "$P3_MOUNT/provision/complete" ] &&
+        [ -f "$P3_MOUNT/$CLEAN_P3_REL" ] &&
+        [ -f "$P4_MOUNT/.plumos-ready" ] &&
+        [ -f "$P4_MOUNT/$CLEAN_P4_REL" ] &&
+        [ "${#fast_expected}" -eq 64 ] &&
+        [ "$verified_system" = "$fast_expected" ]; then
+        FAST_BOOT=1
+    fi
+    umount "$P4_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot unmount inspected PLUMOS"
+    umount "$P3_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot unmount inspected PLUMOS_SYS"
+fi
+
+if [ "$FAST_BOOT" = 0 ] &&
+    [ "$p3_sectors" -eq "$P3_TARGET_SECTORS" ] && [ -n "$P4" ]; then
+    show_progress boot
+fi
+
 if [ "$p3_sectors" -lt "$P3_TARGET_SECTORS" ]; then
     PROVISIONING=1
     P3_RESIZE_REQUIRED=1
@@ -309,25 +354,29 @@ if [ "$p3_sectors" -lt "$P3_TARGET_SECTORS" ]; then
         recovery "kernel did not accept exact p3 geometry sectors=$p3_sectors"
 fi
 
-fsck_ext4 "$P3"
-if [ "$P3_RESIZE_REQUIRED" = 0 ]; then
-    mkdir -p "$P3_MOUNT"
-    mount -t ext4 -o ro,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
-        recovery "cannot inspect PLUMOS_SYS completion state"
-    if [ ! -f "$P3_MOUNT/provision/complete" ]; then
-        PROVISIONING=1
-        P3_RESIZE_REQUIRED=1
-        BOOT_LOG_NAME=first-boot.log
+if [ "$FAST_BOOT" = 0 ]; then
+    fsck_ext4 "$P3"
+    if [ "$P3_RESIZE_REQUIRED" = 0 ]; then
+        mkdir -p "$P3_MOUNT"
+        mount -t ext4 -o ro,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
+            recovery "cannot inspect PLUMOS_SYS completion state"
+        if [ ! -f "$P3_MOUNT/provision/complete" ]; then
+            PROVISIONING=1
+            P3_RESIZE_REQUIRED=1
+            BOOT_LOG_NAME=first-boot.log
+        fi
+        umount "$P3_MOUNT" >> "$LOG" 2>&1 ||
+            recovery "cannot unmount inspected PLUMOS_SYS"
     fi
-    umount "$P3_MOUNT" >> "$LOG" 2>&1 ||
-        recovery "cannot unmount inspected PLUMOS_SYS"
-fi
-if [ "$P3_RESIZE_REQUIRED" = 1 ]; then
-    show_progress prepare
-    log "provision: resizing p3 ext4"
-    resize2fs "$P3" >> "$LOG" 2>&1 || recovery "resize2fs failed"
+    if [ "$P3_RESIZE_REQUIRED" = 1 ]; then
+        show_progress prepare
+        log "provision: resizing p3 ext4"
+        resize2fs "$P3" >> "$LOG" 2>&1 || recovery "resize2fs failed"
+    else
+        log "normal boot: p3 provisioning is complete"
+    fi
 else
-    log "normal boot: p3 provisioning is complete"
+    log "fast boot: clean p3/p4 and cached system verification accepted"
 fi
 
 if [ -n "$TEST_BOOT_PARTITION" ] && [ -b "${DISK}p4" ]; then
@@ -367,7 +416,7 @@ elif [ "$p4_type" != vfat ]; then
 fi
 p4_label="$(blkid_value LABEL "$P4")"
 [ "$p4_label" = PLUMOS ] || recovery "p4 filesystem label is not PLUMOS: $p4_label"
-fsck_fat "$P4"
+[ "$FAST_BOOT" = 1 ] || fsck_fat "$P4"
 
 mount_runtime
 if [ ! -f "$P3_MOUNT/provision/complete" ] ||
@@ -395,6 +444,9 @@ else
     log "normal boot: userdata provisioning is complete"
 fi
 
+rm -f "$P3_MOUNT/$CLEAN_P3_REL" "$P4_MOUNT/$CLEAN_P4_REL"
+sync
+
 if [ "$PROVISION_ONLY" = 1 ]; then
     log "provision: test-only stop before system handoff"
     sync
@@ -408,10 +460,19 @@ SYSTEM_IMAGE="$P1_MOUNT/System/system-a.squashfs"
 SYSTEM_HASH="$P1_MOUNT/System/system-a.sha256"
 [ -f "$SYSTEM_IMAGE" ] || recovery "system-a.squashfs is missing"
 [ -f "$SYSTEM_HASH" ] || recovery "system-a.sha256 is missing"
-[ "$PROVISIONING" = 1 ] && show_progress verify
-verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
-    recovery "system-a hash verification failed"
-log "system-a hash verification passed"
+if [ "$FAST_BOOT" = 1 ]; then
+    log "system-a cached verification accepted"
+else
+    [ "$PROVISIONING" = 1 ] && show_progress verify
+    verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
+        recovery "system-a hash verification failed"
+    expected_system=""
+    expected_ignored=""
+    IFS=' ' read -r expected_system expected_ignored < "$SYSTEM_HASH" || expected_system=""
+    mkdir -p "$P3_MOUNT/provision"
+    printf '%s\n' "$expected_system" > "$P3_MOUNT/$VERIFIED_SYSTEM_REL"
+    log "system-a hash verification passed"
+fi
 copy_boot_log
 sync
 
@@ -447,7 +508,7 @@ if [ "$PROVISIONING" = 1 ]; then
 fi
 LOG="$SYSTEM_ROOT/run/plumos-boot.log"
 log "handoff: executing system init"
-show_progress start
+[ "$FAST_BOOT" = 1 ] || show_progress start
 copy_boot_log
 sync
 exec switch_root "$SYSTEM_ROOT" /sbin/init

@@ -360,6 +360,20 @@ mirror_log_to_app_layer() {
   fi
 }
 
+record_clean_shutdown() {
+  verified="$PLUMOS_ROOT/provision/system-a.verified.sha256"
+  complete="$PLUMOS_ROOT/provision/complete"
+  ready="$PLUMOS_USER_ROOT/.plumos-ready"
+  if [ ! -s "$verified" ] || [ ! -f "$complete" ] || [ ! -f "$ready" ]; then
+    log "quiesce: clean-shutdown marker skipped reason=runtime_not_verified"
+    return 0
+  fi
+  log "quiesce: recording clean shutdown"
+  : > "$PLUMOS_ROOT/provision/clean-shutdown"
+  : > "$PLUMOS_USER_ROOT/.plumos-clean-shutdown"
+  sync 2>/dev/null || true
+}
+
 remount_app_layer_ro() {
   is_mounted_path "$PLUMOS_ROOT" || return 0
   log "quiesce: remount-ro begin source=$(mount_source_for_path "$PLUMOS_ROOT" || true)"
@@ -382,6 +396,7 @@ unmount_persistent_storage_for_final_action() {
   mirror_log_to_app_layer
   sync 2>/dev/null || true
   stop_persistent_storage_users
+  record_clean_shutdown
   safe_sync
 
   unmount_if_mounted "$PLUMOS_ROOT/themes-user" || true

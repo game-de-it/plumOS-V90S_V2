@@ -752,8 +752,7 @@ Build plumOS V90S as a V90S-specific distribution:
     `resize2fs`, userdata seeding, setup progress frames, and overwrote
     `first-boot.log` on every boot despite a valid completion marker.
   - [x] Add a completed-provisioning normal path that preserves the original
-    first-boot log, writes `last-boot.log`, skips resize/seeding writes, and
-    shows a normal `BOOTING PLUMOS` frame.
+    first-boot log, writes `last-boot.log`, and skips resize/seeding writes.
   - [x] Update the SquashFS power action for the four-partition mounts. It now
     stops all p3/p4 users, unmounts p4 aliases and persistent filesystems in
     child-first order, then issues SysRq sync and read-only remount before the
@@ -776,8 +775,19 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Generate and verify
     `plumos-v90s-four-partition-20260718-10.img`, then deploy and read back its
     recovery-safe p2 on the physical card.
-  - [ ] Complete one FE menu shutdown and cold-power-on cycle with p2 `-10`
-    without setup frames, journal recovery, or a FAT dirty bit.
+  - [x] Add a clean-shutdown fast path. A verified system cache plus p3/p4
+    clean-shutdown markers now skip ext4/FAT fsck, full SquashFS hashing, and
+    all initramfs progress frames; the markers are consumed before system
+    handoff so an abnormal next shutdown cannot reuse them.
+  - [x] Validate the fast path on hardware with the updated p2 and power helper.
+    The FE process started at about 3.0 seconds and PowerVR initialized at about
+    3.7 seconds, compared with about 11.8 seconds for PowerVR on the checked
+    normal path.
+  - [x] Generate and verify
+    `plumos-v90s-four-partition-20260718-11.img` with the persistent fast-boot
+    power helper in the system SquashFS.
+  - [ ] Complete one FE menu shutdown and cold-power-on cycle with the complete
+    `-11` image, without setup frames, journal recovery, or a FAT dirty bit.
   - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,

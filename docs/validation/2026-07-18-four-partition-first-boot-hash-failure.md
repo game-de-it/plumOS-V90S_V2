@@ -228,8 +228,9 @@ Dirty bit is set. Fs was not properly unmounted
 
 The initramfs now validates geometry on every boot but uses the completed
 provisioning state to skip `resize2fs`, progress-marker writes, and userdata
-seeding. Normal boots display `BOOTING PLUMOS`, write `last-boot.log`, and
-preserve the original `first-boot.log`.
+seeding. This intermediate normal path displayed `BOOTING PLUMOS`, wrote
+`last-boot.log`, and preserved the original `first-boot.log`. The later clean
+shutdown fast path below removes that frame from verified normal boots.
 
 The SquashFS power helper now stops every process holding p3/p4 paths, unmounts
 SD2 and p4 child mounts before p4 and p3, and sends SysRq sync plus read-only
@@ -316,3 +317,60 @@ Only p2, which is not mounted by the running system, was then updated on the
 physical card. Its full 64 MiB block-device readback matched
 `423b8d...b658`. No active p1 live update was performed. A final FE menu
 shutdown and cold-power-on cycle remains pending.
+
+## Clean-shutdown fast boot
+
+The completed-provisioning path still looked like setup because it displayed
+`BOOTING PLUMOS` and ran p3 ext4 fsck, p4 FAT fsck, and a full 96 MiB system
+SquashFS hash on every boot. A clean-shutdown fast path now requires all of:
+
+```text
+p3 provision/complete
+p3 provision/clean-shutdown
+p4 .plumos-ready
+p4 .plumos-clean-shutdown
+p3 cached verified system hash == current p1 system-a hash metadata
+```
+
+The system power helper writes the two clean-shutdown markers only after it
+has stopped persistent-storage users and confirmed the completion, userdata,
+and verified-system records. Initramfs inspects the markers read-only, consumes
+them after mounting p3/p4 read-write, and then skips both fsck passes, the full
+SquashFS hash, and every progress framebuffer. Missing markers or a changed
+system hash retain the slower checked path and its visible progress/error
+diagnostics.
+
+The updated p2 was deployed without touching the active p1. Its full 64 MiB
+readback matched the host image:
+
+```text
+p2_boot_image_sha256=08b41bd44e63ed1c02b35cb0ae5687a7bb66b4056e58b14e0d01da321cc10ddf
+```
+
+For this one live-card test, the new power helper was executed from `/tmp`
+because the mounted p1 still contained the previous system SquashFS. The next
+boot log contained:
+
+```text
+fast boot: clean p3/p4 and cached system verification accepted
+normal boot: userdata provisioning is complete
+system-a cached verification accepted
+```
+
+It contained no ext4 fsck, FAT fsck, full-hash, or provisioning records. The FE
+was one `plumos-controller-ui-fbdev` process whose `/proc` start time was about
+3.0 seconds after kernel start. PowerVR initialized at about 3.7 seconds; the
+previous checked path initialized it at about 11.8 seconds. Both clean markers
+were absent after handoff, proving they were consumed.
+
+The persistent implementation, including the updated SquashFS power helper,
+passed preflight and complete-image structural verification:
+
+```text
+image=output/images/plumos-v90s-four-partition-20260718-11.img
+sha256=5f55bdfcb4e0c777fa5ead652f83b166ec386e8050ffc2f6eaa0b3e85615eb17
+system_squashfs_sha256=e035d26953785712bc57ce6a1435affcfebac93ef24ec04ad05a3dff5e99c0c5
+p2_boot_image_sha256=08b41bd44e63ed1c02b35cb0ae5687a7bb66b4056e58b14e0d01da321cc10ddf
+preflight=PASS
+verification=PASS
+```
