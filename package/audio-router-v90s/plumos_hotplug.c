@@ -4,7 +4,6 @@
 #include <alsa/asoundlib.h>
 #include <alsa/pcm_external.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -25,8 +24,7 @@ typedef struct {
     snd_pcm_t *physical;
     int physical_card;
     int physical_is_usb;
-    int poll_pipe[2];
-    snd_pcm_uframes_t hw_ptr;
+    snd_pcm_uframes_t submitted_ptr;
     int16_t *output_buffer;
     size_t output_capacity;
     unsigned int probe_countdown;
@@ -37,7 +35,24 @@ typedef struct {
     int allow_fast_drop;
     unsigned int fast_streak;
     unsigned int normal_streak;
+    int debug_enabled;
+    unsigned int debug_count;
 } plumos_pcm_t;
+
+static void debug_event(plumos_pcm_t *pcm, const char *event,
+                        snd_pcm_sframes_t value, snd_pcm_sframes_t detail)
+{
+    if (!pcm->debug_enabled || pcm->debug_count >= 256)
+        return;
+    pcm->debug_count++;
+    fprintf(stderr,
+            "plumos-hotplug-debug: event=%s value=%ld detail=%ld "
+            "io_state=%d io_appl=%lu io_hw=%lu submitted=%lu physical=%d\n",
+            event, (long)value, (long)detail, pcm->io.state,
+            (unsigned long)pcm->io.appl_ptr, (unsigned long)pcm->io.hw_ptr,
+            (unsigned long)pcm->submitted_ptr,
+            pcm->physical ? (int)snd_pcm_state(pcm->physical) : -1);
+}
 
 static int clamp_volume(int volume)
 {
@@ -526,29 +541,54 @@ static snd_pcm_sframes_t plumos_transfer(snd_pcm_ioplug_t *io,
         }
     }
     if (result > 0 && io->buffer_size) {
-        pcm->hw_ptr = (pcm->hw_ptr + (snd_pcm_uframes_t)result) % io->buffer_size;
+        pcm->submitted_ptr =
+            (pcm->submitted_ptr + (snd_pcm_uframes_t)result) % io->buffer_size;
     }
+    debug_event(pcm, "transfer", result, (snd_pcm_sframes_t)size);
     return result;
 }
 
 static int plumos_start(snd_pcm_ioplug_t *io)
 {
     plumos_pcm_t *pcm = io->private_data;
-    return pcm->physical ? 0 : switch_route(pcm, 1);
+    int err = pcm->physical ? 0 : switch_route(pcm, 1);
+
+    debug_event(pcm, "start", err, 0);
+    return err;
 }
 
 static int plumos_stop(snd_pcm_ioplug_t *io)
 {
     plumos_pcm_t *pcm = io->private_data;
+
     if (pcm->physical)
         snd_pcm_drop(pcm->physical);
+    debug_event(pcm, "stop", 0, 0);
     return 0;
 }
 
 static snd_pcm_sframes_t plumos_pointer(snd_pcm_ioplug_t *io)
 {
     plumos_pcm_t *pcm = io->private_data;
-    return (snd_pcm_sframes_t)pcm->hw_ptr;
+    snd_pcm_sframes_t delay;
+    int err;
+
+    if (!pcm->physical || !io->buffer_size)
+        return 0;
+    err = snd_pcm_delay(pcm->physical, &delay);
+    if (err < 0) {
+        debug_event(pcm, "pointer-error", err, 0);
+        return err;
+    }
+    if (delay < 0)
+        delay = 0;
+    if ((snd_pcm_uframes_t)delay > io->buffer_size)
+        delay = (snd_pcm_sframes_t)io->buffer_size;
+    err = (int)(
+        (pcm->submitted_ptr + io->buffer_size -
+         (snd_pcm_uframes_t)delay) % io->buffer_size);
+    debug_event(pcm, "pointer", err, delay);
+    return err;
 }
 
 static int plumos_prepare(snd_pcm_ioplug_t *io)
@@ -557,11 +597,13 @@ static int plumos_prepare(snd_pcm_ioplug_t *io)
     int err = switch_route(pcm, 0);
     if (err < 0)
         return err;
-    pcm->hw_ptr = 0;
+    pcm->submitted_ptr = 0;
     err = snd_pcm_prepare(pcm->physical);
     if (err < 0)
         return err;
-    return restore_active_internal_dac(pcm);
+    err = restore_active_internal_dac(pcm);
+    debug_event(pcm, "prepare", err, 0);
+    return err;
 }
 
 static int plumos_drain(snd_pcm_ioplug_t *io)
@@ -580,6 +622,37 @@ static int plumos_delay(snd_pcm_ioplug_t *io, snd_pcm_sframes_t *delayp)
     return snd_pcm_delay(pcm->physical, delayp);
 }
 
+static int plumos_poll_descriptors_count(snd_pcm_ioplug_t *io)
+{
+    plumos_pcm_t *pcm = io->private_data;
+
+    return pcm->physical ? snd_pcm_poll_descriptors_count(pcm->physical) : 0;
+}
+
+static int plumos_poll_descriptors(snd_pcm_ioplug_t *io, struct pollfd *pfds,
+                                   unsigned int space)
+{
+    plumos_pcm_t *pcm = io->private_data;
+
+    if (!pcm->physical)
+        return -ENODEV;
+    return snd_pcm_poll_descriptors(pcm->physical, pfds, space);
+}
+
+static int plumos_poll_revents(snd_pcm_ioplug_t *io, struct pollfd *pfds,
+                               unsigned int nfds, unsigned short *revents)
+{
+    plumos_pcm_t *pcm = io->private_data;
+    int err;
+
+    if (!pcm->physical)
+        return -ENODEV;
+    err = snd_pcm_poll_descriptors_revents(
+        pcm->physical, pfds, nfds, revents);
+    debug_event(pcm, "poll", err, err < 0 ? 0 : *revents);
+    return err;
+}
+
 static int plumos_close(snd_pcm_ioplug_t *io)
 {
     plumos_pcm_t *pcm = io->private_data;
@@ -590,8 +663,6 @@ static int plumos_close(snd_pcm_ioplug_t *io)
         if (restore_internal)
             apply_internal_dac_volume(INTERNAL_CARD);
     }
-    close(pcm->poll_pipe[0]);
-    close(pcm->poll_pipe[1]);
     free(pcm->output_buffer);
     free(pcm);
     return 0;
@@ -606,6 +677,9 @@ static const snd_pcm_ioplug_callback_t plumos_callbacks = {
     .prepare = plumos_prepare,
     .drain = plumos_drain,
     .delay = plumos_delay,
+    .poll_descriptors_count = plumos_poll_descriptors_count,
+    .poll_descriptors = plumos_poll_descriptors,
+    .poll_revents = plumos_poll_revents,
 };
 
 static int set_constraints(snd_pcm_ioplug_t *io)
@@ -666,18 +740,12 @@ SND_PCM_PLUGIN_DEFINE_FUNC(plumos_hotplug)
     pcm->allow_fast_drop =
         getenv("PLUMOS_AUDIO_FAST_FORWARD_DROP") &&
         !strcmp(getenv("PLUMOS_AUDIO_FAST_FORWARD_DROP"), "1");
-    pcm->poll_pipe[0] = -1;
-    pcm->poll_pipe[1] = -1;
-    if (pipe2(pcm->poll_pipe, O_NONBLOCK | O_CLOEXEC) < 0) {
-        err = -errno;
-        free(pcm);
-        return err;
-    }
+    pcm->debug_enabled = access("/run/plumos/audio/debug", F_OK) == 0;
 
     pcm->io.version = SND_PCM_IOPLUG_VERSION;
     pcm->io.name = "plumOS V90S hotplug audio";
-    pcm->io.poll_fd = pcm->poll_pipe[1];
-    pcm->io.poll_events = POLLOUT;
+    pcm->io.poll_fd = -1;
+    pcm->io.poll_events = 0;
     pcm->io.mmap_rw = 0;
     pcm->io.callback = &plumos_callbacks;
     pcm->io.private_data = pcm;
@@ -694,8 +762,6 @@ SND_PCM_PLUGIN_DEFINE_FUNC(plumos_hotplug)
     return 0;
 
 error:
-    close(pcm->poll_pipe[0]);
-    close(pcm->poll_pipe[1]);
     free(pcm);
     return err;
 }

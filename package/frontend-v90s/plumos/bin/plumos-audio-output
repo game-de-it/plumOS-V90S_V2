@@ -101,6 +101,12 @@ pcm.plumos_output {
     slave.pcm "plumos_hotplug"
 }
 
+# OpenAL and other third-party runtimes commonly ignore AUDIODEV and open the
+# ALSA default PCM. Keep them inside the same mono/USB hotplug policy.
+pcm.!default {
+    type plumos_hotplug
+}
+
 # Pyxel 2.9 requests 22.05 kHz mono and does not permit SDL to alter the
 # obtained format. Keep a named interface for that contract; the router
 # duplicates mono input into its stereo physical stream.

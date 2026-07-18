@@ -1038,6 +1038,16 @@ bind directly to a numbered hardware card.
   `libasound_module_pcm_plumos_hotplug.so`. The plugin runs inside the
   application process, monitors playback-card availability without a daemon,
   and migrates an already-open stream between the built-in codec and a USB DAC.
+- The generated ALSA `default` PCM must point directly to
+  `plumos_hotplug`. OpenAL Soft and some third-party PortMaster runtimes ignore
+  `AUDIODEV` and always open `default`; an outer ALSA `plug` PCM can prevent
+  their playback loop from observing ioplug hardware-pointer progress. Named
+  interfaces such as `plumos_output` and `plumos_pyxel` may retain their
+  explicit format-conversion layer.
+- The ioplug must expose the currently selected physical PCM poll descriptors
+  and calculate its playback pointer from submitted frames minus physical
+  delay. An always-writable synthetic descriptor or a submitted-only pointer
+  lets an application fill one buffer and then leaves the codec in XRUN.
 - RetroArch, PicoArch, standalone emulators, and plumOS Music Player must run
   the helper before opening audio and must export the generated file through
   `ALSA_CONFIG_PATH` and the plugin directory through `ALSA_PLUGIN_DIR`.
