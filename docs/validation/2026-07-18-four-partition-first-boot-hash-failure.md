@@ -374,3 +374,58 @@ p2_boot_image_sha256=08b41bd44e63ed1c02b35cb0ae5687a7bb66b4056e58b14e0d01da321cc
 preflight=PASS
 verification=PASS
 ```
+
+## Complete `-11` reboot and shutdown validation
+
+The complete `-11` image was written to a fresh SD card. The user confirmed
+both FE menu reboot and FE menu shutdown followed by cold power-on reached the
+frontend without displaying the initramfs boot/provisioning frames.
+
+ADB inspection after the shutdown/cold-power-on cycle confirmed the clean fast
+path again:
+
+```text
+fast boot: clean p3/p4 and cached system verification accepted
+normal boot: userdata provisioning is complete
+system-a cached verification accepted
+```
+
+The p3 and p4 clean-shutdown markers were absent after handoff, proving they
+were consumed. The durable provisioning and verification records remained:
+
+```text
+/mnt/plumos/provision/complete
+/mnt/plumos/provision/system-a.verified.sha256
+/mnt/plumos-user/.plumos-ready
+```
+
+The p1 hash metadata, p3 verified-system cache, and host system SquashFS all
+matched `e035d269...e99c0c5`. The complete 64 MiB p2 block-device readback
+matched the host boot image:
+
+```text
+08b41bd44e63ed1c02b35cb0ae5687a7bb66b4056e58b14e0d01da321cc10ddf
+```
+
+The live `/usr/sbin/plumos-power-action` hash also matched its repository
+source at `1cdd3ea5...5ac24fe`. The latest power log recorded
+`quiesce: recording clean shutdown` before child mount and persistent storage
+unmounts.
+
+Runtime state after boot was:
+
+```text
+p1 PLUMBOOT    /mnt/plumos-boot  vfat  ro
+p3 PLUMOS_SYS  /mnt/plumos       ext4  rw,noatime
+p4 PLUMOS      /mnt/plumos-user  vfat  rw
+SD2            /run/plumos/sd2   vfat  rw
+SD2 roms/bios  bind mounts active
+frontend       one plumos-controller-ui-fbdev process
+ADB            active
+SSH            active
+```
+
+PowerVR initialized at about 3.6 seconds and the frontend process started at
+about 3.0 seconds. Kernel logs contained no ext4 journal recovery, FAT dirty
+bit, MMC/I/O error, corruption report, or read-only remount. This completes the
+normal reboot and shutdown/cold-boot validation for the clean fast path.

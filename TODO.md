@@ -786,8 +786,9 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Generate and verify
     `plumos-v90s-four-partition-20260718-11.img` with the persistent fast-boot
     power helper in the system SquashFS.
-  - [ ] Complete one FE menu shutdown and cold-power-on cycle with the complete
-    `-11` image, without setup frames, journal recovery, or a FAT dirty bit.
+  - [x] Complete FE menu reboot and shutdown/cold-power-on cycles with the
+    complete `-11` image. Both returned through the clean fast path without
+    setup frames, journal recovery, a FAT dirty bit, or storage I/O errors.
   - [x] Confirm SquashFS handoff, FE startup, and one frontend process on
     hardware.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
