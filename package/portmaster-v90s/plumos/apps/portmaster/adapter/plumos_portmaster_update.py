@@ -34,9 +34,15 @@ REQUIRED_FILES = {
     "PortMaster/control.txt",
     "PortMaster/device_info.txt",
     "PortMaster/funcs.txt",
+    "PortMaster/gptokeyb",
+    "PortMaster/gptokeyb2",
     "PortMaster/version",
 }
-ADAPTER_VERSION = 5
+EXECUTABLE_FILES = (
+    "PortMaster/gptokeyb",
+    "PortMaster/gptokeyb2",
+)
+ADAPTER_VERSION = 6
 
 
 def fail(message: str) -> NoReturn:
@@ -143,6 +149,15 @@ def validate_archive(archive: Path) -> None:
             fail("release archive is incomplete: " + ", ".join(missing))
 
 
+def enable_runtime_executables(stage: Path) -> None:
+    for relative in EXECUTABLE_FILES:
+        path = stage / relative
+        try:
+            path.chmod(0o755)
+        except OSError as error:
+            fail(f"cannot enable runtime executable {relative}: {error}")
+
+
 def hash_file(path: Path, algorithm: str) -> str:
     digest = hashlib.new(algorithm)
     with path.open("rb") as source:
@@ -186,6 +201,7 @@ def install(channel: str, force: bool) -> None:
         stage.mkdir()
         with zipfile.ZipFile(archive) as zf:
             zf.extractall(stage)
+        enable_runtime_executables(stage)
 
         staged_version = (stage / "PortMaster/version").read_text(
             encoding="utf-8", errors="replace"

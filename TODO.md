@@ -656,9 +656,10 @@ Build plumOS V90S as a V90S-specific distribution:
     SHA-256-keyed userspace extraction cache for zlib SquashFS runtimes, which
     the StockOS kernel cannot mount. Both titles rendered and owned the active
     ALSA PCM on hardware, then stopped without leaving processes or mounts.
-  - [ ] Physically confirm PortMaster GUI navigation and game controls with the
-    V90S buttons. SDL opened `adc_gamepad` with the V90S mapping during both
-    paths, but this still needs user input confirmation.
+  - [x] Physically confirm PortMaster GUI navigation and game controls with the
+    V90S buttons. On the ext4 runtime, repair official ZIP mode `0644` to
+    `0755` for `gptokeyb`/`gptokeyb2`; Donut Dodo then ran with its owned
+    GPTokeYB process and the user confirmed controls.
   - [ ] Keep ARMHF-only, desktop-OpenGL, Weston/GL4ES, Box64, Mono, Java, and
     other runtime classes unavailable until each class is explicitly packaged
     and validated on V90S.

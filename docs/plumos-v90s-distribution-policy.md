@@ -1566,8 +1566,11 @@ updates. The plumOS updater:
 2. downloads into a sibling staging directory on p7
 3. verifies the official MD5, records SHA-256, rejects unsafe archive paths and
    symlinks, and checks the required PortMaster files and version
-4. refuses to switch while the GUI is running
-5. renames the current payload to `upstream.previous` and atomically renames the
+4. sets `gptokeyb` and `gptokeyb2` to mode `0755` in the staged payload;
+   archive mode bits are not trusted, and content hashes cannot detect a lost
+   executable bit
+5. refuses to switch while the GUI is running
+6. renames the current payload to `upstream.previous` and atomically renames the
    validated stage to `upstream`
 
 PortMaster payload retention is limited to two generations during a normal
@@ -1601,6 +1604,12 @@ whereas direct SSH/ADB launches stop and restore exactly one frontend process.
 Both launch paths must bind the same persistent `config`, `libs`, and `themes`
 directories and export the same HarbourMaster tools, ports, and scripts paths.
 An installed port must not see a second empty PortMaster state tree.
+
+Every installed-port launch must also repair and verify executable mode on the
+upstream AArch64 `gptokeyb` and `gptokeyb2` helpers before starting the game.
+This runtime check protects an existing installation as well as future online
+updates. A rendered game without its GPTokeYB process is an input failure, not
+successful Port compatibility.
 
 The StockOS kernel SquashFS implementation does not support the zlib-compressed
 runtimes currently distributed by PortMaster. The V90S adapter therefore uses

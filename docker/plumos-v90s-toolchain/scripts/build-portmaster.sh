@@ -154,6 +154,8 @@ required = {
     "PortMaster/control.txt",
     "PortMaster/device_info.txt",
     "PortMaster/funcs.txt",
+    "PortMaster/gptokeyb",
+    "PortMaster/gptokeyb2",
     "PortMaster/version",
 }
 
@@ -186,7 +188,12 @@ release_version="$(tr -d '\r\n' < "$stage_dir/plumos/apps/portmaster/upstream/Po
     exit 1
 }
 
-rsync -a --copy-links "$PACKAGE_DIR/plumos/" "$stage_dir/plumos/"
+chmod 0755 \
+    "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/gptokeyb" \
+    "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/gptokeyb2"
+
+rsync -a --copy-links --exclude='__pycache__/' --exclude='*.pyc' \
+    "$PACKAGE_DIR/plumos/" "$stage_dir/plumos/"
 mkdir -p \
     "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64" \
@@ -212,7 +219,7 @@ mkdir -p \
 
 cat > "$stage_dir/plumos/apps/portmaster/installed.json" <<EOF
 {
-  "adapter_version": 5,
+  "adapter_version": 6,
   "channel": "stable",
   "official_md5": "${actual_md5}",
   "official_sha256": "${actual_sha256}",
@@ -228,7 +235,7 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
 cat > "$OUT_DIR/portmaster.manifest" <<EOF
 component=portmaster
 target=powkiddy-v90s
-adapter_version=5
+adapter_version=6
 upstream=PortMaster-GUI
 version=${VERSION}
 channel=stable

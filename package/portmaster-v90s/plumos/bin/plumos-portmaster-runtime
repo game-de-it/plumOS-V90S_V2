@@ -27,6 +27,18 @@ prepare() {
     printf 'plumos-portmaster-runtime: incomplete PortMaster payload: %s\n' "$PM_DIR" >&2
     exit 1
   }
+  for helper in gptokeyb gptokeyb2; do
+    [ -f "${PM_DIR}/${helper}" ] || {
+      printf 'plumos-portmaster-runtime: missing input helper: %s\n' \
+        "${PM_DIR}/${helper}" >&2
+      exit 1
+    }
+    chmod 0755 "${PM_DIR}/${helper}" || {
+      printf 'plumos-portmaster-runtime: cannot enable input helper: %s\n' \
+        "${PM_DIR}/${helper}" >&2
+      exit 1
+    }
+  done
   mkdir -p "$RUN_ROOT" "$LIB_DIR" "${PLUMOS_ROOT}/Logs/apps"
   [ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd 2>/dev/null || true
   [ -e /dev/stdin ] || ln -s /proc/self/fd/0 /dev/stdin 2>/dev/null || true
