@@ -620,6 +620,10 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Confirm visible output and audible game audio on real hardware; fix the
     inherited GE8300 SDL2 1280x720 native-window override so Pyxel uses the
     V90S active 640x480 display mode without horizontal displacement or crop.
+  - [x] Keep the official pip-installed Pyxel package user-updatable while an
+    OS-owned SDL2/OpenGL fit layer constrains oversized 3:2 content and
+    preserves centered 1:1 content on the 640x480 LCD. Confirm 720x480 and
+    480x480 geometry on real hardware.
   - [x] Restore exactly one frontend process after the bounded runtime test.
   - [ ] Confirm gamepad controls, game-owned exit, and a `.py` title whose
     project requirements are present.

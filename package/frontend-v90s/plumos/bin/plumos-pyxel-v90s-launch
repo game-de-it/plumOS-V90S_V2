@@ -7,6 +7,7 @@ VENV_DIR="${PLUMOS_PYXEL_VENV:-$PLUMOS_ROOT/venvs/pyxel}"
 PYTHON="$VENV_DIR/bin/python3"
 SDL2_DIR="${PLUMOS_V90S_SDL2_POWERVR_DIR:-$PLUMOS_ROOT/lib/plumos-sdl2-powervr}"
 AUDIO_HELPER="$PLUMOS_ROOT/bin/plumos-audio-output"
+FIT_LIBRARY="${PLUMOS_PYXEL_FIT_LIBRARY:-$PLUMOS_ROOT/lib/plumos-pyxel-fit.so}"
 
 [ -x "$PYTHON" ] || {
   printf 'error: Pyxel environment is not installed: %s\n' "$VENV_DIR" >&2
@@ -33,5 +34,12 @@ export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-alsa}"
 export AUDIODEV="${AUDIODEV:-plumos_pyxel}"
 export ALSA_CONFIG_PATH="${ALSA_CONFIG_PATH:-$RUNTIME_ROOT/audio/asound.conf}"
 export ALSA_PLUGIN_DIR="${ALSA_PLUGIN_DIR:-$PLUMOS_ROOT/lib/alsa-lib}"
+
+if [ -r "$FIT_LIBRARY" ] && [ "${PLUMOS_PYXEL_FIT:-1}" != "0" ]; then
+  export PLUMOS_PYXEL_FIT=1
+  export PLUMOS_PYXEL_FIT_WIDTH="${PLUMOS_PYXEL_FIT_WIDTH:-640}"
+  export PLUMOS_PYXEL_FIT_HEIGHT="${PLUMOS_PYXEL_FIT_HEIGHT:-480}"
+  export LD_PRELOAD="$FIT_LIBRARY${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
 
 exec "$PYTHON" "$@"

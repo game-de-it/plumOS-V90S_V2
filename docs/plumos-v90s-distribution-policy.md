@@ -1563,6 +1563,19 @@ The V90S launch profile is `pyxel:v90s` and executes through
 device-specific compatibility profiles and must not be used as the V90S
 default.
 
+Pyxel package ownership remains with the user. plumOS must not patch or replace
+the `pyxel` wheel selected by `requirements.txt`. V90S display compatibility is
+implemented outside the venv by the OS-owned
+`/mnt/plumos/lib/plumos-pyxel-fit.so`, loaded only by the V90S launcher. The
+layer observes Pyxel's SDL2/OpenGL screen rectangle and, only when it exceeds
+the 640x480 LCD, scales it down with the original aspect ratio and centers it.
+Games which already fit retain Pyxel's own scaling and positioning. This keeps
+`Apps -> Pyxel Setup` free to install a newer official Pyxel release without
+replacing the V90S fix. The compatibility boundary is SDL2/OpenGL and Pyxel's
+screen-uniform contract; a future Pyxel renderer change must be detected by
+real-device validation and adapted in plumOS rather than by pinning users to an
+old Python package.
+
 Rationale:
 
 Keeping Python itself read-only makes the interpreter and standard library
@@ -1572,7 +1585,9 @@ image. Shipping a pinned factory venv makes offline first launch deterministic,
 while the packaged default requirements prevent the optional SD2 content
 partition from becoming a prerequisite for later repair or update. The venv
 creator skips only CPython's optional `lib64` symlink and otherwise uses the
-standard copied-file layout.
+standard copied-file layout. Keeping display fitting outside that venv also
+separates the user-controlled Pyxel update lifecycle from V90S hardware
+adaptation.
 
 ### 2026-07-16: PortMaster Ownership and Update Boundary
 

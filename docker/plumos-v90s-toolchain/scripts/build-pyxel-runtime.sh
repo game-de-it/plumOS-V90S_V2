@@ -6,6 +6,7 @@ requirements="${PLUMOS_V90S_PYXEL_RUNTIME_REQUIREMENTS:-package/frontend-v90s/pl
 install_root="${PLUMOS_V90S_PYXEL_INSTALL_ROOT:-/mnt/plumos}"
 sdl2_dir="${PLUMOS_V90S_PYXEL_SDL2_DIR:-output/sdl2-powervr/usr/local/lib/plumos-sdl2-powervr}"
 pvr_dir="${PLUMOS_V90S_PYXEL_PVR_DIR:-output/vendor/v90s-stockos-r1/root/usr/lib/powervr}"
+fit_source="${PLUMOS_V90S_PYXEL_FIT_SOURCE:-package/pyxel-v90s/plumos_pyxel_fit.c}"
 
 usage() {
     cat <<'USAGE'
@@ -57,6 +58,10 @@ done
     printf 'error: V90S SDL2 runtime is missing: %s\n' "$sdl2_dir/libSDL2-2.0.so.0" >&2
     exit 1
 }
+[ -r "$fit_source" ] || {
+    printf 'error: V90S Pyxel display fit source is missing: %s\n' "$fit_source" >&2
+    exit 1
+}
 python3 -m venv --help >/dev/null 2>&1 || {
     printf 'error: python3-venv is required in the toolchain image\n' >&2
     exit 1
@@ -66,6 +71,11 @@ venv_rel="venvs/pyxel"
 venv_dir="$out_dir/plumos/$venv_rel"
 rm -rf "$out_dir"
 mkdir -p "$out_dir/plumos/venvs" "$out_dir/licenses"
+
+mkdir -p "$out_dir/plumos/lib"
+${CC:-cc} -O2 -fPIC -Wall -Wextra -Werror -shared \
+    -Wl,-soname,plumos-pyxel-fit.so \
+    -o "$out_dir/plumos/lib/plumos-pyxel-fit.so" "$fit_source" -ldl
 
 python3 -m venv --copies "$venv_dir"
 PYTHONDONTWRITEBYTECODE=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -127,6 +137,7 @@ sed -i \
     "$venv_dir/pyvenv.cfg"
 
 requirements_sha256="$(sha256sum "$requirements" | awk '{print $1}')"
+fit_sha256="$(sha256sum "$fit_source" | awk '{print $1}')"
 file_count="$(find "$venv_dir" -type f | wc -l | tr -d ' ')"
 cat > "$out_dir/pyxel-runtime.manifest" <<EOF
 component=pyxel-runtime
@@ -136,6 +147,9 @@ venv=$install_root/$venv_rel
 python=$(python3 --version 2>&1)
 requirements=$requirements
 requirements_sha256=$requirements_sha256
+display_fit=$install_root/lib/plumos-pyxel-fit.so
+display_fit_source=$fit_source
+display_fit_sha256=$fit_sha256
 $package_versions
 file_count=$file_count
 EOF
