@@ -79,13 +79,13 @@ The agreed candidate SD1 layout is:
 raw boot area                  observed about 20.5 MiB before p1
 p1  PLUMBOOT    FAT    1024 MiB       boot assets and versioned system SquashFS
 p2  BOOT        raw      64 MiB       Android boot image: kernel, DTB, initramfs
-p3  PLUMOS_SYS  ext4   1536 MiB seed  expand to 8192 MiB on first boot
+p3  PLUMOS_SYS  ext4   1600 MiB seed  expand to 8192 MiB on first boot
 p4  PLUMOS      FAT32  not in seed    create through the final usable SD sector
 ```
 
 `1 GiB` and `8 GiB` in release tooling mean exactly `1024 MiB` and `8192 MiB`.
 The compact seed image contains only p1-p3. Its expected logical size is about
-2.58 GiB including the raw boot area, alignment, and GPT metadata. p4 is absent
+2.64 GiB including the raw boot area, alignment, and GPT metadata. p4 is absent
 until first-boot provisioning succeeds.
 
 ### PLUMBOOT
@@ -140,8 +140,8 @@ p3 is the Linux-native device-managed area. It contains application releases,
 configuration, active saves and states, update staging, rollback metadata,
 PortMaster, Python environments, and other data that requires POSIX semantics.
 
-The current runtime payload is about 1.11 GiB. The release image carries a
-1536 MiB ext4 p3 and the image build must verify that at least 256 MiB remains
+The current runtime payload is about 1.29 GiB. The release image carries a
+1600 MiB ext4 p3 and the image build must verify that at least 256 MiB remains
 free after seeding it. p3 is expanded to exactly 8192 MiB in the p2 initramfs
 before p4 is created. This avoids making the downloadable and flashed raw image
 as large as the final ext4 runtime allocation.
@@ -221,7 +221,7 @@ resumes these operations in order:
    manifest. Stop in recovery if an unexpected layout could contain user data.
 3. Relocate the backup GPT header and table from the end of the seed image to
    the final usable sectors of the physical SD card.
-4. Grow the p3 partition entry from 1536 MiB to exactly 8192 MiB without
+4. Grow the p3 partition entry from 1600 MiB to exactly 8192 MiB without
    changing its start sector.
 5. Ask the kernel to reread the partition table while no seed partition is
    mounted, and stop in recovery if the new geometry is not visible.
@@ -675,13 +675,13 @@ BATOCERA partitions. It must fail if the boot package still contains the old
 signed system slots within the selected capacity.
 
 The `sd-image` output is a compact provisioning seed with p1 exactly 1024 MiB,
-p2 exactly 64 MiB, p3 exactly 1536 MiB, and no p4 partition. Its build manifest
+p2 exactly 64 MiB, p3 exactly 1600 MiB, and no p4 partition. Its build manifest
 records at least:
 
 ```text
 p1_seed_mib=1024
 p2_mib=64
-p3_seed_mib=1536
+p3_seed_mib=1600
 p3_target_mib=8192
 p3_minimum_free_mib=256
 minimum_sd_gb=16
@@ -722,7 +722,7 @@ video, audio, input, networking, update, rollback, and shutdown validation.
 The first spike should prove only the new boot and storage contract:
 
 1. Build a compact p1-p3 seed while preserving known-good boot0 and hardware
-   initialization inputs, and verify exact 1024/64/1536 MiB capacities.
+   initialization inputs, and verify exact 1024/64/1600 MiB capacities.
 2. Insert the seed into a 16 GB or larger card and boot p2 with a fixed
    environment that has no p6 or external-env dependency.
 3. Verify first boot relocates the backup GPT, expands p3 to exactly 8192 MiB,

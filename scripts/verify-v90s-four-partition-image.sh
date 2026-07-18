@@ -89,9 +89,9 @@ p3_name="$(field 3 6)"
 [ "$p2_sectors" = $((64 * 2048)) ] || fail "p2 capacity is not 64 MiB"
 [ "$p2_name" = boot ] || fail "p2 GPT name is not boot"
 [ "$p3_start" = $((p2_start + p2_sectors)) ] || fail "p3 is not contiguous after p2"
-[ "$p3_sectors" = $((1536 * 2048)) ] || fail "p3 seed capacity is not 1536 MiB"
+[ "$p3_sectors" = $((1600 * 2048)) ] || fail "p3 seed capacity is not 1600 MiB"
 [ "$p3_name" = runtime ] || fail "p3 GPT name is not runtime"
-pass "GPT seed geometry p1=1024MiB p2=64MiB p3=1536MiB p4=absent"
+pass "GPT seed geometry p1=1024MiB p2=64MiB p3=1600MiB p4=absent"
 
 compare_region() {
     source="$1"

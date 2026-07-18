@@ -119,7 +119,7 @@ partition_capacity_mib=64
 init=$init_script
 init_sha256=$init_sha256
 cmdline=$cmdline
-p3_seed_mib=1536
+p3_seed_mib=1600
 p3_target_mib=8192
 p4_first_boot=yes
 EOF

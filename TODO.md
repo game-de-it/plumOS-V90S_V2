@@ -103,6 +103,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `picoarch`
   - `standalone`
   - `portmaster`
+  - `pyxel-runtime`
   - `frontend`
   - `system-rootfs`
   - `app-layer`
@@ -601,7 +602,8 @@ Build plumOS V90S as a V90S-specific distribution:
   plugin's software gain. Keep the physical PCM path enabled at software volume
   zero so RetroArch `audio_sync` cannot stall the emulation runloop.
 - [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
-  release-system squashfs while keeping pip-installed modules on p7.
+  release-system squashfs while keeping pip-installed modules on writable
+  `PLUMOS_SYS`.
 - [x] Add `Apps -> Pyxel Setup` to install
   `/mnt/plumos/roms/pyxel/requirements.txt`, or the packaged default when SD2
   does not provide it, into the FAT-safe copied venv at
@@ -609,8 +611,11 @@ Build plumOS V90S as a V90S-specific distribution:
   complete result in the frontend.
 - [x] Replace the inherited `pyxel:mmf` V90S default with the device-owned
   `pyxel:v90s` launcher contract.
+- [x] Build the pinned AArch64 Pyxel 2.9.3 environment as a reproducible
+  `pyxel-runtime` artifact, require it in strict app-layer builds, and include
+  it in subsequent SD images instead of requiring a first-boot network install.
 - [ ] Complete Pyxel real-device validation through the physical FE controls.
-  - [x] Boot the Pyxel-enabled system image, install the p7 venv, and run a
+  - [x] Boot the Pyxel-enabled system image, install the writable venv, and run a
     `.pyxapp` long enough to prove PowerVR video and ALSA audio initialization.
   - [x] Confirm visible output and audible game audio on real hardware; fix the
     inherited GE8300 SDL2 1280x720 native-window override so Pyxel uses the
@@ -755,7 +760,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - raw vendor-compatible `boot0` and `boot_package` offsets
   - p1 `boot-resource` / `PLUMBOOT` FAT16, exactly 1024 MiB
   - p2 `boot` Android boot image, exactly 64 MiB
-  - p3 `runtime` / `PLUMOS_SYS` ext4, exactly 1536 MiB in the seed
+  - p3 `runtime` / `PLUMOS_SYS` ext4, exactly 1600 MiB in the seed
   - no p4 in the downloadable seed
 - [x] Build a fixed-default boot package that loads GPT partition `boot`
   without the old external `env` / `env-redund` partitions.

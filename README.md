@@ -68,8 +68,10 @@ Docker build flow です。
 ./scripts/docker-build.sh vendor-runtime
 ./scripts/docker-build.sh userland
 ./scripts/docker-build.sh network-services
+./scripts/docker-build.sh sdl2-powervr
 ./scripts/docker-build.sh retroarch
 ./scripts/docker-build.sh cores
+./scripts/docker-build.sh pyxel-runtime
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
 ./scripts/docker-build.sh system-rootfs

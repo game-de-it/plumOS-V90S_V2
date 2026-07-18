@@ -128,6 +128,7 @@ Implemented app-layer target:
 ```sh
 ./scripts/docker-build.sh userland
 ./scripts/docker-build.sh network-services
+./scripts/docker-build.sh pyxel-runtime
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
 ```
@@ -136,8 +137,9 @@ This writes `output/app-layer/v90s/` with `VERSION`, `COMPAT_VENDOR`,
 `MOUNT_PATH`, `manifest.json`, `checksums.sha256`, standard user data
 directories, the MMF-derived V90S frontend, BusyBox/command tools,
 SSH/FTP/SFTP/Samba service payloads, RetroArch, the complete 118-core V90S
-catalog, SDL2 PowerVR private libraries, and the current known-good RetroArch
-defaults template. SSH logins prefer `/mnt/plumos/bin` and then
+catalog, SDL2 PowerVR private libraries, the pinned AArch64 Pyxel environment,
+and the current known-good RetroArch defaults template. SSH logins prefer
+`/mnt/plumos/bin` and then
 `/mnt/plumos/gnu/bin` in PATH. Files are copied without symlinks so the tree can
 be placed on FAT32.
 

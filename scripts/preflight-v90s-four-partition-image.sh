@@ -60,6 +60,8 @@ python3 scripts/patch-v90s-uboot-default-env.py --input "$boot_package" --verify
 pass "boot package fixed environment"
 
 verify_manifest_hash "$boot_image" "$boot_image_manifest" output_sha256
+grep -Fqx 'p3_seed_mib=1600' "$boot_image_manifest" ||
+    fail "boot image manifest does not declare the 1600 MiB p3 seed"
 [ "$(wc -c < "$boot_image" | tr -d ' ')" -le $((64 * 1024 * 1024)) ] ||
     fail "boot image exceeds 64 MiB"
 boot_image_abs="$(realpath "$boot_image")"
@@ -76,6 +78,8 @@ grep -Fq 'cmdline = console=ttyS0,115200 rootwait init=/init' "$tmp_dir/bootimg.
     fail "boot image cmdline does not enter provisioning init"
 cmp -s scripts/v90s-four-partition-init "$tmp_dir/ramdisk/init" ||
     fail "boot image /init differs from repository provisioning init"
+grep -Fq 'P3_SEED_SECTORS=$((1600 * 2048))' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not expect the 1600 MiB p3 seed"
 grep -Fq 'verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH"' "$tmp_dir/ramdisk/init" ||
     fail "initramfs does not use BusyBox-compatible system hash verification"
 if grep -Fq 'sha256sum -c' "$tmp_dir/ramdisk/init"; then
@@ -200,7 +204,7 @@ grep -Fq 'exec "$PLUMOS_ROOT/bin/plumos-frontend-launch"' "$bootstrap" ||
 pass "bounded SD2 mount and single frontend exec chain"
 
 app_used_kib="$(du -sk "$app_runtime" | awk '{print $1}')"
-[ "$app_used_kib" -le $(((1536 - 256) * 1024)) ] ||
+[ "$app_used_kib" -le $(((1600 - 256) * 1024)) ] ||
     fail "app runtime leaves less than 256 MiB in p3 seed"
 pass "p3 seed capacity used_kib=$app_used_kib"
 

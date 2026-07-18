@@ -16,6 +16,7 @@ network_services_dir="${PLUMOS_V90S_NETWORK_SERVICES_DIR:-output/network-service
 audio_router_dir="${PLUMOS_V90S_AUDIO_ROUTER_DIR:-output/audio-router/v90s}"
 nextcommander_dir="${PLUMOS_V90S_NEXTCOMMANDER_DIR:-output/nextcommander/v90s}"
 music_player_dir="${PLUMOS_V90S_MUSIC_PLAYER_DIR:-output/music-player/v90s}"
+pyxel_runtime_dir="${PLUMOS_V90S_PYXEL_RUNTIME_DIR:-output/pyxel-runtime/v90s}"
 portmaster_dir="${PLUMOS_V90S_PORTMASTER_DIR:-output/portmaster/v90s}"
 standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
 picoarch_dir="${PLUMOS_V90S_PICOARCH_DIR:-output/picoarch/v90s}"
@@ -46,6 +47,8 @@ Options:
   --nextcommander-dir PATH
                           NextCommander payload; default output/nextcommander/v90s.
   --music-player-dir PATH Music Player payload; default output/music-player/v90s.
+  --pyxel-runtime-dir PATH
+                          Pyxel venv payload; default output/pyxel-runtime/v90s.
   --portmaster-dir PATH PortMaster payload; default output/portmaster/v90s.
   --standalone-dir PATH  Standalone emulator payload; default output/standalone-emulators/v90s.
   --picoarch-dir PATH    PicoArch payload; default output/picoarch/v90s.
@@ -111,6 +114,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --music-player-dir)
             music_player_dir="$2"
+            shift 2
+            ;;
+        --pyxel-runtime-dir)
+            pyxel_runtime_dir="$2"
             shift 2
             ;;
         --portmaster-dir)
@@ -560,6 +567,20 @@ if require_or_note_missing "$picoarch_dir/bin/plumos-picoarch-launch" "picoarch"
     if [ -f "$picoarch_dir/picoarch.manifest" ]; then
         copy_file "$picoarch_dir/picoarch.manifest" "$out_dir/licenses/picoarch-manifest.txt"
         record_file "licenses/picoarch-manifest.txt" "picoarch-runtime" "$picoarch_dir/picoarch.manifest"
+    fi
+fi
+
+pyxel_runtime_root="$pyxel_runtime_dir/plumos"
+if require_or_note_missing "$pyxel_runtime_root/venvs/pyxel/bin/python3" "pyxel-runtime"; then
+    copy_tree "$pyxel_runtime_root" "$out_dir"
+    record_tree "$pyxel_runtime_root" "pyxel-runtime" "$pyxel_runtime_root"
+    if [ -f "$pyxel_runtime_dir/pyxel-runtime.manifest" ]; then
+        copy_file "$pyxel_runtime_dir/pyxel-runtime.manifest" "$out_dir/licenses/pyxel-runtime-manifest.txt"
+        record_file "licenses/pyxel-runtime-manifest.txt" "pyxel-runtime" "$pyxel_runtime_dir/pyxel-runtime.manifest"
+    fi
+    if [ -f "$pyxel_runtime_dir/checksums.sha256" ]; then
+        copy_file "$pyxel_runtime_dir/checksums.sha256" "$out_dir/licenses/pyxel-runtime-checksums.sha256"
+        record_file "licenses/pyxel-runtime-checksums.sha256" "pyxel-runtime" "$pyxel_runtime_dir/checksums.sha256"
     fi
 fi
 

@@ -252,7 +252,7 @@ StockOS-compatible layout:
 raw boot area                  vendor-compatible boot0 and boot_package offsets
 p1 PLUMBOOT    FAT    1024 MiB       boot assets and signed A/B system SquashFS
 p2 BOOT        raw      64 MiB       kernel, DTB, and plumOS initramfs
-p3 PLUMOS_SYS  ext4   1536 MiB seed  expand to 8192 MiB on first boot
+p3 PLUMOS_SYS  ext4   1600 MiB seed  expand to 8192 MiB on first boot
 p4 PLUMOS      FAT32  not in seed    create through the final usable SD sector
 ```
 
@@ -266,7 +266,7 @@ The candidate removes external `env`/`env-redund`, raw p5 SquashFS, and p6
 BATOCERA partitions. The boot package supplies an immutable default environment
 that loads p2, while the p2 initramfs verifies and loop-mounts a system image
 from p1. Capacity units are exact: `1 GiB` means `1024 MiB` and the final p3 is
-`8192 MiB`. The compact release seed is about 2.58 GiB and contains only p1-p3.
+`8192 MiB`. The compact release seed is about 2.64 GiB and contains only p1-p3.
 On the first V90S boot, the p2 initramfs relocates the backup GPT, expands p3,
 creates p4, formats it as FAT32, and installs the portable user-data tree. The
 minimum supported physical SD card is 16 GB. This process must be idempotent,
@@ -1527,7 +1527,8 @@ Decision:
 
 The system squashfs owns the Bookworm Python 3 interpreter and the standard
 `venv` and `pip` tooling. Pyxel and project-specific Python modules are not
-baked into the squashfs. They are installed into the p7 app/data layer:
+baked into the squashfs. The release build creates a pinned AArch64 factory
+environment and includes it in the writable app/system layer:
 
 ```text
 project requirements: /mnt/plumos/roms/pyxel/requirements.txt
@@ -1536,6 +1537,13 @@ venv:                /mnt/plumos/venvs/pyxel
 wheel cache:         /mnt/plumos/cache/pip
 temporary:           /mnt/plumos/cache/pip-tmp
 ```
+
+The official factory environment is built by `scripts/docker-build.sh
+pyxel-runtime` from `requirements.lock.txt`. A strict app-layer build must fail
+when this artifact is missing. Consequently, a newly written SD image can run
+the bundled Pyxel titles without network access or a first-boot pip install.
+`Apps -> Pyxel Setup` remains the explicit user update path and may replace the
+factory environment atomically.
 
 The project requirements file takes precedence when present. If it is absent,
 the installer uses the plumOS-owned default requirements so Pyxel setup remains
@@ -1558,13 +1566,13 @@ default.
 Rationale:
 
 Keeping Python itself read-only makes the interpreter and standard library
-stable across resets. Keeping pip-installed modules on p7 preserves the normal
-Windows/macOS copy-over workflow and allows a project's `requirements.txt` to
-change independently of the OS image. The packaged default prevents the
-optional SD2 content partition from becoming a prerequisite for the base Pyxel
-runtime. The FAT-safe venv creator skips only
-CPython's optional `lib64` symlink and otherwise uses the standard copied-file
-venv layout.
+stable across resets. Keeping pip-installed modules in the writable app/system
+layer allows a project's `requirements.txt` to change independently of the OS
+image. Shipping a pinned factory venv makes offline first launch deterministic,
+while the packaged default requirements prevent the optional SD2 content
+partition from becoming a prerequisite for later repair or update. The venv
+creator skips only CPython's optional `lib64` symlink and otherwise uses the
+standard copied-file layout.
 
 ### 2026-07-16: PortMaster Ownership and Update Boundary
 

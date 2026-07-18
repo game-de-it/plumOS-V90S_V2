@@ -33,6 +33,7 @@ Commands:
   nextcommander    Build the V90S NextCommander file manager app.
   file-manager     Alias for nextcommander.
   music-player     Build the V90S plumOS Music Player app.
+  pyxel-runtime    Build the pinned AArch64 Pyxel virtual environment.
   portmaster       Package the pinned official PortMaster GUI with the V90S adapter.
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
@@ -250,6 +251,10 @@ case "$cmd" in
     music-player|musicplayer)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-music-player.sh "$@"
+        ;;
+    pyxel-runtime|pyxel)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-pyxel-runtime.sh "$@"
         ;;
     portmaster)
         ensure_image
