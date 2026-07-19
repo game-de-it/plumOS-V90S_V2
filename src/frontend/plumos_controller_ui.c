@@ -14605,6 +14605,9 @@ static int ui_needs_periodic_refresh(const struct ui_state *ui) {
     return 0;
   }
   if (ui_renderer_fbdev_only(ui)) {
+    if (ui->top_transition_active) {
+      return 1;
+    }
     if (ui->gallery_transition_active ||
         (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_GALLERY)) {
       return 1;
@@ -14646,6 +14649,9 @@ static int ui_periodic_refresh_interval_ms(const struct ui_state *ui) {
     return 0;
   }
   if (ui_renderer_fbdev_only(ui)) {
+    if (ui->top_transition_active) {
+      return 16;
+    }
     if (ui->gallery_transition_active ||
         (ui_uses_graphic_mode(ui) && ui->screen == SCREEN_GALLERY)) {
       return 16;

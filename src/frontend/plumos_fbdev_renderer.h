@@ -175,13 +175,29 @@ static void plumos_fbdev_put_pixel(struct plumos_fbdev_renderer *r, int x, int y
 
 static void plumos_fbdev_fill_rect(struct plumos_fbdev_renderer *r, int x, int y,
                                    int w, int h, uint32_t color) {
+  int x_end;
+  int y_end;
   int yy;
   int xx;
-  if (w <= 0 || h <= 0) {
+  if (!r || w <= 0 || h <= 0) {
     return;
   }
-  for (yy = y; yy < y + h; yy++) {
-    for (xx = x; xx < x + w; xx++) {
+  x_end = x + w;
+  y_end = y + h;
+  if (x < 0) {
+    x = 0;
+  }
+  if (y < 0) {
+    y = 0;
+  }
+  if (x_end > (int)r->var.xres) {
+    x_end = (int)r->var.xres;
+  }
+  if (y_end > (int)r->var.yres) {
+    y_end = (int)r->var.yres;
+  }
+  for (yy = y; yy < y_end; yy++) {
+    for (xx = x; xx < x_end; xx++) {
       plumos_fbdev_put_pixel(r, xx, yy, color);
     }
   }
@@ -497,6 +513,18 @@ static int plumos_fbdev_draw_png_box(struct plumos_fbdev_renderer *r,
   start_y = draw_y > y ? draw_y : y;
   end_x = draw_x + draw_w < x + box_w ? draw_x + draw_w : x + box_w;
   end_y = draw_y + draw_h < y + box_h ? draw_y + draw_h : y + box_h;
+  if (start_x < 0) {
+    start_x = 0;
+  }
+  if (start_y < 0) {
+    start_y = 0;
+  }
+  if (end_x > (int)r->var.xres) {
+    end_x = (int)r->var.xres;
+  }
+  if (end_y > (int)r->var.yres) {
+    end_y = (int)r->var.yres;
+  }
 
   for (ty = start_y; ty < end_y; ty++) {
     int sy = (int)((long)(ty - draw_y) * (long)image_h / (long)draw_h);
@@ -1432,6 +1460,7 @@ struct plumos_fbdev_entry {
 
 struct plumos_fbdev_motion {
   char top_layout[32];
+  char transition_axis[32];
   char transition_easing[32];
 };
 
@@ -1678,8 +1707,10 @@ static void plumos_fbdev_load_motion(struct plumos_fbdev_motion *motion,
   memset(motion, 0, sizeof(*motion));
   plumos_fbdev_copy_text(motion->top_layout, sizeof(motion->top_layout),
                          "tile_grid");
+  plumos_fbdev_copy_text(motion->transition_axis,
+                         sizeof(motion->transition_axis), "vertical");
   plumos_fbdev_copy_text(motion->transition_easing,
-                         sizeof(motion->transition_easing), "ease_out");
+                         sizeof(motion->transition_easing), "smoothstep");
   for (i = 0; i < line_count; i++) {
     const char *line = plumos_fbdev_ltrim(lines[i]);
     const char *key;
@@ -1704,6 +1735,11 @@ static void plumos_fbdev_load_motion(struct plumos_fbdev_motion *motion,
          strcmp(value_buf, "tile_strip") == 0)) {
       plumos_fbdev_copy_text(motion->top_layout, sizeof(motion->top_layout),
                              value_buf);
+    } else if (strcmp(key_buf, "transition_axis") == 0 &&
+               (strcmp(value_buf, "horizontal") == 0 ||
+                strcmp(value_buf, "vertical") == 0)) {
+      plumos_fbdev_copy_text(motion->transition_axis,
+                             sizeof(motion->transition_axis), value_buf);
     } else if (strcmp(key_buf, "transition_easing") == 0 && value_buf[0]) {
       plumos_fbdev_copy_text(motion->transition_easing,
                              sizeof(motion->transition_easing), value_buf);
@@ -1939,7 +1975,7 @@ static void plumos_fbdev_battery_label(char *out, size_t out_size) {
   snprintf(out, out_size, "%s %ld", prefix, percent);
 }
 
-static void plumos_fbdev_draw_graphic_top_bar(
+static void plumos_fbdev_draw_graphic_top_bar_overlay(
     struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
     const char *title) {
   char time_label[16];
@@ -1961,7 +1997,6 @@ static void plumos_fbdev_draw_graphic_top_bar(
     title_max_x = w - 16;
   }
 
-  plumos_fbdev_fill_rect(r, 0, 0, w, (int)r->var.yres, p->background);
   plumos_fbdev_fill_rect(r, 0, 0, w, 40, p->panel_inner);
   plumos_fbdev_fill_rect(r, 0, 40, w, 2, p->panel);
   plumos_fbdev_fill_rect(r, 0, 0, 5, (int)r->var.yres, p->accent);
@@ -1970,6 +2005,14 @@ static void plumos_fbdev_draw_graphic_top_bar(
                          p->foreground, title_max_x);
   plumos_fbdev_draw_text(r, w - 14 - right_width, 12, right, 2, p->muted,
                          w - 12);
+}
+
+static void plumos_fbdev_draw_graphic_top_bar(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const char *title) {
+  plumos_fbdev_fill_rect(r, 0, 0, (int)r->var.xres, (int)r->var.yres,
+                         p->background);
+  plumos_fbdev_draw_graphic_top_bar_overlay(r, p, title);
 }
 
 static void plumos_fbdev_draw_tty_top_bar(struct plumos_fbdev_renderer *r) {
@@ -2426,13 +2469,13 @@ static void plumos_fbdev_draw_top_tile(struct plumos_fbdev_renderer *r,
   }
 }
 
-static int plumos_fbdev_render_top(struct plumos_fbdev_renderer *r,
-                                   char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX],
-                                   size_t line_count,
-                                   const struct plumos_fbdev_palette *p) {
-  struct plumos_fbdev_entry entries[12];
-  struct plumos_fbdev_motion motion;
-  size_t count;
+static double plumos_fbdev_ease_progress(double progress, const char *easing);
+
+static void plumos_fbdev_draw_top_entries(
+    struct plumos_fbdev_renderer *r, const struct plumos_fbdev_palette *p,
+    const struct plumos_fbdev_motion *motion,
+    const struct plumos_fbdev_entry *entries, size_t count, int x_offset,
+    int y_offset) {
   size_t i;
   int cols;
   int rows;
@@ -2440,6 +2483,40 @@ static int plumos_fbdev_render_top(struct plumos_fbdev_renderer *r,
   int grid_y;
   int tile_size;
   int gap;
+
+  if (!entries || count == 0) {
+    return;
+  }
+  plumos_fbdev_graphic_top_layout_metrics(r, motion, &cols, &rows, &grid_x,
+                                          &grid_y, &tile_size, &gap);
+  for (i = 0; i < count && i < (size_t)(cols * rows); i++) {
+    int col = (int)i % cols;
+    int row = (int)i / cols;
+    int x = grid_x + x_offset + col * (tile_size + gap);
+    int y = grid_y + y_offset + row * (tile_size + gap);
+    plumos_fbdev_draw_top_tile(r, p, &entries[i], x, y, tile_size, tile_size);
+  }
+}
+
+static int plumos_fbdev_render_top(struct plumos_fbdev_renderer *r,
+                                   char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX],
+                                   size_t line_count,
+                                   const struct plumos_fbdev_palette *p) {
+  struct plumos_fbdev_entry entries[12];
+  struct plumos_fbdev_entry prev_entries[12];
+  struct plumos_fbdev_motion motion;
+  size_t count;
+  size_t prev_count;
+  const char *transition;
+  const char *transition_progress_text;
+  const char *transition_direction_text;
+  double transition_progress = 1.0;
+  int transition_direction = 1;
+  int current_x_offset = 0;
+  int current_y_offset = 0;
+  int prev_x_offset = 0;
+  int prev_y_offset = 0;
+  int slide_active;
 
   count = plumos_fbdev_collect_graphic_entries(lines, line_count, entries,
                                                sizeof(entries) / sizeof(entries[0]));
@@ -2450,21 +2527,53 @@ static int plumos_fbdev_render_top(struct plumos_fbdev_renderer *r,
     count = 1;
   }
   plumos_fbdev_load_motion(&motion, lines, line_count);
-  plumos_fbdev_graphic_top_layout_metrics(r, &motion, &cols, &rows, &grid_x,
-                                          &grid_y, &tile_size, &gap);
-
-  plumos_fbdev_draw_graphic_top_bar(r, p, "PLUMOS V90S GUI");
-
-  for (i = 0; i < count && i < 6; i++) {
-    int col = (int)i % cols;
-    int row = (int)i / cols;
-    int x = grid_x + col * (tile_size + gap);
-    int y = grid_y + row * (tile_size + gap);
-    if (row >= rows) {
-      break;
-    }
-    plumos_fbdev_draw_top_tile(r, p, &entries[i], x, y, tile_size, tile_size);
+  prev_count = plumos_fbdev_collect_graphic_prev_entries(
+      lines, line_count, prev_entries,
+      sizeof(prev_entries) / sizeof(prev_entries[0]));
+  transition = plumos_fbdev_find_value(lines, line_count, "graphic_transition=");
+  transition_progress_text = plumos_fbdev_find_value(
+      lines, line_count, "graphic_transition_progress=");
+  transition_direction_text = plumos_fbdev_find_value(
+      lines, line_count, "graphic_transition_direction=");
+  if (transition_progress_text && transition_progress_text[0]) {
+    transition_progress = strtod(transition_progress_text, NULL);
   }
+  if (transition_direction_text && transition_direction_text[0]) {
+    transition_direction = (int)strtol(transition_direction_text, NULL, 10);
+  }
+  if (transition_progress < 0.0) {
+    transition_progress = 0.0;
+  } else if (transition_progress > 1.0) {
+    transition_progress = 1.0;
+  }
+  slide_active = transition && strcmp(transition, "slide") == 0 &&
+                 prev_count > 0 && transition_progress < 1.0;
+
+  plumos_fbdev_fill_rect(r, 0, 0, (int)r->var.xres, (int)r->var.yres,
+                         p->background);
+  if (slide_active) {
+    int horizontal = strcmp(motion.transition_axis, "horizontal") == 0;
+    int distance = horizontal ? (int)r->var.xres : (int)r->var.yres;
+    double eased_progress = plumos_fbdev_ease_progress(
+        transition_progress, motion.transition_easing);
+    int direction = transition_direction < 0 ? -1 : 1;
+    int prev_offset = -(direction * (int)((double)distance * eased_progress));
+    int current_offset =
+        direction * (int)((double)distance * (1.0 - eased_progress));
+
+    if (horizontal) {
+      prev_x_offset = prev_offset;
+      current_x_offset = current_offset;
+    } else {
+      prev_y_offset = prev_offset;
+      current_y_offset = current_offset;
+    }
+    plumos_fbdev_draw_top_entries(r, p, &motion, prev_entries, prev_count,
+                                  prev_x_offset, prev_y_offset);
+  }
+  plumos_fbdev_draw_top_entries(r, p, &motion, entries, count,
+                                current_x_offset, current_y_offset);
+  plumos_fbdev_draw_graphic_top_bar_overlay(r, p, "PLUMOS V90S GUI");
   return 1;
 }
 
@@ -2634,8 +2743,6 @@ static int plumos_fbdev_lerp_int(int from, int to, double progress) {
 }
 
 static double plumos_fbdev_ease_progress(double progress, const char *easing) {
-  double t;
-
   if (progress < 0.0) {
     progress = 0.0;
   } else if (progress > 1.0) {
@@ -2644,18 +2751,7 @@ static double plumos_fbdev_ease_progress(double progress, const char *easing) {
   if (easing && strcmp(easing, "linear") == 0) {
     return progress;
   }
-  if (easing && strcmp(easing, "ease_in") == 0) {
-    return progress * progress * progress;
-  }
-  if (easing && strcmp(easing, "ease_in_out") == 0) {
-    if (progress < 0.5) {
-      return 4.0 * progress * progress * progress;
-    }
-    t = -2.0 * progress + 2.0;
-    return 1.0 - (t * t * t) * 0.5;
-  }
-  t = 1.0 - progress;
-  return 1.0 - t * t * t;
+  return progress * progress * (3.0 - 2.0 * progress);
 }
 
 static void plumos_fbdev_gallery_slot(

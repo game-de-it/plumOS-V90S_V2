@@ -480,6 +480,12 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Align the V90S TOP status contract with MMF: keep the 3x2 system grid,
   logos, header indicators, selection frame, and left accent, but never draw
   transient/debug `status:` text along the bottom of TOP.
+- [x] Port the MMF/A30 Graphic TOP page transition to the V90S fbdev renderer:
+  draw the previous and current pages with themed vertical/horizontal slide
+  offsets, refresh at 16 ms while active, and present through the existing
+  VSync double-buffer path. The physical V90S visibly confirmed smooth page
+  scrolling on its 640x480p-60 framebuffer; see
+  `docs/validation/2026-07-19-v90s-graphic-top-60fps-slide.md`.
 - [x] Drive the V90S TOP battery label from the StockOS AXP2202 power-supply
   sysfs instead of the missing generic `battery` path. Validate `CHG 100`
   against the live `Full` / `100` state and refresh TOP status every 5 seconds.
