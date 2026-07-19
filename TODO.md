@@ -477,6 +477,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Live-validate `UI Settings` controls: refresh TOP, UI mode,
   empty/favorites/recent TOP entries, ROM cursor wrap, boot resume mode,
   system/ROM sorting, scan-on-enter, and Graphic theme options.
+- [x] Revalidate `boot_resume_mode=recent` through a full hardware reboot after
+  repairing the app-layer metadata from a prior binary-only FE deployment.
+  Bootstrap now validates the deployed FE and manifest, starts one frontend,
+  and reports `screen=4` (`SCREEN_RECENT`); see
+  `docs/validation/2026-07-19-v90s-recent-boot-checksum-recovery.md`.
 - [x] Align the V90S TOP status contract with MMF: keep the 3x2 system grid,
   logos, header indicators, selection frame, and left accent, but never draw
   transient/debug `status:` text along the bottom of TOP.
