@@ -7,12 +7,14 @@ install_root="${PLUMOS_V90S_PYXEL_INSTALL_ROOT:-/mnt/plumos}"
 sdl2_dir="${PLUMOS_V90S_PYXEL_SDL2_DIR:-output/sdl2-powervr/usr/local/lib/plumos-sdl2-powervr}"
 pvr_dir="${PLUMOS_V90S_PYXEL_PVR_DIR:-output/vendor/v90s-stockos-r1/root/usr/lib/powervr}"
 fit_source="${PLUMOS_V90S_PYXEL_FIT_SOURCE:-package/pyxel-v90s/plumos_pyxel_fit.c}"
+host_lib_dir="${PLUMOS_V90S_PYXEL_HOST_LIB_DIR:-/usr/lib/aarch64-linux-gnu}"
 
 usage() {
     cat <<'USAGE'
 Usage:
   build-pyxel-runtime.sh [--out-dir PATH] [--requirements PATH]
                          [--sdl2-dir PATH] [--pvr-dir PATH]
+                         [--host-lib-dir PATH]
 
 Builds the pinned AArch64 Pyxel virtual environment packaged at
 plumos/venvs/pyxel. The deployed environment remains user-updatable through
@@ -36,6 +38,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --pvr-dir)
             pvr_dir="$2"
+            shift 2
+            ;;
+        --host-lib-dir)
+            host_lib_dir="$2"
             shift 2
             ;;
         -h|--help)
@@ -62,6 +68,13 @@ done
     printf 'error: V90S Pyxel display fit source is missing: %s\n' "$fit_source" >&2
     exit 1
 }
+for host_lib in libglib-2.0.so.0 libgthread-2.0.so.0 libpcre2-8.so.0; do
+    [ -r "$host_lib_dir/$host_lib" ] || {
+        printf 'error: Pyxel pygame host library is missing: %s/%s\n' \
+            "$host_lib_dir" "$host_lib" >&2
+        exit 1
+    }
+done
 python3 -m venv --help >/dev/null 2>&1 || {
     printf 'error: python3-venv is required in the toolchain image\n' >&2
     exit 1
@@ -69,8 +82,14 @@ python3 -m venv --help >/dev/null 2>&1 || {
 
 venv_rel="venvs/pyxel"
 venv_dir="$out_dir/plumos/$venv_rel"
+host_runtime_rel="lib/pyxel-host"
+host_runtime_dir="$out_dir/plumos/$host_runtime_rel"
 rm -rf "$out_dir"
-mkdir -p "$out_dir/plumos/venvs" "$out_dir/licenses"
+mkdir -p "$out_dir/plumos/venvs" "$out_dir/licenses" "$host_runtime_dir"
+
+for host_lib in libglib-2.0.so.0 libgthread-2.0.so.0 libpcre2-8.so.0; do
+    cp -L "$host_lib_dir/$host_lib" "$host_runtime_dir/$host_lib"
+done
 
 mkdir -p "$out_dir/plumos/lib"
 ${CC:-cc} -O2 -fPIC -Wall -Wextra -Werror -shared \
@@ -95,7 +114,7 @@ rm -rf \
 find "$site_packages" -type d \( -name test -o -name tests \) -prune \
     -exec rm -rf {} +
 
-validation_library_path="$sdl2_dir"
+validation_library_path="$sdl2_dir:$host_runtime_dir"
 if [ -d "$pvr_dir" ]; then
     validation_library_path="$validation_library_path:$pvr_dir"
 fi
@@ -104,6 +123,8 @@ package_versions="$(
         LD_LIBRARY_PATH="$validation_library_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
         "$venv_dir/bin/python3" - <<'PY'
 from importlib import import_module, metadata
+
+import_module("pygame.mixer")
 
 for distribution, module in (
     ("pyxel", "pyxel"),
@@ -150,6 +171,8 @@ requirements_sha256=$requirements_sha256
 display_fit=$install_root/lib/plumos-pyxel-fit.so
 display_fit_source=$fit_source
 display_fit_sha256=$fit_sha256
+pygame_host_runtime=$install_root/$host_runtime_rel
+pygame_host_libraries=libglib-2.0.so.0,libgthread-2.0.so.0,libpcre2-8.so.0
 $package_versions
 file_count=$file_count
 EOF

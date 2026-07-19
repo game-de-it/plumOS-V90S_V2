@@ -1576,6 +1576,16 @@ screen-uniform contract; a future Pyxel renderer change must be detected by
 real-device validation and adapted in plumOS rather than by pinning users to an
 old Python package.
 
+The official pygame wheel is also user-owned inside the venv, while its
+Linux host dependencies are part of the OS contract. The `pyxel-runtime`
+artifact must provide `libglib-2.0.so.0`, `libgthread-2.0.so.0`, and
+`libpcre2-8.so.0` below `/mnt/plumos/lib/pyxel-host`; the V90S launcher must
+place that directory ahead of inherited library paths. These files remain
+outside the venv so `Apps -> Pyxel Setup` can replace or upgrade pygame without
+deleting the V90S host runtime. Runtime validation must import `pygame.mixer`,
+not only the top-level `pygame` package, because SDL_mixer's FluidSynth
+dependency is where the GLib requirement becomes visible.
+
 Rationale:
 
 Keeping Python itself read-only makes the interpreter and standard library

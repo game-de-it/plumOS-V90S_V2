@@ -624,6 +624,9 @@ Build plumOS V90S as a V90S-specific distribution:
     OS-owned SDL2/OpenGL fit layer constrains oversized 3:2 content and
     preserves centered 1:1 content on the 640x480 LCD. Confirm 720x480 and
     480x480 geometry on real hardware.
+  - [x] Supply pygame's GLib host dependencies outside the user-controlled
+    venv and confirm `LastEmulator` owns a live 44100 Hz, signed 16-bit,
+    two-channel ALSA stream through pygame mixer.
   - [x] Restore exactly one frontend process after the bounded runtime test.
   - [ ] Confirm gamepad controls, game-owned exit, and a `.py` title whose
     project requirements are present.
