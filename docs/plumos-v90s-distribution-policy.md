@@ -1768,3 +1768,45 @@ state, including V90S PowerVR video timing, ALSA routing, controller mappings,
 and plumOS storage paths. Treating it as a versioned build input prevents a
 minimal generated cfg or stale frontend payload from silently changing device
 behavior, while preserving the user's freedom to modify and save settings.
+
+### 2026-07-20: PPSSPP Factory Configuration Ownership
+
+Decision:
+
+The tracked V90S PPSSPP factory configuration is the pair:
+
+```text
+package/frontend-v90s/plumos/factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM/ppsspp.ini
+package/frontend-v90s/plumos/factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM/controls.ini
+```
+
+These are sanitized snapshots of the configuration validated on the physical
+V90S. They retain hardware-relevant video, audio, input, storage, and UI state,
+including `UIScaleFactor=-8`, but exclude recent-ROM history, play time, shader
+cache, saves, and temporary backup files.
+
+`scripts/docker-build.sh standalone ppsspp` must require both files, bundle
+them under the same `plumos/factory-defaults/sa/` path in its build artifact,
+and record their SHA-256 values. App-layer assembly must reject a frontend
+factory copy that differs from the standalone build artifact. The frontend,
+PPSSPP build, first-run seed, and factory reset must therefore share one
+reviewed configuration contract.
+
+The writable PPSSPP configuration remains:
+
+```text
+/mnt/plumos/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM/ppsspp.ini
+/mnt/plumos/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM/controls.ini
+```
+
+The launcher stages both factory files through temporary paths and commits
+`ppsspp.ini` last, before PPSSPP starts, only when the writable `ppsspp.ini`
+does not exist. Normal app-layer updates, builds, deployments, and later
+launches must not repair or overwrite either writable file. If both the user
+profile and complete factory pair are absent, startup must fail clearly instead
+of synthesizing a minimal fallback.
+
+`plumos-factory-reset standalone` is the explicit recovery operation. It backs
+up existing writable PPSSPP settings and then restores the factory pair. Save
+data, save states, texture data, caches, and per-game runtime files are outside
+this reset set.

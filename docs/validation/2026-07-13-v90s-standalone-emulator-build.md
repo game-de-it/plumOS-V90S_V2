@@ -223,31 +223,35 @@ but it must not be reported as true 60 fps. The V90S default remains frame skip
 off. Vulkan was an explicit test only; the reproducible launcher remains on
 GLES2.
 
-## PPSSPP Menu Scale
+## PPSSPP Factory Configuration
 
-The desktop-oriented PPSSPP default `UIScaleFactor=-1` makes menu rows and
-labels too large for the V90S 640x480 LCD. The V90S initial profile now uses:
+The complete hardware-validated `ppsspp.ini` and `controls.ini` are tracked
+under the standalone factory-default tree. The snapshot retains the confirmed
+PowerVR, audio, V90S controller, and menu settings, including
+`UIScaleFactor=-8`. This scales PPSSPP's UI to 50 percent without changing PSP
+game rendering or internal resolution. Run count, recent content, play time,
+shader cache, saves, and temporary backup files are not factory data.
 
-```ini
-[General]
-FirstRun = False
-UIScaleFactor = -8
-```
+`scripts/docker-build.sh standalone ppsspp` requires both factory files,
+bundles them into the standalone artifact, and records their SHA-256 values.
+Frontend and standalone artifacts produced identical hashes. Strict app-layer
+assembly rejects a mismatch between those two copies.
 
-This scales PPSSPP's UI to 50 percent without changing PSP game
-rendering or internal resolution. `plumos-standalone-launch` installs the
-profile atomically only when the user's `ppsspp.ini` does not exist. Normal
-launches, rebuilds, and app-layer deployments therefore do not overwrite a UI
-scale later selected in PPSSPP's `UI size adjustment (DPI)` setting.
+`plumos-standalone-launch` installs both files before PPSSPP starts only when
+the writable `ppsspp.ini` does not exist. Normal launches, rebuilds, and
+app-layer deployments do not overwrite user changes. If neither a user profile
+nor the complete factory pair is available, startup exits with status 78 and a
+clear error instead of creating a hidden minimal configuration.
 
-The live V90S profile was changed from `-1` to `-8`; its previous file was
-retained beside it as `ppsspp.ini.before-v90s-ui-scale-20260720` for this
-one-time hardware trial.
+`plumos-factory-reset standalone` backs up the writable files under
+`backups/factory-reset/TIMESTAMP/sa/` and then restores the factory pair. The
+isolated build test verified first-run seeding, later user-setting preservation,
+missing-factory failure, backup, and restoration.
 
 ## Remaining Hardware Validation
 
-PPSSPP still needs save/config persistence and clean return to the FE. Its
-controller, display, audio, race-start stability, and Ridge Racers performance
-characteristics are validated. ScummVM, EasyRPG Player, OpenBOR, DOSBox
-Staging, and PCSX-ReARMed still need complete real-device display, audio,
-controller, save, and FE-return passes.
+PPSSPP still needs save persistence and clean return to the FE. Its config
+persistence, controller, display, audio, race-start stability, and Ridge Racers
+performance characteristics are validated. ScummVM, EasyRPG Player, OpenBOR,
+DOSBox Staging, and PCSX-ReARMed still need complete real-device display,
+audio, controller, save, and FE-return passes.

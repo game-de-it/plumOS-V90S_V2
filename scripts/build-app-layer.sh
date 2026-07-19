@@ -8,6 +8,7 @@ mount_path="${PLUMOS_V90S_APP_LAYER_MOUNT:-/mnt/plumos}"
 retroarch_dir="${PLUMOS_V90S_RETROARCH_DIR:-output/retroarch-powervr}"
 retroarch_bin="${PLUMOS_V90S_RETROARCH_BIN_NAME:-retroarch-powervr}"
 retroarch_factory_rel="factory-defaults/ra/config/retroarch/retroarch-v90s.cfg"
+ppsspp_factory_rel="factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM"
 cores_dir="${PLUMOS_V90S_CORES_DIR:-output/libretro-cores/v90s}"
 sdl2_powervr_dir="${PLUMOS_V90S_SDL2_POWERVR_DIR:-output/sdl2-powervr}"
 frontend_dir="${PLUMOS_V90S_FRONTEND_DIR:-output/frontend/v90s}"
@@ -153,6 +154,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 retroarch_factory_src="$retroarch_dir/plumos/$retroarch_factory_rel"
+ppsspp_factory_src="$standalone_dir/plumos/$ppsspp_factory_rel"
 
 case "$minimum_core_count" in
     ''|*[!0-9]*)
@@ -536,6 +538,31 @@ if require_or_note_missing "$standalone_dir/bin/plumos-standalone-launch" "stand
         copy_file "$standalone_dir/standalone-emulators.manifest" "$out_dir/licenses/standalone-emulators-manifest.txt"
         record_file "licenses/standalone-emulators-manifest.txt" "standalone-emulator" "$standalone_dir/standalone-emulators.manifest"
     fi
+fi
+
+ppsspp_factory_ready=1
+for ppsspp_factory_name in ppsspp.ini controls.ini; do
+    require_or_note_missing \
+        "$ppsspp_factory_src/$ppsspp_factory_name" \
+        "standalone:ppsspp-factory-$ppsspp_factory_name" || ppsspp_factory_ready=0
+done
+if [ "$ppsspp_factory_ready" -eq 1 ]; then
+    for ppsspp_factory_name in ppsspp.ini controls.ini; do
+        ppsspp_factory_file_src="$ppsspp_factory_src/$ppsspp_factory_name"
+        ppsspp_factory_file_rel="$ppsspp_factory_rel/$ppsspp_factory_name"
+        ppsspp_factory_file_dst="$out_dir/$ppsspp_factory_file_rel"
+        if [ -f "$ppsspp_factory_file_dst" ]; then
+            if ! cmp -s "$ppsspp_factory_file_src" "$ppsspp_factory_file_dst"; then
+                printf 'error: frontend and PPSSPP factory configs do not match:\n  %s\n  %s\n' \
+                    "$ppsspp_factory_file_src" "$ppsspp_factory_file_dst" >&2
+                exit 1
+            fi
+        else
+            copy_file "$ppsspp_factory_file_src" "$ppsspp_factory_file_dst"
+            record_file "$ppsspp_factory_file_rel" \
+                "ppsspp-factory-config" "$ppsspp_factory_file_src"
+        fi
+    done
 fi
 
 retroarch_soname_map="$out_dir/config/standalone/soname-links.tsv"

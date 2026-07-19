@@ -253,9 +253,10 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Characterize PPSSPP performance: Ridge Racers is 60/60 in light scenes
     but about 38/60 in its heavy grandstand scene due to a saturated Cortex-A53
     main/render thread, not GPU saturation or thermal throttling.
-  - [x] Seed new PPSSPP profiles with the V90S menu scale at
-    `UIScaleFactor=-8`. The launcher copies the default only when `ppsspp.ini`
-    does not exist, so later user UI-size changes remain persistent.
+  - [x] Track the hardware-validated PPSSPP `ppsspp.ini` and `controls.ini` as
+    the standalone factory snapshot. The PPSSPP build requires and hashes both
+    files, the launcher installs them only for a new profile, and Standalone
+    Factory Reset backs up user settings before restoring the snapshot.
   - [x] Start Flycast 2.6 with Crazy Taxi through the FE standalone profile;
     verify PowerVR GLES, `adc_gamepad`, nonblank framebuffer output, ALSA PCM,
     and clean PID-targeted TERM shutdown.
@@ -310,7 +311,10 @@ Build plumOS V90S as a V90S-specific distribution:
     asynchronous core audio independently from the 58.955 Hz LCD loop. The
     physical V90S displays the game and plays BGM without periodic popping; see
     `docs/validation/2026-07-15-v90s-picoarch-easyrpg.md`.
-  - [ ] Validate PPSSPP save/config persistence and clean FE return.
+  - [x] Validate PPSSPP config persistence: app-layer deployment preserves the
+    live `ppsspp.ini` and `controls.ini`, and normal launch does not overwrite
+    later user changes.
+  - [ ] Validate PPSSPP save persistence and clean FE return.
   - [ ] Fix the standalone ScummVM directory launch before validation. The
     current generic launcher passes the content directory as a game ID;
     `--auto-detect --path=CONTENT_DIR` launches the same game with normal audio.

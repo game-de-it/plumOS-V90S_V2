@@ -27,6 +27,8 @@ COMMON_LDFLAGS=${COMMON_LDFLAGS:-""}
 
 PPSSPP_REPO=${PPSSPP_REPO:-https://github.com/hrydgard/ppsspp.git}
 PPSSPP_REF=${PPSSPP_REF:-v1.20.4}
+PPSSPP_FACTORY_DIR=${PLUMOS_V90S_PPSSPP_FACTORY_DIR:-"${ROOT_DIR}/package/frontend-v90s/plumos/factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM"}
+PPSSPP_FACTORY_OUTPUT_REL="plumos/factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM"
 V90S_SDL2_ROOT=${V90S_SDL2_ROOT:-"${ROOT_DIR}/output/sdl2-powervr/usr/local"}
 SCUMMVM_REPO=${SCUMMVM_REPO:-https://github.com/scummvm/scummvm.git}
 SCUMMVM_REF=${SCUMMVM_REF:-v2026.2.0}
@@ -182,6 +184,25 @@ stage_binary() {
   copy_runtime_deps "${dst}"
   append_manifest "  output=standalone/${id}/bin/${name}"
   append_manifest "  architecture=$(file -b "${dst}")"
+}
+
+stage_ppsspp_factory_defaults() {
+  local name src dst sha
+  dst="${OUT_DIR}/${PPSSPP_FACTORY_OUTPUT_REL}"
+  mkdir -p "${dst}"
+  rm -f "${OUT_DIR}/config/standalone/ppsspp-v90s-default.ini"
+  for name in ppsspp.ini controls.ini; do
+    src="${PPSSPP_FACTORY_DIR}/${name}"
+    if [ ! -f "${src}" ]; then
+      echo "missing V90S PPSSPP factory config: ${src}" >&2
+      return 1
+    fi
+    install -m 0644 "${src}" "${dst}/${name}" || return 1
+    sha=$(sha256sum "${dst}/${name}" | awk '{print $1}')
+    append_manifest "ppsspp_factory_${name%.ini}_source=${src}"
+    append_manifest "ppsspp_factory_${name%.ini}_output=${PPSSPP_FACTORY_OUTPUT_REL}/${name}"
+    append_manifest "ppsspp_factory_${name%.ini}_sha256=${sha}"
+  done
 }
 
 stage_license() {
@@ -659,14 +680,28 @@ case "${id}" in
   ppsspp)
     exe="${EMU_ROOT}/ppsspp/bin/PPSSPPSDL"
     workdir="${EMU_ROOT}/ppsspp"
-    ppsspp_default="${PLUMOS_ROOT}/config/standalone/ppsspp-v90s-default.ini"
-    ppsspp_config="${XDG_CONFIG_HOME}/ppsspp/PSP/SYSTEM/ppsspp.ini"
-    if [ ! -f "${ppsspp_config}" ] && [ -f "${ppsspp_default}" ]; then
-      mkdir -p "$(dirname "${ppsspp_config}")"
-      ppsspp_config_tmp="${ppsspp_config}.tmp.$$"
-      cp "${ppsspp_default}" "${ppsspp_config_tmp}" &&
-        mv -f "${ppsspp_config_tmp}" "${ppsspp_config}"
-      rm -f "${ppsspp_config_tmp}"
+    ppsspp_factory_dir="${PLUMOS_ROOT}/factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM"
+    ppsspp_config_dir="${XDG_CONFIG_HOME}/ppsspp/PSP/SYSTEM"
+    ppsspp_config="${ppsspp_config_dir}/ppsspp.ini"
+    if [ ! -f "${ppsspp_config}" ]; then
+      for ppsspp_name in controls.ini ppsspp.ini; do
+        if [ ! -f "${ppsspp_factory_dir}/${ppsspp_name}" ]; then
+          echo "plumos-standalone-launch: PPSSPP factory config missing: ${ppsspp_factory_dir}/${ppsspp_name}" >&2
+          exit 78
+        fi
+      done
+      mkdir -p "${ppsspp_config_dir}"
+      for ppsspp_name in controls.ini ppsspp.ini; do
+        ppsspp_config_tmp="${ppsspp_config_dir}/${ppsspp_name}.tmp.$$"
+        if ! cp "${ppsspp_factory_dir}/${ppsspp_name}" "${ppsspp_config_tmp}"; then
+          rm -f "${ppsspp_config_dir}/controls.ini.tmp.$$" \
+            "${ppsspp_config_dir}/ppsspp.ini.tmp.$$"
+          exit 78
+        fi
+      done
+      mv -f "${ppsspp_config_dir}/controls.ini.tmp.$$" \
+        "${ppsspp_config_dir}/controls.ini"
+      mv -f "${ppsspp_config_dir}/ppsspp.ini.tmp.$$" "${ppsspp_config}"
     fi
     if ! pidof PPSSPPSDL >/dev/null 2>&1; then
       rm -f /dev/shm/PPSSPP_ID /run/shm/PPSSPP_ID 2>/dev/null || true
@@ -797,12 +832,6 @@ rc=$?
 exit "${rc}"
 EOF
   chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
-
-  cat >"${OUT_DIR}/config/standalone/ppsspp-v90s-default.ini" <<'EOF'
-[General]
-FirstRun = False
-UIScaleFactor = -8
-EOF
 
   cat >"${OUT_DIR}/bin/plumos-standalone-stop" <<'EOF'
 #!/bin/sh
@@ -937,6 +966,7 @@ esac
   esac
   echo "cflags=${COMMON_CFLAGS}"
 } >"${MANIFEST}"
+stage_ppsspp_factory_defaults || exit 1
 write_launcher
 build_one ppsspp "${PPSSPP_REPO}" "${PPSSPP_REF}" build_ppsspp
 build_one scummvm "${SCUMMVM_REPO}" "${SCUMMVM_REF}" build_scummvm
