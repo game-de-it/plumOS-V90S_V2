@@ -253,6 +253,9 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Characterize PPSSPP performance: Ridge Racers is 60/60 in light scenes
     but about 38/60 in its heavy grandstand scene due to a saturated Cortex-A53
     main/render thread, not GPU saturation or thermal throttling.
+  - [x] Seed new PPSSPP profiles with the V90S menu scale at
+    `UIScaleFactor=-8`. The launcher copies the default only when `ppsspp.ini`
+    does not exist, so later user UI-size changes remain persistent.
   - [x] Start Flycast 2.6 with Crazy Taxi through the FE standalone profile;
     verify PowerVR GLES, `adc_gamepad`, nonblank framebuffer output, ALSA PCM,
     and clean PID-targeted TERM shutdown.

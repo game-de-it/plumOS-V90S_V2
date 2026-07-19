@@ -223,6 +223,27 @@ but it must not be reported as true 60 fps. The V90S default remains frame skip
 off. Vulkan was an explicit test only; the reproducible launcher remains on
 GLES2.
 
+## PPSSPP Menu Scale
+
+The desktop-oriented PPSSPP default `UIScaleFactor=-1` makes menu rows and
+labels too large for the V90S 640x480 LCD. The V90S initial profile now uses:
+
+```ini
+[General]
+FirstRun = False
+UIScaleFactor = -8
+```
+
+This scales PPSSPP's UI to 50 percent without changing PSP game
+rendering or internal resolution. `plumos-standalone-launch` installs the
+profile atomically only when the user's `ppsspp.ini` does not exist. Normal
+launches, rebuilds, and app-layer deployments therefore do not overwrite a UI
+scale later selected in PPSSPP's `UI size adjustment (DPI)` setting.
+
+The live V90S profile was changed from `-1` to `-8`; its previous file was
+retained beside it as `ppsspp.ini.before-v90s-ui-scale-20260720` for this
+one-time hardware trial.
+
 ## Remaining Hardware Validation
 
 PPSSPP still needs save/config persistence and clean return to the FE. Its

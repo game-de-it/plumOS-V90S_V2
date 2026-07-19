@@ -659,6 +659,15 @@ case "${id}" in
   ppsspp)
     exe="${EMU_ROOT}/ppsspp/bin/PPSSPPSDL"
     workdir="${EMU_ROOT}/ppsspp"
+    ppsspp_default="${PLUMOS_ROOT}/config/standalone/ppsspp-v90s-default.ini"
+    ppsspp_config="${XDG_CONFIG_HOME}/ppsspp/PSP/SYSTEM/ppsspp.ini"
+    if [ ! -f "${ppsspp_config}" ] && [ -f "${ppsspp_default}" ]; then
+      mkdir -p "$(dirname "${ppsspp_config}")"
+      ppsspp_config_tmp="${ppsspp_config}.tmp.$$"
+      cp "${ppsspp_default}" "${ppsspp_config_tmp}" &&
+        mv -f "${ppsspp_config_tmp}" "${ppsspp_config}"
+      rm -f "${ppsspp_config_tmp}"
+    fi
     if ! pidof PPSSPPSDL >/dev/null 2>&1; then
       rm -f /dev/shm/PPSSPP_ID /run/shm/PPSSPP_ID 2>/dev/null || true
     fi
@@ -788,6 +797,12 @@ rc=$?
 exit "${rc}"
 EOF
   chmod 0755 "${OUT_DIR}/bin/plumos-standalone-launch"
+
+  cat >"${OUT_DIR}/config/standalone/ppsspp-v90s-default.ini" <<'EOF'
+[General]
+FirstRun = False
+UIScaleFactor = -8
+EOF
 
   cat >"${OUT_DIR}/bin/plumos-standalone-stop" <<'EOF'
 #!/bin/sh
