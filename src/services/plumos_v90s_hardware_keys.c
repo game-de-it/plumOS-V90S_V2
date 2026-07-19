@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <poll.h>
@@ -21,6 +22,7 @@
 #define REPEAT_INTERVAL_MS 120
 #define PERSIST_DELAY_MS 750
 #define PORTMASTER_EXIT_HOLD_MS 1000
+#define POWER_MENU_DEBOUNCE_MS 800
 #define VOLUME_MAX 12
 #define VOLUME_DEFAULT 8
 
@@ -30,11 +32,18 @@ struct input_source {
 };
 
 static volatile sig_atomic_t running = 1;
+static volatile sig_atomic_t power_menu_requested = 0;
 
 static void stop_running(int signal_number)
 {
     (void)signal_number;
     running = 0;
+}
+
+static void request_power_menu(int signal_number)
+{
+    (void)signal_number;
+    power_menu_requested = 1;
 }
 
 static long long monotonic_ms(void)
@@ -106,6 +115,82 @@ static int run_helper(const char *helper_name, const char *action)
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
         return -EIO;
     return 0;
+}
+
+static int process_owns_fb0(pid_t pid)
+{
+    char directory_path[64];
+    DIR *directory;
+    struct dirent *entry;
+    int owns_fb0 = 0;
+
+    if (pid <= 1 || snprintf(directory_path, sizeof(directory_path),
+                             "/proc/%ld/fd", (long)pid) >=
+                        (int)sizeof(directory_path))
+        return 0;
+    directory = opendir(directory_path);
+    if (!directory)
+        return 0;
+    while ((entry = readdir(directory)) != NULL) {
+        char link_path[128];
+        char target[128];
+        ssize_t length;
+
+        if (entry->d_name[0] == '.')
+            continue;
+        if (snprintf(link_path, sizeof(link_path), "%s/%s", directory_path,
+                     entry->d_name) >= (int)sizeof(link_path))
+            continue;
+        length = readlink(link_path, target, sizeof(target) - 1);
+        if (length < 0)
+            continue;
+        target[length] = '\0';
+        if (strcmp(target, "/dev/fb0") == 0) {
+            owns_fb0 = 1;
+            break;
+        }
+    }
+    closedir(directory);
+    return owns_fb0;
+}
+
+static pid_t frontend_ready_pid(void)
+{
+    FILE *file = fopen("/tmp/plumos-fe-ready", "r");
+    char line[64];
+    long value = 0;
+
+    if (!file)
+        return 0;
+    while (fgets(line, sizeof(line), file)) {
+        if (sscanf(line, "pid=%ld", &value) == 1)
+            break;
+    }
+    fclose(file);
+    if (value <= 1 || kill((pid_t)value, 0) < 0)
+        return 0;
+    return (pid_t)value;
+}
+
+static int open_power_menu(int force_overlay)
+{
+    pid_t frontend_pid = frontend_ready_pid();
+    int result;
+
+    if (!force_overlay && frontend_pid > 0 && process_owns_fb0(frontend_pid)) {
+        fprintf(stderr,
+                "hardware-keys: action=power-menu delegated=frontend pid=%ld\n",
+                (long)frontend_pid);
+        return 0;
+    }
+    if (access("/run/plumos/power-menu-overlay.lock", F_OK) == 0) {
+        fprintf(stderr, "hardware-keys: action=power-menu skipped=already-open\n");
+        return 0;
+    }
+    result = run_helper("plumos-power-menu-overlay", "open");
+    fprintf(stderr, "hardware-keys: action=power-menu overlay=1 rc=%d\n",
+            result);
+    return result;
 }
 
 static int read_volume_state(const char *path)
@@ -217,10 +302,12 @@ int main(void)
 {
     struct input_source gamepad = { "adc_gamepad", -1 };
     struct input_source volume_keys = { "sunxi-keyboard", -1 };
+    struct input_source power_key = { "axp2202-pek", -1 };
     long long next_reopen = 0;
     long long repeat_due = 0;
     long long persist_due = 0;
     long long portmaster_exit_due = 0;
+    long long power_menu_debounce_due = 0;
     int select_down = 0;
     int start_down = 0;
     int portmaster_exit_latched = 0;
@@ -256,6 +343,7 @@ int main(void)
 
     signal(SIGINT, stop_running);
     signal(SIGTERM, stop_running);
+    signal(SIGUSR1, request_power_menu);
     setvbuf(stderr, NULL, _IOLBF, 0);
     fprintf(stderr, "hardware-keys: starting pid=%ld\n", (long)getpid());
 
@@ -263,8 +351,8 @@ int main(void)
     (void)run_helper("plumos-display-control", "apply");
 
     while (running) {
-        struct pollfd poll_fds[2];
-        struct input_source *sources[2] = { &gamepad, &volume_keys };
+        struct pollfd poll_fds[3];
+        struct input_source *sources[3] = { &gamepad, &volume_keys, &power_key };
         long long now = monotonic_ms();
         int timeout = 100;
         int index;
@@ -273,20 +361,28 @@ int main(void)
         if (now >= next_reopen) {
             reopen_source(&gamepad);
             reopen_source(&volume_keys);
+            reopen_source(&power_key);
             next_reopen = now + REOPEN_INTERVAL_MS;
         }
 
-        for (index = 0; index < 2; index++) {
+        for (index = 0; index < 3; index++) {
             poll_fds[index].fd = sources[index]->fd;
             poll_fds[index].events = POLLIN;
             poll_fds[index].revents = 0;
         }
-        ready = poll(poll_fds, 2, timeout);
+        ready = poll(poll_fds, 3, timeout);
         now = monotonic_ms();
         if (ready < 0 && errno != EINTR)
             fprintf(stderr, "hardware-keys: poll failed errno=%d\n", errno);
 
-        for (index = 0; ready > 0 && index < 2; index++) {
+        if (power_menu_requested) {
+            power_menu_requested = 0;
+            (void)open_power_menu(1);
+            now = monotonic_ms();
+            power_menu_debounce_due = now + POWER_MENU_DEBOUNCE_MS;
+        }
+
+        for (index = 0; ready > 0 && index < 3; index++) {
             struct input_source *source = sources[index];
 
             if (source->fd < 0 || !(poll_fds[index].revents & (POLLIN | POLLERR | POLLHUP)))
@@ -296,7 +392,16 @@ int main(void)
                 ssize_t bytes = read(source->fd, &event, sizeof(event));
 
                 if (bytes == (ssize_t)sizeof(event)) {
-                    if (source == &gamepad && event.type == EV_KEY &&
+                    if (source == &power_key && event.type == EV_KEY &&
+                        event.code == KEY_POWER) {
+                        if (event.value == 1 &&
+                            now >= power_menu_debounce_due) {
+                            (void)open_power_menu(0);
+                            now = monotonic_ms();
+                            power_menu_debounce_due =
+                                now + POWER_MENU_DEBOUNCE_MS;
+                        }
+                    } else if (source == &gamepad && event.type == EV_KEY &&
                         (event.code == BTN_SELECT ||
                          event.code == BTN_START)) {
                         if (event.code == BTN_SELECT)
@@ -402,6 +507,8 @@ int main(void)
         close(gamepad.fd);
     if (volume_keys.fd >= 0)
         close(volume_keys.fd);
+    if (power_key.fd >= 0)
+        close(power_key.fd);
     close(lock_fd);
     fprintf(stderr, "hardware-keys: stopped\n");
     return 0;

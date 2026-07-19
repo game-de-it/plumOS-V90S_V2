@@ -612,6 +612,13 @@ Build plumOS V90S as a V90S-specific distribution:
   route user volume for both speaker and USB-DAC through the ALSA hotplug
   plugin's software gain. Keep the physical PCM path enabled at software volume
   zero so RetroArch `audio_sync` cannot stall the emulation runloop.
+- [x] Make the physical Power key open one power menu across the FE and active
+  display-owning runtimes without stopping SSH/ADB. Validate native FE handling,
+  framebuffer restoration, single-instance ownership, and cancel/resume with
+  RetroArch, standalone YabaSanshiro, and PPSSPP. Recover the shared physical
+  ALSA stream after SIGSTOP/SIGCONT so both direct ALSA and SDL callback clients
+  resume audio. See
+  `docs/validation/2026-07-19-v90s-global-power-menu.md`.
 - [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
   release-system squashfs while keeping pip-installed modules on writable
   `PLUMOS_SYS`.

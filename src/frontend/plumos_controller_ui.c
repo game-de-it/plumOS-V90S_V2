@@ -9854,7 +9854,8 @@ static void mark_frontend_ready_if_needed(struct ui_state *ui) {
 
   if (!ui || ui->fe_ready_flag_written ||
       (!ui->renderer_mali && !ui->renderer_fbdev && !ui->renderer_mmf_gfx) ||
-      !ui->renderer_active || ui->render_failed || ui->rescue_network) {
+      !ui->renderer_active || ui->render_failed || ui->rescue_network ||
+      ui->power_overlay) {
     return;
   }
   snprintf(content, sizeof(content), "pid=%ld\nscreen=%d\n",
@@ -14413,11 +14414,12 @@ static int discover_input_event(char *out, size_t out_size) {
 }
 
 static int discover_power_input_event(char *out, size_t out_size) {
-  if (discover_named_input_event(out, out_size, "soc:gpio_keys", NULL) ||
+  if (discover_named_input_event(out, out_size, "axp2202-pek", NULL) ||
+      discover_named_input_event(out, out_size, "soc:gpio_keys", NULL) ||
       discover_named_input_event(out, out_size, "gpio-keys", NULL)) {
     return 1;
   }
-  return copy_string(out, out_size, "/dev/input/event0");
+  return copy_string(out, out_size, "/dev/input/event1");
 }
 
 static int same_path(const char *a, const char *b) {

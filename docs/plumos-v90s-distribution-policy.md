@@ -464,6 +464,26 @@ emulator launches must not rebuild the complete compatibility map when its
 signature is unchanged. Background prewarming must not leave an unreaped child
 under the vendor PID 1 or move noticeable latency into frontend startup.
 
+The physical Power key is a system-wide UI input, not an FE-only shortcut.
+The always-running hardware-key service owns the `axp2202-pek` input device.
+When the normal frontend owns `/dev/fb0`, the event is delegated to the FE's
+native power menu. While RetroArch, PicoArch, a standalone emulator, or an App
+owns the display, the service launches a single global power-menu overlay. The
+overlay must snapshot the visible framebuffer, pause only processes that hold
+V90S display device descriptors, restore every framebuffer page on cancel, and
+resume exactly the PIDs it paused. It must not stop SSH, ADB, or unrelated
+diagnostic processes. Overlay instances must never replace the normal FE ready
+marker.
+
+Pausing a display owner can leave its physical ALSA PCM in XRUN while the
+application's logical `plumos_output` PCM remains running. The plumOS ALSA
+ioplug must recover XRUN/SUSPENDED physical streams, restore the internal DAC
+gain, discard the matching lost logical queue once, and let the application
+submit fresh audio. Recovery must not treat unrelated device errors as XRUNs.
+This shared rule applies to callback-driven SDL clients such as PPSSPP and to
+direct ALSA clients such as standalone YabaSanshiro; per-emulator audio restart
+fallbacks are not the release design.
+
 Power actions are a special case. The frontend may expose a compatibility
 entry point in the FAT32 app layer, but the final Reboot/Shutdown implementation
 must live in the system squashfs and run without depending on `/mnt/plumos`.

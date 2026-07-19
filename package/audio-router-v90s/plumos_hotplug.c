@@ -37,6 +37,7 @@ typedef struct {
     int allow_fast_drop;
     unsigned int fast_streak;
     unsigned int normal_streak;
+    int physical_resync_pending;
     int debug_enabled;
     unsigned int debug_count;
 } plumos_pcm_t;
@@ -44,9 +45,12 @@ typedef struct {
 static void debug_event(plumos_pcm_t *pcm, const char *event,
                         snd_pcm_sframes_t value, snd_pcm_sframes_t detail)
 {
-    if (!pcm->debug_enabled || pcm->debug_count >= 256)
+    int recovery_event = strstr(event, "recover") || strstr(event, "resync");
+
+    if (!pcm->debug_enabled || (!recovery_event && pcm->debug_count >= 256))
         return;
-    pcm->debug_count++;
+    if (!recovery_event)
+        pcm->debug_count++;
     fprintf(stderr,
             "plumos-hotplug-debug: event=%s value=%ld detail=%ld "
             "io_state=%d io_appl=%lu io_hw=%lu submitted=%lu physical=%d\n",
@@ -431,6 +435,55 @@ static void read_input_frame(const snd_pcm_ioplug_t *io, const void *input,
                  : read_input_sample(io->format, input, index + 1);
 }
 
+static int recover_physical(plumos_pcm_t *pcm, int error)
+{
+    snd_pcm_state_t state;
+    int recovery_error = error;
+    int result;
+
+    if (!pcm->physical)
+        return -ENODEV;
+    state = snd_pcm_state(pcm->physical);
+    if (state == SND_PCM_STATE_XRUN)
+        recovery_error = -EPIPE;
+    else if (state == SND_PCM_STATE_SUSPENDED)
+        recovery_error = -ESTRPIPE;
+    else if (error != -EPIPE && error != -ESTRPIPE)
+        return error < 0 ? error : 0;
+    else if (error >= 0)
+        return 0;
+
+    result = snd_pcm_recover(pcm->physical, recovery_error, 1);
+    if (result < 0 && recovery_error == -ESTRPIPE)
+        result = snd_pcm_prepare(pcm->physical);
+    if (result >= 0) {
+        pcm->physical_resync_pending = 1;
+        result = restore_active_internal_dac(pcm);
+    }
+    debug_event(pcm, "physical-recover", result, recovery_error);
+    return result;
+}
+
+static void resync_prepared_physical(plumos_pcm_t *pcm)
+{
+    if (!pcm->physical_resync_pending || !pcm->physical ||
+        pcm->io.state != SND_PCM_STATE_RUNNING ||
+        snd_pcm_state(pcm->physical) != SND_PCM_STATE_PREPARED)
+        return;
+
+    /* The physical queue is empty after an XRUN recovery. Drop the matching
+     * logical backlog so callback-driven clients can submit fresh audio. */
+    pcm->submitted_ptr = pcm->io.appl_ptr;
+    pcm->last_transfer.tv_sec = 0;
+    pcm->last_transfer.tv_nsec = 0;
+    pcm->producer_is_fast = 0;
+    pcm->fast_streak = 0;
+    pcm->normal_streak = 0;
+    pcm->physical_resync_pending = 0;
+    debug_event(pcm, "physical-resync", 0,
+                (snd_pcm_sframes_t)pcm->submitted_ptr);
+}
+
 static snd_pcm_sframes_t write_physical(plumos_pcm_t *pcm,
                                         const int16_t *samples,
                                         snd_pcm_uframes_t frames)
@@ -439,12 +492,9 @@ static snd_pcm_sframes_t write_physical(plumos_pcm_t *pcm,
     while (completed < frames) {
         snd_pcm_sframes_t written = snd_pcm_writei(
             pcm->physical, samples + completed * 2, frames - completed);
-        if (written == -EPIPE || written == -ESTRPIPE) {
-            int recovered = snd_pcm_recover(pcm->physical, (int)written, 1);
+        if (written < 0) {
+            int recovered = recover_physical(pcm, (int)written);
             if (recovered >= 0) {
-                int volume_err = restore_active_internal_dac(pcm);
-                if (volume_err < 0)
-                    return volume_err;
                 continue;
             }
             written = recovered;
@@ -616,6 +666,7 @@ static int plumos_stop(snd_pcm_ioplug_t *io)
 
     if (pcm->physical)
         snd_pcm_drop(pcm->physical);
+    pcm->physical_resync_pending = 0;
     debug_event(pcm, "stop", 0, 0);
     return 0;
 }
@@ -628,10 +679,15 @@ static snd_pcm_sframes_t plumos_pointer(snd_pcm_ioplug_t *io)
 
     if (!pcm->physical || !io->buffer_size)
         return 0;
+    resync_prepared_physical(pcm);
     err = snd_pcm_delay(pcm->physical, &delay);
     if (err < 0) {
-        debug_event(pcm, "pointer-error", err, 0);
-        return err;
+        int recovered = recover_physical(pcm, err);
+        if (recovered < 0) {
+            debug_event(pcm, "pointer-error", recovered, err);
+            return recovered;
+        }
+        delay = 0;
     }
     if (delay < 0)
         delay = 0;
@@ -651,6 +707,7 @@ static int plumos_prepare(snd_pcm_ioplug_t *io)
     if (err < 0)
         return err;
     pcm->submitted_ptr = 0;
+    pcm->physical_resync_pending = 0;
     err = snd_pcm_prepare(pcm->physical);
     if (err < 0)
         return err;
@@ -668,11 +725,21 @@ static int plumos_drain(snd_pcm_ioplug_t *io)
 static int plumos_delay(snd_pcm_ioplug_t *io, snd_pcm_sframes_t *delayp)
 {
     plumos_pcm_t *pcm = io->private_data;
+    int err;
+
     if (!pcm->physical) {
         *delayp = 0;
         return 0;
     }
-    return snd_pcm_delay(pcm->physical, delayp);
+    resync_prepared_physical(pcm);
+    err = snd_pcm_delay(pcm->physical, delayp);
+    if (err < 0) {
+        int recovered = recover_physical(pcm, err);
+        if (recovered < 0)
+            return recovered;
+        *delayp = 0;
+    }
+    return 0;
 }
 
 static int plumos_poll_descriptors_count(snd_pcm_ioplug_t *io)
@@ -696,12 +763,41 @@ static int plumos_poll_revents(snd_pcm_ioplug_t *io, struct pollfd *pfds,
                                unsigned int nfds, unsigned short *revents)
 {
     plumos_pcm_t *pcm = io->private_data;
+    snd_pcm_state_t state;
     int err;
 
     if (!pcm->physical)
         return -ENODEV;
+    state = snd_pcm_state(pcm->physical);
+    if (pcm->physical_resync_pending && state == SND_PCM_STATE_PREPARED &&
+        io->state == SND_PCM_STATE_RUNNING) {
+        resync_prepared_physical(pcm);
+        *revents = POLLOUT;
+        debug_event(pcm, "poll-resync", 0, *revents);
+        return 0;
+    }
+    if (state == SND_PCM_STATE_XRUN || state == SND_PCM_STATE_SUSPENDED) {
+        err = recover_physical(pcm, state == SND_PCM_STATE_XRUN
+                                        ? -EPIPE
+                                        : -ESTRPIPE);
+        if (err < 0)
+            return err;
+        *revents = POLLOUT;
+        debug_event(pcm, "poll-recover", 0, *revents);
+        return 0;
+    }
     err = snd_pcm_poll_descriptors_revents(
         pcm->physical, pfds, nfds, revents);
+    if (err >= 0 && (*revents & POLLERR)) {
+        state = snd_pcm_state(pcm->physical);
+        if (state == SND_PCM_STATE_XRUN || state == SND_PCM_STATE_SUSPENDED) {
+            err = recover_physical(pcm, state == SND_PCM_STATE_XRUN
+                                            ? -EPIPE
+                                            : -ESTRPIPE);
+            if (err >= 0)
+                *revents = POLLOUT;
+        }
+    }
     debug_event(pcm, "poll", err, err < 0 ? 0 : *revents);
     return err;
 }
