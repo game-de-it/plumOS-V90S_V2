@@ -222,6 +222,17 @@ Build plumOS V90S as a V90S-specific distribution:
   reduce the A7Xpg, Abombniball, and Profanation Deluxe sample audit to zero
   unresolved SONAMEs. Device-side `ldd` also reports zero unresolved libraries;
   video, audio, controls, and clean exit remain per-port runtime tests.
+- [x] Complete the 24.02 GiB full PortMaster AArch64 payload audit: download,
+  size/MD5/ZIP-validate, and inspect all 1126 candidates. After separating 358
+  Android/Bionic payloads and adding the actual SDL2_ttf runtime source to the
+  target contract, the final report contains zero protected target-contract
+  failures and 22 unresolved SONAMEs across 23 ports. See
+  `docs/validation/2026-07-20-v90s-portmaster-aarch64-full-audit.md`.
+- [ ] Triage and implement only approved PortMaster follow-up classes from the
+  full audit: evaluate `libreadline.so.7` as the next common ABI; keep OpenSSL
+  1.1 isolated; validate declared Weston/Java/Mono/Godot runtimes separately;
+  reject Rockchip RGA/Mali dependencies instead of adding them globally; and
+  leave single-port ABI dependencies with their owning port or runtime.
 - [x] Implement `picoarch` as a native AArch64 runtime with SDL12 compatibility,
   V90S fbdev double-buffer presentation, FAT32-owned settings/saves, and shared
   `/mnt/plumos/cores/*_libretro.so` core resolution. QuickNES video and ALSA

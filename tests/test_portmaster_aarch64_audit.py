@@ -101,6 +101,32 @@ class ElfParserTests(unittest.TestCase):
         self.assertIn("libmissing.so.8", result["needed"])
         self.assertNotIn("armhf", result["script_flags"])
 
+    def test_zip_audit_separates_android_bionic_dependencies(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = Path(temporary) / "android.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr(
+                    "sample/lib/arm64-v8a/libgame.so",
+                    make_elf(needed=("libc.so", "libdl.so", "liblog.so")),
+                )
+                archive.writestr(
+                    "sample/gmloadernext.aarch64",
+                    make_elf(needed=("libc.so.6",)),
+                )
+            result = AUDIT.audit_zip(archive_path)
+        self.assertEqual(result["needed"], ["libc.so.6"])
+        self.assertEqual(result["bionic_needed"], ["libc.so", "libdl.so", "liblog.so"])
+        self.assertIn("android-bionic", result["script_flags"])
+        record = {
+            "payload_status": "audited",
+            "unsafe_entries": [],
+            "elf_machine_counts": result["elf_machine_counts"],
+            "script_flags": result["script_flags"],
+            "missing_sonames": [],
+            "runtime_status": "not-required",
+        }
+        self.assertEqual(AUDIT.classify_port(record), "runtime-unvalidated")
+
 
 class CatalogTests(unittest.TestCase):
     def test_foreign_arch_path_components(self):

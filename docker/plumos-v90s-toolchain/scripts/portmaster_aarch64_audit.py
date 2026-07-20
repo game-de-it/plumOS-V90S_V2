@@ -71,6 +71,10 @@ def has_foreign_arch_component(parts: Iterable[str]) -> bool:
     )
 
 
+def has_android_bionic_component(parts: Iterable[str]) -> bool:
+    return any(part.lower() == "arm64-v8a" for part in parts)
+
+
 def read_c_string(data: bytes, offset: int) -> str:
     if offset < 0 or offset >= len(data):
         return ""
@@ -216,6 +220,7 @@ def audit_zip(path: Path) -> dict[str, Any]:
     scripts: list[str] = []
     binaries: list[dict[str, Any]] = []
     provided: set[str] = set()
+    bionic_needed: set[str] = set()
     unsafe_entries: list[str] = []
     with zipfile.ZipFile(path) as archive:
         for entry in archive.infolist():
@@ -246,6 +251,8 @@ def audit_zip(path: Path) -> dict[str, Any]:
             binary = {"path": entry.filename, **elf}
             binaries.append(binary)
             if elf["machine"] == "aarch64":
+                if has_android_bionic_component(pure.parts):
+                    bionic_needed.update(elf["needed"])
                 if is_library_name(basename):
                     provided.add(basename)
                 if elf["soname"]:
@@ -255,16 +262,21 @@ def audit_zip(path: Path) -> dict[str, Any]:
             dependency
             for binary in binaries
             if binary["machine"] == "aarch64"
+            and not has_android_bionic_component(PurePosixPath(binary["path"]).parts)
             for dependency in binary["needed"]
         }
     )
     machine_counts = Counter(binary["machine"] for binary in binaries)
+    script_flags = set(analyze_scripts(scripts))
+    if bionic_needed:
+        script_flags.add("android-bionic")
     return {
+        "bionic_needed": sorted(bionic_needed),
         "binaries": sorted(binaries, key=lambda item: item["path"]),
         "elf_machine_counts": dict(sorted(machine_counts.items())),
         "needed": needed,
         "provided": sorted(provided),
-        "script_flags": analyze_scripts(scripts),
+        "script_flags": sorted(script_flags),
         "script_count": len(scripts),
         "unsafe_entries": sorted(unsafe_entries),
     }
@@ -410,6 +422,8 @@ def classify_port(record: dict[str, Any]) -> str:
         return "unsupported-runtime"
     if record["runtime_status"] == "unvalidated":
         return "runtime-unvalidated"
+    if "android-bionic" in record["script_flags"]:
+        return "runtime-unvalidated"
     if not counts.get("aarch64"):
         return "script-or-runtime-only"
     return "static-pass"
@@ -498,6 +512,7 @@ def main(argv: list[str] | None = None) -> int:
 
     default_library_roots = [
         root / "output/app-layer/v90s/lib",
+        root / "output/app-layer/v90s/apps/nextcommander/lib",
         root / "output/portmaster/v90s/plumos/apps/portmaster/adapter/lib/aarch64",
         root / "output/portmaster/v90s/plumos/apps/portmaster/upstream/PortMaster/runtimes",
         root / "output/vendor/v90s-stockos-r1/root/usr/lib/powervr",
@@ -536,6 +551,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = find_payload(name, payload_roots)
         payload_status = "unavailable"
         zip_audit = {
+            "bionic_needed": [],
             "binaries": [],
             "elf_machine_counts": {},
             "needed": [],

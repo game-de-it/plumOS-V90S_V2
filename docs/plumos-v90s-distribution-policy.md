@@ -1824,6 +1824,22 @@ renaming a newer incompatible SONAME or by copying a binary from an installed
 port. Future common ABI additions must pass the same audit, provenance,
 dependency-closure, app-layer metadata, and real-device loader checks.
 
+ELF architecture alone is not a sufficient ABI classification. AArch64 shared
+objects below Android `arm64-v8a` payload paths use Bionic contracts such as
+unversioned `libc.so`, `libdl.so`, `liblog.so`, and `libOpenSLES.so`. Keep those
+dependencies in an explicit `android-bionic` loader/runtime class; never report
+them as missing glibc target libraries or copy Android system libraries into
+the global adapter path. Compatibility for gmloader, unityloader, or another
+Android translation layer requires separate runtime and hardware validation.
+
+The target library contract must model the effective PortMaster launch path,
+not merely one top-level app-layer directory. A library outside
+`/mnt/plumos/lib` counts as provided only when an owned runtime helper
+explicitly projects it into `/run/plumos/portmaster/lib`. The current example
+is `libSDL2_ttf-2.0.so.0` from the NextCommander library directory. Conversely,
+a library that happens to exist elsewhere in the app layer must not satisfy a
+PortMaster dependency when the launcher cannot reach it.
+
 ### 2026-07-19: RetroArch Factory Configuration Ownership
 
 Decision:
