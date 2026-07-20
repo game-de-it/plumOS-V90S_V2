@@ -34,6 +34,43 @@ index ca0bdf7..2757092 100644
  };
  
  static const struct in_pdata in_sdl_platform_data = {
+diff --git a/frontend/main.c b/frontend/main.c
+index ee2de1c..cfab8e7 100644
+--- a/frontend/main.c
++++ b/frontend/main.c
+@@ -52,3 +52,6 @@
+ #include "libpicofe/readpng.h"
+ 
++#ifdef PLUMOS_V90S
++volatile int plumos_v90s_fast_forward;
++#endif
+ static void toggle_fast_forward(int force_off);
+@@ -746,19 +749,25 @@ static void toggle_fast_forward(int force_off)
+ 	if (force_off && !fast_forward)
+ 		return;
+ 
+ 	fast_forward = !fast_forward;
+ 	if (fast_forward) {
++#ifdef PLUMOS_V90S
++		plumos_v90s_fast_forward = 1;
++#endif
+ 		normal_g_opts = g_opts;
+ 		normal_frameskip = pl_rearmed_cbs.frameskip;
+ 		normal_enhancement_enable =
+ 			pl_rearmed_cbs.gpu_neon.enhancement_enable;
+ 
+ 		g_opts |= OPT_NO_FRAMELIM;
+ 		if (normal_frameskip != 0)
+ 			pl_rearmed_cbs.frameskip = 3;
+ 		pl_rearmed_cbs.gpu_neon.enhancement_enable = 0;
+ 	} else {
++#ifdef PLUMOS_V90S
++		plumos_v90s_fast_forward = 0;
++#endif
+ 		g_opts = normal_g_opts;
+ 		pl_rearmed_cbs.frameskip = normal_frameskip;
+ 		pl_rearmed_cbs.gpu_neon.enhancement_enable =
+ 			normal_enhancement_enable;
 diff --git a/plugins/dfsound/alsa.c b/plugins/dfsound/alsa.c
 index 6b9f83e..53465eb 100644
 --- a/plugins/dfsound/alsa.c
@@ -47,10 +84,14 @@ index 6b9f83e..53465eb 100644
  #include <string.h>
  #define ALSA_PCM_NEW_HW_PARAMS_API
  #define ALSA_PCM_NEW_SW_PARAMS_API
-@@ -24,6 +26,19 @@
+@@ -24,6 +26,23 @@
  
  static snd_pcm_t *handle = NULL;
  static snd_pcm_uframes_t buffer_size;
++#ifdef PLUMOS_V90S
++extern volatile int plumos_v90s_fast_forward;
++static int fast_forward_muted;
++#endif
 +static FILE *audio_dump;
 +static size_t audio_dump_bytes;
 +static size_t audio_dump_limit;
@@ -157,7 +198,7 @@ index 6b9f83e..53465eb 100644
   if(handle != NULL)
    {
     snd_pcm_drop(handle);
-@@ -182,34 +234,140 @@ static int alsa_busy(void)
+@@ -182,34 +238,160 @@ static int alsa_busy(void)
   return l;
  }
  
@@ -237,6 +278,26 @@ index 6b9f83e..53465eb 100644
 + const char *data;
  
   if (handle == NULL) return;
++#ifdef PLUMOS_V90S
++ if (plumos_v90s_fast_forward)
++  {
++   if (!fast_forward_muted)
++    {
++     snd_pcm_drop(handle);
++     snd_pcm_prepare(handle);
++     resample_phase = 0;
++     resample_have_previous = 0;
++     fast_forward_muted = 1;
++    }
++   return;
++  }
++ if (fast_forward_muted)
++  {
++   snd_pcm_prepare(handle);
++   fast_forward_muted = 0;
++  }
++#endif
++
  
 - if (snd_pcm_state(handle) == SND_PCM_STATE_XRUN)
 + if (audio_dump != NULL && audio_dump_bytes < audio_dump_limit)

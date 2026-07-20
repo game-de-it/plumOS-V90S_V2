@@ -1103,10 +1103,16 @@ still a plumOS-managed route, not direct `hw:*` access.
   `plumos_hotplug` at 48 kHz, and require the ALSA driver. It must not silently
   fall back to the SDL audio backend. Resampling arithmetic must remain signed
   through interpolation and division so negative PCM samples cannot be
-  converted into large unsigned values.
-- RetroArch alone enables the bounded nonblocking producer policy needed for
-  fast-forward. PicoArch, standalone emulators, and Music Player use blocking
-  physical writes so ordinary playback cannot discard samples.
+  converted into large unsigned values. PCSX is also a documented
+  fast-forward exception: while its explicit Fast Forward action is active,
+  it discards its own SPU output before the blocking ALSA write. When Fast
+  Forward is disabled, PCSX prepares ALSA again and resumes the normal 48 kHz
+  path. This exception must remain local to PCSX and must not change the common
+  router's normal write policy.
+- RetroArch enables the bounded nonblocking producer policy needed for its
+  fast-forward route. PicoArch, Music Player, and standalone emulators other
+  than the documented PCSX exception use blocking physical writes so ordinary
+  playback cannot discard samples.
 - Failure to detect or configure a valid output is fatal to that application
   launch. The normal path must not silently fall back to `hw:0,0`.
 - Direct `hw:0,0` playback remains available only in explicit audio diagnostics.

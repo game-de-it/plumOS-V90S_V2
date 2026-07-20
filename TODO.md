@@ -366,7 +366,10 @@ Build plumOS V90S as a V90S-specific distribution:
       The r26l build uses the V90S SDL12-compat runtime, an asynchronous fbdev
       presenter, V90S controller bindings, and a required ALSA path. Its native
       44.1 kHz stream is converted to the vendor codec's stable 48 kHz
-      contract without XRUN or clipping; see
+      contract without XRUN or clipping. Fast Forward discards PCSX SPU output
+      before the blocking ALSA write and re-prepares ALSA when normal speed is
+      restored; real-device testing confirmed that FF exceeds normal speed.
+      See
       `docs/validation/2026-07-21-v90s-pcsx-rearmed-standalone.md`.
     - [ ] Make ScummVM resolve a ROM directory to a valid detected game target.
     - [x] Make standalone EasyRPG pass the selected game directory through

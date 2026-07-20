@@ -68,6 +68,25 @@ The first nonzero sample appeared at the same time in both files
 (`19.296168 s` source and `19.296167 s` output). The conversion no longer adds
 DC offsets, peak growth, clipping, or a discontinuity at the start of audio.
 
+## Fast-forward diagnosis
+
+`SACTION_FAST_FORWARD` correctly set `OPT_NO_FRAMELIM`, and the active V90S
+controller configuration bound `adc_gamepad` button 7 to both PlayStation R2
+and Fast Forward. The emulator nevertheless remained at normal speed because
+its blocking ALSA writes paced the emulation loop to the physical 48 kHz audio
+clock.
+
+The V90S PCSX build now exposes its explicit Fast Forward state to its ALSA
+backend. While Fast Forward is active, the backend drops the pending physical
+queue once and discards subsequent SPU blocks before `snd_pcm_writei()`. When
+Fast Forward is disabled, it prepares ALSA again, resets the resampler boundary,
+and resumes the normal blocking 44.1-to-48 kHz route. The common plumOS audio
+router and every other standalone emulator retain their normal behavior.
+
+The user confirmed on the physical V90S that Fast Forward now exceeds normal
+speed. After returning to normal speed, the physical PCM was `RUNNING` with
+`period_size=1024`, `buffer_size=4096`, and a finite queue delay.
+
 ## Physical result
 
 The final physical PCM contract was:
@@ -89,7 +108,8 @@ confirmed on the same standalone route.
 Deployed hashes matched `/mnt/plumos/checksums.sha256`:
 
 ```text
-992852796722a4c38cd63066ced661402434bc4c6da468e8be8edc0e935fa439  standalone/pcsx_rearmed/bin/pcsx
-8511fe4db636bb750a7974e7d520c30c0985b41306739c371575a9a71b9974a3  standalone/pcsx_rearmed/lib/libSDL-1.2.so.0
 270d01d39c2c1b9bf1246756f51590d990ed148b57419af6b6e86a275eef6379  bin/plumos-standalone-launch
+6b1097a48efcbd5181940a0f2c0904702fd9f47c569d4708a0b8f2a2e91bd82c  lib/alsa-lib/libasound_module_pcm_plumos_hotplug.so
+c20d695e41a73b44ee06779ab8328890a1632c6168251b7ae49e06d4b13860e2  standalone/pcsx_rearmed/bin/pcsx
+1dd9ad97571859e7a3d4788c5f14d1279229ecb72f55a9e5f9946020004631f4  standalone/pcsx_rearmed/lib/libSDL-1.2.so.0
 ```
