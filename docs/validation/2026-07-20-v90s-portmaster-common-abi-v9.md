@@ -52,7 +52,40 @@ handling decision for every unresolved SONAME:
 | `libsndio.so.7.0` | `runtime-owned`, Weston/Java audio |
 | `librga.so.2` | `unsupported-hardware`, Rockchip RGA |
 
-This work proves loader dependency closure only. Wizznic and Yatka still need
-real-device video, audio, controls, performance, and clean-exit validation.
+## Real-device Validation
+
+Adapter version 9 was deployed to the V90S through a metadata-preserving
+app-layer update. The update retained the device's changed user settings,
+PortMaster runtime files, and Neo Geo CD core while replacing only the v9-owned
+files and their manifest entries.
+
+- Device adapter version: 9
+- App-layer checksum verification: 5,959 of 5,959 files passed
+- PortMaster component verification: 192 of 192 entries passed
+- Runtime Readline resolution:
+  `/run/plumos/portmaster/lib/libreadline.so.7`
+- Runtime target:
+  `/mnt/plumos/apps/portmaster/adapter/lib/aarch64/libreadline.so.7`
+- Official Wizznic ZIP MD5: `d148440d75c8d0e9cd50ce062f44c7b1`
+- Official Yatka ZIP MD5: `bfe2334d7b9b181aa40091e3222acd5f`
+
+Both Wizznic and Yatka were then launched through
+`plumos-portmaster-port-launch` on the real device. For each title:
+
+- `libfluidsynth.so.1` resolved `libreadline.so.7` from the owned `/run`
+  projection with no unresolved direct dependency.
+- The game process stayed alive and changed the visible framebuffer hash.
+- The internal plumOS ALSA PCM reported `RUNNING` and was owned by the game.
+- The PortMaster GPTokeYB helper was attached to the matching game process.
+- `plumos-portmaster-port-stop` stopped only the owned game group.
+- No game, GPTokeYB, or `/usr/lib/compat` state remained after exit.
+- SD2 remained mounted read-write and the kernel log contained no FAT or I/O
+  errors from the test.
+
+The frontend was normalized to exactly one process after the two tests.
+Physical button response and extended gameplay remain user-visible checks, but
+the common ABI's loader, video, audio, input-helper, and clean-exit paths are
+now proven on V90S hardware.
+
 The runtime-owned and isolated candidates remain unavailable until their exact
 runtime packages are separately implemented and validated on V90S.

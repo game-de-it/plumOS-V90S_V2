@@ -232,6 +232,11 @@ Build plumOS V90S as a V90S-specific distribution:
   9: source-build SHA-256-pinned GNU Readline 7.0 as its real
   `libreadline.so.7` SONAME, project it only through the owned PortMaster
   runtime, and make Wizznic and Yatka pass the complete static audit.
+- [x] Deploy PortMaster adapter version 9 to V90S and validate the Readline 7
+  consumer path with Wizznic and Yatka. Both titles resolved the owned ABI,
+  changed the framebuffer, opened the plumOS ALSA route, attached GPTokeYB,
+  stopped through the owned helper, and left one frontend process. See
+  `docs/validation/2026-07-20-v90s-portmaster-common-abi-v9.md`.
 - [x] Encode the remaining repeated ABI candidates in the audit contract by
   owner and handling class. Keep OpenSSL 1.1 isolated, assign GL/X11/Java/sndio
   dependencies to their runtime families, reject Rockchip RGA on V90S, and do
