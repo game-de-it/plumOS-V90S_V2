@@ -1755,6 +1755,16 @@ packaged V90S runtime and real-device video, audio, input, exit, save, and FE
 restoration evidence. A working GUI or successful download alone is not a port
 compatibility result.
 
+ARMHF-only PortMaster games are explicitly unsupported on V90S. The vendor
+runtime has no 32-bit PowerVR userspace driver. A 2026-07-20 Maldita Castilla
+probe proved that the kernel can execute ARMHF code and that Mesa llvmpipe can
+render the game through an offscreen framebuffer bridge, but physical testing
+showed roughly 10 fps even after stable double-buffered scanout and working
+input. Do not package that CPU-rendering fallback or advertise ARMHF support.
+The installed-port launcher must reject scripts declaring `PORT_32BIT=Y`
+before stopping the frontend and record the compatibility failure in the
+PortMaster port log.
+
 ### 2026-07-19: RetroArch Factory Configuration Ownership
 
 Decision:

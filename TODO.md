@@ -715,9 +715,12 @@ Build plumOS V90S as a V90S-specific distribution:
     V90S buttons. On the ext4 runtime, repair official ZIP mode `0644` to
     `0755` for `gptokeyb`/`gptokeyb2`; Donut Dodo then ran with its owned
     GPTokeYB process and the user confirmed controls.
-  - [ ] Keep ARMHF-only, desktop-OpenGL, Weston/GL4ES, Box64, Mono, Java, and
-    other runtime classes unavailable until each class is explicitly packaged
-    and validated on V90S.
+  - [x] Keep ARMHF-only ports unavailable. The V90S has no 32-bit PowerVR
+    userspace driver; the Maldita Castilla ARMHF probe rendered and accepted
+    input through Mesa llvmpipe but ran at roughly 10 fps. Reject installed
+    scripts declaring `PORT_32BIT=Y` before stopping FE. Desktop OpenGL,
+    Weston/GL4ES, Box64, Mono, Java, and other runtime classes remain gated
+    until each class is explicitly packaged and validated on V90S.
 - [ ] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.

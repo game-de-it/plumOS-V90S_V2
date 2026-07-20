@@ -132,6 +132,19 @@ patch_known_port_runtime_path() {
   sync "$gui_file" 2>/dev/null || sync
 }
 
+port_requires_armhf() {
+  grep -Eq "^[[:space:]]*(export[[:space:]]+)?PORT_32BIT[[:space:]]*=[[:space:]]*['\"]?[Yy]" "$script"
+}
+
+if port_requires_armhf; then
+  mkdir -p "$(dirname "$LOG_FILE")"
+  message="PortMaster ARMHF port is not supported on POWKIDDY V90S: $(basename "$script")"
+  printf '%s\n' "$message" >&2
+  printf '\n[%s] unsupported_armhf script=%s\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$script" >> "$LOG_FILE"
+  exit 78
+fi
+
 if [ -f "$PID_FILE" ]; then
   old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
   if [ -d "/proc/${old_pid}" ]; then
