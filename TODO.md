@@ -239,6 +239,12 @@ Build plumOS V90S as a V90S-specific distribution:
 - [ ] Validate the declared Weston/GL4ES, Java, Mono, and Godot runtime families
   separately on V90S. A runtime-owned or isolated ABI remains unresolved until
   its exact runtime image, loader path, and hardware behavior are proven.
+- [x] Run a representative real-device sample from the `static-pass` set.
+  Apotris, Abombniball, A7Xpg, Abu Simbel Profanation Deluxe, and OpenSyobon
+  all reached their owned game process, changed the framebuffer away from FE,
+  opened the plumOS ALSA route, attached the PortMaster input helper, stopped
+  through the owned helper, and restored one FE process. Physical button
+  response and extended gameplay remain user-visible tests.
 - [x] Implement `picoarch` as a native AArch64 runtime with SDL12 compatibility,
   V90S fbdev double-buffer presentation, FAT32-owned settings/saves, and shared
   `/mnt/plumos/cores/*_libretro.so` core resolution. QuickNES video and ALSA
