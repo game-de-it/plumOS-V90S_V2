@@ -1048,7 +1048,10 @@ the normal correction path rather than an optional cosmetic feature.
 ### Audio Output Policy
 
 Normal plumOS applications must open the logical ALSA PCM `plumos_output`, not
-bind directly to a numbered hardware card.
+bind directly to a numbered hardware card. A timing-sensitive application may
+open the underlying logical `plumos_hotplug` ioplug when it already supplies an
+exact supported format and its exception is documented and validated. This is
+still a plumOS-managed route, not direct `hw:*` access.
 
 - With only the V90S `audiocodec` present, `plumos_output` routes
   `0.5 * left + 0.5 * right` to both hardware channels of `hw:<card>,0`. The
@@ -1094,6 +1097,13 @@ bind directly to a numbered hardware card.
 - RetroArch, PicoArch, standalone emulators, and plumOS Music Player must run
   the helper before opening audio and must export the generated file through
   `ALSA_CONFIG_PATH` and the plugin directory through `ALSA_PLUGIN_DIR`.
+- Standalone PCSX-ReARMed is a documented exact-format exception. Its SPU
+  produces 44.1 kHz stereo, while the V90S vendor codec is stable when opened
+  at 48 kHz. PCSX must convert 44.1 kHz to 48 kHz in-process, open
+  `plumos_hotplug` at 48 kHz, and require the ALSA driver. It must not silently
+  fall back to the SDL audio backend. Resampling arithmetic must remain signed
+  through interpolation and division so negative PCM samples cannot be
+  converted into large unsigned values.
 - RetroArch alone enables the bounded nonblocking producer policy needed for
   fast-forward. PicoArch, standalone emulators, and Music Player use blocking
   physical writes so ordinary playback cannot discard samples.

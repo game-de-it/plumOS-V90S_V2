@@ -1,0 +1,76 @@
+diff --git a/frontend/plat_sdl.c b/frontend/plat_sdl.c
+index ca0bdf7..b74891e 100644
+--- a/frontend/plat_sdl.c
++++ b/frontend/plat_sdl.c
+@@ -28,6 +28,10 @@
+ #include "plat.h"
+ #include "revision.h"
+ 
++#ifdef PLUMOS_V90S
++#include "pcsx_v90s_fbdev.h"
++#endif
++
+ #include "libpicofe/plat_sdl.c"
+ 
+ #ifdef MIYOO
+@@ -226,6 +230,15 @@ void plat_init(void)
+   if (ret != 0)
+     exit(1);
+ 
++#ifdef PLUMOS_V90S
++  plat_target.vout_method = 0;
++  if (plat_sdl_change_video_mode(g_menuscreen_w, g_menuscreen_h, 1) != 0 ||
++      v90s_pcsx_fb_init() != 0) {
++    fprintf(stderr, "V90S fbdev presenter initialization failed\n");
++    exit(1);
++  }
++#endif
++
+   ver = SDL_Linked_Version();
+   sdl12_compat = ver->patch >= 50;
+   printf("SDL %u.%u.%u compat=%d\n", ver->major, ver->minor, ver->patch, sdl12_compat);
+@@ -262,6 +275,9 @@ void plat_init(void)
+ 
+ void plat_finish(void)
+ {
++#ifdef PLUMOS_V90S
++  v90s_pcsx_fb_finish();
++#endif
+   free(shadow_fb);
+   shadow_fb = NULL;
+   free(menubg_img);
+@@ -403,6 +419,9 @@ static void gl_resize(void)
+ 
+ static void overlay_or_gl_check_enable(void)
+ {
++#ifdef PLUMOS_V90S
++  plat_target.vout_method = 0;
++#endif
+   int ovl_on = plat_target.vout_method == vout_mode_overlay ||
+     plat_target.vout_method == vout_mode_overlay2x;
+   int gl_on = plat_target.vout_method == vout_mode_gl;
+@@ -564,6 +583,9 @@ static void *setup_blit_callbacks(int w, int h)
+ static void change_mode(int w, int h)
+ {
+   int set_w = w, set_h = h, had_overlay = 0, had_gl = 0;
++#ifdef PLUMOS_V90S
++  plat_target.vout_method = 0;
++#endif
+   if (plat_target.vout_fullscreen && (plat_target.vout_method != 0 || !sdl12_compat))
+     set_w = fs_w, set_h = fs_h;
+   if (plat_sdl_screen->w != set_w || plat_sdl_screen->h != set_h ||
+@@ -685,8 +707,13 @@ void *plat_gvideo_flip(void)
+     forced_flips--;
+     do_flip |= 1;
+   }
+-  if (do_flip)
++  if (do_flip) {
++#ifdef PLUMOS_V90S
++    v90s_pcsx_fb_present(plat_sdl_screen);
++#else
+     SDL_Flip(plat_sdl_screen);
++#endif
++  }
+   handle_window_resize();
+   if (do_flip) {
+     if (forced_clears > 0) {

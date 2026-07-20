@@ -40,6 +40,8 @@ DOSBOX_REPO=${DOSBOX_REPO:-https://github.com/dosbox-staging/dosbox-staging.git}
 DOSBOX_REF=${DOSBOX_REF:-v0.82.2}
 PCSX_REARMED_REPO=${PCSX_REARMED_REPO:-https://github.com/notaz/pcsx_rearmed.git}
 PCSX_REARMED_REF=${PCSX_REARMED_REF:-r26l}
+PCSX_SDL12_COMPAT_REPO=${PCSX_SDL12_COMPAT_REPO:-https://github.com/libsdl-org/sdl12-compat.git}
+PCSX_SDL12_COMPAT_REF=${PCSX_SDL12_COMPAT_REF:-fc2ec0c128197f1f5050e48359bc41e618f3abfb}
 FLYCAST_REPO=${FLYCAST_REPO:-https://github.com/flyinghead/flycast.git}
 FLYCAST_REF=${FLYCAST_REF:-v2.6}
 MUPEN64PLUS_UI_REPO=${MUPEN64PLUS_UI_REPO:-https://github.com/mupen64plus/mupen64plus-ui-console.git}
@@ -350,17 +352,68 @@ build_dosbox() {
 }
 
 build_pcsx_rearmed() {
-  local src=$1
+  local src=$1 input_patch libpicofe_patch fbdev_patch fbdev_header compat_src compat_build compat_log compat_lib
+  input_patch="${PATCH_DIR}/pcsx-rearmed-r26l-v90s-input.patch"
+  libpicofe_patch="${PATCH_DIR}/pcsx-rearmed-r26l-v90s-libpicofe-input.patch"
+  fbdev_patch="${PATCH_DIR}/pcsx-rearmed-r26l-v90s-fbdev.patch"
+  fbdev_header="${PATCH_DIR}/pcsx_v90s_fbdev.h"
+  compat_src="${SRC_ROOT}/pcsx_sdl12_compat"
+  compat_build="${compat_src}/build-v90s"
+  compat_log="${LOG_DIR}/pcsx_rearmed.log"
+  compat_lib="${compat_build}/libSDL-1.2.so.1.2.72"
+  if [ ! -f "${V90S_SDL2_ROOT}/include/SDL2/SDL.h" ] ||
+     [ ! -f "${V90S_SDL2_ROOT}/lib/plumos-sdl2-powervr/libSDL2.so" ]; then
+    echo "missing V90S SDL2 build under ${V90S_SDL2_ROOT}" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${input_patch}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${input_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${input_patch}" >/dev/null 2>&1; then
+    echo "PCSX-ReARMed V90S input patch does not apply cleanly" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}/frontend/libpicofe" -p1 <"${libpicofe_patch}" >/dev/null 2>&1; then
+    patch -d "${src}/frontend/libpicofe" -p1 <"${libpicofe_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}/frontend/libpicofe" -p1 <"${libpicofe_patch}" >/dev/null 2>&1; then
+    echo "PCSX-ReARMed V90S libpicofe patch does not apply cleanly" >&2
+    return 1
+  fi
+  if patch --dry-run -d "${src}" -p1 <"${fbdev_patch}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${fbdev_patch}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${fbdev_patch}" >/dev/null 2>&1; then
+    echo "PCSX-ReARMed V90S fbdev patch does not apply cleanly" >&2
+    return 1
+  fi
+  install -m 0644 "${fbdev_header}" "${src}/frontend/pcsx_v90s_fbdev.h" || return 1
   (
     cd "${src}" || exit 1
     make clean >/dev/null 2>&1 || true
     env CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" STRIP="${STRIP}" \
-      CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+      CFLAGS="${COMMON_CFLAGS} -DPLUMOS_V90S=1" \
+      CXXFLAGS="${COMMON_CXXFLAGS} -DPLUMOS_V90S=1" LDFLAGS="${COMMON_LDFLAGS}" \
       ./configure --platform=generic --gpu=neon --sound-drivers="alsa sdl" \
         --enable-neon --enable-threads --disable-dynamic --dynarec=ari64 && \
       make -j"${JOBS}"
   ) || return 1
-  stage_binary pcsx_rearmed "${src}/pcsx" pcsx
+  rm -rf "${OUT_DIR}/standalone/pcsx_rearmed"
+  stage_binary pcsx_rearmed "${src}/pcsx" pcsx || return 1
+
+  clone_repo pcsx_sdl12_compat "${PCSX_SDL12_COMPAT_REPO}" \
+    "${PCSX_SDL12_COMPAT_REF}" "${compat_log}" || return 1
+  cmake -S "${compat_src}" -B "${compat_build}" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DSDL2_INCLUDE_DIRS="${V90S_SDL2_ROOT}/include/SDL2" \
+    -DSDL12TESTS=OFF || return 1
+  cmake --build "${compat_build}" -j"${JOBS}" || return 1
+  [ -f "${compat_lib}" ] || return 1
+  mkdir -p "${OUT_DIR}/standalone/pcsx_rearmed/lib"
+  install -m 0644 "${compat_lib}" \
+    "${OUT_DIR}/standalone/pcsx_rearmed/lib/libSDL-1.2.so.0"
+  install -m 0644 "${compat_src}/LICENSE.txt" \
+    "${OUT_DIR}/licenses/pcsx_rearmed-sdl12-compat-LICENSE.txt"
+  append_manifest "  sdl12_compat_repo=${PCSX_SDL12_COMPAT_REPO}"
+  append_manifest "  sdl12_compat_ref=${PCSX_SDL12_COMPAT_REF}"
+  append_manifest "  runtime=standalone/pcsx_rearmed/lib/libSDL-1.2.so.0"
 }
 
 build_flycast() {
@@ -781,7 +834,35 @@ case "${id}" in
     ;;
   openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
   dosbox-staging) exe="${EMU_ROOT}/dosbox-staging/bin/dosbox" ;;
-  pcsx_rearmed) exe="${EMU_ROOT}/pcsx_rearmed/bin/pcsx" ;;
+  pcsx_rearmed)
+    exe="${EMU_ROOT}/pcsx_rearmed/bin/pcsx"
+    pcsx_sdl12_dir="${EMU_ROOT}/pcsx_rearmed/lib"
+    pcsx_sdl12="${pcsx_sdl12_dir}/libSDL-1.2.so.0"
+    [ -f "${pcsx_sdl12}" ] || {
+      echo "missing PCSX-ReARMed V90S SDL12 compatibility runtime: ${pcsx_sdl12}" >&2
+      exit 127
+    }
+    export LD_LIBRARY_PATH="${pcsx_sdl12_dir}:${LD_LIBRARY_PATH}"
+    export SDL12COMPAT_OPENGL_SCALING=0
+    export SDL12COMPAT_SYNC_TO_VBLANK=0
+    export SDL_RENDER_VSYNC=0
+    export ALSA_NAME=plumos_hotplug
+    export PLUMOS_PCSX_AUDIO_INPUT_RATE=44100
+    export PLUMOS_PCSX_REQUIRE_ALSA=1
+    pcsx_bios_dir="${HOME}/.pcsx/bios"
+    mkdir -p "${pcsx_bios_dir}"
+    for bios in psxonpsp660.bin scph5500.bin scph5501.bin scph5502.bin \
+      scph1000.bin SCPH1001.BIN; do
+      if [ -f "${PLUMOS_ROOT}/bios/${bios}" ]; then
+        ln -sf "${PLUMOS_ROOT}/bios/${bios}" "${pcsx_bios_dir}/plumos-default.bin"
+        break
+      fi
+    done
+    rom=${1:-}
+    [ -n "${rom}" ] || { echo "missing PlayStation content path" >&2; exit 2; }
+    shift
+    set -- -cdfile "${rom}" "$@"
+    ;;
   *) echo "unknown standalone emulator: ${id}" >&2; exit 2 ;;
 esac
 [ -x "${exe}" ] || { echo "missing standalone emulator: ${exe}" >&2; exit 127; }
