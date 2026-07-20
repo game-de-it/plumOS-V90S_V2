@@ -1765,6 +1765,54 @@ The installed-port launcher must reject scripts declaring `PORT_32BIT=Y`
 before stopping the frontend and record the compatibility failure in the
 PortMaster port log.
 
+### 2026-07-20: PortMaster AArch64 Static Dependency Audit
+
+Decision:
+
+PortMaster compatibility work must begin with the reproducible static audit,
+not repeated blind launches on the physical V90S. The official build entry is:
+
+```text
+./scripts/docker-build.sh portmaster-audit
+```
+
+The audit reads the official PortMaster `ports.json`, includes every port that
+declares `aarch64` and every legacy port with an undeclared architecture, and
+records explicitly non-AArch64 ports outside the candidate set. Catalog-only
+mode processes all candidates and any already cached payloads without silently
+starting a multi-gigabyte download. A complete payload audit requires both
+`--download-payloads` and `--allow-large-download`; archives are cached,
+resumable, and accepted only after their catalog size, MD5, and ZIP structure
+match.
+
+Each available port ZIP is inspected without persistent extraction. The audit
+parses AArch64 ELF program headers and dynamic tags directly, inventories
+`DT_NEEDED`, `DT_SONAME`, interpreter and search paths, and scans launch scripts
+for ARMHF, Box, FRT/Godot, GL4ES, LÖVE, Mono, Python, Ren'Py, Java, and Weston
+contracts. Resolution uses only the declared V90S contract plus libraries
+actually present in the built system squashfs, app layer, vendor PowerVR
+runtime, official PortMaster runtime tree, and adapter compatibility runtime.
+Build-host development libraries must never satisfy a target dependency.
+The normal audit must fail when the built vendor, system-rootfs, PortMaster, or
+app-layer contract input is absent. An explicit incomplete-contract option is
+diagnostic only and cannot produce release compatibility evidence.
+
+The generated `manifest.json`, `summary.tsv`, `missing-libraries.tsv`,
+`runtime-families.tsv`, download plan, component manifest, and
+`checksums.sha256` belong below `output/portmaster-audit/v90s`. Missing SONAMEs
+are separated into protected target-contract failures, common AArch64 ABI
+candidates reused by multiple ports, and port-local candidates. This report is
+the evidence used to decide whether a new library belongs in the curated
+adapter runtime; it does not automatically copy libraries from installed
+ports or the Docker host.
+
+A static pass proves only that the inspected AArch64 dependency closure is
+available. It does not prove video, audio, input, performance, save behavior,
+emergency exit, or frontend restoration. Real-device testing remains required,
+but it should cover representative runtime families and ports that passed the
+static gate instead of discovering deterministic loader failures one title at
+a time.
+
 ### 2026-07-19: RetroArch Factory Configuration Ownership
 
 Decision:

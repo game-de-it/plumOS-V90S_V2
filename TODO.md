@@ -105,6 +105,7 @@ Build plumOS V90S as a V90S-specific distribution:
   - `portmaster`
   - `pyxel-runtime`
   - `frontend`
+  - `portmaster-audit`
   - `system-rootfs`
   - `app-layer`
   - `sd-image`
@@ -208,6 +209,13 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
+- [x] Add `portmaster-audit` as the reproducible PortMaster AArch64 static
+  compatibility gate. It audits all explicit and legacy-undeclared AArch64
+  candidates from the official catalog, incrementally scans cached/downloaded
+  ZIP payloads without persistent extraction, resolves ELF dependencies only
+  against the built V90S runtime contract, and emits manifests, TSV reports,
+  and SHA-256 checksums. Full payload retrieval is an explicit large-download
+  operation because the current candidate set exceeds 24 GiB.
 - [x] Implement `picoarch` as a native AArch64 runtime with SDL12 compatibility,
   V90S fbdev double-buffer presentation, FAT32-owned settings/saves, and shared
   `/mnt/plumos/cores/*_libretro.so` core resolution. QuickNES video and ALSA

@@ -35,6 +35,7 @@ Commands:
   music-player     Build the V90S plumOS Music Player app.
   pyxel-runtime    Build the pinned AArch64 Pyxel virtual environment.
   portmaster       Package the pinned official PortMaster GUI with the V90S adapter.
+  portmaster-audit Audit PortMaster AArch64 metadata, scripts, and ELF dependencies.
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
   app-layer        Assemble the FAT32 plumOS app/update/data layer.
@@ -62,6 +63,7 @@ Environment:
                                   retry after an initial per-core build failure.
   PLUMOS_STANDALONE_FILTER      Standalone emulator filter used when no IDs are
                                   passed. Default: all.
+  PLUMOS_PORTMASTER_AUDIT_JOBS Concurrent PortMaster payload downloads. Default: 4.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target
@@ -259,6 +261,15 @@ case "$cmd" in
     portmaster)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/docker/plumos-v90s-toolchain/scripts/build-portmaster.sh "$@"
+        ;;
+    portmaster-audit|audit-portmaster)
+        ensure_image
+        docker run \
+            -e PLUMOS_PORTMASTER_AUDIT_JOBS="${PLUMOS_PORTMASTER_AUDIT_JOBS:-4}" \
+            "${docker_run_user[@]}" \
+            /workspace/docker/plumos-v90s-toolchain/scripts/portmaster_aarch64_audit.py \
+            --jobs "${PLUMOS_PORTMASTER_AUDIT_JOBS:-4}" \
+            "$@"
         ;;
     sdl2-powervr|sdl2-ge8300)
         ensure_image
