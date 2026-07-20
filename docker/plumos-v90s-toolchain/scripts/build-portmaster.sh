@@ -16,6 +16,14 @@ OPENAL_COMMIT="d3875f333fb6abe2f39d82caca329414871ae53b"
 OPENAL_ARCHIVE="openal-soft-${OPENAL_VERSION}.tar.gz"
 OPENAL_URL="https://github.com/kcat/openal-soft/archive/refs/tags/${OPENAL_VERSION}.tar.gz"
 OPENAL_SHA256="dfddf3a1f61059853c625b7bb03de8433b455f2f79f89548cbcbd5edca3d4a4a"
+FFMPEG_COMPAT_VERSION="4.4.6"
+FFMPEG_COMPAT_ARCHIVE="ffmpeg-${FFMPEG_COMPAT_VERSION}.tar.xz"
+FFMPEG_COMPAT_URL="https://ffmpeg.org/releases/${FFMPEG_COMPAT_ARCHIVE}"
+FFMPEG_COMPAT_SHA256="2290461f467c08ab801731ed412d8e724a5511d6c33173654bd9c1d2e25d0617"
+LIBEVDEV_VERSION="1.13.1"
+LIBEVDEV_ARCHIVE="libevdev-${LIBEVDEV_VERSION}.tar.xz"
+LIBEVDEV_URL="https://www.freedesktop.org/software/libevdev/${LIBEVDEV_ARCHIVE}"
+LIBEVDEV_SHA256="06a77bf2ac5c993305882bc1641017f5bec1592d6d1b64787bad492ab34f2f36"
 SQUASHFS_TOOLS_VERSION="1:4.5.1-1"
 
 usage() {
@@ -46,7 +54,7 @@ case "${1:-}" in
         ;;
 esac
 
-for tool in cmake curl dpkg-query md5sum ninja sha256sum tar unzip python3 rsync; do
+for tool in cmake curl dpkg-query make md5sum meson ninja sha256sum tar unzip python3 rsync; do
     command -v "$tool" >/dev/null 2>&1 || {
         printf 'error: required tool is unavailable: %s\n' "$tool" >&2
         exit 1
@@ -109,6 +117,38 @@ actual_openal_sha256="$(sha256sum "$openal_archive_path" | awk '{print $1}')"
     exit 1
 }
 
+ffmpeg_compat_archive_path="$CACHE_DIR/$FFMPEG_COMPAT_ARCHIVE"
+if [ ! -f "$ffmpeg_compat_archive_path" ] ||
+   [ "$(sha256sum "$ffmpeg_compat_archive_path" | awk '{print $1}')" != "$FFMPEG_COMPAT_SHA256" ]; then
+    ffmpeg_compat_archive_tmp="$ffmpeg_compat_archive_path.tmp.$$"
+    rm -f "$ffmpeg_compat_archive_tmp"
+    curl --fail --location --retry 3 --output "$ffmpeg_compat_archive_tmp" "$FFMPEG_COMPAT_URL"
+    mv -f "$ffmpeg_compat_archive_tmp" "$ffmpeg_compat_archive_path"
+fi
+
+actual_ffmpeg_compat_sha256="$(sha256sum "$ffmpeg_compat_archive_path" | awk '{print $1}')"
+[ "$actual_ffmpeg_compat_sha256" = "$FFMPEG_COMPAT_SHA256" ] || {
+    printf 'error: FFmpeg compatibility source SHA-256 mismatch: expected %s, got %s\n' \
+        "$FFMPEG_COMPAT_SHA256" "$actual_ffmpeg_compat_sha256" >&2
+    exit 1
+}
+
+libevdev_archive_path="$CACHE_DIR/$LIBEVDEV_ARCHIVE"
+if [ ! -f "$libevdev_archive_path" ] ||
+   [ "$(sha256sum "$libevdev_archive_path" | awk '{print $1}')" != "$LIBEVDEV_SHA256" ]; then
+    libevdev_archive_tmp="$libevdev_archive_path.tmp.$$"
+    rm -f "$libevdev_archive_tmp"
+    curl --fail --location --retry 3 --output "$libevdev_archive_tmp" "$LIBEVDEV_URL"
+    mv -f "$libevdev_archive_tmp" "$libevdev_archive_path"
+fi
+
+actual_libevdev_sha256="$(sha256sum "$libevdev_archive_path" | awk '{print $1}')"
+[ "$actual_libevdev_sha256" = "$LIBEVDEV_SHA256" ] || {
+    printf 'error: libevdev source SHA-256 mismatch: expected %s, got %s\n' \
+        "$LIBEVDEV_SHA256" "$actual_libevdev_sha256" >&2
+    exit 1
+}
+
 openal_src="$BUILD_DIR/openal-soft-src"
 openal_build="$BUILD_DIR/openal-soft-build"
 rm -rf "$openal_src" "$openal_build"
@@ -140,6 +180,55 @@ openal_library="$(find "$openal_build" -type f -name 'libopenal.so.*' | sort | t
     printf 'error: OpenAL Soft shared library was not produced\n' >&2
     exit 1
 }
+
+ffmpeg_compat_src="$BUILD_DIR/ffmpeg-compat-src"
+ffmpeg_compat_build="$BUILD_DIR/ffmpeg-compat-build"
+ffmpeg_compat_install="$BUILD_DIR/ffmpeg-compat-install"
+rm -rf "$ffmpeg_compat_src" "$ffmpeg_compat_build" "$ffmpeg_compat_install"
+mkdir -p "$ffmpeg_compat_src" "$ffmpeg_compat_build" "$ffmpeg_compat_install"
+tar -xJf "$ffmpeg_compat_archive_path" --strip-components=1 -C "$ffmpeg_compat_src"
+(
+    cd "$ffmpeg_compat_build"
+    "$ffmpeg_compat_src/configure" \
+        --prefix=/usr \
+        --arch=aarch64 \
+        --target-os=linux \
+        --disable-programs \
+        --disable-doc \
+        --disable-debug \
+        --disable-static \
+        --enable-shared \
+        --enable-pic \
+        --disable-autodetect \
+        --disable-avdevice \
+        --disable-avfilter \
+        --disable-postproc \
+        --disable-network \
+        --disable-encoders \
+        --disable-muxers \
+        --disable-filters \
+        --disable-devices \
+        --disable-hwaccels \
+        --disable-protocols \
+        --enable-protocol=file
+    make -j"${JOBS:-2}"
+    make DESTDIR="$ffmpeg_compat_install" install
+)
+
+libevdev_src="$BUILD_DIR/libevdev-src"
+libevdev_build="$BUILD_DIR/libevdev-build"
+libevdev_install="$BUILD_DIR/libevdev-install"
+rm -rf "$libevdev_src" "$libevdev_build" "$libevdev_install"
+mkdir -p "$libevdev_src" "$libevdev_install"
+tar -xJf "$libevdev_archive_path" --strip-components=1 -C "$libevdev_src"
+meson setup "$libevdev_build" "$libevdev_src" \
+    --buildtype=release \
+    --default-library=shared \
+    --prefix=/usr \
+    -Dtests=disabled \
+    -Ddocumentation=disabled
+meson compile -C "$libevdev_build"
+DESTDIR="$libevdev_install" meson install -C "$libevdev_build"
 
 python3 - "$archive_path" <<'PY'
 import stat
@@ -204,8 +293,33 @@ install -m 0644 "$openal_library" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libopenal.so.1"
 install -m 0644 "$lzo_library" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/liblzo2.so.2"
+for library in \
+    libavcodec.so.58 \
+    libavformat.so.58 \
+    libavutil.so.56 \
+    libswresample.so.3 \
+    libswscale.so.5; do
+    source_library="$(find "$ffmpeg_compat_install/usr/lib" -type f -name "${library}.*" | sort | tail -n 1)"
+    [ -n "$source_library" ] && [ -f "$source_library" ] || {
+        printf 'error: FFmpeg compatibility library was not produced: %s\n' "$library" >&2
+        exit 1
+    }
+    install -m 0644 "$source_library" \
+        "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/$library"
+done
+libevdev_library="$(find "$libevdev_install/usr/lib" -type f -name 'libevdev.so.2.*' | sort | tail -n 1)"
+[ -n "$libevdev_library" ] && [ -f "$libevdev_library" ] || {
+    printf 'error: libevdev shared library was not produced\n' >&2
+    exit 1
+}
+install -m 0644 "$libevdev_library" \
+    "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libevdev.so.2"
 install -m 0644 "$openal_src/COPYING" \
     "$stage_dir/plumos/licenses/openal-soft-LGPL-2.0-or-later.txt"
+install -m 0644 "$ffmpeg_compat_src/COPYING.LGPLv2.1" \
+    "$stage_dir/plumos/licenses/ffmpeg-compat-LGPL-2.1-or-later.txt"
+install -m 0644 "$libevdev_src/COPYING" \
+    "$stage_dir/plumos/licenses/libevdev-MIT.txt"
 install -m 0644 /usr/share/doc/squashfs-tools/copyright \
     "$stage_dir/plumos/licenses/squashfs-tools-copyright.txt"
 install -m 0644 /usr/share/doc/liblzo2-2/copyright \
@@ -219,7 +333,7 @@ mkdir -p \
 
 cat > "$stage_dir/plumos/apps/portmaster/installed.json" <<EOF
 {
-  "adapter_version": 6,
+  "adapter_version": 7,
   "channel": "stable",
   "official_md5": "${actual_md5}",
   "official_sha256": "${actual_sha256}",
@@ -235,7 +349,7 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
 cat > "$OUT_DIR/portmaster.manifest" <<EOF
 component=portmaster
 target=powkiddy-v90s
-adapter_version=6
+adapter_version=7
 upstream=PortMaster-GUI
 version=${VERSION}
 channel=stable
@@ -246,6 +360,10 @@ update_policy=plumos-staged-switch
 openal_soft_version=${OPENAL_VERSION}
 openal_soft_commit=${OPENAL_COMMIT}
 openal_soft_sha256=${actual_openal_sha256}
+ffmpeg_compat_version=${FFMPEG_COMPAT_VERSION}
+ffmpeg_compat_sha256=${actual_ffmpeg_compat_sha256}
+libevdev_version=${LIBEVDEV_VERSION}
+libevdev_sha256=${actual_libevdev_sha256}
 squashfs_tools_version=${actual_squashfs_tools_version}
 unsquashfs_sha256=$(sha256sum /usr/bin/unsquashfs | awk '{print $1}')
 EOF

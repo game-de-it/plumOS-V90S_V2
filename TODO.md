@@ -675,6 +675,11 @@ Build plumOS V90S as a V90S-specific distribution:
     ownership state, restores one FE, and leaves ADB/SSH running.
   - [x] Route PortMaster and launched ports through the proven PowerVR SDL2,
     `adc_gamepad`, and `plumos_output` contracts.
+  - [x] Package a source-pinned common AArch64 compatibility runtime for
+    FFmpeg 4.4 ABI (`libavcodec.so.58` and its companion libraries) and
+    `libevdev.so.2`. Recreate its SONAMEs under `/run` without replacing the
+    PowerVR EGL/GLES or patched SDL2 route. On hardware, Moonlight Embedded
+    2.7.0 resolves every direct dependency and reaches its LÖVE launcher.
   - [x] Add PortMaster and its confirmed staged updater to FE Apps. On hardware,
     validate the official stable metadata refresh, GUI rendering, controller
     discovery, and single-frontend restoration. A future newer upstream release

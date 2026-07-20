@@ -70,6 +70,18 @@ prepare() {
     "${ADAPTER_DIR}/lib/aarch64/libopenal.so.1"
   link_one liblzo2.so.2 \
     "${ADAPTER_DIR}/lib/aarch64/liblzo2.so.2"
+  link_one libavcodec.so.58 \
+    "${ADAPTER_DIR}/lib/aarch64/libavcodec.so.58"
+  link_one libavformat.so.58 \
+    "${ADAPTER_DIR}/lib/aarch64/libavformat.so.58"
+  link_one libavutil.so.56 \
+    "${ADAPTER_DIR}/lib/aarch64/libavutil.so.56"
+  link_one libswresample.so.3 \
+    "${ADAPTER_DIR}/lib/aarch64/libswresample.so.3"
+  link_one libswscale.so.5 \
+    "${ADAPTER_DIR}/lib/aarch64/libswscale.so.5"
+  link_one libevdev.so.2 \
+    "${ADAPTER_DIR}/lib/aarch64/libevdev.so.2"
 
   cat > "${RUN_ROOT}/gamecontrollerdb.txt" <<'EOF'
 1900c50a330100009011000000000000,adc_gamepad,a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:b6,righttrigger:b7,platform:Linux

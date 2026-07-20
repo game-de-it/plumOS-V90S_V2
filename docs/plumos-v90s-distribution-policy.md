@@ -1712,6 +1712,27 @@ adapter. In particular, LÖVE-based ports use the adapter-owned AArch64 OpenAL
 Soft build configured for ALSA, while the normal plumOS audio router remains
 the only PCM route.
 
+The adapter also owns a curated AArch64 common compatibility runtime for
+widely reused Linux ABI families that are absent from the Debian Bookworm and
+StockOS-derived base. The initial compatibility set is FFmpeg 4.4
+(`libavcodec.so.58`, `libavformat.so.58`, `libavutil.so.56`,
+`libswresample.so.3`, and `libswscale.so.5`) plus `libevdev.so.2`. These
+libraries are built from pinned, SHA-256-verified source archives, stored as
+regular files below `adapter/lib/aarch64`, and linked into
+`/run/plumos/portmaster/lib` for each launch. The FFmpeg build enables its
+built-in decoders and demuxers without external codec libraries, which keeps
+the dependency closure limited to the packaged FFmpeg libraries and glibc.
+
+This common runtime is not permission to collect every historical SONAME in
+one global search path. Old SDL 1.2 stacks, desktop OpenGL, Android/Bionic,
+ARMHF, Mono, Java, and other incompatible runtime classes remain separate and
+disabled until their complete dependency and hardware contract is packaged
+and validated. A new missing library should first be classified as a common
+Linux AArch64 ABI, an upstream PortMaster runtime dependency, or a port-local
+dependency. Only the first class belongs in the common adapter runtime. The
+PowerVR EGL/GLES and patched SDL2 libraries always retain priority over generic
+compatibility libraries.
+
 The boot-persistent hardware-key service provides a one-second `Select+Start`
 emergency exit for PortMaster ports by calling the same ownership-validated
 stop helper. It must not signal a process name, PID outside the recorded
