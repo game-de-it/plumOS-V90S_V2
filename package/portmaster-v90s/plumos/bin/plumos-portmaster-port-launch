@@ -4,6 +4,7 @@ set -u
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
 APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
+LIB_DIR="${RUN_ROOT}/lib"
 ROMS_ROOT="${PLUMOS_ROOT}/roms"
 STATE_ROOT="${PLUMOS_ROOT}/state/portmaster"
 LOG_FILE="${PLUMOS_ROOT}/Logs/apps/portmaster-ports.log"
@@ -79,6 +80,58 @@ cleanup() {
 
 trap cleanup EXIT HUP INT TERM
 
+prepare_compat_mount() {
+  compat_target=/usr/lib/compat
+
+  [ -d "$compat_target" ] || return 0
+
+  if is_mounted "$compat_target"; then
+    printf 'PortMaster has a stale compatibility mount: %s\n' "$compat_target" >&2
+    return 1
+  fi
+  mount --bind "$LIB_DIR" "$compat_target" || {
+    printf 'PortMaster cannot bind the compatibility runtime: %s\n' "$compat_target" >&2
+    return 1
+  }
+  printf '%s\n' "$compat_target" >> "$MOUNTS_FILE"
+}
+
+patch_known_port_runtime_path() {
+  case "$(basename "$script" | tr '[:upper:]' '[:lower:]')" in
+    'moonlight new.sh') ;;
+    *) return 0 ;;
+  esac
+
+  gui_file="$(dirname "$script")/moonlightnew/gui/main.lua"
+  old_path='LD_LIBRARY_PATH=%s/moonlight/libs:/usr/lib/compat'
+  interim_path='LD_LIBRARY_PATH=%s/moonlight/libs:/run/plumos/portmaster/lib:/usr/lib/powervr:/usr/lib/compat'
+  new_path='LD_LIBRARY_PATH=%s/moonlight/libs:/usr/lib/compat:${LD_LIBRARY_PATH:-}'
+  [ -f "$gui_file" ] || {
+    printf 'PortMaster Moonlight GUI is missing: %s\n' "$gui_file" >&2
+    return 1
+  }
+  grep -Fq "$new_path" "$gui_file" && return 0
+  if grep -Fq "$old_path" "$gui_file"; then
+    source_path="$old_path"
+  elif grep -Fq "$interim_path" "$gui_file"; then
+    source_path="$interim_path"
+  else
+    printf 'PortMaster Moonlight GUI has an unknown runtime-path contract: %s\n' "$gui_file" >&2
+    return 1
+  fi
+
+  temp_file="${gui_file}.plumos.$$"
+  sed "s#${source_path}#${new_path}#" "$gui_file" > "$temp_file" || {
+    rm -f "$temp_file"
+    return 1
+  }
+  mv -f "$temp_file" "$gui_file" || {
+    rm -f "$temp_file"
+    return 1
+  }
+  sync "$gui_file" 2>/dev/null || sync
+}
+
 if [ -f "$PID_FILE" ]; then
   old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
   if [ -d "/proc/${old_pid}" ]; then
@@ -96,6 +149,8 @@ audio_status="$("${PLUMOS_ROOT}/bin/plumos-audio-output" prepare 2>&1)" || {
 
 mkdir -p "$RUN_ROOT" "$(dirname "$LOG_FILE")" "$STATE_ROOT/home"
 : > "$MOUNTS_FILE"
+patch_known_port_runtime_path || exit 1
+prepare_compat_mount || exit 1
 for name in config libs themes; do
   source_dir="${STATE_ROOT}/${name}"
   target_dir="${APP_ROOT}/upstream/PortMaster/${name}"

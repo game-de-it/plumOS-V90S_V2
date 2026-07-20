@@ -965,7 +965,7 @@ build_stage1() {
 
     root="$work_dir/stage1-root"
     rm -rf "$root"
-    mkdir -p "$root/bin" "$root/sbin" "$root/lib" "$root/usr/lib" "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/new_root"
+    mkdir -p "$root/bin" "$root/sbin" "$root/lib" "$root/usr/lib" "$root/usr/lib/compat" "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/new_root"
 
     cp -a "$knulli_ramdisk/bin/busybox" "$root/bin/busybox"
     ln -sf busybox "$root/bin/sh"
@@ -989,7 +989,7 @@ build_debian_minbase() {
 
     debootstrap --arch=arm64 --variant=minbase --include=dosfstools "$suite" "$root" "$mirror"
 
-    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root"
+    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root" "$root/usr/lib/compat"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
     install_app_layer_bootstrap "$root"
@@ -1224,7 +1224,8 @@ build_release_system() {
 
     mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" \
         "$root/boot" "$root/overlay" "$root/mnt/share" "$root/mnt/plumos" \
-        "$root/mnt/plumos-boot" "$root/mnt/plumos-user" "$root/root"
+        "$root/mnt/plumos-boot" "$root/mnt/plumos-user" "$root/root" \
+        "$root/usr/lib/compat"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
     install_app_layer_bootstrap "$root"
@@ -1288,7 +1289,7 @@ build_debian_retroarch_payload() {
     fi
     debootstrap --arch=arm64 --variant=minbase --include="$retroarch_packages" "$suite" "$root" "$mirror"
 
-    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root" "$root/roms/nes"
+    mkdir -p "$root/proc" "$root/sys" "$root/dev" "$root/run" "$root/tmp" "$root/boot" "$root/mnt/share" "$root/mnt/plumos" "$root/root" "$root/roms/nes" "$root/usr/lib/compat"
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
     install_app_layer_bootstrap "$root"

@@ -1722,6 +1722,16 @@ regular files below `adapter/lib/aarch64`, and linked into
 `/run/plumos/portmaster/lib` for each launch. The FFmpeg build enables its
 built-in decoders and demuxers without external codec libraries, which keeps
 the dependency closure limited to the packaged FFmpeg libraries and glibc.
+The rootfs provides an empty `/usr/lib/compat`, and an owned PortMaster session
+bind-mounts the same runtime there for upstream ports that replace rather than
+extend `LD_LIBRARY_PATH`. Existing images without that mountpoint must not
+overlay the global `/usr/lib`: doing so changes the dynamic-loader view for
+unrelated system processes. For a known port on such an image, the adapter may
+apply an idempotent, exact-content-guarded runtime-path correction to the
+installed port. The correction must extend the inherited launcher path instead
+of replacing it with another fixed list, so the common runtime, PowerVR,
+plumOS compatibility libraries, and future path changes remain centralized.
+Unknown source content must be left untouched and reported as an error.
 
 This common runtime is not permission to collect every historical SONAME in
 one global search path. Old SDL 1.2 stacks, desktop OpenGL, Android/Bionic,

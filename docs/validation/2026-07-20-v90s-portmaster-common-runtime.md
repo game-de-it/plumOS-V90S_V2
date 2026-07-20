@@ -80,3 +80,47 @@ The normal `Moonlight New.sh` path then started its LÖVE GUI with one owned
 `love` process. The user can now select a host and stream to validate the
 network session, video decode, audio, controls, and exit behavior separately
 from dynamic-loader availability.
+
+## Upstream Compatibility Path Follow-up
+
+The first GUI retest still displayed the old loader error. A framebuffer
+capture proved that this was not merely stale text. `gui/main.lua` launches
+Pair and Reload Apps with an explicit environment:
+
+```text
+LD_LIBRARY_PATH=<port>/moonlight/libs:/usr/lib/compat
+```
+
+That assignment discards the inherited plumOS runtime path. The normal shell
+launch and `ldd` test therefore succeeded while the Lua GUI child failed.
+
+The adapter bind-mounts `/run/plumos/portmaster/lib` at the upstream convention
+`/usr/lib/compat` for the lifetime of an owned port session when the rootfs
+contains that empty mountpoint. Future rootfs images provide it.
+
+The current read-only SquashFS image predates that mountpoint. A temporary
+overlay on global `/usr/lib` was tested and rejected: cleanup could leave the
+overlay busy and change the library view for unrelated processes. The adapter
+instead recognizes only `Moonlight New.sh`, verifies the exact known Lua source
+string, and changes the assignment to prepend the port libraries while retaining
+`${LD_LIBRARY_PATH}` inherited from the owned plumOS launcher. This preserves
+the common FFmpeg runtime as well as Avahi, Pulse compatibility, PowerVR, and
+normal system paths. Already-patched content is accepted idempotently; unknown
+content is not modified.
+
+The corrected launcher and complete app-layer were deployed again with the
+metadata files committed last. Device-side SHA-256 verification passed for the
+launcher, PortMaster component checksum set, and merged app-layer manifest.
+The exact shell assignment emitted by the Lua GUI then produced:
+
+```text
+exact_rc=0
+Moonlight Embedded 2.7.0-master-274d3db
+unresolved ELF dependencies: none
+```
+
+The old `pair.txt` loader error was replaced by Moonlight's expected connection
+result for the placeholder host. After the owned stop helper ran, exactly one
+frontend process remained and `/proc/self/mountinfo` contained no `/usr/lib`
+or `/usr/lib/compat` mount. This proves both the GUI child path and cleanup
+boundary on the current hardware image.
