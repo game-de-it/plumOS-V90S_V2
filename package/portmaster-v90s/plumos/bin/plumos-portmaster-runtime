@@ -86,6 +86,8 @@ prepare() {
     "${ADAPTER_DIR}/lib/aarch64/libFLAC.so.8"
   link_one libjpeg.so.8 \
     "${ADAPTER_DIR}/lib/aarch64/libjpeg.so.8"
+  link_one libreadline.so.7 \
+    "${ADAPTER_DIR}/lib/aarch64/libreadline.so.7"
 
   cat > "${RUN_ROOT}/gamecontrollerdb.txt" <<'EOF'
 1900c50a330100009011000000000000,adc_gamepad,a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:b6,righttrigger:b7,platform:Linux

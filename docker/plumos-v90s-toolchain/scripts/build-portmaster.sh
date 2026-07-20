@@ -32,6 +32,10 @@ JPEG_COMPAT_VERSION="8d"
 JPEG_COMPAT_ARCHIVE="jpegsrc.v${JPEG_COMPAT_VERSION}.tar.gz"
 JPEG_COMPAT_URL="https://www.ijg.org/files/${JPEG_COMPAT_ARCHIVE}"
 JPEG_COMPAT_SHA256="fdc4d4c11338ad028a7d23fb53f5bb9354671392a67fb1b52e0c32a7121891f8"
+READLINE_COMPAT_VERSION="7.0"
+READLINE_COMPAT_ARCHIVE="readline-${READLINE_COMPAT_VERSION}.tar.gz"
+READLINE_COMPAT_URL="https://ftp.gnu.org/gnu/readline/${READLINE_COMPAT_ARCHIVE}"
+READLINE_COMPAT_SHA256="750d437185286f40a369e1e4f4764eda932b9459b5ec9a731628393dd3d32334"
 SQUASHFS_TOOLS_VERSION="1:4.5.1-1"
 
 usage() {
@@ -189,6 +193,22 @@ actual_jpeg_compat_sha256="$(sha256sum "$jpeg_compat_archive_path" | awk '{print
     exit 1
 }
 
+readline_compat_archive_path="$CACHE_DIR/$READLINE_COMPAT_ARCHIVE"
+if [ ! -f "$readline_compat_archive_path" ] ||
+   [ "$(sha256sum "$readline_compat_archive_path" | awk '{print $1}')" != "$READLINE_COMPAT_SHA256" ]; then
+    readline_compat_archive_tmp="$readline_compat_archive_path.tmp.$$"
+    rm -f "$readline_compat_archive_tmp"
+    curl --fail --location --retry 3 --output "$readline_compat_archive_tmp" "$READLINE_COMPAT_URL"
+    mv -f "$readline_compat_archive_tmp" "$readline_compat_archive_path"
+fi
+
+actual_readline_compat_sha256="$(sha256sum "$readline_compat_archive_path" | awk '{print $1}')"
+[ "$actual_readline_compat_sha256" = "$READLINE_COMPAT_SHA256" ] || {
+    printf 'error: Readline compatibility source SHA-256 mismatch: expected %s, got %s\n' \
+        "$READLINE_COMPAT_SHA256" "$actual_readline_compat_sha256" >&2
+    exit 1
+}
+
 openal_src="$BUILD_DIR/openal-soft-src"
 openal_build="$BUILD_DIR/openal-soft-build"
 rm -rf "$openal_src" "$openal_build"
@@ -307,6 +327,23 @@ install -m 0755 /usr/share/misc/config.sub "$jpeg_compat_src/config.sub"
     make DESTDIR="$jpeg_compat_install" install
 )
 
+readline_compat_src="$BUILD_DIR/readline-compat-src"
+readline_compat_build="$BUILD_DIR/readline-compat-build"
+readline_compat_install="$BUILD_DIR/readline-compat-install"
+rm -rf "$readline_compat_src" "$readline_compat_build" "$readline_compat_install"
+mkdir -p "$readline_compat_src" "$readline_compat_build" "$readline_compat_install"
+tar -xzf "$readline_compat_archive_path" --strip-components=1 -C "$readline_compat_src"
+(
+    cd "$readline_compat_build"
+    "$readline_compat_src/configure" \
+        --prefix=/usr \
+        --disable-static \
+        --enable-shared \
+        --with-curses
+    make -j"${JOBS:-2}" SHLIB_LIBS="-ltinfo"
+    make DESTDIR="$readline_compat_install" SHLIB_LIBS="-ltinfo" install-shared
+)
+
 python3 - "$archive_path" <<'PY'
 import stat
 import sys
@@ -405,6 +442,13 @@ jpeg_compat_library="$(find "$jpeg_compat_install/usr/lib" -type f -name 'libjpe
 }
 install -m 0644 "$jpeg_compat_library" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libjpeg.so.8"
+readline_compat_library="$(find "$readline_compat_install/usr/lib" -type f -name 'libreadline.so.7.*' | sort | tail -n 1)"
+[ -n "$readline_compat_library" ] && [ -f "$readline_compat_library" ] || {
+    printf 'error: Readline compatibility library was not produced\n' >&2
+    exit 1
+}
+install -m 0644 "$readline_compat_library" \
+    "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libreadline.so.7"
 install -m 0644 "$openal_src/COPYING" \
     "$stage_dir/plumos/licenses/openal-soft-LGPL-2.0-or-later.txt"
 install -m 0644 "$ffmpeg_compat_src/COPYING.LGPLv2.1" \
@@ -415,6 +459,8 @@ install -m 0644 "$flac_compat_src/COPYING.Xiph" \
     "$stage_dir/plumos/licenses/flac-compat-Xiph-BSD.txt"
 install -m 0644 "$jpeg_compat_src/README" \
     "$stage_dir/plumos/licenses/libjpeg-compat-IJG.txt"
+install -m 0644 "$readline_compat_src/COPYING" \
+    "$stage_dir/plumos/licenses/readline-compat-GPL-3.0-or-later.txt"
 install -m 0644 /usr/share/doc/squashfs-tools/copyright \
     "$stage_dir/plumos/licenses/squashfs-tools-copyright.txt"
 install -m 0644 /usr/share/doc/liblzo2-2/copyright \
@@ -428,7 +474,7 @@ mkdir -p \
 
 cat > "$stage_dir/plumos/apps/portmaster/installed.json" <<EOF
 {
-  "adapter_version": 8,
+  "adapter_version": 9,
   "channel": "stable",
   "official_md5": "${actual_md5}",
   "official_sha256": "${actual_sha256}",
@@ -444,7 +490,7 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
 cat > "$OUT_DIR/portmaster.manifest" <<EOF
 component=portmaster
 target=powkiddy-v90s
-adapter_version=8
+adapter_version=9
 upstream=PortMaster-GUI
 version=${VERSION}
 channel=stable
@@ -463,6 +509,8 @@ flac_compat_version=${FLAC_COMPAT_VERSION}
 flac_compat_sha256=${actual_flac_compat_sha256}
 jpeg_compat_version=${JPEG_COMPAT_VERSION}
 jpeg_compat_sha256=${actual_jpeg_compat_sha256}
+readline_compat_version=${READLINE_COMPAT_VERSION}
+readline_compat_sha256=${actual_readline_compat_sha256}
 squashfs_tools_version=${actual_squashfs_tools_version}
 unsquashfs_sha256=$(sha256sum /usr/bin/unsquashfs | awk '{print $1}')
 EOF

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "target": "powkiddy-v90s",
   "architecture": "aarch64",
   "always_provided_sonames": [
@@ -39,5 +39,47 @@
   "unsupported_runtime_patterns": [
     "armhf",
     "box86"
-  ]
+  ],
+  "abi_handling": {
+    "libGL.so.1": {
+      "classification": "runtime-owned",
+      "owner": "weston-gl4es",
+      "handling": "Provide only through a validated Weston or GL4ES graphics runtime; never alias PowerVR GLES as desktop GL."
+    },
+    "libXxf86vm.so.1": {
+      "classification": "runtime-owned",
+      "owner": "weston-x11",
+      "handling": "Provide with the validated Weston X11 runtime used by the owning port."
+    },
+    "libcrypto.so.1.1": {
+      "classification": "isolated-compat",
+      "owner": "port-or-runtime-openssl-1.1",
+      "handling": "Keep the EOL OpenSSL 1.1 ABI private to the owning port or runtime; do not publish it in the common adapter path."
+    },
+    "libjawt.so": {
+      "classification": "runtime-owned",
+      "owner": "java-runtime",
+      "handling": "Resolve from the exact Java runtime mounted by the port."
+    },
+    "libreadline.so.7": {
+      "classification": "plumos-common",
+      "owner": "portmaster-adapter",
+      "handling": "Build pinned GNU Readline 7 and publish its real SONAME through the owned PortMaster runtime."
+    },
+    "librga.so.2": {
+      "classification": "unsupported-hardware",
+      "owner": "rockchip-rga",
+      "handling": "Reject this Rockchip-specific binary path on Allwinner V90S; do not package a fake or foreign RGA library."
+    },
+    "libsndio.so.7.0": {
+      "classification": "runtime-owned",
+      "owner": "weston-java-audio",
+      "handling": "Resolve from the owning Weston or Java runtime and validate its audio route separately."
+    },
+    "libssl.so.1.1": {
+      "classification": "isolated-compat",
+      "owner": "port-or-runtime-openssl-1.1",
+      "handling": "Keep the EOL OpenSSL 1.1 ABI private to the owning port or runtime; do not publish it in the common adapter path."
+    }
+  }
 }

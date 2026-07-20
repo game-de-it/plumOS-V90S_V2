@@ -148,8 +148,29 @@ class CatalogTests(unittest.TestCase):
         contract = json.loads(
             (ROOT / "docker/plumos-v90s-toolchain/portmaster-audit-contract.json").read_text()
         )
+        self.assertEqual(contract["schema_version"], 2)
         self.assertEqual(contract["architecture"], "aarch64")
         self.assertIn("libc.so.6", contract["always_provided_sonames"])
+
+    def test_missing_abi_policy_separates_common_runtime_and_hardware(self):
+        contract = json.loads(
+            (ROOT / "docker/plumos-v90s-toolchain/portmaster-audit-contract.json").read_text()
+        )
+        readline = AUDIT.missing_library_handling("libreadline.so.7", 2, contract)
+        self.assertEqual(readline["classification"], "plumos-common")
+        self.assertEqual(readline["owner"], "portmaster-adapter")
+        rga = AUDIT.missing_library_handling("librga.so.2", 2, contract)
+        self.assertEqual(rga["classification"], "unsupported-hardware")
+        openssl = AUDIT.missing_library_handling("libcrypto.so.1.1", 3, contract)
+        self.assertEqual(openssl["classification"], "isolated-compat")
+
+    def test_untriaged_repeated_abi_is_not_implicitly_common(self):
+        contract = json.loads(
+            (ROOT / "docker/plumos-v90s-toolchain/portmaster-audit-contract.json").read_text()
+        )
+        result = AUDIT.missing_library_handling("libexample.so.1", 3, contract)
+        self.assertEqual(result["classification"], "untriaged-common-candidate")
+        self.assertEqual(result["owner"], "unassigned")
 
 
 if __name__ == "__main__":

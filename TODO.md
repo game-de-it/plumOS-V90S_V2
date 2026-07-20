@@ -228,11 +228,17 @@ Build plumOS V90S as a V90S-specific distribution:
   target contract, the final report contains zero protected target-contract
   failures and 22 unresolved SONAMEs across 23 ports. See
   `docs/validation/2026-07-20-v90s-portmaster-aarch64-full-audit.md`.
-- [ ] Triage and implement only approved PortMaster follow-up classes from the
-  full audit: evaluate `libreadline.so.7` as the next common ABI; keep OpenSSL
-  1.1 isolated; validate declared Weston/Java/Mono/Godot runtimes separately;
-  reject Rockchip RGA/Mali dependencies instead of adding them globally; and
-  leave single-port ABI dependencies with their owning port or runtime.
+- [x] Promote the approved follow-up common ABI in PortMaster adapter version
+  9: source-build SHA-256-pinned GNU Readline 7.0 as its real
+  `libreadline.so.7` SONAME, project it only through the owned PortMaster
+  runtime, and make Wizznic and Yatka pass the complete static audit.
+- [x] Encode the remaining repeated ABI candidates in the audit contract by
+  owner and handling class. Keep OpenSSL 1.1 isolated, assign GL/X11/Java/sndio
+  dependencies to their runtime families, reject Rockchip RGA on V90S, and do
+  not automatically promote an untriaged repeated SONAME into the common path.
+- [ ] Validate the declared Weston/GL4ES, Java, Mono, and Godot runtime families
+  separately on V90S. A runtime-owned or isolated ABI remains unresolved until
+  its exact runtime image, loader path, and hardware behavior are proven.
 - [x] Implement `picoarch` as a native AArch64 runtime with SDL12 compatibility,
   V90S fbdev double-buffer presentation, FAT32-owned settings/saves, and shared
   `/mnt/plumos/cores/*_libretro.so` core resolution. QuickNES video and ALSA

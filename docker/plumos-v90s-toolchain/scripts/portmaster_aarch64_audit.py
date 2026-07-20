@@ -429,6 +429,38 @@ def classify_port(record: dict[str, Any]) -> str:
     return "static-pass"
 
 
+def missing_library_handling(
+    soname: str,
+    port_count: int,
+    contract: dict[str, Any],
+) -> dict[str, str]:
+    protected = [re.compile(pattern) for pattern in contract["protected_soname_patterns"]]
+    if any(pattern.search(soname) for pattern in protected):
+        return {
+            "classification": "target-contract-missing",
+            "owner": "plumos-target-runtime",
+            "handling": "Restore the protected V90S target runtime contract before testing ports.",
+        }
+    policy = contract.get("abi_handling", {}).get(soname)
+    if policy:
+        return {
+            "classification": str(policy["classification"]),
+            "owner": str(policy["owner"]),
+            "handling": str(policy["handling"]),
+        }
+    if port_count >= 2:
+        return {
+            "classification": "untriaged-common-candidate",
+            "owner": "unassigned",
+            "handling": "Review provenance and runtime ownership before adding this ABI to plumOS.",
+        }
+    return {
+        "classification": "port-local-candidate",
+        "owner": "owning-port-or-runtime",
+        "handling": "Keep this ABI with the single port or runtime that requires it.",
+    }
+
+
 def write_tsv(path: Path, header: list[str], rows: Iterable[list[Any]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
@@ -603,20 +635,14 @@ def main(argv: list[str] | None = None) -> int:
         record["static_status"] = classify_port(record)
         records.append(record)
 
-    protected_patterns = [re.compile(pattern) for pattern in contract["protected_soname_patterns"]]
     missing_rows = []
     for soname, names in sorted(missing_occurrences.items()):
         unique_names = sorted(set(names))
-        if any(pattern.search(soname) for pattern in protected_patterns):
-            classification = "target-contract-missing"
-        elif len(unique_names) >= 2:
-            classification = "common-abi-candidate"
-        else:
-            classification = "port-local-candidate"
+        handling = missing_library_handling(soname, len(unique_names), contract)
         missing_rows.append(
             {
                 "soname": soname,
-                "classification": classification,
+                **handling,
                 "port_count": len(unique_names),
                 "ports": unique_names,
             }
@@ -625,7 +651,7 @@ def main(argv: list[str] | None = None) -> int:
     status_counts = Counter(record["static_status"] for record in records)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "target": contract["target"],
         "architecture": contract["architecture"],
         "catalog": {
@@ -673,8 +699,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     write_tsv(
         args.output_dir / "missing-libraries.tsv",
-        ["soname", "classification", "port_count", "ports"],
-        ([row["soname"], row["classification"], row["port_count"], ",".join(row["ports"])] for row in missing_rows),
+        ["soname", "classification", "owner", "port_count", "ports", "handling"],
+        (
+            [
+                row["soname"], row["classification"], row["owner"],
+                row["port_count"], ",".join(row["ports"]), row["handling"],
+            ]
+            for row in missing_rows
+        ),
     )
     write_tsv(
         args.output_dir / "runtime-families.tsv",

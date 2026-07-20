@@ -1840,6 +1840,33 @@ is `libSDL2_ttf-2.0.so.0` from the NextCommander library directory. Conversely,
 a library that happens to exist elsewhere in the app layer must not satisfy a
 PortMaster dependency when the launcher cannot reach it.
 
+PortMaster adapter version 9 adds the second audit-backed promotion: pinned GNU
+Readline 7.0 with source SHA-256
+`750d437185286f40a369e1e4f4764eda932b9459b5ec9a731628393dd3d32334`.
+The build installs the real `libreadline.so.7` SONAME and records its GPL license
+and source identity. Its only non-libc dependency is the existing
+`libtinfo.so.6` target ABI. The owned runtime projects the library into
+`/run/plumos/portmaster/lib`; no system-wide rootfs replacement or renamed
+newer Readline library is used. The complete offline audit then moves Wizznic
+and Yatka from `missing-libraries` to `static-pass`.
+
+Repeated missing SONAMEs are not automatically common ABIs. The audit contract
+must assign each reviewed candidate an owner and handling class:
+
+- `plumos-common`: provenance-pinned and safe for the owned common adapter path.
+- `isolated-compat`: private to the affected port or runtime; OpenSSL 1.1 stays
+  here because it is an end-of-life security ABI.
+- `runtime-owned`: supplied only by the exact validated Weston/GL4ES, Java, or
+  other runtime family that owns it.
+- `unsupported-hardware`: rejected on V90S; Rockchip RGA/Mali libraries must
+  never be copied into the Allwinner/PowerVR environment.
+- `port-local-candidate`: remains with the single owning port or runtime.
+
+Any repeated SONAME without an explicit policy is reported as
+`untriaged-common-candidate`, not silently treated as available. This prevents
+desktop GL aliases, Java libraries, EOL crypto libraries, or foreign hardware
+drivers from contaminating every PortMaster process.
+
 ### 2026-07-19: RetroArch Factory Configuration Ownership
 
 Decision:
