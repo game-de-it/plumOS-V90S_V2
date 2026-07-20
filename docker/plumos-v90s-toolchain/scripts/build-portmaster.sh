@@ -24,6 +24,14 @@ LIBEVDEV_VERSION="1.13.1"
 LIBEVDEV_ARCHIVE="libevdev-${LIBEVDEV_VERSION}.tar.xz"
 LIBEVDEV_URL="https://www.freedesktop.org/software/libevdev/${LIBEVDEV_ARCHIVE}"
 LIBEVDEV_SHA256="06a77bf2ac5c993305882bc1641017f5bec1592d6d1b64787bad492ab34f2f36"
+FLAC_COMPAT_VERSION="1.3.3"
+FLAC_COMPAT_ARCHIVE="flac-${FLAC_COMPAT_VERSION}.tar.xz"
+FLAC_COMPAT_URL="https://downloads.xiph.org/releases/flac/${FLAC_COMPAT_ARCHIVE}"
+FLAC_COMPAT_SHA256="213e82bd716c9de6db2f98bcadbc4c24c7e2efe8c75939a1a84e28539c4e1748"
+JPEG_COMPAT_VERSION="8d"
+JPEG_COMPAT_ARCHIVE="jpegsrc.v${JPEG_COMPAT_VERSION}.tar.gz"
+JPEG_COMPAT_URL="https://www.ijg.org/files/${JPEG_COMPAT_ARCHIVE}"
+JPEG_COMPAT_SHA256="fdc4d4c11338ad028a7d23fb53f5bb9354671392a67fb1b52e0c32a7121891f8"
 SQUASHFS_TOOLS_VERSION="1:4.5.1-1"
 
 usage() {
@@ -149,6 +157,38 @@ actual_libevdev_sha256="$(sha256sum "$libevdev_archive_path" | awk '{print $1}')
     exit 1
 }
 
+flac_compat_archive_path="$CACHE_DIR/$FLAC_COMPAT_ARCHIVE"
+if [ ! -f "$flac_compat_archive_path" ] ||
+   [ "$(sha256sum "$flac_compat_archive_path" | awk '{print $1}')" != "$FLAC_COMPAT_SHA256" ]; then
+    flac_compat_archive_tmp="$flac_compat_archive_path.tmp.$$"
+    rm -f "$flac_compat_archive_tmp"
+    curl --fail --location --retry 3 --output "$flac_compat_archive_tmp" "$FLAC_COMPAT_URL"
+    mv -f "$flac_compat_archive_tmp" "$flac_compat_archive_path"
+fi
+
+actual_flac_compat_sha256="$(sha256sum "$flac_compat_archive_path" | awk '{print $1}')"
+[ "$actual_flac_compat_sha256" = "$FLAC_COMPAT_SHA256" ] || {
+    printf 'error: FLAC compatibility source SHA-256 mismatch: expected %s, got %s\n' \
+        "$FLAC_COMPAT_SHA256" "$actual_flac_compat_sha256" >&2
+    exit 1
+}
+
+jpeg_compat_archive_path="$CACHE_DIR/$JPEG_COMPAT_ARCHIVE"
+if [ ! -f "$jpeg_compat_archive_path" ] ||
+   [ "$(sha256sum "$jpeg_compat_archive_path" | awk '{print $1}')" != "$JPEG_COMPAT_SHA256" ]; then
+    jpeg_compat_archive_tmp="$jpeg_compat_archive_path.tmp.$$"
+    rm -f "$jpeg_compat_archive_tmp"
+    curl --fail --location --retry 3 --output "$jpeg_compat_archive_tmp" "$JPEG_COMPAT_URL"
+    mv -f "$jpeg_compat_archive_tmp" "$jpeg_compat_archive_path"
+fi
+
+actual_jpeg_compat_sha256="$(sha256sum "$jpeg_compat_archive_path" | awk '{print $1}')"
+[ "$actual_jpeg_compat_sha256" = "$JPEG_COMPAT_SHA256" ] || {
+    printf 'error: JPEG compatibility source SHA-256 mismatch: expected %s, got %s\n' \
+        "$JPEG_COMPAT_SHA256" "$actual_jpeg_compat_sha256" >&2
+    exit 1
+}
+
 openal_src="$BUILD_DIR/openal-soft-src"
 openal_build="$BUILD_DIR/openal-soft-build"
 rm -rf "$openal_src" "$openal_build"
@@ -229,6 +269,43 @@ meson setup "$libevdev_build" "$libevdev_src" \
     -Ddocumentation=disabled
 meson compile -C "$libevdev_build"
 DESTDIR="$libevdev_install" meson install -C "$libevdev_build"
+
+flac_compat_src="$BUILD_DIR/flac-compat-src"
+flac_compat_build="$BUILD_DIR/flac-compat-build"
+flac_compat_install="$BUILD_DIR/flac-compat-install"
+rm -rf "$flac_compat_src" "$flac_compat_build" "$flac_compat_install"
+mkdir -p "$flac_compat_src" "$flac_compat_build" "$flac_compat_install"
+tar -xJf "$flac_compat_archive_path" --strip-components=1 -C "$flac_compat_src"
+(
+    cd "$flac_compat_build"
+    "$flac_compat_src/configure" \
+        --prefix=/usr \
+        --disable-static \
+        --enable-shared \
+        --disable-cpplibs \
+        --disable-examples \
+        --disable-doxygen-docs
+    make -C src/libFLAC -j"${JOBS:-2}"
+    make -C src/libFLAC DESTDIR="$flac_compat_install" install
+)
+
+jpeg_compat_src="$BUILD_DIR/jpeg-compat-src"
+jpeg_compat_build="$BUILD_DIR/jpeg-compat-build"
+jpeg_compat_install="$BUILD_DIR/jpeg-compat-install"
+rm -rf "$jpeg_compat_src" "$jpeg_compat_build" "$jpeg_compat_install"
+mkdir -p "$jpeg_compat_src" "$jpeg_compat_build" "$jpeg_compat_install"
+tar -xzf "$jpeg_compat_archive_path" --strip-components=1 -C "$jpeg_compat_src"
+install -m 0755 /usr/share/misc/config.guess "$jpeg_compat_src/config.guess"
+install -m 0755 /usr/share/misc/config.sub "$jpeg_compat_src/config.sub"
+(
+    cd "$jpeg_compat_build"
+    "$jpeg_compat_src/configure" \
+        --prefix=/usr \
+        --disable-static \
+        --enable-shared
+    make -j"${JOBS:-2}"
+    make DESTDIR="$jpeg_compat_install" install
+)
 
 python3 - "$archive_path" <<'PY'
 import stat
@@ -314,12 +391,30 @@ libevdev_library="$(find "$libevdev_install/usr/lib" -type f -name 'libevdev.so.
 }
 install -m 0644 "$libevdev_library" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libevdev.so.2"
+flac_compat_library="$(find "$flac_compat_install/usr/lib" -type f -name 'libFLAC.so.8.*' | sort | tail -n 1)"
+[ -n "$flac_compat_library" ] && [ -f "$flac_compat_library" ] || {
+    printf 'error: FLAC compatibility library was not produced\n' >&2
+    exit 1
+}
+install -m 0644 "$flac_compat_library" \
+    "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libFLAC.so.8"
+jpeg_compat_library="$(find "$jpeg_compat_install/usr/lib" -type f -name 'libjpeg.so.8.*' | sort | tail -n 1)"
+[ -n "$jpeg_compat_library" ] && [ -f "$jpeg_compat_library" ] || {
+    printf 'error: JPEG compatibility library was not produced\n' >&2
+    exit 1
+}
+install -m 0644 "$jpeg_compat_library" \
+    "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libjpeg.so.8"
 install -m 0644 "$openal_src/COPYING" \
     "$stage_dir/plumos/licenses/openal-soft-LGPL-2.0-or-later.txt"
 install -m 0644 "$ffmpeg_compat_src/COPYING.LGPLv2.1" \
     "$stage_dir/plumos/licenses/ffmpeg-compat-LGPL-2.1-or-later.txt"
 install -m 0644 "$libevdev_src/COPYING" \
     "$stage_dir/plumos/licenses/libevdev-MIT.txt"
+install -m 0644 "$flac_compat_src/COPYING.Xiph" \
+    "$stage_dir/plumos/licenses/flac-compat-Xiph-BSD.txt"
+install -m 0644 "$jpeg_compat_src/README" \
+    "$stage_dir/plumos/licenses/libjpeg-compat-IJG.txt"
 install -m 0644 /usr/share/doc/squashfs-tools/copyright \
     "$stage_dir/plumos/licenses/squashfs-tools-copyright.txt"
 install -m 0644 /usr/share/doc/liblzo2-2/copyright \
@@ -333,7 +428,7 @@ mkdir -p \
 
 cat > "$stage_dir/plumos/apps/portmaster/installed.json" <<EOF
 {
-  "adapter_version": 7,
+  "adapter_version": 8,
   "channel": "stable",
   "official_md5": "${actual_md5}",
   "official_sha256": "${actual_sha256}",
@@ -349,7 +444,7 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
 cat > "$OUT_DIR/portmaster.manifest" <<EOF
 component=portmaster
 target=powkiddy-v90s
-adapter_version=7
+adapter_version=8
 upstream=PortMaster-GUI
 version=${VERSION}
 channel=stable
@@ -364,6 +459,10 @@ ffmpeg_compat_version=${FFMPEG_COMPAT_VERSION}
 ffmpeg_compat_sha256=${actual_ffmpeg_compat_sha256}
 libevdev_version=${LIBEVDEV_VERSION}
 libevdev_sha256=${actual_libevdev_sha256}
+flac_compat_version=${FLAC_COMPAT_VERSION}
+flac_compat_sha256=${actual_flac_compat_sha256}
+jpeg_compat_version=${JPEG_COMPAT_VERSION}
+jpeg_compat_sha256=${actual_jpeg_compat_sha256}
 squashfs_tools_version=${actual_squashfs_tools_version}
 unsquashfs_sha256=$(sha256sum /usr/bin/unsquashfs | awk '{print $1}')
 EOF

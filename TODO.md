@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-18
+Last updated: 2026-07-20
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -216,6 +216,12 @@ Build plumOS V90S as a V90S-specific distribution:
   against the built V90S runtime contract, and emits manifests, TSV reports,
   and SHA-256 checksums. Full payload retrieval is an explicit large-download
   operation because the current candidate set exceeds 24 GiB.
+- [x] Promote the first audit-backed common ABI set into PortMaster adapter
+  version 8: source-build pinned `libFLAC.so.8` and `libjpeg.so.8`, package
+  their licenses and source hashes, create runtime links below `/run`, and
+  reduce the A7Xpg, Abombniball, and Profanation Deluxe sample audit to zero
+  unresolved SONAMEs. Device-side `ldd` also reports zero unresolved libraries;
+  video, audio, controls, and clean exit remain per-port runtime tests.
 - [x] Implement `picoarch` as a native AArch64 runtime with SDL12 compatibility,
   V90S fbdev double-buffer presentation, FAT32-owned settings/saves, and shared
   `/mnt/plumos/cores/*_libretro.so` core resolution. QuickNES video and ALSA

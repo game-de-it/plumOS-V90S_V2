@@ -1813,6 +1813,17 @@ but it should cover representative runtime families and ports that passed the
 static gate instead of discovering deterministic loader failures one title at
 a time.
 
+The first audit-backed common ABI promotion is PortMaster adapter version 8.
+It packages source-built, SHA-256-pinned FLAC 1.3.3 as `libFLAC.so.8` and IJG
+JPEG 8d as `libjpeg.so.8`. Each SONAME was independently required by at least
+two inspected AArch64 ports, and neither is a PowerVR, SDL, runtime-family, or
+port-local library. They are regular adapter files with licenses and source
+identities in the PortMaster component manifest; the owned runtime creates
+their links below `/run/plumos/portmaster/lib`. Do not satisfy either ABI by
+renaming a newer incompatible SONAME or by copying a binary from an installed
+port. Future common ABI additions must pass the same audit, provenance,
+dependency-closure, app-layer metadata, and real-device loader checks.
+
 ### 2026-07-19: RetroArch Factory Configuration Ownership
 
 Decision:
