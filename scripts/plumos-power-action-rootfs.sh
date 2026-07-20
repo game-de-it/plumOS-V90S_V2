@@ -23,6 +23,7 @@ FINAL_UNMOUNT="${PLUMOS_POWER_ACTION_FINAL_UNMOUNT:-${PLUMOS_SAFE_SHUTDOWN_FINAL
 MIRROR_LOG="${PLUMOS_POWER_ACTION_MIRROR_LOG:-1}"
 QUIESCE_CLEAN=0
 CLEAN_MARKERS_RECORDED=0
+ADB_RESUME_REQUIRED=0
 
 usage() {
   cat <<'USAGE'
@@ -523,6 +524,35 @@ set_wakealarm() {
   echo "+$WAKEUP_SEC" >/sys/class/rtc/rtc0/wakealarm 2>/dev/null || true
 }
 
+capture_adb_sleep_state() {
+  services_conf="$PLUMOS_ROOT/config/network/services.conf"
+  adb_control="$PLUMOS_ROOT/bin/plumos-adbd"
+
+  ADB_RESUME_REQUIRED=0
+  [ -x "$adb_control" ] || return 0
+  [ -r "$services_conf" ] || return 0
+  grep -Eq '^adb_enabled=(1|true|on)$' "$services_conf" 2>/dev/null || return 0
+
+  status="$($adb_control status 2>/dev/null || true)"
+  printf '%s\n' "$status" | grep -q '^running=1$' || return 0
+  ADB_RESUME_REQUIRED=1
+  log "sleep: adb resume required"
+}
+
+restore_adb_after_sleep() {
+  [ "$ADB_RESUME_REQUIRED" -eq 1 ] || return 0
+  adb_control="$PLUMOS_ROOT/bin/plumos-adbd"
+
+  log "sleep: restarting adb gadget after resume"
+  "$adb_control" stop >> "$LOG_FILE" 2>&1 || true
+  if "$adb_control" start >> "$LOG_FILE" 2>&1; then
+    state="$(cat /sys/class/udc/*/state 2>/dev/null | head -1 || true)"
+    log "sleep: adb gadget restarted udc_state=${state:-unknown}"
+  else
+    log "sleep: adb gadget restart failed"
+  fi
+}
+
 trigger_sysrq() {
   key="$1"
   name="$2"
@@ -546,6 +576,7 @@ trigger_sysrq() {
 }
 
 sleep_action() {
+  capture_adb_sleep_state
   safe_sync
   case "$SLEEP_BACKEND" in
     none)
@@ -566,6 +597,7 @@ sleep_action() {
         return 0
       fi
       echo "$SLEEP_BACKEND" >/sys/power/state
+      restore_adb_after_sleep
       echo "result=sleep_returned"
       return 0
       ;;

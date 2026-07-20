@@ -668,6 +668,14 @@ Build plumOS V90S as a V90S-specific distribution:
   ALSA stream after SIGSTOP/SIGCONT so both direct ALSA and SDL callback clients
   resume audio. See
   `docs/validation/2026-07-19-v90s-global-power-menu.md`.
+- [x] Validate vendor-kernel `mem` sleep from the FE with physical-Power
+  resume. LCD, FE, Wi-Fi, and hardware keys recovered, but the FunctionFS ADB
+  gadget required a rebind. Restart only an enabled/running `plumos-adbd`
+  after real sleep return; a second hardware cycle restored ADB automatically
+  with one FE and clean storage logs. See
+  `docs/validation/2026-07-20-v90s-mem-sleep-resume.md`.
+- [ ] Validate `mem` sleep and resume while RetroArch, PicoArch, standalone
+  emulators, and Apps own video/audio/input.
 - [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
   release-system squashfs while keeping pip-installed modules on writable
   `PLUMOS_SYS`.
