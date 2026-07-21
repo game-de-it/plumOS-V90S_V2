@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import errno
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -8,11 +10,23 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPO = Path(__file__).resolve().parents[1]
 BUILDER = REPO / "scripts/build-v90s-update-package.py"
 UPDATER = REPO / "scripts/plumos-system-update.py"
+
+
+def load_updater_module():
+    spec = importlib.util.spec_from_file_location("plumos_system_update", UPDATER)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load updater module: {UPDATER}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class V90SUpdateTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="plumos-v90s-update-test-")
@@ -198,6 +212,20 @@ class V90SUpdateTest(unittest.TestCase):
         self.assertFalse((self.live / "bin/new-tool").exists())
         result = json.loads((state / "last-result.json").read_text())
         self.assertEqual(result["result"], "rolled_back")
+
+    def test_vendor_vfat_fsync_fallback_is_narrow(self) -> None:
+        updater = load_updater_module()
+        with mock.patch.object(updater.os, "fsync", side_effect=OSError(0, "Error")), \
+             mock.patch.object(updater.os, "sync") as sync:
+            updater.fsync_file_descriptor(1)
+            sync.assert_called_once_with()
+
+        with mock.patch.object(
+            updater.os, "fsync", side_effect=OSError(errno.EIO, "I/O error")
+        ), mock.patch.object(updater.os, "sync") as sync:
+            with self.assertRaises(OSError):
+                updater.fsync_file_descriptor(1)
+            sync.assert_not_called()
 
 
 if __name__ == "__main__":

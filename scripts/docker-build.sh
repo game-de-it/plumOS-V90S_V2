@@ -65,6 +65,7 @@ Environment:
   PLUMOS_STANDALONE_FILTER      Standalone emulator filter used when no IDs are
                                   passed. Default: all.
   PLUMOS_PORTMASTER_AUDIT_JOBS Concurrent PortMaster payload downloads. Default: 4.
+  PLUMOS_V90S_SYSTEM_VERSION  Version embedded in a System SquashFS/update.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target
@@ -105,6 +106,7 @@ docker_env=(
     -e PLUMOS_V90S_SSH_AUTHORIZED_KEYS="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
     -e PLUMOS_V90S_SSH_ROOT_PASSWORD="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
     -e PLUMOS_V90S_RETROARCH_START_MODE="${PLUMOS_V90S_RETROARCH_START_MODE:-}"
+    -e PLUMOS_V90S_SYSTEM_VERSION="${PLUMOS_V90S_SYSTEM_VERSION:-}"
     -e CORE_RECIPES="${CORE_RECIPES:-/workspace/docker/plumos-v90s-toolchain/libretro-core-recipes.tsv}"
     -e PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-plumos}"
     -e FAIL_ON_CORE_ERROR="${FAIL_ON_CORE_ERROR:-1}"

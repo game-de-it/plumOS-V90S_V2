@@ -143,6 +143,13 @@ at two slots rather than accumulating old SquashFS images. p3 is authoritative
 for active, pending, attempted, and healthy state; p1 `active-slot` is only a
 host-visible seed hint.
 
+The StockOS-derived Linux 4.9 VFAT implementation can return `fsync()` failure
+with errno left at zero after flushing a large file. Only that unsupported
+errno class may fall back to a filesystem-wide `sync`; the inactive image must
+still pass a complete readback SHA-256 before rename or pending-slot commit.
+p1 remount mode is verified through `/proc/mounts`, and p1 is restored to
+read-only on every success or failure path.
+
 ## Retention and Logs
 
 - Runtime backups: one previous transaction

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import errno
 import fcntl
 import hashlib
 import json
@@ -135,13 +136,31 @@ def fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
+def fsync_file_descriptor(fd: int) -> None:
+    try:
+        os.fsync(fd)
+    except OSError as exc:
+        unsupported = {
+            0,
+            errno.EINVAL,
+            getattr(errno, "ENOTSUP", errno.EINVAL),
+            getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+        }
+        if exc.errno not in unsupported:
+            raise
+        # The vendor 4.9 VFAT driver may return failure with errno left at 0
+        # after flushing a large file. Complete a filesystem-wide sync and let
+        # the mandatory readback SHA-256 decide whether the write is valid.
+        os.sync()
+
+
 def atomic_bytes(path: Path, payload: bytes, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(f".{path.name}.new-{os.getpid()}")
     with temp.open("wb") as handle:
         handle.write(payload)
         handle.flush()
-        os.fsync(handle.fileno())
+        fsync_file_descriptor(handle.fileno())
     os.chmod(temp, mode)
     os.replace(temp, path)
     fsync_directory(path.parent)
@@ -411,7 +430,7 @@ def extract_payload(package: Path, manifest: dict[str, Any], destination: Path) 
                 with target.open("wb") as handle:
                     shutil.copyfileobj(source, handle, 1024 * 1024)
                     handle.flush()
-                    os.fsync(handle.fileno())
+                    fsync_file_descriptor(handle.fileno())
                 os.chmod(target, int(entry["mode"]))
                 actual = sha256_file(target)
             if actual != entry["sha256"]:
@@ -515,7 +534,7 @@ def apply_runtime(package: Path, manifest: dict[str, Any]) -> int:
                 os.replace(staged, target)
                 if target.is_file() and not target.is_symlink():
                     with target.open("rb") as handle:
-                        os.fsync(handle.fileno())
+                        fsync_file_descriptor(handle.fileno())
                 operation["installed"] = True
                 fsync_directory(target.parent)
                 journal_write(journal)
@@ -533,17 +552,53 @@ def apply_runtime(package: Path, manifest: dict[str, Any]) -> int:
     return 0
 
 
+def boot_mount_state() -> tuple[str, set[str]]:
+    try:
+        lines = Path("/proc/mounts").read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise UpdateError(f"cannot inspect PLUMBOOT mount state: {exc}") from exc
+    for line in lines:
+        fields = line.split()
+        if len(fields) >= 4 and fields[1] == str(BOOT_ROOT):
+            return fields[0], set(fields[3].split(","))
+    raise UpdateError(f"PLUMBOOT is not mounted: {BOOT_ROOT}")
+
+
 def remount_boot(mode: str) -> None:
     if os.environ.get("PLUMOS_UPDATE_BOOT_REMOUNT", "1") == "0":
         return
-    result = subprocess.run(
+    source, _ = boot_mount_state()
+    errors: list[str] = []
+    for command in (
+        ["mount", "-o", f"remount,{mode}", source, str(BOOT_ROOT)],
         ["mount", "-o", f"remount,{mode}", str(BOOT_ROOT)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise UpdateError(f"cannot remount PLUMBOOT {mode}")
+    ):
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        _, options = boot_mount_state()
+        if result.returncode == 0 and mode in options:
+            return
+        errors.append(result.stderr.strip() or f"rc={result.returncode}")
+    raise UpdateError(f"cannot remount PLUMBOOT {mode}: {'; '.join(errors)}")
+
+
+def verify_boot_write() -> None:
+    probe = BOOT_ROOT / "System" / ".plumos-update-write-probe"
+    try:
+        with probe.open("xb") as handle:
+            handle.write(b"plumOS update write probe\n")
+            handle.flush()
+            fsync_file_descriptor(handle.fileno())
+        probe.unlink()
+        fsync_directory(probe.parent)
+    except OSError as exc:
+        probe.unlink(missing_ok=True)
+        raise UpdateError(f"PLUMBOOT write probe failed: {exc}") from exc
 
 
 def apply_system(package: Path, manifest: dict[str, Any], manifest_bytes: bytes, signature: bytes) -> int:
@@ -564,14 +619,39 @@ def apply_system(package: Path, manifest: dict[str, Any], manifest_bytes: bytes,
     final_image = system_dir / f"system-{inactive}.squashfs"
     remounted_rw = False
     remount_error: UpdateError | None = None
+    cleanup_error: UpdateError | None = None
     try:
         remount_boot("rw")
         remounted_rw = True
+        verify_boot_write()
         show_progress("update_system")
-        with source.open("rb") as src, temp_image.open("wb") as dst:
+        destination_fd: int | None = None
+        read_only_states: list[str] = []
+        for _ in range(3):
+            # Keep the verified remount and destination open in the same retry
+            # window. The vendor kernel may briefly restore boot-resource ro
+            # after a metadata sync.
+            remount_boot("rw")
+            try:
+                destination_fd = os.open(
+                    temp_image, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644
+                )
+                break
+            except OSError as exc:
+                if exc.errno != errno.EROFS:
+                    raise
+                _, options = boot_mount_state()
+                read_only_states.append(",".join(sorted(options)))
+                time.sleep(0.1)
+        if destination_fd is None:
+            raise UpdateError(
+                "PLUMBOOT returned read-only while opening inactive slot: "
+                + "; ".join(read_only_states)
+            )
+        with source.open("rb") as src, os.fdopen(destination_fd, "wb") as dst:
             shutil.copyfileobj(src, dst, 1024 * 1024)
             dst.flush()
-            os.fsync(dst.fileno())
+            fsync_file_descriptor(dst.fileno())
         if sha256_file(temp_image) != expected:
             raise UpdateError("PLUMBOOT readback hash mismatch")
         os.replace(temp_image, final_image)
@@ -580,12 +660,21 @@ def apply_system(package: Path, manifest: dict[str, Any], manifest_bytes: bytes,
         atomic_bytes(system_dir / f"system-{inactive}.manifest.sig", signature)
         os.sync()
     finally:
+        operation_failed = sys.exc_info()[0] is not None
+        try:
+            temp_image.unlink(missing_ok=True)
+        except OSError as exc:
+            if not operation_failed:
+                cleanup_error = UpdateError(
+                    f"cannot remove inactive-slot temporary image: {exc}"
+                )
         if remounted_rw:
             try:
                 remount_boot("ro")
             except UpdateError as exc:
                 remount_error = exc
-        temp_image.unlink(missing_ok=True)
+    if cleanup_error is not None:
+        raise cleanup_error
     if remount_error is not None:
         raise remount_error
     STATE_ROOT.mkdir(parents=True, exist_ok=True)

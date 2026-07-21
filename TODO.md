@@ -1080,8 +1080,10 @@ Build plumOS V90S as a V90S-specific distribution:
   failure evidence.
 - [x] Add `System Settings -> System Update` for the newest compatible package
   copied to `PLUMOS/updates`.
-- [ ] Validate Runtime success, Runtime rollback, System A/B promotion, and
-  System rollback on physical V90S hardware.
+- [x] Validate signed Runtime success and System A/B promotion on physical
+  V90S hardware, including full app checksum and inactive-slot readback proof.
+- [ ] Validate interrupted Runtime rollback and System readiness-failure
+  rollback on physical V90S hardware.
 
 - [x] Generate and fully verify the complete four-partition seed image under
   `output/images/`.
