@@ -23,6 +23,8 @@ standalone_dir="${PLUMOS_V90S_STANDALONE_DIR:-output/standalone-emulators/v90s}"
 picoarch_dir="${PLUMOS_V90S_PICOARCH_DIR:-output/picoarch/v90s}"
 retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s-powervr-quicknes.cfg}"
 minimum_core_count="${PLUMOS_V90S_MIN_CORE_COUNT:-118}"
+plumos_license="${PLUMOS_V90S_LICENSE_FILE:-LICENSE}"
+plumos_notice="${PLUMOS_V90S_NOTICE_FILE:-NOTICE.md}"
 strict=0
 
 usage() {
@@ -291,17 +293,23 @@ printf '%s\n' "$compat_vendor" > "$out_dir/COMPAT_VENDOR"
 printf '%s\n' '1' > "$out_dir/RUNTIME_ABI"
 printf '%s\n' "$mount_path" > "$out_dir/MOUNT_PATH"
 
-cat > "$out_dir/licenses/NOTICE.txt" <<'EOF'
-plumOS V90S includes runtime components derived from the POWKIDDY V90S
-StockOS/Batocera distribution for device compatibility. Bundled open-source
-components retain their upstream licenses.
-EOF
+[ -f "$plumos_license" ] || {
+    printf 'error: plumOS license is missing: %s\n' "$plumos_license" >&2
+    exit 1
+}
+[ -f "$plumos_notice" ] || {
+    printf 'error: plumOS notice is missing: %s\n' "$plumos_notice" >&2
+    exit 1
+}
+copy_file "$plumos_license" "$out_dir/licenses/plumOS-MIT.txt"
+copy_file "$plumos_notice" "$out_dir/licenses/NOTICE.txt"
 
 record_file "VERSION" "metadata" "generated"
 record_file "COMPAT_VENDOR" "metadata" "generated"
 record_file "RUNTIME_ABI" "metadata" "generated"
 record_file "MOUNT_PATH" "metadata" "generated"
-record_file "licenses/NOTICE.txt" "notice" "generated"
+record_file "licenses/plumOS-MIT.txt" "license" "$plumos_license"
+record_file "licenses/NOTICE.txt" "notice" "$plumos_notice"
 
 userland_root="$userland_dir/plumos"
 if require_or_note_missing "$userland_root/bin/busybox" "userland"; then

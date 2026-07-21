@@ -638,6 +638,17 @@ test ROM or temporary payload only when the profile name makes that explicit.
 - license notices for bundled app-layer components
 - update metadata
 
+plumOS-authored code, scripts, configuration, and packaging logic are released
+under the repository MIT License. Every app-layer build must include that
+license and the repository notice under `/mnt/plumos/licenses`.
+
+The plumOS MIT License does not relicense vendor or third-party payloads.
+POWKIDDY StockOS/Batocera-derived runtime files, RetroArch, libretro cores,
+standalone emulators, firmware, fonts, and libraries retain their respective
+source licenses and notices. Release packaging must preserve those notices
+alongside the MIT license rather than replacing them with one project-wide
+license declaration.
+
 The app-layer network service controller owns the user-facing Wi-Fi and SSH
 service state alongside FTP, SFTP, Samba, and ADB so the frontend, logs, and
 troubleshooting view all agree. On V90S the Wi-Fi path must assume an external

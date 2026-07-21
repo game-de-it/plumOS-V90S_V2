@@ -22,4 +22,9 @@ as miniaudio and FFmpeg/libav when those components are bundled by the build
 output.
 
 New plumOS-authored scripts, configuration, packaging logic, and device
-integration files are maintained in this repository.
+integration files are licensed under the MIT License in `LICENSE`.
+
+The MIT License applies only to plumOS-authored material. It does not replace
+or relicense POWKIDDY StockOS/Batocera-derived files, RetroArch, libretro
+cores, standalone emulators, firmware, fonts, libraries, or other bundled
+third-party components. Those files retain their respective upstream terms.

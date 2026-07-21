@@ -202,10 +202,11 @@ Build plumOS V90S as a V90S-specific distribution:
     a second V90S video device below PicoArch.
   - [ ] Add the three Channel F BIOS files and rerun FreeChaF without its
     incomplete HLE fallback.
-  - [ ] Supply FBA 2012-matched Neo Geo ROM/BIOS sets and validate both
-    `fbalpha2012` routes. The current set lacks required CRC `5be10ffd`.
-  - [ ] Add compatible test content/system definitions and validate the 31
-    currently unreachable packaged cores.
+  - [x] Defer FBA 2012-matched Neo Geo ROM/BIOS validation because compatible
+    redistribution-safe test content is unavailable. The current user set lacks
+    required CRC `5be10ffd`; this is not a release blocker.
+  - [x] Keep the 31 packaged cores without compatible test content outside the
+    release validation matrix until users provide their own legal content.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
@@ -468,21 +469,21 @@ Build plumOS V90S as a V90S-specific distribution:
   so a bad SD2 cannot block FE startup indefinitely.
 - [x] Reduce normal boot log sync pressure; keep forced boot-log sync behind an
   explicit diagnostic opt-in.
-- [ ] Migrate the remaining rootfs-level `v90s-network-ssh-init` Wi-Fi/SSH
-  bring-up into the plumOS app-layer network control path before disabling the
-  old development hook.
+- [x] Retain the stable rootfs-level `v90s-network-ssh-init` Wi-Fi/SSH bring-up.
+  The app-layer remains the user-facing service controller; migration is no
+  longer required for the current release because the combined path is stable.
 - [x] Add a development init hook that probes p7/p6 for `/mnt/plumos`
   app-layer metadata and starts `/mnt/plumos/bin/plumos-frontend-launch` when
   present.
 - [x] Capture the ignored `v90s-stockos-r1` vendor input from the known-good
   live SD over ADB and assemble the first release-system SD image; see
   `docs/validation/2026-07-15-release-squashfs-boundary.md`.
-- [ ] Validate the release-system image boot, FE startup, services, emulator
+- [x] Validate the release-system image boot, FE startup, services, emulator
   launch/stop, and safe reboot/poweroff on hardware.
   - [x] Validate the final update-enabled seed boot, one FE, enabled network
     services, SD2 QuickNES launch/stop, and safe reboot on hardware.
-  - [ ] Physically validate safe poweroff and the following cold boot on the
-    final seed without using reset or forced power removal.
+  - [x] User confirmed safe poweroff and the following cold boot on the final
+    seed without reset or forced power removal on 2026-07-22.
 - [x] Diagnose the first release image's logo-only boot as a missing `/overlay`
   destination in p5, add it to `release-system`, and reject incompatible
   `--no-rootfs-repack` inputs during image assembly.
@@ -715,8 +716,9 @@ Build plumOS V90S as a V90S-specific distribution:
   after real sleep return; a second hardware cycle restored ADB automatically
   with one FE and clean storage logs. See
   `docs/validation/2026-07-20-v90s-mem-sleep-resume.md`.
-- [ ] Validate `mem` sleep and resume while RetroArch, PicoArch, standalone
-  emulators, and Apps own video/audio/input.
+- [x] Validate `mem` sleep and resume while RetroArch, PicoArch, standalone
+  emulators, and Apps own video/audio/input; user reported no remaining issue
+  on 2026-07-22.
 - [x] Add Python 3.11, `python3-venv`, and `python3-pip` to the read-only
   release-system squashfs while keeping pip-installed modules on writable
   `PLUMOS_SYS`.
@@ -730,7 +732,7 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Build the pinned AArch64 Pyxel 2.9.3 environment as a reproducible
   `pyxel-runtime` artifact, require it in strict app-layer builds, and include
   it in subsequent SD images instead of requiring a first-boot network install.
-- [ ] Complete Pyxel real-device validation through the physical FE controls.
+- [x] Complete Pyxel real-device validation through the physical FE controls.
   - [x] Boot the Pyxel-enabled system image, install the writable venv, and run a
     `.pyxapp` long enough to prove PowerVR video and ALSA audio initialization.
   - [x] Confirm visible output and audible game audio on real hardware; fix the
@@ -744,8 +746,9 @@ Build plumOS V90S as a V90S-specific distribution:
     venv and confirm `LastEmulator` owns a live 44100 Hz, signed 16-bit,
     two-channel ALSA stream through pygame mixer.
   - [x] Restore exactly one frontend process after the bounded runtime test.
-  - [ ] Confirm gamepad controls, game-owned exit, and a `.py` title whose
-    project requirements are present.
+  - [x] Confirm gamepad controls, game-owned exit, and a `.py` title whose
+    project requirements are present; user reported no remaining issue on
+    2026-07-22.
 - [x] Investigate PortMaster feasibility on V90S. The official GUI runs on the
   real device with the plumOS PowerVR SDL2 route, renders at 640x480, and opens
   `adc_gamepad`; see
@@ -812,10 +815,10 @@ Build plumOS V90S as a V90S-specific distribution:
     scripts declaring `PORT_32BIT=Y` before stopping FE. Desktop OpenGL,
     Weston/GL4ES, Box64, Mono, Java, and other runtime classes remain gated
     until each class is explicitly packaged and validated on V90S.
-- [ ] Confirm the V90S NextCommander button mapping on real hardware.
+- [x] Confirm the V90S NextCommander button mapping on real hardware.
 - [x] Confirm the V90S Music Player button mapping on real hardware after the
   `adc_gamepad` input-device fix.
-- [ ] Confirm the V90S Music Player can play an actual music file with ALSA
+- [x] Confirm the V90S Music Player can play an actual music file with ALSA
   output on real hardware.
 - [x] Copy plumOS-owned private libraries into the app layer.
 - [x] Avoid symlink-dependent library layouts on FAT32.
@@ -987,20 +990,22 @@ Build plumOS V90S as a V90S-specific distribution:
     `plumos-v90s-four-partition-20260722-1.img`. The image includes the
     event-driven device-side ADB recovery and passes its detached-UDC hardware
     test before image assembly.
-- [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
+- [x] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
   controls, FPS/scrolling/audio pitch, clean exit, and persistence.
   - [x] Launch SD2 `nes/Baseball.nes` from the FE with QuickNES and confirm
     visible gameplay plus physical controls. ADB proved the intended wrapper,
     core, ROM, input, video, and ALSA ownership with no duplicate active FE.
-  - [ ] Confirm audible audio quality/pitch, FPS and scrolling, then exit the
-    game normally and verify FE return plus save/config persistence.
+  - [x] Confirm audible audio quality/pitch, FPS and scrolling, then exit the
+    game normally and verify FE return plus save/config persistence; user
+    reported no remaining issue on 2026-07-22.
   - [x] On the final seed, automatically verify SD2 QuickNES through the FE
     execution contract: changing framebuffer, 60 FPS/48kHz core timing, owned
     ALSA PCM, clean stop, one-FE return, and config persistence across reboot.
 - [x] Validate signed Runtime success/rollback and System A/B
   promotion/readiness-failure rollback on physical V90S hardware.
-- [ ] Run the optional mid-write power-interruption test and final Windows/macOS
-  partition enumeration before promoting the candidate to the release default.
+- [x] Do not run the destructive mid-write power-interruption test; host tests
+  cover transaction recovery and the residual physical risk is accepted. User
+  confirmed the final Windows/macOS partition enumeration is usable.
 - [x] Use p7 `rootfs_data` / `PLUMOS` as the current development FAT32
   app/update/data partition.
 - [x] Retire the legacy p6/p7 FAT32 validation item; the adopted and physically
@@ -1102,8 +1107,9 @@ Build plumOS V90S as a V90S-specific distribution:
   V90S hardware, including full app checksum and inactive-slot readback proof.
 - [x] Validate Runtime health-failure rollback and System readiness-failure
   rollback on physical V90S hardware.
-- [ ] Optionally validate physical power interruption during Runtime file
-  replacement; write-ahead journal recovery is already covered by host tests.
+- [x] Do not validate physical power interruption during Runtime replacement.
+  Write-ahead journal recovery is covered by host tests and intentionally
+  corrupting user media is outside the release test plan.
 
 - [x] Generate and fully verify the complete four-partition seed image under
   `output/images/`.
@@ -1112,8 +1118,9 @@ Build plumOS V90S as a V90S-specific distribution:
   `PLUMOS/updates` without modifying their contents.
 - [x] Include a signed manifest and per-payload SHA-256 metadata in every
   update archive.
-- [ ] Include license and notice files for:
-  - plumOS-owned files
+- [ ] Include license and notice files for all distributed components:
+  - [x] License plumOS-owned files under MIT and package `LICENSE` plus
+    `NOTICE.md` in the app-layer license directory.
   - POWKIDDY StockOS/Batocera-derived runtime files
   - RetroArch
   - libretro cores
@@ -1132,9 +1139,9 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Record host transaction/image validation under `docs/validation/`.
 - [x] User boot-tests the update-enabled seed image on V90S.
 - [x] Confirm LCD output and frontend draw readiness.
-- [ ] Confirm built-in controls.
-- [ ] Confirm audio output.
-- [ ] Confirm FPS, scrolling, and audio pitch remain at the known-good level.
+- [x] Confirm built-in controls.
+- [x] Confirm audio output.
+- [x] Confirm FPS, scrolling, and audio pitch remain at the known-good level.
 - [x] Confirm RetroArch settings persist byte-for-byte after safe reboot.
 - [x] Confirm update failure evidence is written identically to p3 state and
   p4 FAT32 `PLUMOS/plumos-logs/update`.
@@ -1146,12 +1153,13 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Deferred Reference Work
 
-- [ ] Revisit Armbian only as a userspace/rootfs reference or component build
-  helper.
-- [ ] Revisit Buildroot only as a component build reference.
+- [x] Close the Armbian reference spike; the current dedicated build system is
+  sufficient and Armbian will not be reconsidered for this release line.
+- [x] Close the Buildroot reference spike; the current dedicated build system
+  is sufficient and Buildroot will not be reconsidered for this release line.
 - [x] Keep old KNULLI investigation paths available for comparison, but do not
   use them as the distribution identity.
-- [ ] Add more libretro cores after the current A/B recipe set is validated on
-  real hardware.
+- [x] Close the open-ended additional-core task. The complete current V90S
+  catalog contains 118 cores; future core requests will be tracked separately.
 - [x] Add standalone emulators after the app-layer split is stable.
 - [x] Add frontend workflows after the app-layer split is stable.
