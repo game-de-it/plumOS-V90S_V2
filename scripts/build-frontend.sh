@@ -183,6 +183,12 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-hardware-keys-service" ]; then
   }
 fi
 
+if [ -x "$PLUMOS_ROOT/bin/plumos-wifi-recovery" ]; then
+  "$PLUMOS_ROOT/bin/plumos-wifi-recovery" sync >> "$log" 2>&1 || {
+    printf 'plumos-frontend-launch: Wi-Fi recovery monitor failed to sync\n' >> "$log"
+  }
+fi
+
 exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s" >> "$log" 2>&1
 EOF
       ;;

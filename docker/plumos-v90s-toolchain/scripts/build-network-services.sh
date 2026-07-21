@@ -204,6 +204,8 @@ assemble_base() {
   chmod 0755 "${BIN_DIR}/plumos-usb-disk-mode"
   chmod 0755 "${BIN_DIR}/plumos-adbd"
   chmod 0755 "${BIN_DIR}/plumos-adb-uevent"
+  chmod 0755 "${BIN_DIR}/plumos-wifi-recovery"
+  chmod 0755 "${BIN_DIR}/plumos-wifi-uevent"
   chmod 0755 "${BIN_DIR}/plumos-ssh-home"
   chmod 0755 "${BIN_DIR}/plumos-ssh-password"
   chmod 0755 "${PLUMOS_DIR}/ssh/start-ssh.sh" "${PLUMOS_DIR}/ssh/stop-ssh.sh"
@@ -592,6 +594,9 @@ Services:
     Wi-Fi runtime used by the frontend. V90S has no internal Wi-Fi; when no USB
     dongle or supported interface is present, scan/connect return with a
     bounded failure stage instead of waiting forever.
+    /mnt/plumos/bin/plumos-wifi-recovery blocks on kernel uevents while the
+    saved Wi-Fi switch is ON and performs one bounded WPA/DHCP recovery after a
+    USB Wi-Fi interface is re-added. It does not poll when a dongle is absent.
   FTP:
     BusyBox tcpsvd + ftpd, port 21, max 20 concurrent connections.
     Use FileZilla's Force UTF-8 charset setting for Japanese ROM filenames.

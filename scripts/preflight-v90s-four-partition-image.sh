@@ -198,12 +198,17 @@ pass "complete app runtime and checksums"
 frontend_launch="$app_runtime/bin/plumos-frontend-launch"
 sd2_mount="$app_runtime/bin/plumos-sd2-content-mount"
 usb_disk="$app_runtime/bin/plumos-usb-disk-mode"
+wifi_control="$app_runtime/bin/plumos-network-control"
+wifi_recovery="$app_runtime/bin/plumos-wifi-recovery"
+wifi_uevent="$app_runtime/bin/plumos-wifi-uevent"
 bootstrap="scripts/plumos-app-layer-bootstrap.sh"
-for file in "$frontend_launch" "$sd2_mount" "$usb_disk" "$bootstrap" \
+for file in "$frontend_launch" "$sd2_mount" "$usb_disk" "$wifi_control" \
+    "$wifi_recovery" "$wifi_uevent" "$bootstrap" \
     "$app_runtime/bin/plumos-controller-ui-v90s"; do
     [ -x "$file" ] || fail "frontend contract executable missing: $file"
 done
-for file in "$frontend_launch" "$sd2_mount" "$usb_disk" "$bootstrap"; do
+for file in "$frontend_launch" "$sd2_mount" "$usb_disk" "$wifi_control" \
+    "$wifi_recovery" "$wifi_uevent" "$bootstrap"; do
     sh -n "$file" 2>/dev/null || fail "shell syntax failed: $file"
 done
 grep -Fq 'PLUMOS_SD2_FSCK_TIMEOUT' "$sd2_mount" || fail "SD2 fsck timeout is missing"
@@ -225,6 +230,22 @@ grep -Fq 'exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s"' "$frontend_launch" 
 grep -Fq 'exec "$PLUMOS_ROOT/bin/plumos-frontend-launch"' "$bootstrap" ||
     fail "system bootstrap does not exec the frontend launcher"
 pass "bounded SD2 mount and single frontend exec chain"
+
+grep -Fq 'plumos-wifi-recovery" sync' "$frontend_launch" ||
+    fail "frontend launcher does not synchronize Wi-Fi recovery monitoring"
+grep -Fq '"$WIFI_RECOVERY" start' "$wifi_control" ||
+    fail "Wi-Fi ON does not start hotplug recovery monitoring"
+grep -Fq '"$WIFI_RECOVERY" stop' "$wifi_control" ||
+    fail "Wi-Fi OFF does not stop hotplug recovery monitoring"
+grep -Fq '[ "${ACTION:-}" = add ]' "$wifi_uevent" ||
+    fail "Wi-Fi recovery helper does not filter interface-add events"
+grep -Fq '[ "${SUBSYSTEM:-}" = net ]' "$wifi_uevent" ||
+    fail "Wi-Fi recovery helper does not filter net uevents"
+grep -Fq 'exec "$RECOVERY_CONTROL" recover' "$wifi_uevent" ||
+    fail "Wi-Fi recovery helper does not invoke bounded recovery"
+grep -Fq 'exec "$BUSYBOX" uevent "$UEVENT_HELPER"' "$wifi_recovery" ||
+    fail "Wi-Fi recovery does not use blocking kernel uevents"
+pass "event-driven USB Wi-Fi hotplug recovery contract"
 
 grep -Fq 'MOUNT_DIR="${PLUMOS_USB_DISK_MOUNT:-${USERDATA_ROOT}}"' "$usb_disk" ||
     fail "USB Disk Mode does not target p4 /mnt/plumos-user"

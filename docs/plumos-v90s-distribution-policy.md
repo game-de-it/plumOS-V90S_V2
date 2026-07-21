@@ -709,6 +709,15 @@ rerun idempotent startup for enabled network services after IPv4 becomes
 available. Samba may persist as enabled while no IPv4 exists, but its runtime
 state should report `waiting_network` and start after address acquisition.
 
+USB hub or dongle disconnects may remove the Wi-Fi interface and its IPv4
+address while a surviving `wpa_supplicant` later reassociates without rerunning
+the one-shot DHCP client. While `wifi_enabled=true`, plumOS must therefore keep
+a blocking kernel-uevent monitor for wireless-interface `add` events. Each
+event is coalesced and invokes one bounded `plumos-network-control --wifi on`
+recovery after a short settle delay. Turning Wi-Fi OFF must stop the monitor,
+and an absent dongle must not cause periodic polling or an unbounded reconnect
+loop.
+
 The system-rootfs OpenSSH configuration must route the SFTP subsystem through
 `/mnt/plumos/ssh/libexec/sftp-server`. This lets the SFTP checkbox enable or
 disable the app-layer server path without stopping the shared SSH listener.

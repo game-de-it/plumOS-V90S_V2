@@ -609,6 +609,12 @@ Build plumOS V90S as a V90S-specific distribution:
   `tcpsvd`, and `ftpd`; recover the live V90S from a partial app-layer copy.
 - [x] Recover USB Wi-Fi from `wpa_state=COMPLETED` with no IPv4 by renewing DHCP
   and restarting enabled services after address acquisition.
+- [x] Add event-driven USB Wi-Fi hotplug recovery. While the saved Wi-Fi switch
+  is ON, a blocking kernel-uevent monitor handles one wireless-interface add
+  event with one bounded WPA/DHCP recovery; Wi-Fi OFF stops the monitor and no
+  dongle-absent polling loop is used.
+- [ ] Physically unplug and reconnect the OTG hub/Wi-Fi dongle and confirm that
+  IPv4, SSH, FTP, and SFTP return without using the FE Wi-Fi toggle or ADB.
 - [x] Restore Wi-Fi scanning and connection in the release-system image: keep
   `wpa_supplicant`, `wpa_cli`, `iw`, and regulatory data in p5; poll Realtek
   scan results for up to eight seconds; and apply BusyBox `udhcpc` leases with
