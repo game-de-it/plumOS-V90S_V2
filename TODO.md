@@ -1082,8 +1082,10 @@ Build plumOS V90S as a V90S-specific distribution:
   copied to `PLUMOS/updates`.
 - [x] Validate signed Runtime success and System A/B promotion on physical
   V90S hardware, including full app checksum and inactive-slot readback proof.
-- [ ] Validate interrupted Runtime rollback and System readiness-failure
+- [x] Validate Runtime health-failure rollback and System readiness-failure
   rollback on physical V90S hardware.
+- [ ] Optionally validate physical power interruption during Runtime file
+  replacement; write-ahead journal recovery is already covered by host tests.
 
 - [x] Generate and fully verify the complete four-partition seed image under
   `output/images/`.

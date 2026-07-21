@@ -1,7 +1,7 @@
 # V90S Transactional Update Host Validation
 
 Date: 2026-07-22
-Result: Host validation PASS; physical Runtime success and System A/B promotion PASS
+Result: Host and physical Runtime/System update and rollback validation PASS
 
 ## Scope
 
@@ -59,16 +59,24 @@ retains 349 MiB free before first-boot expansion.
 
 ## Physical V90S Results
 
-The seed image completed first boot on a 128GB SD card. p3 expanded to 8GiB,
-p4 was created through the remaining 106GiB, p1 stayed read-only during normal
-operation, SD2 ROM/BIOS bind mounts were present, one frontend owned the
-display, and all 5,644 app-runtime checksums passed.
+The final seed image (`8d580bf0f8c46c76b53fc6ef31276dfd119123db65dea6824b4dfb2153f9b3b9`)
+completed first boot on a 128GB SD card. p3 expanded to 8GiB, p4 was created
+through the remaining 106GiB, p1 stayed read-only during normal operation,
+both A/B images passed their stored hashes, SD2 ROM/BIOS bind mounts were
+present, one frontend owned the display, and all 5,644 app-runtime checksums
+passed.
 
 A signed Runtime package changed only `VERSION`, `manifest.json`, and
 `checksums.sha256`. The device advanced from `0.1.0-dev` to
 `0.1.0-runtime-test1`, wrote frontend readiness, marked the transaction
 healthy, retained exactly one 2.3MiB previous-generation backup, removed all
 pending state, and passed all 5,644 checksums again.
+
+The same minimal Runtime package was then applied without health confirmation
+and the device was normally rebooted. Early boot detected `pending_health`,
+restored `0.1.0-dev`, removed the pending state, recorded
+`frontend readiness was not confirmed before reboot`, restarted exactly one
+frontend, and passed all 5,644 checksums after restoration.
 
 The first System test exposed a vendor-kernel VFAT behavior: Python `fsync()`
 returned failure with errno zero after writing the 96MiB inactive image even
@@ -85,7 +93,18 @@ then promoted it. The final observed state was System
 `0.1.0-system-test1`, active=`b`, pending absent, p1 read-only, and exactly one
 frontend process.
 
+A fresh final-seed installation then repeated the System transaction with
+frontend readiness deliberately withheld for the trial boot. The device booted
+`0.1.0-system-test1` from slot `b`, recorded the attempted marker, exposed ADB,
+and left readiness absent. On the next normal reboot, p2 rejected the attempted
+pending slot, returned to slot `a` and `0.1.0-dev`, removed pending/attempted
+state, and recorded `pending slot rolled back before frontend readiness`.
+Both System slot hashes and all 5,644 app-runtime checksums passed afterward;
+p1 was read-only and exactly one frontend was running.
+
 ## Remaining Hardware Proof
 
-Interrupted Runtime rollback, System readiness-failure rollback, and final
-post-update reboot/shutdown should still be validated and recorded separately.
+A physical power interruption in the middle of Runtime file replacement remains
+an optional destructive test. The write-ahead journal recovery path is covered
+by the automated interruption test; normal health-failure Runtime rollback and
+System readiness-failure rollback are now proven on hardware.
