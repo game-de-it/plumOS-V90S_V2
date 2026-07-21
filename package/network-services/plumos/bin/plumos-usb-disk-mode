@@ -3,6 +3,7 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
+USERDATA_ROOT="${PLUMOS_USERDATA_ROOT:-/mnt/plumos-user}"
 RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT
@@ -11,22 +12,30 @@ STATE_DIR="${PLUMOS_USB_DISK_STATE_DIR:-${PLUMOS_ROOT}/state/usb-disk}"
 RUN_DIR="${PLUMOS_USB_DISK_RUN_DIR:-${RUNTIME_ROOT}/usb-disk}"
 LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${LOG_DIR}/usb-disk-mode.log"
-IMAGE="${PLUMOS_USB_DISK_IMAGE:-${STATE_DIR}/plumos-usb-transfer.img}"
-MOUNT_DIR="${PLUMOS_USB_DISK_MOUNT:-${PLUMOS_ROOT}/usb-transfer}"
-IMAGE_SIZE_MB="${PLUMOS_USB_DISK_SIZE_MB:-64}"
+MOUNT_DIR="${PLUMOS_USB_DISK_MOUNT:-${USERDATA_ROOT}}"
+EXPORT_DEVICE_OVERRIDE="${PLUMOS_USB_DISK_DEVICE:-}"
+EXPORT_DEVICE=""
 CONNECT_TIMEOUT_SECONDS="${PLUMOS_USB_DISK_CONNECT_TIMEOUT_SECONDS:-45}"
 COMMAND_TIMEOUT_SECONDS="${PLUMOS_USB_COMMAND_TIMEOUT_SECONDS:-120}"
+FSCK_TIMEOUT_SECONDS="${PLUMOS_USB_FSCK_TIMEOUT_SECONDS:-30}"
 COMMAND_DIR_NAME="${PLUMOS_USB_COMMAND_DIR_NAME:-commands}"
 RESULTS_DIR_NAME="${PLUMOS_USB_RESULTS_DIR_NAME:-results}"
 PROCESSED_DIR_NAME="${PLUMOS_USB_PROCESSED_DIR_NAME:-processed}"
-ROM_INBOX_NAME="${PLUMOS_USB_ROM_INBOX_NAME:-roms}"
-ROM_TARGET="${PLUMOS_USB_ROM_TARGET:-${PLUMOS_ROOT}/roms}"
 GADGET_NAME="${PLUMOS_USB_DISK_GADGET_NAME:-plumos_usb_disk}"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 FUNCTION_NAME="mass_storage.usb0"
 ADB_CONTROL="${PLUMOS_ROOT}/bin/plumos-adbd"
+NETWORK_SERVICES="${PLUMOS_ROOT}/bin/plumos-network-services"
+SERVICES_CONF="${PLUMOS_ROOT}/config/network/services.conf"
+SERVICES_BACKUP="${RUN_DIR}/services.conf.before-usb"
+SERVICES_RESTORE_FILE="${RUN_DIR}/restore-network-services"
+ADB_RESTORE_FILE="${RUN_DIR}/restore-adb"
+SD2_CONTROL="${PLUMOS_ROOT}/bin/plumos-sd2-content-mount"
+BOOTSTRAP_CONTROL="${PLUMOS_USB_BOOTSTRAP_CONTROL:-/usr/sbin/plumos-app-layer-bootstrap}"
 ACTIVE=0
 ADB_RESTORE=0
+SERVICES_RESTORE=0
+USERDATA_RELEASED=0
 
 mkdir -p "$STATE_DIR" "$RUN_DIR" "$LOG_DIR" 2>/dev/null || true
 
@@ -38,8 +47,9 @@ cleanup_on_signal() {
   if [ "$ACTIVE" -eq 1 ]; then
     log "signal_cleanup"
     teardown_gadget
-    mount_image || true
   fi
+  [ "$USERDATA_RELEASED" -eq 0 ] || mount_userdata || true
+  restore_network_services
   restore_adb
   exit 130
 }
@@ -51,34 +61,37 @@ usage() {
 Usage: plumos-usb-disk-mode COMMAND
 
 Commands:
-  enter     Export a dedicated plumOS USB transfer image as a USB drive.
-  leave     Unexport the USB drive and mount the transfer image on V90S.
-  mount     Mount the transfer image on V90S without exporting it.
-  unmount   Unmount the transfer image from V90S.
+  enter     Unmount and export SD1 p4 PLUMOS as a USB drive.
+  leave     Unexport, check, and remount p4 on V90S.
+  mount     Check and mount p4 on V90S without exporting it.
+  unmount   Unmount p4 from V90S after releasing content bindings.
   process-commands
-            Execute an armed commands/run.sh from the transfer image.
-  import-roms
-            Import PLUMUSB/roms into the active /mnt/plumos/roms storage.
+            Execute an armed commands/run.sh from p4.
   status    Print USB disk mode state.
 
-The exported disk is a separate image file, not /mnt/plumos itself. This avoids
-sharing the live FAT32 app layer with the PC and V90S at the same time.
-
-ROM transfer:
-  Copy ROM files below roms/<system>/ on PLUMUSB. After host eject and cable
-  disconnect, plumOS atomically imports them into the active ROM storage.
+The exported disk is SD1 p4 PLUMOS itself. plumOS releases every p4 bind mount
+and unmounts p4 before binding it to USB, then checks and remounts it after host
+eject and disconnect. The PC and V90S never mount p4 concurrently.
 
 USB command mailbox:
-  1. Put a shell script at commands/run.sh on the PLUMUSB drive.
+  1. Put a shell script at commands/run.sh on the PLUMOS drive.
   2. Create an empty commands/ALLOW_EXECUTE file.
-  3. Eject PLUMUSB on the PC and unplug the USB cable.
-  4. V90S executes the script after remounting the transfer image.
+  3. Eject PLUMOS on the PC and unplug the USB cable.
+  4. V90S executes the script after remounting p4.
   5. Read RESULT-LATEST.txt and results/<timestamp>/ on the next USB session.
 USAGE
 }
 
+is_path_mounted() {
+  grep -q " $1 " /proc/mounts 2>/dev/null
+}
+
 is_mounted() {
-  grep -q " ${MOUNT_DIR} " /proc/mounts 2>/dev/null
+  is_path_mounted "$MOUNT_DIR"
+}
+
+mount_source() {
+  awk -v target="$1" '$2 == target { print $1; exit }' /proc/mounts 2>/dev/null
 }
 
 gadget_bound() {
@@ -118,47 +131,125 @@ ensure_configfs() {
   [ -d /sys/kernel/config/usb_gadget ]
 }
 
-ensure_image() {
-  if [ -s "$IMAGE" ]; then
+resolve_export_device() {
+  if [ -n "$EXPORT_DEVICE" ] && [ -b "$EXPORT_DEVICE" ]; then
+    printf '%s\n' "$EXPORT_DEVICE"
     return 0
   fi
-
-  rm -f "$IMAGE"
-  log "creating_image path=${IMAGE} size_mb=${IMAGE_SIZE_MB}"
-  dd if=/dev/zero of="$IMAGE" bs=1M count="$IMAGE_SIZE_MB" >> "$LOG_FILE" 2>&1 || return 1
-
-  if command -v mkfs.vfat >/dev/null 2>&1; then
-    mkfs.vfat -n PLUMUSB "$IMAGE" >> "$LOG_FILE" 2>&1 || return 1
-  elif command -v mkfs.fat >/dev/null 2>&1; then
-    mkfs.fat -n PLUMUSB "$IMAGE" >> "$LOG_FILE" 2>&1 || return 1
-  else
-    log "mkfs_fat_missing"
+  candidate=""
+  if [ -n "$EXPORT_DEVICE_OVERRIDE" ]; then
+    candidate="$EXPORT_DEVICE_OVERRIDE"
+  elif is_mounted; then
+    candidate="$(mount_source "$MOUNT_DIR")"
+  elif [ -s "${RUN_DIR}/export-device" ]; then
+    candidate="$(sed -n '1p' "${RUN_DIR}/export-device")"
+  fi
+  case "$candidate" in
+    /dev/*) ;;
+    *) log "export_device_invalid path=${candidate:-missing}"; return 1 ;;
+  esac
+  [ -b "$candidate" ] || {
+    log "export_device_missing path=${candidate}"
     return 1
+  }
+  probe="$(blkid -c /dev/null "$candidate" 2>/dev/null || blkid "$candidate" 2>/dev/null || true)"
+  label="$(printf '%s\n' "$probe" | sed -n 's/.*LABEL="\([^"]*\)".*/\1/p')"
+  fstype="$(printf '%s\n' "$probe" | sed -n 's/.*TYPE="\([^"]*\)".*/\1/p')"
+  [ "$label" = PLUMOS ] || {
+    log "export_device_refused path=${candidate} label=${label:-missing}"
+    return 1
+  }
+  case "$fstype" in vfat|msdos) ;; *)
+    log "export_device_refused path=${candidate} fstype=${fstype:-missing}"
+    return 1
+  esac
+  EXPORT_DEVICE="$candidate"
+  printf '%s\n' "$EXPORT_DEVICE" > "${RUN_DIR}/export-device"
+  printf '%s\n' "$EXPORT_DEVICE"
+}
+
+stop_sd2_bindings() {
+  if [ -x "$SD2_CONTROL" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_USERDATA_ROOT="$USERDATA_ROOT" \
+      "$SD2_CONTROL" stop >> "$LOG_FILE" 2>&1 || true
   fi
 }
 
-unmount_image() {
-  if is_mounted; then
-    sync
-    umount "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || return 1
-  fi
+unmount_content_bindings() {
+  for target in \
+      "$PLUMOS_ROOT/themes-user" \
+      "$PLUMOS_ROOT/Images" \
+      "$PLUMOS_ROOT/bios" \
+      "$PLUMOS_ROOT/roms"; do
+    if is_path_mounted "$target"; then
+      umount "$target" >> "$LOG_FILE" 2>&1 || return 1
+    fi
+  done
 }
 
-mount_image() {
-  ensure_image || return 1
+mount_userdata() {
+  resolve_export_device >/dev/null || return 1
   if gadget_bound; then
     log "mount_refused reason=gadget_bound"
     return 1
   fi
   mkdir -p "$MOUNT_DIR"
-  if is_mounted; then
-    return 0
+  if ! is_mounted; then
+    command -v fsck.fat >/dev/null 2>&1 || {
+      log "userdata_check_failed reason=fsck_fat_missing"
+      return 1
+    }
+    fsck_rc=0
+    if command -v timeout >/dev/null 2>&1; then
+      timeout "$FSCK_TIMEOUT_SECONDS" fsck.fat -a "$EXPORT_DEVICE" \
+        >> "$LOG_FILE" 2>&1 || fsck_rc="$?"
+    else
+      fsck.fat -a "$EXPORT_DEVICE" >> "$LOG_FILE" 2>&1 || fsck_rc="$?"
+    fi
+    case "$fsck_rc" in
+      0|1) ;;
+      *)
+        log "userdata_check_failed device=${EXPORT_DEVICE} rc=${fsck_rc}"
+        return 1
+        ;;
+    esac
+    mount -t vfat -o rw,utf8,shortname=mixed,fmask=0022,dmask=0022,errors=remount-ro \
+      "$EXPORT_DEVICE" "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || return 1
   fi
-  if command -v fsck.fat >/dev/null 2>&1; then
-    fsck.fat -a "$IMAGE" >> "$LOG_FILE" 2>&1 || true
-  fi
-  mount -t vfat -o loop,rw,utf8 "$IMAGE" "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || return 1
+  USERDATA_RELEASED=0
+  [ -f "$MOUNT_DIR/.plumos-ready" ] || {
+    log "mount_refused reason=ready_marker_missing"
+    umount "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || true
+    return 1
+  }
   prepare_transfer_tree
+  if [ -x "$BOOTSTRAP_CONTROL" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_USERDATA_ROOT="$USERDATA_ROOT" \
+      "$BOOTSTRAP_CONTROL" validate >> "$LOG_FILE" 2>&1 || return 1
+  fi
+  if [ -x "$SD2_CONTROL" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_USERDATA_ROOT="$USERDATA_ROOT" \
+      "$SD2_CONTROL" start >> "$LOG_FILE" 2>&1 || true
+  fi
+}
+
+unmount_userdata() {
+  resolve_export_device >/dev/null || return 1
+  stop_sd2_bindings
+  if ! unmount_content_bindings; then
+    mount_userdata || true
+    return 1
+  fi
+  sync
+  if is_mounted; then
+    umount "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 || {
+      log "userdata_unmount_failed target=${MOUNT_DIR}"
+      mount_userdata || true
+      return 1
+    }
+  fi
+  USERDATA_RELEASED=1
+  return 0
 }
 
 prepare_transfer_tree() {
@@ -166,23 +257,7 @@ prepare_transfer_tree() {
   mkdir -p \
     "${MOUNT_DIR}/${COMMAND_DIR_NAME}" \
     "${MOUNT_DIR}/${RESULTS_DIR_NAME}" \
-    "${MOUNT_DIR}/${PROCESSED_DIR_NAME}" \
-    "${MOUNT_DIR}/${ROM_INBOX_NAME}" 2>/dev/null || true
-
-  if [ ! -f "${MOUNT_DIR}/${ROM_INBOX_NAME}/README.TXT" ]; then
-    cat > "${MOUNT_DIR}/${ROM_INBOX_NAME}/README.TXT" <<'EOF' 2>/dev/null || true
-plumOS V90S ROM inbox
-
-Copy files into a system directory, for example:
-
-  roms/nes/Game.nes
-  roms/FC/Game.nes
-
-After you eject PLUMUSB and disconnect the cable, plumOS imports the files into
-the currently active ROM storage. Successfully imported files are removed from
-this inbox. Existing ROM files with the same path are replaced atomically.
-EOF
-  fi
+    "${MOUNT_DIR}/${PROCESSED_DIR_NAME}" 2>/dev/null || true
 
   if [ ! -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/README.TXT" ]; then
     cat > "${MOUNT_DIR}/${COMMAND_DIR_NAME}/README.TXT" <<'EOF' 2>/dev/null || true
@@ -192,9 +267,9 @@ To run one command batch on V90S:
 
 1. Copy your shell script to commands/run.sh.
 2. Create an empty commands/ALLOW_EXECUTE file.
-3. Eject the PLUMUSB drive from your PC.
+3. Eject the PLUMOS drive from your PC.
 4. Unplug the USB cable.
-5. V90S runs commands/run.sh after it remounts this transfer image.
+5. V90S runs commands/run.sh after it remounts p4.
 6. Re-enter USB Disk Mode and read RESULT-LATEST.txt plus results/.
 
 The command runs with /mnt/plumos/bin early in PATH and /mnt/plumos as cwd.
@@ -217,54 +292,6 @@ plumos-network-control status 2>/dev/null || true
 df -h
 EOF
   fi
-}
-
-import_roms() {
-  inbox="${MOUNT_DIR}/${ROM_INBOX_NAME}"
-  [ -d "$inbox" ] || return 0
-  [ -d "$ROM_TARGET" ] || {
-    log "rom_import_refused reason=target_missing target=${ROM_TARGET}"
-    return 1
-  }
-  [ -w "$ROM_TARGET" ] || {
-    log "rom_import_refused reason=target_read_only target=${ROM_TARGET}"
-    return 1
-  }
-
-  find "$inbox" -type f ! -path "$inbox/README.TXT" 2>/dev/null |
-  while IFS= read -r src; do
-    rel="${src#"$inbox"/}"
-    case "$rel" in
-      ""|/*|../*|*/../*|*/..)
-        log "rom_import_refused reason=unsafe_path path=${rel}"
-        continue
-        ;;
-    esac
-    dst="${ROM_TARGET}/${rel}"
-    dst_dir="$(dirname "$dst")"
-    tmp="${dst}.plumos-usb-import.$$"
-    if mkdir -p "$dst_dir" 2>/dev/null &&
-        cp "$src" "$tmp" 2>/dev/null &&
-        mv -f "$tmp" "$dst" 2>/dev/null; then
-      rm -f "$src" 2>/dev/null || true
-      log "rom_import_ok path=${rel}"
-    else
-      rm -f "$tmp" 2>/dev/null || true
-      log "rom_import_failed path=${rel}"
-    fi
-  done
-
-  # The loop runs in a subshell on BusyBox, so the remaining files are the
-  # authoritative import result.
-  pending="$(find "$inbox" -type f ! -path "$inbox/README.TXT" 2>/dev/null | wc -l | tr -d ' ')"
-  find "$inbox" -depth -type d ! -path "$inbox" -exec rmdir {} \; 2>/dev/null || true
-  sync
-  if [ "${pending:-0}" -ne 0 ] 2>/dev/null; then
-    log "rom_import_incomplete pending=${pending} target=${ROM_TARGET}"
-    return 1
-  fi
-  log "rom_import_complete target=${ROM_TARGET}"
-  return 0
 }
 
 make_result_dir() {
@@ -372,7 +399,7 @@ process_commands() {
     log "command_refused reason=gadget_bound"
     return 1
   fi
-  mount_image || return 1
+  mount_userdata || return 1
   prepare_transfer_tree
 
   command_dir="${MOUNT_DIR}/${COMMAND_DIR_NAME}"
@@ -429,6 +456,46 @@ process_commands() {
   return 0
 }
 
+pause_network_services() {
+  [ -x "$NETWORK_SERVICES" ] || return 0
+  if [ -f "$SERVICES_CONF" ]; then
+    cp "$SERVICES_CONF" "$SERVICES_BACKUP" >> "$LOG_FILE" 2>&1 || return 1
+  else
+    : > "$SERVICES_BACKUP"
+  fi
+  for service in ftp sftp samba; do
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+      "$NETWORK_SERVICES" stop "$service" >> "$LOG_FILE" 2>&1 || true
+  done
+  if [ -s "$SERVICES_BACKUP" ]; then
+    cp "$SERVICES_BACKUP" "$SERVICES_CONF" >> "$LOG_FILE" 2>&1 || return 1
+  fi
+  SERVICES_RESTORE=1
+  : > "$SERVICES_RESTORE_FILE"
+  log "network_storage_services_paused"
+}
+
+service_was_enabled() {
+  key="$1"
+  value="$(sed -n "s/^${key}=//p" "$SERVICES_CONF" 2>/dev/null | tail -n 1)"
+  [ "$value" = 1 ] || [ "$value" = true ] || [ "$value" = on ]
+}
+
+restore_network_services() {
+  [ "$SERVICES_RESTORE" -eq 1 ] || [ -e "$SERVICES_RESTORE_FILE" ] || return 0
+  SERVICES_RESTORE=0
+  rm -f "$SERVICES_RESTORE_FILE" 2>/dev/null || true
+  [ -x "$NETWORK_SERVICES" ] || return 0
+  for pair in ftp:ftp_enabled sftp:sftp_enabled samba:samba_enabled; do
+    service="${pair%%:*}"
+    key="${pair#*:}"
+    service_was_enabled "$key" || continue
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+      "$NETWORK_SERVICES" start "$service" >> "$LOG_FILE" 2>&1 || true
+  done
+  log "network_storage_services_restored"
+}
+
 teardown_gadget() {
   if [ -d "$GADGET_DIR" ]; then
     if [ -w "${GADGET_DIR}/UDC" ]; then
@@ -450,6 +517,7 @@ stop_adb_for_transfer() {
   if PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
       "$ADB_CONTROL" status 2>/dev/null | grep -q '^running=1$'; then
     ADB_RESTORE=1
+    : > "$ADB_RESTORE_FILE"
     log "adb_pause_requested"
     PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
       "$ADB_CONTROL" stop >> "$LOG_FILE" 2>&1 || return 1
@@ -457,8 +525,9 @@ stop_adb_for_transfer() {
 }
 
 restore_adb() {
-  [ "$ADB_RESTORE" -eq 1 ] || return 0
+  [ "$ADB_RESTORE" -eq 1 ] || [ -e "$ADB_RESTORE_FILE" ] || return 0
   ADB_RESTORE=0
+  rm -f "$ADB_RESTORE_FILE" 2>/dev/null || true
   [ -x "$ADB_CONTROL" ] || return 0
   log "adb_restore_requested"
   PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
@@ -484,17 +553,17 @@ setup_gadget() {
   printf 'plumos-v90s-%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null | cut -c1-8)" \
     > "${GADGET_DIR}/strings/0x409/serialnumber"
   printf 'plumOS\n' > "${GADGET_DIR}/strings/0x409/manufacturer"
-  printf 'plumOS V90S USB Transfer\n' > "${GADGET_DIR}/strings/0x409/product"
-  printf 'USB Transfer\n' > "${GADGET_DIR}/configs/c.1/strings/0x409/configuration"
+  printf 'plumOS V90S PLUMOS Volume\n' > "${GADGET_DIR}/strings/0x409/product"
+  printf 'PLUMOS Volume\n' > "${GADGET_DIR}/configs/c.1/strings/0x409/configuration"
   printf '120\n' > "${GADGET_DIR}/configs/c.1/MaxPower"
 
   printf '1\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/removable"
   printf '0\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/ro"
   printf '0\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/cdrom"
-  printf '1\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/nofua" 2>/dev/null || true
-  printf 'plumOS USB Transfer\n' \
+  printf '0\n' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/nofua" 2>/dev/null || true
+  printf 'plumOS PLUMOS Volume\n' \
     > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/inquiry_string" 2>/dev/null || true
-  printf '%s\n' "$IMAGE" > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/file"
+  printf '%s\n' "$EXPORT_DEVICE" > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/file"
   ln -s "${GADGET_DIR}/functions/${FUNCTION_NAME}" "${GADGET_DIR}/configs/c.1/${FUNCTION_NAME}"
   printf '%s\n' "$udc" > "${GADGET_DIR}/UDC"
 }
@@ -531,12 +600,23 @@ wait_for_disconnect() {
 }
 
 enter_mode() {
-  log "enter_requested image=${IMAGE}"
+  log "enter_requested target=${MOUNT_DIR}"
   ensure_configfs || return 1
-  ensure_image || return 1
-  unmount_image || return 1
-  stop_adb_for_transfer || return 1
+  resolve_export_device >/dev/null || return 1
+  pause_network_services || return 1
+  if ! stop_adb_for_transfer; then
+    restore_network_services
+    restore_adb
+    return 1
+  fi
+  if ! unmount_userdata; then
+    restore_network_services
+    restore_adb
+    return 1
+  fi
   if ! setup_gadget; then
+    mount_userdata || true
+    restore_network_services
     restore_adb
     return 1
   fi
@@ -547,17 +627,22 @@ enter_mode() {
     log "disconnect_detected"
     teardown_gadget
     ACTIVE=0
-    restore_adb
-    mount_image || return 1
-    import_roms || true
+    if ! mount_userdata; then
+      restore_network_services
+      restore_adb
+      return 1
+    fi
     process_commands || true
+    restore_network_services
+    restore_adb
     log "leave_complete mounted=${MOUNT_DIR}"
     return 0
   fi
 
   teardown_gadget
   ACTIVE=0
-  mount_image || true
+  mount_userdata || true
+  restore_network_services
   restore_adb
   return 1
 }
@@ -565,22 +650,21 @@ enter_mode() {
 leave_mode() {
   log "leave_requested"
   teardown_gadget
-  mount_image || return 1
-  import_roms || true
+  mount_userdata || return 1
   process_commands || true
+  restore_network_services
+  restore_adb
 }
 
 status_mode() {
-  printf 'image=%s\n' "$IMAGE"
+  resolve_export_device >/dev/null 2>&1 || true
+  printf 'export_device=%s\n' "$EXPORT_DEVICE"
   printf 'mount_dir=%s\n' "$MOUNT_DIR"
-  printf 'rom_inbox=%s/%s\n' "$MOUNT_DIR" "$ROM_INBOX_NAME"
-  printf 'rom_target=%s\n' "$ROM_TARGET"
-  printf 'image_exists=%s\n' "$( [ -s "$IMAGE" ] && echo 1 || echo 0 )"
+  printf 'volume=PLUMOS\n'
   printf 'mounted=%s\n' "$( is_mounted && echo 1 || echo 0 )"
   printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
   printf 'udc_state=%s\n' "$(udc_state)"
   if is_mounted; then
-    printf 'rom_pending=%s\n' "$(find "${MOUNT_DIR}/${ROM_INBOX_NAME}" -type f ! -path "${MOUNT_DIR}/${ROM_INBOX_NAME}/README.TXT" 2>/dev/null | wc -l | tr -d ' ')"
     printf 'command_script=%s\n' "$( [ -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/run.sh" ] && echo 1 || echo 0 )"
     printf 'command_armed=%s\n' "$( [ -e "${MOUNT_DIR}/${COMMAND_DIR_NAME}/ALLOW_EXECUTE" ] && echo 1 || echo 0 )"
     printf 'latest_result=%s\n' "$( [ -f "${MOUNT_DIR}/RESULT-LATEST.txt" ] && echo 1 || echo 0 )"
@@ -598,16 +682,13 @@ case "${1:-status}" in
     leave_mode
     ;;
   mount)
-    mount_image
+    mount_userdata
     ;;
   unmount)
-    unmount_image
+    unmount_userdata
     ;;
   process-commands)
     process_commands
-    ;;
-  import-roms)
-    import_roms
     ;;
   status)
     status_mode

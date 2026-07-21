@@ -627,7 +627,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Route SFTP through the app-layer subsystem, validate SFTP OFF/ON without
   stopping SSH, and restrict SSH process adoption to the real listener.
 - [x] Add USB Disk Mode as a file-transfer fallback for unstable USB Wi-Fi
-  dongles. It exposes a dedicated transfer image, not `/mnt/plumos` itself.
+  dongles. It safely releases and directly exports SD1 p4 `PLUMOS`, not the p3
+  application runtime, so ROMs and update archives use the full p4 capacity.
 - [x] Keep the FE responsive while USB Disk Mode waits for host eject and cable
   disconnect. Run the transfer helper asynchronously, poll its completion
   result, and restore the NW Service screen when it finishes.
@@ -636,13 +637,13 @@ Build plumOS V90S as a V90S-specific distribution:
   restore ADB automatically when USB Disk Mode exits.
 - [x] Add a USB command mailbox to USB Disk Mode so diagnostics can be queued
   as `commands/run.sh` plus `commands/ALLOW_EXECUTE` and results are written
-  back to `RESULT-LATEST.txt` and `results/` after V90S remounts the transfer
-  image.
-- [x] Use `PLUMUSB/roms/` as a safe ROM inbox and atomically import successful
-  files into the active `/mnt/plumos/roms` backing store after host eject.
+  back to `RESULT-LATEST.txt` and `results/` after V90S remounts p4.
+- [x] Replace the capacity-limited 64 MiB ROM inbox with direct SD1 p4 export.
+  Stop p4 network writers and ADB, release SD2/p4 content bindings, unmount p4,
+  export its block device, then fsck/remount and restore bindings/services.
 - [ ] Physically validate USB Disk Mode from macOS with a data-capable USB
-  cable and confirm the `PLUMUSB` drive appears, can be ejected, and remounts
-  on V90S at `/mnt/plumos/usb-transfer`.
+  cable and confirm the full-size `PLUMOS` drive appears, accepts a large disc
+  image/update archive, can be ejected, and remounts at `/mnt/plumos-user`.
 - [x] Confirm the USB command mailbox execution path. A live V90S smoke test
   executed an armed command, captured stdout and exit status, verified timeout
   handling, and prevented automatic re-execution; see the USB validation note.

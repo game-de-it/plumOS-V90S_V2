@@ -718,18 +718,19 @@ process, not an authenticated child or a stale PID file.
 USB cable diagnostics are a separate path from Wi-Fi/SSH. With the current
 StockOS-derived kernel, USB Ethernet and USB ACM serial are not available, so
 the supported file-transfer cable path is USB Disk Mode plus a command mailbox
-in the dedicated `PLUMUSB` transfer image. The mailbox may execute an
-explicitly armed `commands/run.sh` after the PC ejects the drive and the V90S
-remounts the image, then write command output back under `results/`. This does
-not make `/mnt/plumos` itself a shared live USB disk.
+on p4 `PLUMOS`. USB Disk Mode directly exports the p4 FAT32 block device, never
+p3 `/mnt/plumos`. Before gadget binding, it must stop FTP/SFTP/Samba and ADB
+without changing their persistent enabled state, release SD2 and p4 content
+bind mounts, sync, and cleanly unmount `/mnt/plumos-user`. If p4 remains busy,
+the operation must fail rather than force-unmount it or stop SSH.
 
-USB Disk Mode uses `PLUMUSB/roms/` as a ROM inbox. USB mass storage cannot
-export the `/mnt/plumos/roms` directory directly, and plumOS must not expose a
-filesystem that is still mounted by the running device. After host eject and
-disconnect, import inbox files into the currently active `/mnt/plumos/roms`
-backing store with per-file temporary-copy plus rename semantics. This supports
-both p4 ROM storage and an SD2 ROM bind without mounting either live filesystem
-on the host.
+After host eject and cable disconnect, unbind the gadget, run a bounded FAT
+check, remount p4 at `/mnt/plumos-user`, validate `.plumos-ready`, restore p4
+content bindings and any SD2 overlay, then restart only services that were
+enabled before entry. This gives the host full p4 capacity for ROMs, BIOS,
+media, and `updates/` while ensuring the PC and V90S never mount p4
+concurrently. The mailbox may execute an explicitly armed `commands/run.sh`
+after remount and write output under `results/`.
 
 The supported interactive USB command path is standard ADB over the kernel's
 FunctionFS/configfs gadget support. The app layer should ship the `adbd`

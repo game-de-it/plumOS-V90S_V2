@@ -197,12 +197,13 @@ pass "complete app runtime and checksums"
 
 frontend_launch="$app_runtime/bin/plumos-frontend-launch"
 sd2_mount="$app_runtime/bin/plumos-sd2-content-mount"
+usb_disk="$app_runtime/bin/plumos-usb-disk-mode"
 bootstrap="scripts/plumos-app-layer-bootstrap.sh"
-for file in "$frontend_launch" "$sd2_mount" "$bootstrap" \
+for file in "$frontend_launch" "$sd2_mount" "$usb_disk" "$bootstrap" \
     "$app_runtime/bin/plumos-controller-ui-v90s"; do
     [ -x "$file" ] || fail "frontend contract executable missing: $file"
 done
-for file in "$frontend_launch" "$sd2_mount" "$bootstrap"; do
+for file in "$frontend_launch" "$sd2_mount" "$usb_disk" "$bootstrap"; do
     sh -n "$file" 2>/dev/null || fail "shell syntax failed: $file"
 done
 grep -Fq 'PLUMOS_SD2_FSCK_TIMEOUT' "$sd2_mount" || fail "SD2 fsck timeout is missing"
@@ -224,6 +225,26 @@ grep -Fq 'exec "$PLUMOS_ROOT/bin/plumos-controller-ui-v90s"' "$frontend_launch" 
 grep -Fq 'exec "$PLUMOS_ROOT/bin/plumos-frontend-launch"' "$bootstrap" ||
     fail "system bootstrap does not exec the frontend launcher"
 pass "bounded SD2 mount and single frontend exec chain"
+
+grep -Fq 'MOUNT_DIR="${PLUMOS_USB_DISK_MOUNT:-${USERDATA_ROOT}}"' "$usb_disk" ||
+    fail "USB Disk Mode does not target p4 /mnt/plumos-user"
+grep -Fq '[ "$label" = PLUMOS ]' "$usb_disk" ||
+    fail "USB Disk Mode does not require the PLUMOS volume label"
+grep -Fq 'unmount_content_bindings' "$usb_disk" ||
+    fail "USB Disk Mode does not release p4 content bindings"
+grep -Fq 'umount "$MOUNT_DIR"' "$usb_disk" ||
+    fail "USB Disk Mode does not cleanly unmount p4"
+grep -Fq 'printf '\''%s\n'\'' "$EXPORT_DEVICE" > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/file"' "$usb_disk" ||
+    fail "USB Disk Mode does not export the p4 block device"
+grep -Fq 'fsck.fat -a "$EXPORT_DEVICE"' "$usb_disk" ||
+    fail "USB Disk Mode does not check p4 before remount"
+grep -Fq 'userdata_check_failed device=${EXPORT_DEVICE} rc=${fsck_rc}' "$usb_disk" ||
+    fail "USB Disk Mode does not refuse a failed p4 check"
+grep -Fq 'printf '\''0\n'\'' > "${GADGET_DIR}/functions/${FUNCTION_NAME}/lun.0/nofua"' "$usb_disk" ||
+    fail "USB Disk Mode does not preserve host write-through semantics"
+grep -Fq '"$BOOTSTRAP_CONTROL" validate' "$usb_disk" ||
+    fail "USB Disk Mode does not restore p4 content bindings"
+pass "direct p4 USB Disk Mode safety contract"
 
 app_used_kib="$(du -sk "$app_runtime" | awk '{print $1}')"
 [ "$app_used_kib" -le $(((1600 - 256) * 1024)) ] ||

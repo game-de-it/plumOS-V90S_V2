@@ -615,10 +615,10 @@ Services:
     netlink uevent listener repairs a detached UDC after an android_usb
     disconnect. It sleeps until a kernel event arrives and does not poll.
   USB Disk Mode:
-    Exposes a dedicated transfer image as a USB mass-storage drive. It does not
-    expose /mnt/plumos itself, so the live FAT32 app layer is not mounted by the
-    PC and V90S at the same time. Eject the USB drive on the PC, then unplug
-    the USB cable; plumOS mounts the transfer image at /mnt/plumos/usb-transfer.
+    Safely unmounts and exposes SD1 p4 PLUMOS as a USB mass-storage drive, so
+    ROMs, BIOS, media, and update archives can be transferred without a fixed
+    staging-size limit. Eject the drive on the PC, then unplug the USB cable;
+    plumOS checks and remounts p4 and restores its content bindings.
 
 Persistent service state:
   /mnt/plumos/config/network/services.conf

@@ -1,15 +1,16 @@
 # V90S USB cable transfer investigation and USB Disk Mode
 
 Date: 2026-07-11
+Direct p4 export update: 2026-07-22
 
 ## Goal
 
 Reduce dependence on the unstable USB Wi-Fi dongle for development access.
 
-The desired long-term result is command and file transfer over a USB cable. The
-first implemented step is safe USB file transfer through a dedicated mass
-storage image. The second implemented step is a diagnostic command mailbox over
-that same transfer image.
+The desired result is command and unrestricted-size file transfer over a USB
+cable. The initial 64 MiB transfer image proved the gadget and command mailbox,
+but could not carry disc images. The current design directly exports SD1 p4
+`PLUMOS` after safely releasing it from V90S.
 
 ## Kernel Capability Check
 
@@ -72,19 +73,22 @@ Build source:
 package/network-services/plumos/bin/plumos-usb-disk-mode
 ```
 
-The helper exposes a dedicated transfer image instead of exporting
-`/mnt/plumos` directly:
+The helper exports the p4 FAT32 block device that is normally mounted at:
 
 ```text
-image=/mnt/plumos/state/usb-disk/plumos-usb-transfer.img
-mount_dir=/mnt/plumos/usb-transfer
-size=64MiB by default
+device=/dev/mmcblk0p4 (resolved and label/type checked at runtime)
+label=PLUMOS
+mount_dir=/mnt/plumos-user
 ```
 
-This avoids mounting the live FAT32 app layer on both V90S and the PC at the
-same time.
+It never exports p3 `/mnt/plumos`. Before gadget binding, it pauses p4 network
+writers and ADB, stops SD2 content bindings, releases p4 bind mounts, syncs, and
+cleanly unmounts p4. SSH is not stopped; if any process still holds p4, entry
+fails without a force-unmount. After host eject and disconnect, it runs a
+bounded FAT check, remounts p4, validates `.plumos-ready`, and restores p4/SD2
+bindings and previously enabled services.
 
-The transfer image also carries a diagnostic command mailbox:
+p4 also carries the diagnostic command mailbox:
 
 ```text
 commands/README.TXT
@@ -98,17 +102,8 @@ RESULT-LATEST.txt
 
 The mailbox is deliberately opt-in. V90S executes `commands/run.sh` only when
 `commands/ALLOW_EXECUTE` also exists, and only after the USB drive has been
-ejected/unplugged and the transfer image is remounted on V90S. Results are
-written back to the same transfer image.
-
-The transfer image also uses `roms/` as a safe ROM inbox. A USB mass-storage
-gadget can export only a block device, not the live `/mnt/plumos/roms`
-directory. Files copied to `PLUMUSB/roms/<system>/` are therefore imported,
-after host eject and cable disconnect, into the currently active
-`/mnt/plumos/roms` storage. Each file is copied to a temporary sibling and
-renamed into place, and only a successfully imported inbox file is removed.
-This preserves the rule that the PC and V90S never mount the same live ROM
-filesystem concurrently.
+ejected/unplugged and p4 is remounted on V90S. Results are
+written back to p4 after remount.
 
 Frontend change:
 
@@ -116,7 +111,12 @@ Frontend change:
 Network Settings -> NW Service -> USB Disk Mode
 ```
 
-## Live Deployment
+## Historical Initial Deployment
+
+The hashes and loop mount below describe the earlier capacity-limited transfer
+image implementation. They remain as evidence for the gadget and mailbox
+bring-up, but the current implementation supersedes this storage target with
+direct p4 export.
 
 Deployed binaries:
 
@@ -186,7 +186,7 @@ the UI path should not remain stuck forever when started without a cable.
 
 ## Command Mailbox Workflow
 
-On the Mac or other PC host, while `PLUMUSB` is visible:
+On the Mac or other PC host, while `PLUMOS` is visible:
 
 ```sh
 mkdir -p commands
@@ -203,8 +203,8 @@ EOF
 touch commands/ALLOW_EXECUTE
 ```
 
-Then eject `PLUMUSB` from the host and unplug the USB cable. V90S remounts the
-transfer image and runs the command. The next USB Disk Mode session should show:
+Then eject `PLUMOS` from the host and unplug the USB cable. V90S checks and
+remounts p4, then runs the command. The next USB Disk Mode session should show:
 
 ```text
 RESULT-LATEST.txt
@@ -276,25 +276,61 @@ This prior live use validates command execution, output capture, timeout, and
 one-shot behavior. Physical macOS enumeration remains a USB Disk Mode transport
 check rather than a separate mailbox implementation check.
 
+## Direct p4 Host Simulation
+
+The current direct-export implementation was exercised in a privileged Linux
+container with a loop-backed FAT32 volume labeled `PLUMOS`.
+
+Round trip:
+
+```text
+volume size: 256 MiB
+host write:  roms/psx/test-96m.chd (96 MiB)
+host write:  updates/test.tar.gz
+result:      direct-p4-roundtrip=PASS
+```
+
+The test mounted p4 on the simulated V90S, released it through
+`plumos-usb-disk-mode unmount`, mounted it on the simulated host, wrote files
+larger than the old 64 MiB transfer image, unmounted it from the host, and
+restored it through `plumos-usb-disk-mode mount`. The `.plumos-ready` marker,
+ROM image, update archive, and command-mailbox tree were all present after the
+round trip.
+
+Negative and recovery tests:
+
+```text
+busy-p4-refusal=PASS
+failed-fsck-refusal=PASS
+wrong-label-refusal=PASS
+cross-process-service-restore=PASS
+```
+
+The helper refuses to export a busy p4, refuses to remount after an unrepaired
+FAT check, and rejects a block device whose current uncached label is not
+`PLUMOS`. Recovery markers under `/run` also restore ADB plus only the
+previously enabled FTP/SFTP/Samba services when `leave` runs in a new helper
+process. The mass-storage LUN keeps FUA handling enabled (`nofua=0`); users
+must still eject `PLUMOS` on the host before unplugging the cable.
+
 ## User Validation Needed
 
-Actual Mac-side USB drive detection and ROM import still need physical
-validation:
+Actual Mac-side direct-p4 detection still needs physical validation:
 
 1. Connect V90S to the Mac with a data-capable USB cable.
 2. Open `Network Settings -> NW Service -> USB Disk Mode`.
 3. Press A on `READY TO ENTER`.
-4. A `PLUMUSB` drive should appear on the Mac.
-5. Copy a test ROM to `roms/<system>/` on the drive.
+4. The full-size `PLUMOS` drive should appear on the Mac.
+5. Copy a disc image to `roms/<system>/` and an update archive to `updates/`.
 6. Eject the drive on macOS.
 7. Unplug the USB cable.
-8. V90S should return and mount the transfer image at:
+8. V90S should return and remount p4 at:
 
 ```text
-/mnt/plumos/usb-transfer
+/mnt/plumos-user
 ```
-9. Confirm the test ROM was moved into the active `/mnt/plumos/roms` storage
-   and removed from the inbox.
+9. Confirm p4 and any SD2 overlay are restored, the FE remains responsive, and
+   the copied files are visible through their normal paths.
 
 ## Remaining Work
 
