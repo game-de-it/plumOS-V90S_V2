@@ -203,6 +203,7 @@ assemble_base() {
   chmod 0755 "${BIN_DIR}/plumos-time-sync"
   chmod 0755 "${BIN_DIR}/plumos-usb-disk-mode"
   chmod 0755 "${BIN_DIR}/plumos-adbd"
+  chmod 0755 "${BIN_DIR}/plumos-adb-uevent"
   chmod 0755 "${BIN_DIR}/plumos-ssh-home"
   chmod 0755 "${BIN_DIR}/plumos-ssh-password"
   chmod 0755 "${PLUMOS_DIR}/ssh/start-ssh.sh" "${PLUMOS_DIR}/ssh/stop-ssh.sh"
@@ -610,7 +611,9 @@ Services:
   ADB:
     AOSP adbd over the kernel's USB FunctionFS/configfs gadget path. This is a
     no-auth development shell intended for local USB debugging on V90S; only
-    enable it while connected to a trusted host.
+    enable it while connected to a trusted host. While ADB is enabled, a
+    netlink uevent listener repairs a detached UDC after an android_usb
+    disconnect. It sleeps until a kernel event arrives and does not poll.
   USB Disk Mode:
     Exposes a dedicated transfer image as a USB mass-storage drive. It does not
     expose /mnt/plumos itself, so the live FAT32 app layer is not mounted by the
@@ -638,6 +641,7 @@ Runtime control:
   /mnt/plumos/bin/plumos-network-services start adb
   /mnt/plumos/bin/plumos-network-services stop adb
   /mnt/plumos/bin/plumos-adbd status
+  /mnt/plumos/bin/plumos-adbd recover
   /mnt/plumos/bin/plumos-network-services start-enabled
   /mnt/plumos/bin/plumos-usb-disk-mode status
   /mnt/plumos/bin/plumos-usb-disk-mode enter

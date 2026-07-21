@@ -12,6 +12,10 @@ LOG_DIR="${PLUMOS_ROOT}/Logs"
 LOG_FILE="${LOG_DIR}/adbd.log"
 ADBD="${PLUMOS_ADBD_BIN:-${PLUMOS_ROOT}/adb/bin/adbd}"
 PID_FILE="${RUN_DIR}/adbd.pid"
+BUSYBOX="${PLUMOS_ROOT}/bin/busybox"
+RECOVERY_HELPER="${PLUMOS_ROOT}/bin/plumos-adb-uevent"
+RECOVERY_PID_FILE="${RUN_DIR}/uevent.pid"
+RECOVERY_LOCK_DIR="${RUN_DIR}/recover.lock"
 GADGET_NAME="${PLUMOS_ADBD_GADGET_NAME:-plumos_adb}"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 FUNCTION_NAME="ffs.adb"
@@ -33,6 +37,7 @@ Commands:
   start     Start AOSP adbd over USB FunctionFS/configfs.
   stop      Stop adbd and unbind the USB ADB gadget.
   restart   Stop then start adbd.
+  recover   Repair an enabled ADB gadget after a kernel USB disconnect.
   status    Print ADB service state.
 USAGE
 }
@@ -46,6 +51,18 @@ pid_running() {
   comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
   case "${cmdline} ${comm}" in
     *adbd*) return 0 ;;
+  esac
+  return 1
+}
+
+recovery_monitor_running() {
+  [ -s "$RECOVERY_PID_FILE" ] || return 1
+  recovery_pid="$(sed -n '1p' "$RECOVERY_PID_FILE" 2>/dev/null | tr -d '[:space:]')"
+  [ -n "$recovery_pid" ] || return 1
+  kill -0 "$recovery_pid" 2>/dev/null || return 1
+  recovery_cmdline="$(tr '\000' ' ' < "/proc/${recovery_pid}/cmdline" 2>/dev/null || true)"
+  case "$recovery_cmdline" in
+    *"busybox uevent ${RECOVERY_HELPER}"*) return 0 ;;
   esac
   return 1
 }
@@ -120,6 +137,42 @@ close_inherited_display_fds() {
         ;;
     esac
   done
+}
+
+start_recovery_monitor() {
+  if recovery_monitor_running; then
+    return 0
+  fi
+  if [ ! -x "$BUSYBOX" ] || [ ! -x "$RECOVERY_HELPER" ]; then
+    log "recovery_monitor_missing busybox=${BUSYBOX} helper=${RECOVERY_HELPER}"
+    return 1
+  fi
+
+  rm -f "$RECOVERY_PID_FILE"
+  (
+    close_inherited_display_fds
+    export PLUMOS_ROOT PLUMOS_SDCARD_ROOT
+    exec "$BUSYBOX" uevent "$RECOVERY_HELPER" >> "$LOG_FILE" 2>&1 < /dev/null
+  ) &
+  printf '%s\n' "$!" > "$RECOVERY_PID_FILE"
+  sleep 1
+  if ! recovery_monitor_running; then
+    log "recovery_monitor_start_failed"
+    rm -f "$RECOVERY_PID_FILE"
+    return 1
+  fi
+  log "recovery_monitor_started pid=$(cat "$RECOVERY_PID_FILE" 2>/dev/null || true)"
+}
+
+stop_recovery_monitor() {
+  if recovery_monitor_running; then
+    recovery_pid="$(sed -n '1p' "$RECOVERY_PID_FILE" 2>/dev/null | tr -d '[:space:]')"
+    kill "$recovery_pid" 2>/dev/null || true
+    sleep 1
+    kill -0 "$recovery_pid" 2>/dev/null && kill -9 "$recovery_pid" 2>/dev/null || true
+    log "recovery_monitor_stopped pid=${recovery_pid}"
+  fi
+  rm -f "$RECOVERY_PID_FILE"
 }
 
 setup_gadget() {
@@ -244,23 +297,56 @@ start_mode() {
   log "start_requested"
   ensure_configfs || return 1
   if gadget_bound && pid_running; then
+    start_recovery_monitor || return 1
     status_mode
     return 0
   fi
+  stop_recovery_monitor
   teardown_gadget
   setup_gadget || return 1
   start_adbd_process || return 1
   wait_for_ffs_ready || return 1
   bind_gadget || return 1
+  start_recovery_monitor || return 1
   log "started pid=$(cat "$PID_FILE" 2>/dev/null || true) udc_state=$(udc_state)"
   status_mode
 }
 
 stop_mode() {
   log "stop_requested"
+  stop_recovery_monitor
   teardown_gadget
   status_mode || true
   return 0
+}
+
+recover_mode() {
+  if ! mkdir "$RECOVERY_LOCK_DIR" 2>/dev/null; then
+    log "recover_coalesced"
+    return 0
+  fi
+  trap 'rmdir "$RECOVERY_LOCK_DIR" 2>/dev/null || true' EXIT HUP INT TERM
+
+  log "recover_requested udc_state=$(udc_state)"
+  ensure_configfs || return 1
+  if pid_running && ffs_mounted && [ -d "$GADGET_DIR" ]; then
+    if gadget_bound; then
+      log "recover_not_needed reason=gadget_bound udc_state=$(udc_state)"
+    else
+      bind_gadget || return 1
+      log "recover_rebound udc_state=$(udc_state)"
+    fi
+  else
+    stop_recovery_monitor
+    teardown_gadget
+    setup_gadget || return 1
+    start_adbd_process || return 1
+    wait_for_ffs_ready || return 1
+    bind_gadget || return 1
+    log "recover_rebuilt pid=$(cat "$PID_FILE" 2>/dev/null || true) udc_state=$(udc_state)"
+  fi
+  start_recovery_monitor || return 1
+  status_mode
 }
 
 status_mode() {
@@ -274,6 +360,7 @@ status_mode() {
   printf 'running=%s\n' "$( pid_running && echo 1 || echo 0 )"
   printf 'ffs_mounted=%s\n' "$( ffs_mounted && echo 1 || echo 0 )"
   printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
+  printf 'recovery_monitor=%s\n' "$( recovery_monitor_running && echo 1 || echo 0 )"
   printf 'udc_state=%s\n' "$live_udc_state"
   if pid_running && gadget_bound; then
     case "$live_udc_state" in
@@ -309,6 +396,9 @@ case "${1:-status}" in
   restart)
     stop_mode >/dev/null 2>&1 || true
     start_mode
+    ;;
+  recover)
+    recover_mode
     ;;
   status)
     status_mode

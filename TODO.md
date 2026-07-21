@@ -658,6 +658,13 @@ Build plumOS V90S as a V90S-specific distribution:
   FunctionFS mounted, but `gadget_bound=0`, `udc_state=not attached`, and macOS
   no longer enumerated `plumOS V90S ADB`; restarting only ADB over SSH rebound
   the gadget and restored `adb devices`.
+- [x] Recover the same device-side ADB failure without periodic polling. While
+  ADB is enabled, a BusyBox netlink listener handles only
+  `android_usb/USB_STATE=DISCONNECTED`, waits one second for the controller to
+  settle, and rebinds the existing FunctionFS gadget. Explicit ADB OFF stops
+  the listener before unbinding. A deliberate live UDC detach recovered to
+  `configured` in about 1.47 seconds without changing the `adbd` PID, and the
+  idle listener consumed zero CPU ticks over five seconds.
 - [ ] Physically confirm the FE ADB checkbox can be toggled with V90S controls
   during normal menu navigation.
 - [x] Investigate and recover ADB host re-enumeration after repeated

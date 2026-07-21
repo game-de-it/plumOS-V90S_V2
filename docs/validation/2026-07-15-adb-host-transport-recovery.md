@@ -125,3 +125,38 @@ macOS still had no USB device, proving that the remaining condition was the
 physical cable/hub link rather than PicoArch, the frontend, or the host ADB
 server. No periodic recovery poll was added; the audio-sensitive runtime should
 not gain another timer loop merely to conceal a physically absent USB link.
+
+## 2026-07-22 device-side event recovery
+
+A later failure reproduced the device-gadget side of the problem. `adbd` was
+still alive, FunctionFS remained mounted, and no service `stop_requested` was
+logged. The daemon instead reported `Connection reset by peer` and
+`Cannot send after transport endpoint shutdown`. At the same time, the kernel
+logged disconnects for the OTG hub devices followed by:
+
+```text
+android_work: sent uevent USB_STATE=DISCONNECTED
+```
+
+This rules out an ADB idle timeout and a frontend service toggle. A transient in
+the shared USB controller/link detached the gadget while leaving the daemon
+alive, and the old implementation had no device-side event path to rebind it.
+
+The ADB service now starts BusyBox `uevent` as a blocking netlink listener. Its
+helper accepts only `SUBSYSTEM=android_usb` and `USB_STATE=DISCONNECTED`, checks
+that persistent `adb_enabled=1`, waits one second, checks the setting again, and
+runs `plumos-adbd recover`. The recover command keeps the existing `adbd` and
+FunctionFS instance when healthy and only rebinds the UDC. A lock coalesces
+duplicate events. Explicit stop terminates the listener before gadget teardown.
+
+Live validation deliberately detached the active UDC by writing an empty value
+to the plumOS gadget's `UDC` attribute. The kernel emitted `DISCONNECTED`; the
+listener rebound it and the kernel emitted `CONNECTED` and `CONFIGURED` about
+1.47 seconds later. The `adbd` PID remained `7531`, the frontend remained a
+single process, and ADB returned without SSH, FE, or OS restart. The listener's
+CPU tick count did not change during a five-second idle sample, confirming that
+this is event-driven rather than a periodic recovery loop.
+
+This complements, rather than replaces, `scripts/v90s-adb.sh`: the host helper
+repairs a macOS-only transport loss when USB still enumerates, while the V90S
+uevent listener repairs a detached device gadget.

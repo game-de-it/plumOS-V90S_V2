@@ -1,0 +1,23 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
+SERVICES_CONF="${PLUMOS_ROOT}/config/network/services.conf"
+ADBD_CONTROL="${PLUMOS_ROOT}/bin/plumos-adbd"
+SETTLE_SECONDS="${PLUMOS_ADB_RECOVERY_SETTLE_SECONDS:-1}"
+
+adb_enabled() {
+  [ -r "$SERVICES_CONF" ] || return 1
+  value="$(sed -n 's/^adb_enabled=//p' "$SERVICES_CONF" 2>/dev/null | tail -n 1)"
+  [ "$value" = 1 ] || [ "$value" = true ] || [ "$value" = on ]
+}
+
+[ "${SUBSYSTEM:-}" = android_usb ] || exit 0
+[ "${USB_STATE:-}" = DISCONNECTED ] || exit 0
+adb_enabled || exit 0
+[ -x "$ADBD_CONTROL" ] || exit 0
+
+sleep "$SETTLE_SECONDS"
+adb_enabled || exit 0
+
+exec "$ADBD_CONTROL" recover >/dev/null 2>&1

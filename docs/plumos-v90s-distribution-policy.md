@@ -806,6 +806,14 @@ maps to `running`; a bound gadget with another UDC state maps to `waiting_usb`.
 The persistent FE checkbox continues to represent `adb_enabled`, independently
 of this live status.
 
+When ADB is enabled, device-side recovery may listen for kernel netlink uevents
+and rebind the plumOS gadget after an `android_usb` `USB_STATE=DISCONNECTED`
+event. It must not use a periodic timer or restart the frontend, SSH, audio, or
+an otherwise healthy `adbd` process. Recovery must re-check `adb_enabled` after
+a short controller-settle delay, coalesce duplicate events, and refuse to take
+the UDC from another gadget. Explicit ADB OFF and USB Disk Mode must stop the
+listener before unbinding so user intent is not undone by recovery.
+
 The app-layer output should use a stable tree layout under:
 
 ```text
