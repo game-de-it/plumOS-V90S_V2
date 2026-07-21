@@ -277,12 +277,12 @@ Build plumOS V90S as a V90S-specific distribution:
   - ScummVM 2026.2.0
   - EasyRPG Player 0.8.1.1
   - OpenBOR v6391
-  - DOSBox Staging 0.82.2
   - PCSX-ReARMed r26l
   - Flycast 2.6
   - Mupen64Plus 2.6.0
+  - NXEngine-evo (`21d8aaf`)
   - YabaSanshiro 2.10.4 (`8406a5c`)
-- [x] Build all eight standalone executables as native aarch64 binaries with
+- [x] Build all nine standalone executables as native aarch64 binaries with
   zero failed recipes.
 - [x] Support incremental one-emulator builds such as
   `scripts/docker-build.sh standalone flycast` without deleting the other
@@ -369,8 +369,8 @@ Build plumOS V90S as a V90S-specific distribution:
     `--auto-detect --path=CONTENT_DIR` launches the same game with normal audio.
     Standalone, PicoArch, and RetroArch ScummVM have all passed physical display,
     audio, and controller validation.
-  - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
-    PCSX-ReARMed on the physical V90S.
+  - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed on the
+    physical V90S.
     - [x] Fix standalone PCSX-ReARMed startup, display, controls, and audio.
       The r26l build uses the V90S SDL12-compat runtime, an asynchronous fbdev
       presenter, V90S controller bindings, and a required ALSA path. Its native
@@ -391,12 +391,13 @@ Build plumOS V90S as a V90S-specific distribution:
       through standalone, RetroArch, and PicoArch.
     - [x] Stage the selected OpenBOR PAK in an isolated runtime `Paks` contract
       and validate display, audio, controls, and exit on the physical V90S.
-    - [ ] Complete DOSBox Staging physical validation. The V90S build now forces
-      opaque alpha into 32-bit SDL texture uploads, and the launcher uses
-      DOSBox Staging's native executable `PATH` contract instead of quoted
-      `-c` commands. `DOSBOX_DOOM.ZIP` reaches the DOOM title screen and remains
-      active; controller, audio, exit, and FE return still need confirmation.
-      See `docs/validation/2026-07-21-v90s-dosbox-staging-standalone.md`.
+    - [x] Retire standalone DOSBox Staging after a physical A/B test. DOOM was
+      playable after the V90S video, launch, and controller fixes, but remained
+      slow and produced audio breakup at both `ondemand` and `performance`.
+      RetroArch DOSBox Pure ran the same `DOSBOX_DOOM.ZIP` smoothly with clean
+      audio under `performance`, so DOS now exposes only the current and legacy
+      DOSBox Pure cores. See
+      `docs/validation/2026-07-21-v90s-dosbox-staging-standalone.md`.
   - [ ] Replace or remove the stale `PORTS/tmp/1.sh` entry that writes to the
     unavailable `/dev/cpuset/foreground/tasks` path.
 - [x] Implement `frontend`.

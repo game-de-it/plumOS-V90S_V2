@@ -36,8 +36,6 @@ EASYRPG_REPO=${EASYRPG_REPO:-https://github.com/EasyRPG/Player.git}
 EASYRPG_REF=${EASYRPG_REF:-0.8.1.1}
 OPENBOR_REPO=${OPENBOR_REPO:-https://github.com/DCurrent/openbor.git}
 OPENBOR_REF=${OPENBOR_REF:-v6391}
-DOSBOX_REPO=${DOSBOX_REPO:-https://github.com/dosbox-staging/dosbox-staging.git}
-DOSBOX_REF=${DOSBOX_REF:-v0.82.2}
 PCSX_REARMED_REPO=${PCSX_REARMED_REPO:-https://github.com/notaz/pcsx_rearmed.git}
 PCSX_REARMED_REF=${PCSX_REARMED_REF:-r26l}
 PCSX_SDL12_COMPAT_REPO=${PCSX_SDL12_COMPAT_REPO:-https://github.com/libsdl-org/sdl12-compat.git}
@@ -89,13 +87,13 @@ validate_filter() {
   for id in ${requested}; do
     known=0
     case "${id}" in
-      launcher-only|ppsspp|scummvm|easyrpg|openbor|dosbox-staging|pcsx_rearmed|flycast|mupen64plus|nxengine-evo|yabasanshiro)
+      launcher-only|ppsspp|scummvm|easyrpg|openbor|pcsx_rearmed|flycast|mupen64plus|nxengine-evo|yabasanshiro)
         known=1
         ;;
     esac
     if [ "${known}" -ne 1 ]; then
       printf 'error: unknown standalone emulator ID: %s\n' "${id}" >&2
-      printf 'valid IDs: launcher-only ppsspp scummvm easyrpg openbor dosbox-staging pcsx_rearmed flycast mupen64plus nxengine-evo yabasanshiro\n' >&2
+      printf 'valid IDs: launcher-only ppsspp scummvm easyrpg openbor pcsx_rearmed flycast mupen64plus nxengine-evo yabasanshiro\n' >&2
       return 2
     fi
   done
@@ -343,35 +341,6 @@ build_openbor() {
       LIBRARIES=/usr/lib/aarch64-linux-gnu CC="${CC}"
   ) || return 1
   stage_binary openbor "${bin}" OpenBOR
-}
-
-build_dosbox() {
-  local src=$1 build bin resources patch_file
-  build="${src}/build-v90s"
-  resources="${OUT_DIR}/standalone/dosbox-staging/resources"
-  patch_file="${PATCH_DIR}/dosbox-staging-0.82.2-v90s-video.patch"
-  if patch --dry-run -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
-    patch -d "${src}" -p1 <"${patch_file}" || return 1
-  elif ! patch --dry-run -R -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
-    echo "DOSBox Staging V90S video patch does not apply cleanly" >&2
-    return 1
-  fi
-  rm -rf "${build}"
-  CFLAGS="${COMMON_CFLAGS} -DPLUMOS_V90S=1" \
-  CXXFLAGS="${COMMON_CXXFLAGS} -DPLUMOS_V90S=1" \
-    meson setup "${build}" "${src}" --prefix=/mnt/plumos/standalone/dosbox-staging \
-    --buildtype=release -Duse_sdl2_net=false -Duse_opengl=false \
-    -Duse_fluidsynth=false -Duse_mt32emu=false -Duse_slirp=false \
-    -Duse_alsa=true -Duse_xinput2=false -Ddynamic_core=dynrec \
-    -Dper_page_w_or_x=disabled -Dpagesize=4096 -Duse_zlib_ng=false \
-    -Dunit_tests=disabled || return 1
-  meson compile -C "${build}" -j"${JOBS}" || return 1
-  bin=$(find_binary "${build}" dosbox) || return 1
-  stage_binary dosbox-staging "${bin}" dosbox || return 1
-  if [ -d "${build}/resources" ]; then
-    rsync -a --delete "${build}/resources/" "${resources}/"
-    append_manifest "  data=standalone/dosbox-staging/resources"
-  fi
 }
 
 build_pcsx_rearmed() {
@@ -901,59 +870,6 @@ case "${id}" in
     workdir=${openbor_workdir}
     set --
     ;;
-  dosbox-staging)
-    exe="${EMU_ROOT}/dosbox-staging/bin/dosbox"
-    content=${1:-}
-    [ -n "${content}" ] || { echo "missing DOS content path" >&2; exit 2; }
-    shift
-    case "${content}" in
-      *.[zZ][iI][pP])
-        content_name=${content##*/}
-        content_stem=${content_name%.[zZ][iI][pP]}
-        case "${content_stem}" in
-          DOSBOX_*) executable_stem=${content_stem#DOSBOX_} ;;
-          dosbox_*) executable_stem=${content_stem#dosbox_} ;;
-          *) executable_stem=${content_stem} ;;
-        esac
-        safe_stem=$(printf '%s' "${content_stem}" | tr -c 'A-Za-z0-9._-' '_')
-        dosbox_workdir="${XDG_CACHE_HOME}/content/${safe_stem}.$$"
-        mkdir -p "${dosbox_workdir}"
-        if ! unzip -oq "${content}" -d "${dosbox_workdir}"; then
-          echo "failed to extract DOS ZIP: ${content}" >&2
-          exit 78
-        fi
-        dosbox_entry=$(find "${dosbox_workdir}" -type f \
-          -iname "${executable_stem}.exe" -print -quit 2>/dev/null || true)
-        if [ -z "${dosbox_entry}" ]; then
-          dosbox_candidates=$(find "${dosbox_workdir}" -type f \
-            \( -iname '*.exe' -o -iname '*.com' -o -iname '*.bat' \) \
-            -print 2>/dev/null || true)
-          dosbox_candidate_count=$(printf '%s\n' "${dosbox_candidates}" | \
-            sed '/^$/d' | wc -l | tr -d ' ')
-          if [ "${dosbox_candidate_count}" = 1 ]; then
-            dosbox_entry=${dosbox_candidates}
-          else
-            echo "DOS ZIP entry is ambiguous: expected ${executable_stem}.exe, candidates=${dosbox_candidate_count}" >&2
-            exit 78
-          fi
-        fi
-        # Let DOSBox Staging mount the executable's parent and run it via its
-        # native PATH contract. Quoted commands passed with -c are accepted by
-        # the shell but silently skip executable launch on this target.
-        set -- -noconsole --fullscreen "${dosbox_entry}" "$@"
-        ;;
-      *.[eE][xX][eE]|*.[cC][oO][mM]|*.[bB][aA][tT])
-        set -- -noconsole --fullscreen "${content}" "$@"
-        ;;
-      *.[cC][oO][nN][fF])
-        set -- -noconsole -fullscreen -conf "${content}" "$@"
-        ;;
-      *)
-        echo "unsupported standalone DOS content: ${content}" >&2
-        exit 78
-        ;;
-    esac
-    ;;
   pcsx_rearmed)
     exe="${EMU_ROOT}/pcsx_rearmed/bin/pcsx"
     pcsx_sdl12_dir="${EMU_ROOT}/pcsx_rearmed/lib"
@@ -1181,7 +1097,6 @@ build_one ppsspp "${PPSSPP_REPO}" "${PPSSPP_REF}" build_ppsspp
 build_one scummvm "${SCUMMVM_REPO}" "${SCUMMVM_REF}" build_scummvm
 build_one easyrpg "${EASYRPG_REPO}" "${EASYRPG_REF}" build_easyrpg
 build_one openbor "${OPENBOR_REPO}" "${OPENBOR_REF}" build_openbor
-build_one dosbox-staging "${DOSBOX_REPO}" "${DOSBOX_REF}" build_dosbox
 build_one pcsx_rearmed "${PCSX_REARMED_REPO}" "${PCSX_REARMED_REF}" build_pcsx_rearmed
 build_one flycast "${FLYCAST_REPO}" "${FLYCAST_REF}" build_flycast
 build_one mupen64plus "${MUPEN64PLUS_UI_REPO}" "${MUPEN64PLUS_REF}" build_mupen64plus

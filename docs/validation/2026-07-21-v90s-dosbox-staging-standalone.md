@@ -2,6 +2,8 @@
 
 Date: 2026-07-21
 
+Status: retired; RetroArch DOSBox Pure is the supported V90S DOS route.
+
 ## Scope
 
 This validation covers DOSBox Staging 0.82.2 on the physical V90S using:
@@ -74,5 +76,20 @@ dosbox -noconsole --fullscreen /run/plumos/cache/standalone/dosbox-staging/conte
 The process stayed active, changed to VGA 320x200 256-colour mode, initialized
 the Sound Blaster 16 path, and the physical framebuffer showed the DOOM title
 screen. This proves archive selection, extraction, executable startup, and LCD
-output. Physical controller, audio, normal exit, and FE return are still open
-acceptance checks.
+output. A later V90S controller mapper made gameplay controls usable.
+
+The physical performance comparison used the same `DOSBOX_DOOM.ZIP` content
+and a `performance` CPU policy for both routes. Standalone DOSBox Staging still
+felt slow and its audio broke up. RetroArch DOSBox Pure was immediately smooth
+and its audio was clean. Earlier standalone tests at 25,000, 60,000, 100,000,
+and maximum protected-mode cycles either remained slow, overloaded real-time
+audio, or stalled; changing only the CPU governor did not resolve the issue.
+
+## Retirement decision
+
+plumOS no longer builds, packages, or exposes standalone DOSBox Staging. The
+DOS system defaults to `retroarch:dosbox_pure` with `performance`; the pinned
+`retroarch:dosbox_pure_0.9.7` core remains the explicit legacy choice. The
+standalone patch and launcher branch were removed so stale runtime files cannot
+be selected accidentally. This is an explicit route replacement, not a hidden
+fallback.

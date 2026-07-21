@@ -39,12 +39,13 @@ output/standalone-emulators/v90s/
 | `scummvm` | `v2026.2.0` | `scummvm` |
 | `easyrpg` | `0.8.1.1` | `easyrpg-player` |
 | `openbor` | `v6391` | `OpenBOR` |
-| `dosbox-staging` | `v0.82.2` | `dosbox` |
 | `pcsx_rearmed` | `r26l` | `pcsx` |
 | `flycast` | `v2.6` | `flycast` |
 | `mupen64plus` | `2.6.0` | `mupen64plus` |
+| `nxengine-evo` | `21d8aaf` | `nxengine-evo` |
+| `yabasanshiro` | `8406a5c` | `yabasanshiro` |
 
-All eight executables were verified with `file` as 64-bit ARM aarch64 ELF
+All nine executables were verified with `file` as 64-bit ARM aarch64 ELF
 executables using `/lib/ld-linux-aarch64.so.1`.
 
 Individual recipes can be rebuilt without removing the other outputs:
@@ -252,6 +253,6 @@ missing-factory failure, backup, and restoration.
 
 PPSSPP still needs save persistence; normal exit and clean return to the FE are
 validated. ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed now have physical
-display, audio, controller, and exit validation. DOSBox Staging reaches and
-continuously runs the DOOM title screen after its V90S alpha and native PATH
-launch fixes; controller, audio, exit, and FE return remain to be confirmed.
+display, audio, controller, and exit validation. DOSBox Staging was removed
+from the supported set on 2026-07-21 after the same DOOM content remained slow
+and produced audio breakup while RetroArch DOSBox Pure was smooth and clean.

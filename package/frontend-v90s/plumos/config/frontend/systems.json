@@ -953,9 +953,9 @@
           {"root": "sdcard", "path": "Images/dos"}
         ]
       },
-      "launch_profiles": ["standalone:dosbox-staging", "retroarch:dosbox_pure", "retroarch:dosbox_pure_0.9.7"],
-      "default_launch_profile": "standalone:dosbox-staging",
-      "default_cpu_policy": "ondemand",
+      "launch_profiles": ["retroarch:dosbox_pure", "retroarch:dosbox_pure_0.9.7"],
+      "default_launch_profile": "retroarch:dosbox_pure",
+      "default_cpu_policy": "performance",
       "scraper": {
         "enabled": false,
         "reason": "not_single_rom_crc"
