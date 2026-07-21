@@ -265,6 +265,12 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Add `scripts/v90s-fe-pico-smoke-test.sh` to derive all live FE PICO
     choices, verify loaded cores and framebuffer updates, stop by owned PID,
     and restore exactly one frontend process.
+  - [x] Diagnose KM_DUCKSTATION audio breakup with Wild Arms. The opening movie
+    and post-title gameplay audio are clean, while the title screen breaks up
+    under the vendor `ondemand` policy at 816-1008 MHz. A live `performance`
+    comparison held all CPUs at 1.8 GHz and removed the breakup without an
+    ALSA XRUN; see
+    `docs/validation/2026-07-21-v90s-picoarch-km-duckstation-audio.md`.
 - [x] Implement `standalone` for the MMF final-package emulator set plus
   V90S PPSSPP, Dreamcast, and N64:
   - PPSSPP 1.20.4

@@ -1481,6 +1481,14 @@ the launcher restores `scaling_min_freq` and `scaling_max_freq` to the hardware
 `cpuinfo_min_freq` and `cpuinfo_max_freq` range. This prevents an old fixed-MHz
 override from surviving a governor change.
 
+KM_DUCKSTATION through PicoArch is a documented profile-level performance
+exception. On the physical V90S, the Wild Arms opening movie and normal
+post-title gameplay audio were clean, but its title screen broke up while the
+vendor `ondemand` policy remained at 816-1008 MHz. A live `performance` test at
+1.8 GHz removed the breakup without an ALSA XRUN. This result supports a
+KM_DUCKSTATION-specific `performance` selection; it does not change the global
+`ondemand` default or justify applying `performance` to unrelated profiles.
+
 All four Cortex-A53 CPUs, CPU0 through CPU3, must remain online while the
 frontend is idle and while RetroArch, PicoArch, Pyxel, standalone emulators,
 and scraper jobs run. V90S has no supported per-system or per-ROM CPU-count
