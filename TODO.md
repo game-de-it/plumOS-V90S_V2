@@ -972,6 +972,12 @@ Build plumOS V90S as a V90S-specific distribution:
     mounted read-only and one frontend process.
   - [x] Generate and structurally verify
     `plumos-v90s-four-partition-20260719-2.img` with the fast-boot retry fix.
+  - [x] Rebuild the boot package, provisioning boot image, release-system
+    SquashFS, and strict app layer from source commit `c50d100`, then generate
+    and structurally verify
+    `plumos-v90s-four-partition-20260722-1.img`. The image includes the
+    event-driven device-side ADB recovery and passes its detached-UDC hardware
+    test before image assembly.
 - [ ] Launch a ROM from SD2 through the FE and reconfirm LCD video, audio,
   controls, FPS/scrolling/audio pitch, clean exit, and persistence.
   - [x] Launch SD2 `nes/Baseball.nes` from the FE with QuickNES and confirm
