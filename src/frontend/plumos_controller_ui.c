@@ -5217,6 +5217,7 @@ static enum setting_control_type setting_control_type_for_id(const char *id) {
       strcmp(id, "system_manual_time") == 0 ||
       strcmp(id, "system_manual_time_apply") == 0 ||
       strcmp(id, "system_information") == 0 ||
+      strcmp(id, "system_update") == 0 ||
       strcmp(id, "system_factory_reset") == 0 ||
       strcmp(id, "system_factory_reset_all") == 0 ||
       strcmp(id, "system_factory_reset_ra") == 0 ||
@@ -5567,6 +5568,8 @@ static void format_runtime_number_setting_value(const char *id, long value,
 
 static void add_system_settings_entries(struct ui_state *ui) {
   char value[256];
+  char runtime_version[64];
+  char system_version[64];
   char contrast_value[32];
   char hue_value[32];
   char saturation_value[32];
@@ -5596,6 +5599,17 @@ static void add_system_settings_entries(struct ui_state *ui) {
                     setting_choice_display_value("system_timezone", device->timezone));
   add_setting_entry(ui, "system_language", "Language",
                     setting_choice_display_value("system_language", device->language));
+  if (!read_first_line_file("/mnt/plumos/VERSION", runtime_version,
+                            sizeof(runtime_version))) {
+    copy_string(runtime_version, sizeof(runtime_version), "unknown");
+  }
+  if (!read_first_line_file("/etc/plumos-system-version", system_version,
+                            sizeof(system_version))) {
+    copy_string(system_version, sizeof(system_version), "unknown");
+  }
+  snprintf(value, sizeof(value), "Runtime %s / System %s",
+           runtime_version, system_version);
+  add_setting_entry(ui, "system_update", "System Update", value);
   add_setting_entry(ui, "system_factory_reset", "Factory Reset", "");
   add_setting_entry(ui, "system_information", "INFORMATION", "");
 }
@@ -9088,6 +9102,9 @@ static void setting_help_lines(const struct ui_state *ui,
     } else if (strcmp(id, "system_language") == 0) {
       copy_string(line1, line1_size, "Frontend language setting.");
       copy_string(line2, line2_size, "Saves language to plumOS config.");
+    } else if (strcmp(id, "system_update") == 0) {
+      copy_string(line1, line1_size, "Verify and apply the newest update package.");
+      copy_string(line2, line2_size, "Reads signed packages from PLUMOS/updates.");
     } else if (strcmp(id, "system_model") == 0 ||
                strcmp(id, "system_plumos_version") == 0 ||
                strcmp(id, "system_vendor_runtime") == 0 ||
@@ -11466,6 +11483,50 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
   return 0;
 }
 
+static int request_latest_system_update(struct ui_state *ui) {
+  char log_dir[PATH_MAX];
+  char log_path[PATH_MAX];
+  char cmd[UI_COMMAND_MAX];
+  size_t pos = 0;
+  int rc;
+
+  if (!file_exists("/usr/sbin/plumos-system-update")) {
+    set_status(ui, "System Update helper missing");
+    return 0;
+  }
+  if (!join_path(log_dir, sizeof(log_dir), ui->plumos_root, "Logs") ||
+      !join_path(log_path, sizeof(log_path), log_dir,
+                 "frontend-system-update.log")) {
+    set_status(ui, "System Update log path too long");
+    return 0;
+  }
+
+  set_status(ui, "Verifying latest update package...");
+  render_ui(ui);
+  cmd[0] = '\0';
+  if (!append_string(cmd, sizeof(cmd), &pos, "mkdir -p ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, log_dir) ||
+      !append_string(cmd, sizeof(cmd), &pos, "; PLUMOS_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
+      !append_string(cmd, sizeof(cmd), &pos,
+                     " PLUMOS_USERDATA_ROOT=/mnt/plumos-user"
+                     " PLUMOS_BOOT_ROOT=/mnt/plumos-boot"
+                     " /usr/sbin/plumos-system-update request-latest >") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, log_path) ||
+      !append_string(cmd, sizeof(cmd), &pos, " 2>&1")) {
+    set_status(ui, "System Update command too long");
+    return 0;
+  }
+  rc = system(cmd);
+  if (!system_command_succeeded(rc)) {
+    set_status(ui, "No compatible update; see frontend-system-update.log");
+    return 0;
+  }
+  set_status(ui, "Update ready; restarting safely");
+  render_ui(ui);
+  return run_power_action(ui, "reboot", 0);
+}
+
 static int write_power_overlay_selection(struct ui_state *ui, const char *action) {
   const char *path = getenv("PLUMOS_POWER_MENU_SELECTION");
   FILE *fp;
@@ -12937,6 +12998,10 @@ static int is_system_information_entry(const struct setting_entry *entry) {
   return entry && strcmp(entry->id, "system_information") == 0;
 }
 
+static int is_system_update_entry(const struct setting_entry *entry) {
+  return entry && strcmp(entry->id, "system_update") == 0;
+}
+
 static int is_system_factory_reset_entry(const struct setting_entry *entry) {
   return entry && strcmp(entry->id, "system_factory_reset") == 0;
 }
@@ -13964,6 +14029,10 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
       }
       if (is_system_information_entry(entry)) {
         open_settings_screen(ui, SETTINGS_CATEGORY_SYSTEM_INFORMATION);
+        return;
+      }
+      if (is_system_update_entry(entry)) {
+        request_latest_system_update(ui);
         return;
       }
       if (is_system_factory_reset_entry(entry)) {

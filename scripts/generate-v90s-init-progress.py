@@ -122,6 +122,12 @@ def main():
         "verify": ("VERIFYING SYSTEM", 70, False),
         "mount": ("MOUNTING SYSTEM", 85, False),
         "start": ("STARTING PLUMOS", 95, False),
+        "update_verify": ("VERIFYING UPDATE", 15, False),
+        "update_runtime": ("UPDATING RUNTIME", 45, False),
+        "update_system": ("UPDATING SYSTEM", 55, False),
+        "update_finalize": ("FINALIZING UPDATE", 90, False),
+        "update_rollback": ("RESTORING PREVIOUS", 70, False),
+        "update_error": ("UPDATE FAILED", 100, True),
         "error": ("STARTUP FAILED", 100, True),
     }
     expected_size = WIDTH * VIRTUAL_HEIGHT * 4

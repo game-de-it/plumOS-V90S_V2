@@ -27,7 +27,7 @@ P3_RESIZE_REQUIRED=0
 FAST_BOOT=0
 CLEAN_P3_REL=provision/clean-shutdown
 CLEAN_P4_REL=.plumos-clean-shutdown
-VERIFIED_SYSTEM_REL=provision/system-a.verified.sha256
+SYSTEM_SLOT=a
 
 log() {
     printf '%s\n' "$*" | tee -a "$LOG"
@@ -298,18 +298,22 @@ if [ "$p3_sectors" -eq "$P3_TARGET_SECTORS" ] && [ -n "$P4" ]; then
     mkdir -p "$P1_MOUNT" "$P3_MOUNT" "$P4_MOUNT"
     mount -t vfat -o ro,utf8,shortname=mixed "$P1" "$P1_MOUNT" >> "$LOG" 2>&1 ||
         recovery "cannot mount PLUMBOOT for fast-boot inspection"
-    fast_hash_file="$P1_MOUNT/System/system-a.sha256"
+    mount -t ext4 -o ro,noload,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot inspect PLUMOS_SYS fast-boot state"
+    mount -t vfat -o ro,utf8,shortname=mixed "$P4" "$P4_MOUNT" >> "$LOG" 2>&1 ||
+        recovery "cannot inspect PLUMOS fast-boot state"
+    fast_slot="$(cat "$P3_MOUNT/update-state/system-active" 2>/dev/null || cat "$P1_MOUNT/System/active-slot" 2>/dev/null || echo a)"
+    case "$fast_slot" in a|b) ;; *) fast_slot=a ;; esac
+    fast_pending="$(cat "$P3_MOUNT/update-state/system-pending" 2>/dev/null || true)"
+    fast_attempted=0
+    [ -f "$P3_MOUNT/update-state/system-pending-attempted" ] && fast_attempted=1
+    fast_hash_file="$P1_MOUNT/System/system-$fast_slot.sha256"
     fast_expected=""
     fast_ignored=""
     if [ -f "$fast_hash_file" ]; then
         IFS=' ' read -r fast_expected fast_ignored < "$fast_hash_file" || fast_expected=""
     fi
-
-    mount -t ext4 -o ro,noload,noatime "$P3" "$P3_MOUNT" >> "$LOG" 2>&1 ||
-        recovery "cannot inspect PLUMOS_SYS fast-boot state"
-    mount -t vfat -o ro,utf8,shortname=mixed "$P4" "$P4_MOUNT" >> "$LOG" 2>&1 ||
-        recovery "cannot inspect PLUMOS fast-boot state"
-    verified_system="$(cat "$P3_MOUNT/$VERIFIED_SYSTEM_REL" 2>/dev/null || true)"
+    verified_system="$(cat "$P3_MOUNT/provision/system-$fast_slot.verified.sha256" 2>/dev/null || true)"
     fast_p3_complete=0
     fast_p3_clean=0
     fast_p4_ready=0
@@ -327,11 +331,14 @@ if [ "$p3_sectors" -eq "$P3_TARGET_SECTORS" ] && [ -n "$P4" ]; then
         [ "$fast_p3_clean" -eq 1 ] &&
         [ "$fast_p4_ready" -eq 1 ] &&
         [ "$fast_p4_clean" -eq 1 ] &&
+        [ -z "$fast_pending" ] &&
+        [ "$fast_attempted" -eq 0 ] &&
         [ "$fast_expected_valid" -eq 1 ] &&
         [ "$fast_hash_match" -eq 1 ]; then
         FAST_BOOT=1
+        SYSTEM_SLOT="$fast_slot"
     else
-        log "fast boot rejected: p3_complete=$fast_p3_complete p3_clean=$fast_p3_clean p4_ready=$fast_p4_ready p4_clean=$fast_p4_clean hash_metadata=$fast_expected_valid hash_match=$fast_hash_match"
+        log "fast boot rejected: p3_complete=$fast_p3_complete p3_clean=$fast_p3_clean p4_ready=$fast_p4_ready p4_clean=$fast_p4_clean pending=${fast_pending:-none} attempted=$fast_attempted hash_metadata=$fast_expected_valid hash_match=$fast_hash_match"
     fi
     umount "$P4_MOUNT" >> "$LOG" 2>&1 ||
         recovery "cannot unmount inspected PLUMOS"
@@ -434,6 +441,35 @@ p4_label="$(blkid_value LABEL "$P4")"
 [ "$FAST_BOOT" = 1 ] || fsck_fat "$P4"
 
 mount_runtime
+mkdir -p "$P3_MOUNT/update-state"
+SYSTEM_ACTIVE_SLOT="$(cat "$P3_MOUNT/update-state/system-active" 2>/dev/null || cat "$P1_MOUNT/System/active-slot" 2>/dev/null || echo a)"
+case "$SYSTEM_ACTIVE_SLOT" in a|b) ;; *) SYSTEM_ACTIVE_SLOT=a ;; esac
+SYSTEM_PENDING_SLOT="$(cat "$P3_MOUNT/update-state/system-pending" 2>/dev/null || true)"
+case "$SYSTEM_PENDING_SLOT" in
+    a|b)
+        if [ -f "$P3_MOUNT/update-state/system-pending-attempted" ]; then
+            log "system update rollback: pending slot $SYSTEM_PENDING_SLOT did not reach frontend readiness"
+            show_progress update_rollback
+            rm -f "$P3_MOUNT/update-state/system-pending" \
+                "$P3_MOUNT/update-state/system-pending-attempted" \
+                "$P3_MOUNT/update-state/system-pending.json"
+            printf '%s\n' 'pending slot rolled back before frontend readiness' \
+                > "$P3_MOUNT/update-state/system-boot-result"
+            SYSTEM_SLOT="$SYSTEM_ACTIVE_SLOT"
+            SYSTEM_PENDING_SLOT=""
+            sync
+        else
+            SYSTEM_SLOT="$SYSTEM_PENDING_SLOT"
+            touch "$P3_MOUNT/update-state/system-pending-attempted"
+            log "system update trial boot: active=$SYSTEM_ACTIVE_SLOT pending=$SYSTEM_SLOT"
+            sync
+        fi
+        ;;
+    *)
+        SYSTEM_PENDING_SLOT=""
+        SYSTEM_SLOT="$SYSTEM_ACTIVE_SLOT"
+        ;;
+esac
 if [ ! -f "$P3_MOUNT/provision/complete" ] ||
     [ ! -f "$P4_MOUNT/.plumos-ready" ] ||
     [ -e "$P4_MOUNT/.plumos-provisioning" ]; then
@@ -471,22 +507,52 @@ if [ "$PROVISION_ONLY" = 1 ]; then
     exit 0
 fi
 
-SYSTEM_IMAGE="$P1_MOUNT/System/system-a.squashfs"
-SYSTEM_HASH="$P1_MOUNT/System/system-a.sha256"
-[ -f "$SYSTEM_IMAGE" ] || recovery "system-a.squashfs is missing"
-[ -f "$SYSTEM_HASH" ] || recovery "system-a.sha256 is missing"
+SYSTEM_IMAGE="$P1_MOUNT/System/system-$SYSTEM_SLOT.squashfs"
+SYSTEM_HASH="$P1_MOUNT/System/system-$SYSTEM_SLOT.sha256"
+if { [ ! -f "$SYSTEM_IMAGE" ] || [ ! -f "$SYSTEM_HASH" ]; } &&
+   [ -n "$SYSTEM_PENDING_SLOT" ] && [ "$SYSTEM_SLOT" != "$SYSTEM_ACTIVE_SLOT" ]; then
+    log "system update rollback: pending slot $SYSTEM_SLOT payload is incomplete"
+    show_progress update_rollback
+    rm -f "$P3_MOUNT/update-state/system-pending" \
+        "$P3_MOUNT/update-state/system-pending-attempted" \
+        "$P3_MOUNT/update-state/system-pending.json"
+    SYSTEM_SLOT="$SYSTEM_ACTIVE_SLOT"
+    SYSTEM_PENDING_SLOT=""
+    SYSTEM_IMAGE="$P1_MOUNT/System/system-$SYSTEM_SLOT.squashfs"
+    SYSTEM_HASH="$P1_MOUNT/System/system-$SYSTEM_SLOT.sha256"
+    sync
+fi
+[ -f "$SYSTEM_IMAGE" ] || recovery "system-$SYSTEM_SLOT.squashfs is missing"
+[ -f "$SYSTEM_HASH" ] || recovery "system-$SYSTEM_SLOT.sha256 is missing"
 if [ "$FAST_BOOT" = 1 ]; then
-    log "system-a cached verification accepted"
+    log "system-$SYSTEM_SLOT cached verification accepted"
 else
     [ "$PROVISIONING" = 1 ] && show_progress verify
-    verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
-        recovery "system-a hash verification failed"
+    if ! verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH"; then
+        if [ -n "$SYSTEM_PENDING_SLOT" ] && [ "$SYSTEM_SLOT" != "$SYSTEM_ACTIVE_SLOT" ]; then
+            log "system update rollback: pending slot $SYSTEM_SLOT hash verification failed"
+            show_progress update_rollback
+            rm -f "$P3_MOUNT/update-state/system-pending" \
+                "$P3_MOUNT/update-state/system-pending-attempted" \
+                "$P3_MOUNT/update-state/system-pending.json"
+            SYSTEM_SLOT="$SYSTEM_ACTIVE_SLOT"
+            SYSTEM_PENDING_SLOT=""
+            SYSTEM_IMAGE="$P1_MOUNT/System/system-$SYSTEM_SLOT.squashfs"
+            SYSTEM_HASH="$P1_MOUNT/System/system-$SYSTEM_SLOT.sha256"
+            [ -f "$SYSTEM_IMAGE" ] || recovery "rollback system-$SYSTEM_SLOT.squashfs is missing"
+            [ -f "$SYSTEM_HASH" ] || recovery "rollback system-$SYSTEM_SLOT.sha256 is missing"
+            verify_sha256 "$SYSTEM_IMAGE" "$SYSTEM_HASH" ||
+                recovery "active system-$SYSTEM_SLOT hash verification failed"
+        else
+            recovery "system-$SYSTEM_SLOT hash verification failed"
+        fi
+    fi
     expected_system=""
     expected_ignored=""
     IFS=' ' read -r expected_system expected_ignored < "$SYSTEM_HASH" || expected_system=""
     mkdir -p "$P3_MOUNT/provision"
-    printf '%s\n' "$expected_system" > "$P3_MOUNT/$VERIFIED_SYSTEM_REL"
-    log "system-a hash verification passed"
+    printf '%s\n' "$expected_system" > "$P3_MOUNT/provision/system-$SYSTEM_SLOT.verified.sha256"
+    log "system-$SYSTEM_SLOT hash verification passed"
 fi
 copy_boot_log
 sync

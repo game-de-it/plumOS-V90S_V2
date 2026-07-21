@@ -1,7 +1,8 @@
 # plumOS V90S ext4 Runtime and FAT32 User-Data Update Design
 
 Date: 2026-07-18
-Status: Draft for discussion; not yet adopted by the Distribution Policy
+Status: Historical design input. The implemented update contract is now
+`docs/plumos-v90s-update-contract.md`.
 
 ## Purpose
 

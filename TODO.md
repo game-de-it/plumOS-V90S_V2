@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-20
+Last updated: 2026-07-22
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -15,10 +15,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - plumOS owns userspace behavior, init, launchers, RetroArch, cores, standalone
   emulators, frontend, configuration, image assembly, and releases.
 - The Linux base lives in a read-only system squashfs.
-- The user-visible app/update/data layer lives on a FAT32 partition mounted at
-  `/mnt/plumos`.
-- Normal updates are applied from Windows or macOS by copying update files onto
-  the SD card.
+- The plumOS-managed runtime lives on p3 ext4 at `/mnt/plumos`; the user-visible
+  ROM/BIOS/media/import/export layer lives on p4 FAT32 at `/mnt/plumos-user`.
+- Normal updates are copied from Windows or macOS to p4 `PLUMOS/updates` and
+  are transactionally applied to p3 or the inactive p1 System slot.
 - Global volume uses 12 software-gain steps, with immediate tmpfs updates and
   delayed persistence so physical-key feedback does not wait for mixer probes
   or FAT32 writes.
@@ -1069,14 +1069,27 @@ Build plumOS V90S as a V90S-specific distribution:
 
 ## Milestone 7: Release Packaging
 
-- [ ] Generate a full SD-root style package:
-  `dist/plumos-v90s-sdroot-VERSION/`.
-- [x] Generate an update-only package:
-  `dist/plumos-v90s-update-VERSION/`.
-- [x] Ensure update-only packages can be copied over the FAT32 app layer from
-  Windows or macOS.
-- [x] Generate release `manifest.json`.
-- [x] Generate release `checksums.sha256`.
+- [x] Adopt the two-part update contract in
+  `docs/plumos-v90s-update-contract.md`: transactional Runtime updates on p3
+  and fixed two-slot System SquashFS updates on p1; the vendor kernel and p2
+  remain full-image-only.
+- [x] Add signed Runtime/System package generation through
+  `scripts/docker-build.sh update-package`.
+- [x] Add one-generation Runtime rollback, System A/B trial boot, frontend
+  renderer health confirmation, bounded staging/state, and host-readable last
+  failure evidence.
+- [x] Add `System Settings -> System Update` for the newest compatible package
+  copied to `PLUMOS/updates`.
+- [ ] Validate Runtime success, Runtime rollback, System A/B promotion, and
+  System rollback on physical V90S hardware.
+
+- [x] Generate and fully verify the complete four-partition seed image under
+  `output/images/`.
+- [x] Generate signed Runtime and System update archives under `dist/updates/`.
+- [x] Ensure update archives can be copied from Windows or macOS into p4
+  `PLUMOS/updates` without modifying their contents.
+- [x] Include a signed manifest and per-payload SHA-256 metadata in every
+  update archive.
 - [ ] Include license and notice files for:
   - plumOS-owned files
   - POWKIDDY StockOS/Batocera-derived runtime files
@@ -1085,27 +1098,27 @@ Build plumOS V90S as a V90S-specific distribution:
   - bundled standalone emulators
   - bundled frontend dependencies
 - [x] Ensure release archives do not contain private ROMs or credentials.
-- [x] Document the copy-over update workflow for Windows and macOS users.
+- [x] Document the host copy plus on-device transactional update workflow.
 
 ## Milestone 8: Validation
 
-- [x] Build the first policy-aligned development image with:
-  - `v90s-stockos-r1` vendor runtime
-  - system squashfs on p5
-  - FAT32 app layer on the chosen p6/p7 partition
-  - RetroArch launched from `/mnt/plumos`
-- [ ] User boot-tests the development image on V90S.
-- [ ] Record boot result under `docs/validation/`.
+- [x] Build and host-verify the policy-aligned four-partition seed with:
+  - fixed `v90s-stockos-r1` vendor kernel/runtime boundary
+  - A/B System SquashFS on p1
+  - fixed vendor kernel, DTB, and plumOS initramfs on p2
+  - ext4 runtime seed on p3 and first-boot-created FAT32 user data on p4
+- [x] Record host transaction/image validation under `docs/validation/`.
+- [ ] User boot-tests the update-enabled seed image on V90S.
 - [ ] Confirm LCD output.
 - [ ] Confirm built-in controls.
 - [ ] Confirm audio output.
 - [ ] Confirm FPS, scrolling, and audio pitch remain at the known-good level.
 - [ ] Confirm RetroArch settings persist after reboot.
-- [ ] Confirm logs are visible from macOS or Windows through the FAT32 app
-  layer.
-- [ ] Test an update-only package by copying it onto the SD card from macOS or
-  Windows.
-- [ ] Record the update test result under `docs/validation/`.
+- [ ] Confirm update failure evidence is visible from macOS or Windows through
+  p4 `PLUMOS/plumos-logs/update`.
+- [ ] Test signed Runtime and System packages copied into `PLUMOS/updates`.
+- [ ] Record Runtime success/rollback and System promotion/rollback results
+  under `docs/validation/`.
 
 ## Deferred Reference Work
 

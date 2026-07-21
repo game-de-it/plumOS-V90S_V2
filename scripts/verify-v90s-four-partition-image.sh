@@ -137,6 +137,10 @@ debugfs -R "dump -p /manifest.json $tmp_dir/p3-manifest.json" "$tmp_dir/p3.ext4"
     fail "p3 manifest.json is missing"
 debugfs -R "dump -p /bin/plumos-frontend-launch $tmp_dir/p3-frontend-launch" "$tmp_dir/p3.ext4" >/dev/null 2>&1 ||
     fail "p3 frontend launcher is missing"
+debugfs -R "dump -p /RUNTIME_ABI $tmp_dir/p3-runtime-abi" "$tmp_dir/p3.ext4" >/dev/null 2>&1 ||
+    fail "p3 RUNTIME_ABI is missing"
+[ "$(tr -d '\r\n' < "$tmp_dir/p3-runtime-abi")" = 1 ] ||
+    fail "p3 RUNTIME_ABI is not 1"
 cmp -s "$app_runtime/manifest.json" "$tmp_dir/p3-manifest.json" || fail "p3 app manifest differs"
 cmp -s "$app_runtime/bin/plumos-frontend-launch" "$tmp_dir/p3-frontend-launch" ||
     fail "p3 frontend launcher differs"

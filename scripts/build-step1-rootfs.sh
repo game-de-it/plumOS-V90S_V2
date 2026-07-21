@@ -832,6 +832,74 @@ retry_plumos_network_services_after_network() {
     persist_debian_log
 }
 
+apply_pending_plumos_update() {
+    [ -x /usr/sbin/plumos-system-update ] || return 0
+
+    log "debian-init: checking pending plumOS update"
+    persist_debian_log
+    PLUMOS_ROOT=/mnt/plumos \
+    PLUMOS_USERDATA_ROOT=/mnt/plumos-user \
+    PLUMOS_BOOT_ROOT=/mnt/plumos-boot \
+        /usr/sbin/plumos-system-update apply-pending >> "$LOG" 2>&1
+    update_rc=$?
+    case "$update_rc" in
+        0)
+            log "debian-init: pending update check complete"
+            ;;
+        20)
+            log "debian-init: System update staged; rebooting into pending slot"
+            persist_debian_log
+            PLUMOS_ROOT=/mnt/plumos PLUMOS_SDCARD_ROOT=/mnt/plumos \
+            PLUMOS_USER_ROOT=/mnt/plumos-user PLUMOS_BOOT_ROOT=/mnt/plumos-boot \
+                /usr/sbin/plumos-power-action --reboot --wait-sec 0 --no-hold-resume
+            while :; do sleep 3600; done
+            ;;
+        *)
+            log "debian-init: update rejected rc=$update_rc; current generation retained"
+            ;;
+    esac
+    persist_debian_log
+    return 0
+}
+
+confirm_plumos_update_after_frontend() {
+    [ -x /usr/sbin/plumos-system-update ] || return 0
+
+    attempts=0
+    while [ "$attempts" -lt 60 ]; do
+        if [ -f /tmp/plumos-fe-ready ]; then
+            log "debian-init: frontend draw proof observed; confirming update"
+            PLUMOS_ROOT=/mnt/plumos \
+            PLUMOS_USERDATA_ROOT=/mnt/plumos-user \
+            PLUMOS_BOOT_ROOT=/mnt/plumos-boot \
+                /usr/sbin/plumos-system-update mark-healthy >> "$LOG" 2>&1
+            update_rc=$?
+            log "debian-init: update health confirmation rc=$update_rc"
+            persist_debian_log
+            return "$update_rc"
+        fi
+        attempts=$((attempts + 1))
+        sleep 1
+    done
+    log "debian-init: frontend draw proof timeout; update remains pending"
+    persist_debian_log
+    return 1
+}
+
+start_rootfs_network_init_bg() {
+    [ -x /usr/local/sbin/v90s-network-ssh-init ] || return 0
+
+    log "debian-init: starting network/SSH init in background"
+    persist_debian_log
+    (
+        /usr/local/sbin/v90s-network-ssh-init >> "$LOG" 2>&1
+        rc=$?
+        log "debian-init: network/SSH init exited rc=$rc"
+        persist_debian_log
+        retry_plumos_network_services_after_network "$rc"
+    ) &
+}
+
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 if [ ! -c /dev/console ]; then
@@ -873,22 +941,13 @@ if [ -x /usr/local/sbin/v90s-pvr-probe ]; then
     ) &
 fi
 
-if [ -x /usr/local/sbin/v90s-network-ssh-init ]; then
-    log "debian-init: starting network/SSH init in background"
-    persist_debian_log
-    (
-        /usr/local/sbin/v90s-network-ssh-init >> "$LOG" 2>&1
-        rc=$?
-        log "debian-init: network/SSH init exited rc=$rc"
-        persist_debian_log
-        retry_plumos_network_services_after_network "$rc"
-    ) &
-fi
-
 frontend_attempted=0
 frontend_pid=""
 if prepare_plumos_app_layer; then
     frontend_attempted=1
+    apply_pending_plumos_update
+    start_rootfs_network_init_bg
+    rm -f /tmp/plumos-fe-ready
     log "debian-init: starting plumOS frontend through rootfs bootstrap"
     persist_debian_log
     (
@@ -908,8 +967,11 @@ if prepare_plumos_app_layer; then
     log "debian-init: plumOS frontend pid=$frontend_pid"
     persist_debian_log
 
+    confirm_plumos_update_after_frontend &
+
     start_plumos_network_services_bg after-frontend
 else
+    start_rootfs_network_init_bg
     log "debian-init: app layer unavailable; no application fallback will be started"
     printf '%s\n' 'plumOS app layer unavailable; repair the PLUMOS partition.' > /dev/console 2>/dev/null || true
 fi
@@ -954,6 +1016,26 @@ install_app_layer_bootstrap() {
     root="$1"
     install -D -m 0755 "$script_dir/plumos-app-layer-bootstrap.sh" "$root/usr/sbin/plumos-app-layer-bootstrap"
     printf '%s\n' 'v90s-stockos-r1' > "$root/etc/plumos-v90s-vendor-id"
+}
+
+install_system_update() {
+    root="$1"
+    progress_dir="$work_dir/update-progress"
+
+    install -D -m 0755 "$script_dir/plumos-system-update.py" \
+        "$root/usr/sbin/plumos-system-update"
+    install -D -m 0644 "$script_dir/../package/system-v90s/plumos-update-public.pem" \
+        "$root/etc/plumos-update-public.pem"
+    printf '%s\n' "${PLUMOS_V90S_SYSTEM_VERSION:-0.1.0-dev}" \
+        > "$root/etc/plumos-system-version"
+    printf '%s\n' '1' > "$root/etc/plumos-system-abi"
+
+    rm -rf "$progress_dir"
+    python3 "$script_dir/generate-v90s-init-progress.py" --output-dir "$progress_dir"
+    for frame in "$progress_dir"/update_*.raw; do
+        install -D -m 0644 "$frame" \
+            "$root/usr/share/plumos/update-progress/$(basename "$frame")"
+    done
 }
 
 build_stage1() {
@@ -1212,7 +1294,7 @@ EOF
 
 build_release_system() {
     root="$work_dir/release-system-root"
-    release_packages="alsa-utils,input-utils,procps,psmisc,kmod,dosfstools,coreutils,util-linux,openssh-server,wpasupplicant,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates,python3,python3-venv,python3-pip"
+    release_packages="alsa-utils,input-utils,procps,psmisc,kmod,dosfstools,coreutils,util-linux,openssh-server,wpasupplicant,iproute2,rfkill,iw,usbutils,wireless-regdb,ca-certificates,openssl,python3,python3-venv,python3-pip"
     if [ -n "$wifi_ssid" ] || [ -n "$ssh_authorized_keys" ] || [ -n "$ssh_root_password" ]; then
         printf 'error: release-system refuses embedded Wi-Fi or SSH credentials; use an explicit development profile\n' >&2
         exit 2
@@ -1229,6 +1311,7 @@ build_release_system() {
     write_debian_init "$root/sbin/init"
     install_power_action "$root"
     install_app_layer_bootstrap "$root"
+    install_system_update "$root"
     install -D -m 0755 "$script_dir/v90s-fb-console.pl" "$root/usr/local/sbin/v90s-fb-console"
     install_pvr_probe "$root"
     install_sdl2_powervr "$root"

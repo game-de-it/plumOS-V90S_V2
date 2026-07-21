@@ -75,34 +75,32 @@ Docker build flow です。
 ./scripts/docker-build.sh frontend
 ./scripts/docker-build.sh app-layer --strict
 ./scripts/docker-build.sh system-rootfs
-./scripts/docker-build.sh release
+./scripts/docker-build.sh sd-image --name plumos-v90s-four-partition-seed.img
 
 # Vendor inputがない場合だけ、既知良好な実機SDからADB経由で採取します。
 ./scripts/capture-v90s-vendor-runtime-adb.sh --force
 ./scripts/docker-build.sh vendor-runtime
 
-# 正式なrelease-system SD imageです。p5を再パックしません。
-./scripts/docker-build.sh sd-image \
-  --rootfs-squashfs output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
-  --no-rootfs-repack \
-  --app-layer-dir output/app-layer/v90s \
-  --share-size 4096M \
-  --name plumos-v90s-system-squashfs-20260715-5.img
+# 署名付き更新パッケージです。詳細はupdate contractを参照してください。
+./scripts/docker-build.sh update-package \
+  --type runtime --input output/app-layer/v90s \
+  --base-dir PATH/TO/PREVIOUS/RUNTIME \
+  --base-version OLD --version NEW --output-dir dist/updates
+./scripts/docker-build.sh update-package \
+  --type system \
+  --input output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
+  --base-version OLD --version NEW --output-dir dist/updates
 
 # Explicit Step 2 diagnostic profile; not the release rootfs.
 ./scripts/docker-build.sh system-rootfs \
   --profile debian-retroarch-powervr \
   --out-dir output/rootfs-step2 \
   --rom "artifacts/nes/Super Mario Bros..nes"
-./scripts/docker-build.sh sd-image --name plumos-v90s-stockos-smoke-20260710-1.img
-./scripts/docker-build.sh sd-image \
-  --rootfs-squashfs output/rootfs-step2/debian-bookworm-retroarch-powervr-step2.squashfs \
-  --name plumos-v90s-stockos-ra-20260710-1.img
 ```
 
 `quicknes` は現在の1 core開発用aliasです。通常の libretro core build 入口は
-`cores` です。`rootfs` は `system-rootfs`、`stockos-image` は `sd-image` の
-移行aliasとして残します。
+`cores` です。`rootfs` は `system-rootfs` の移行aliasです。`stockos-image` は
+旧7パーティション診断用で、現在の`sd-image`とは別経路です。
 
 `userland` は BusyBox と補助コマンド群を `output/userland/v90s/` に生成します。
 `network-services` は FTP/SFTP/Samba のapp-layer payloadを
@@ -113,40 +111,33 @@ Docker build flow です。
 app-layerの `ssh/start-ssh.sh` / `ssh/stop-ssh.sh` から起動または採用し、
 SSHログイン時は `/mnt/plumos/bin:/mnt/plumos/gnu/bin` をPATH先頭へ入れます。
 
-`app-layer` は FAT32 にコピーする plumOS 側ツリーを
+`app-layer` は p3 ext4 `/mnt/plumos` に配置する plumOS runtime を
 `output/app-layer/v90s/` に生成します。現在は RetroArch、QuickNES、frontend、
 BusyBox/command tools、FTP/SFTP/Samba payload、SDL2 PowerVR private libs、
 既知良好RetroArch設定テンプレート、metadata、checksumを含みます。manifestの
 `complete`がfalse、または`missing_optional`が空でないapp-layerからはreleaseを
-生成しません。symlinkは
-使わず、FAT32上で成立する実体ファイルとして配置します。
+生成しません。`RUNTIME_ABI`、`manifest.json`、`checksums.sha256` は同じ
+成果物として生成されます。
 
-`release` は `output/app-layer/v90s/` から update-only package を
-`dist/plumos-v90s-update-VERSION/`、`.tar.gz`、`.zip` として生成します。
-現時点では full SD-root package ではなく、FAT32 app layer へ上書きコピーする
-ための更新パッケージです。コピー手順は `docs/update-workflow.md` に記録します。
+通常更新は `update-package` が生成する署名付き `.tar.gz` を、Windows/macOS
+からp4 `PLUMOS/updates`へコピーし、FEのSystem Updateから適用します。p3
+Runtimeは1世代rollback、System SquashFSはp1の固定A/Bで更新します。kernel、
+DTB、boot0、boot package、p2 initramfsは通常更新の対象外です。
 
-`sd-image` は StockOS 実機スナップショットで確認したパーティション契約を
-再現します。
+`sd-image` は実機確認済みの4パーティションseedを生成します。
 
 ```text
-p1 boot-resource / Volumn vfat
-p2 env
-p3 env-redund
-p4 boot Android boot image
-p5 batocera squashfs
-p6 rootfs / BATOCERA ext4
-p7 rootfs_data / PLUMOS FAT32
+p1 PLUMBOOT   FAT16 1024MiB       boot resources and A/B System SquashFS
+p2 BOOT       raw     64MiB       fixed vendor kernel/DTB and plumOS initramfs
+p3 PLUMOS_SYS ext4  1600MiB seed  first boot expands to 8192MiB
+p4 PLUMOS     FAT32 created on first boot through the SD-card end
 ```
 
-反復テストを速くするため、p1 の FAT 領域はデフォルトで `33M` に抑えます。
-StockOS 由来の `boot0` / `boot_package` が未採取の場合に互換性のある
-KNULLI V90S asset を使うには、診断用として
-`--allow-knulli-boot-fallback` を明示します。
+seed imageはp1-p3のみ約2.6GiBです。初回起動がp3拡張とp4作成を行います。
 vendor runtime の正式入力は `artifacts/vendor/v90s-stockos-r1/`、正式出力は
 `output/vendor/v90s-stockos-r1/` です。`output/vendor/stockos-runtime` は移行中
 の互換エイリアスとして扱います。
-現在のRA入りStockOSレイアウト候補は
+旧RA入りStockOSレイアウトの履歴成果物は
 `output/images/plumos-v90s-stockos-ra-20260710-2-stockos-video.img` です。
 
 旧 KNULLI/Armbian レイアウトを使う場合だけ、明示的に `knulli-image` を使います。

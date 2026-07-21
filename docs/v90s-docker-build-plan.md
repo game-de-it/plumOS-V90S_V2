@@ -2,6 +2,12 @@
 
 Date: 2026-07-10
 
+Status: Historical build-system plan. The current four-partition ownership and
+update behavior are defined by `docs/plumos-v90s-distribution-policy.md` and
+`docs/plumos-v90s-update-contract.md`. Commands below that describe the old
+seven-partition/FAT32 app-layer flow are retained only as implementation
+history.
+
 ## Direction
 
 The V90S build should move away from treating Armbian or Buildroot as the main

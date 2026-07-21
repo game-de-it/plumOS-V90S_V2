@@ -288,6 +288,7 @@ trap 'rm -f "$entries_file" "$missing_file"' EXIT
 
 printf '%s\n' "$version" > "$out_dir/VERSION"
 printf '%s\n' "$compat_vendor" > "$out_dir/COMPAT_VENDOR"
+printf '%s\n' '1' > "$out_dir/RUNTIME_ABI"
 printf '%s\n' "$mount_path" > "$out_dir/MOUNT_PATH"
 
 cat > "$out_dir/licenses/NOTICE.txt" <<'EOF'
@@ -298,6 +299,7 @@ EOF
 
 record_file "VERSION" "metadata" "generated"
 record_file "COMPAT_VENDOR" "metadata" "generated"
+record_file "RUNTIME_ABI" "metadata" "generated"
 record_file "MOUNT_PATH" "metadata" "generated"
 record_file "licenses/NOTICE.txt" "notice" "generated"
 

@@ -401,11 +401,14 @@ persist_final_log_to_user_storage() {
 }
 
 record_clean_shutdown() {
-  verified="$PLUMOS_ROOT/provision/system-a.verified.sha256"
+  active_slot="$(cat "$PLUMOS_ROOT/update-state/system-active" 2>/dev/null || \
+      cat "$PLUMOS_BOOT_ROOT/System/active-slot" 2>/dev/null || echo a)"
+  case "$active_slot" in a|b) ;; *) active_slot=a ;; esac
+  verified="$PLUMOS_ROOT/provision/system-$active_slot.verified.sha256"
   complete="$PLUMOS_ROOT/provision/complete"
   ready="$PLUMOS_USER_ROOT/.plumos-ready"
   if [ ! -s "$verified" ] || [ ! -f "$complete" ] || [ ! -f "$ready" ]; then
-    log "quiesce: clean-shutdown marker skipped reason=runtime_not_verified"
+    log "quiesce: clean-shutdown marker skipped reason=runtime_not_verified slot=$active_slot"
     return 0
   fi
   if ! : > "$PLUMOS_ROOT/provision/clean-shutdown"; then

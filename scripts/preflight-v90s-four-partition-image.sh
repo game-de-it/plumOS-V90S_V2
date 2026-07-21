@@ -95,6 +95,10 @@ grep -Fq 'fast boot: clean p3/p4 and cached system verification accepted' "$tmp_
     fail "initramfs does not recognize a clean verified fast boot"
 grep -Fq 'fast boot rejected:' "$tmp_dir/ramdisk/init" ||
     fail "initramfs does not log rejected fast-boot conditions"
+grep -Fq 'system update trial boot:' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not select a pending System A/B slot"
+grep -Fq 'system update rollback:' "$tmp_dir/ramdisk/init" ||
+    fail "initramfs does not roll back an unhealthy System slot"
 grep -Fq '[ "$FAST_BOOT" = 1 ] || show_progress start' "$tmp_dir/ramdisk/init" ||
     fail "initramfs still displays the startup progress frame on fast boot"
 grep -Fq 'rm -f "$P3_MOUNT/$CLEAN_P3_REL" "$P4_MOUNT/$CLEAN_P4_REL"' "$tmp_dir/ramdisk/init" ||
@@ -130,6 +134,8 @@ pass "p2 provisioning initramfs and storage tools"
 rootfs_listing="$tmp_dir/system-rootfs.list"
 unsquashfs -ll "$system_squashfs" > "$rootfs_listing"
 for path in sbin usr/sbin/init usr/sbin/plumos-app-layer-bootstrap \
+    usr/sbin/plumos-system-update etc/plumos-update-public.pem \
+    etc/plumos-system-version etc/plumos-system-abi \
     etc/plumos-v90s-vendor-id mnt/plumos mnt/plumos-boot mnt/plumos-user; do
     grep -Eq "squashfs-root/$path( -> .*)?$" "$rootfs_listing" ||
         fail "system SquashFS path missing: /$path"
@@ -138,6 +144,18 @@ unsquashfs -cat "$system_squashfs" usr/sbin/plumos-app-layer-bootstrap \
     > "$tmp_dir/system-app-layer-bootstrap"
 cmp -s scripts/plumos-app-layer-bootstrap.sh "$tmp_dir/system-app-layer-bootstrap" ||
     fail "system SquashFS app-layer bootstrap differs from repository source"
+unsquashfs -cat "$system_squashfs" usr/sbin/plumos-system-update \
+    > "$tmp_dir/system-update"
+cmp -s scripts/plumos-system-update.py "$tmp_dir/system-update" ||
+    fail "system SquashFS updater differs from repository source"
+unsquashfs -cat "$system_squashfs" etc/plumos-update-public.pem \
+    > "$tmp_dir/system-update-public.pem"
+cmp -s package/system-v90s/plumos-update-public.pem "$tmp_dir/system-update-public.pem" ||
+    fail "system SquashFS update public key differs from repository source"
+for frame in update_verify update_runtime update_system update_finalize update_rollback update_error; do
+    grep -Eq "squashfs-root/usr/share/plumos/update-progress/$frame.raw$" "$rootfs_listing" ||
+        fail "system SquashFS update progress frame missing: $frame.raw"
+done
 unsquashfs -cat "$system_squashfs" usr/sbin/plumos-power-action \
     > "$tmp_dir/system-power-action"
 cmp -s scripts/plumos-power-action-rootfs.sh "$tmp_dir/system-power-action" ||
@@ -150,8 +168,10 @@ grep -Fq 'prepare_sysrq_final_action' "$tmp_dir/system-power-action" ||
     fail "system power action does not sync and remount filesystems read-only"
 grep -Fq 'record_clean_shutdown' "$tmp_dir/system-power-action" ||
     fail "system power action does not record a clean shutdown"
-grep -Fq 'system-a.verified.sha256' "$tmp_dir/system-power-action" ||
-    fail "system power action does not require a verified system cache"
+grep -Fq 'update-state/system-active' "$tmp_dir/system-power-action" ||
+    fail "system power action does not read the active System A/B slot"
+grep -Fq 'system-$active_slot.verified.sha256' "$tmp_dir/system-power-action" ||
+    fail "system power action does not require the active verified System cache"
 pass "system SquashFS init, app bootstrap, and four-partition power action"
 
 python3 - "$app_runtime/manifest.json" <<'PY'
@@ -164,6 +184,8 @@ if not manifest.get("complete"):
     raise SystemExit("app runtime manifest is incomplete")
 if manifest.get("mount_path") != "/mnt/plumos":
     raise SystemExit("app runtime mount path is not /mnt/plumos")
+if not any(item.get("path") == "RUNTIME_ABI" for item in manifest.get("files", [])):
+    raise SystemExit("app runtime manifest lacks RUNTIME_ABI")
 if manifest.get("libretro_core_count", 0) < manifest.get("minimum_libretro_core_count", 118):
     raise SystemExit("app runtime core inventory is incomplete")
 PY
