@@ -101,6 +101,15 @@ The mailbox is deliberately opt-in. V90S executes `commands/run.sh` only when
 ejected/unplugged and the transfer image is remounted on V90S. Results are
 written back to the same transfer image.
 
+The transfer image also uses `roms/` as a safe ROM inbox. A USB mass-storage
+gadget can export only a block device, not the live `/mnt/plumos/roms`
+directory. Files copied to `PLUMUSB/roms/<system>/` are therefore imported,
+after host eject and cable disconnect, into the currently active
+`/mnt/plumos/roms` storage. Each file is copied to a temporary sibling and
+renamed into place, and only a successfully imported inbox file is removed.
+This preserves the rule that the PC and V90S never mount the same live ROM
+filesystem concurrently.
+
 Frontend change:
 
 ```text
@@ -263,16 +272,20 @@ USB_MAILBOX_TIMEOUT_SMOKE
 After each run, `command_script=0` and `command_armed=0` in `status`, confirming
 that the same command is not re-executed automatically.
 
+This prior live use validates command execution, output capture, timeout, and
+one-shot behavior. Physical macOS enumeration remains a USB Disk Mode transport
+check rather than a separate mailbox implementation check.
+
 ## User Validation Needed
 
-Actual Mac-side USB drive detection and command-mailbox execution still need
-physical validation:
+Actual Mac-side USB drive detection and ROM import still need physical
+validation:
 
 1. Connect V90S to the Mac with a data-capable USB cable.
 2. Open `Network Settings -> NW Service -> USB Disk Mode`.
 3. Press A on `READY TO ENTER`.
 4. A `PLUMUSB` drive should appear on the Mac.
-5. Copy files to/from the drive.
+5. Copy a test ROM to `roms/<system>/` on the drive.
 6. Eject the drive on macOS.
 7. Unplug the USB cable.
 8. V90S should return and mount the transfer image at:
@@ -280,8 +293,8 @@ physical validation:
 ```text
 /mnt/plumos/usb-transfer
 ```
-9. Repeat with a diagnostic `commands/run.sh` and `commands/ALLOW_EXECUTE`.
-10. Re-enter USB Disk Mode and confirm `RESULT-LATEST.txt` plus `results/`.
+9. Confirm the test ROM was moved into the active `/mnt/plumos/roms` storage
+   and removed from the inbox.
 
 ## Remaining Work
 

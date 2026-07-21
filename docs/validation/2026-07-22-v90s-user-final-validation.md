@@ -15,6 +15,7 @@ system:
 - NextCommander physical controls
 - Music Player playback through ALSA
 - usable Windows/macOS partition enumeration
+- update failure evidence readable from the p4 FAT32 volume on macOS/Windows
 
 The stable rootfs Wi-Fi/SSH initialization remains in place. Moving it into the
 app layer is no longer a release requirement unless the current path develops a
@@ -26,7 +27,7 @@ media is not required for release acceptance.
 
 The following remain separate checks:
 
-- macOS USB Disk Mode enumeration and USB command mailbox workflow
+- macOS USB Disk Mode enumeration
 - host-readable update failure evidence on p4
 - optional PortMaster runtime-family compatibility
 - third-party license inventory and packaging

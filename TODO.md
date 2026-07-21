@@ -244,7 +244,10 @@ Build plumOS V90S as a V90S-specific distribution:
   not automatically promote an untriaged repeated SONAME into the common path.
 - [ ] Validate the declared Weston/GL4ES, Java, Mono, and Godot runtime families
   separately on V90S. A runtime-owned or isolated ABI remains unresolved until
-  its exact runtime image, loader path, and hardware behavior are proven.
+  its exact runtime image, loader path, and hardware behavior are proven. The
+  completed 24.02 GiB/1126-port audit checked port payloads and static library
+  closure; this remaining item concerns external runtime SquashFS images plus
+  representative hardware execution, not another catalog-wide download.
 - [x] Run a representative real-device sample from the `static-pass` set.
   Apotris, Abombniball, A7Xpg, Abu Simbel Profanation Deluxe, and OpenSyobon
   all reached their owned game process, changed the framebuffer away from FE,
@@ -635,13 +638,14 @@ Build plumOS V90S as a V90S-specific distribution:
   as `commands/run.sh` plus `commands/ALLOW_EXECUTE` and results are written
   back to `RESULT-LATEST.txt` and `results/` after V90S remounts the transfer
   image.
+- [x] Use `PLUMUSB/roms/` as a safe ROM inbox and atomically import successful
+  files into the active `/mnt/plumos/roms` backing store after host eject.
 - [ ] Physically validate USB Disk Mode from macOS with a data-capable USB
   cable and confirm the `PLUMUSB` drive appears, can be ejected, and remounts
   on V90S at `/mnt/plumos/usb-transfer`.
-- [ ] Physically validate the USB command mailbox from macOS by copying a
-  diagnostic `commands/run.sh`, creating `commands/ALLOW_EXECUTE`, ejecting
-  `PLUMUSB`, unplugging USB, and confirming the result files on the next USB
-  Disk Mode session.
+- [x] Confirm the USB command mailbox execution path. A live V90S smoke test
+  executed an armed command, captured stdout and exit status, verified timeout
+  handling, and prevented automatic re-execution; see the USB validation note.
 - [x] Add standard ADB over USB FunctionFS/configfs as the intended interactive
   USB command path.
 - [x] Physically validate ADB from macOS: enable ADB from the frontend or
@@ -1145,8 +1149,8 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Confirm RetroArch settings persist byte-for-byte after safe reboot.
 - [x] Confirm update failure evidence is written identically to p3 state and
   p4 FAT32 `PLUMOS/plumos-logs/update`.
-- [ ] Confirm the p4 failure evidence is readable after physically inserting
-  the card into macOS or Windows.
+- [x] User confirmed the p4 failure evidence is readable after physically
+  inserting the card into macOS or Windows on 2026-07-22.
 - [x] Test signed Runtime and System packages copied into `PLUMOS/updates`.
 - [x] Record Runtime success/rollback and System promotion/rollback results
   under `docs/validation/`.

@@ -723,6 +723,14 @@ explicitly armed `commands/run.sh` after the PC ejects the drive and the V90S
 remounts the image, then write command output back under `results/`. This does
 not make `/mnt/plumos` itself a shared live USB disk.
 
+USB Disk Mode uses `PLUMUSB/roms/` as a ROM inbox. USB mass storage cannot
+export the `/mnt/plumos/roms` directory directly, and plumOS must not expose a
+filesystem that is still mounted by the running device. After host eject and
+disconnect, import inbox files into the currently active `/mnt/plumos/roms`
+backing store with per-file temporary-copy plus rename semantics. This supports
+both p4 ROM storage and an SD2 ROM bind without mounting either live filesystem
+on the host.
+
 The supported interactive USB command path is standard ADB over the kernel's
 FunctionFS/configfs gadget support. The app layer should ship the `adbd`
 userspace daemon and expose it through:

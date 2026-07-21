@@ -19,6 +19,8 @@ COMMAND_TIMEOUT_SECONDS="${PLUMOS_USB_COMMAND_TIMEOUT_SECONDS:-120}"
 COMMAND_DIR_NAME="${PLUMOS_USB_COMMAND_DIR_NAME:-commands}"
 RESULTS_DIR_NAME="${PLUMOS_USB_RESULTS_DIR_NAME:-results}"
 PROCESSED_DIR_NAME="${PLUMOS_USB_PROCESSED_DIR_NAME:-processed}"
+ROM_INBOX_NAME="${PLUMOS_USB_ROM_INBOX_NAME:-roms}"
+ROM_TARGET="${PLUMOS_USB_ROM_TARGET:-${PLUMOS_ROOT}/roms}"
 GADGET_NAME="${PLUMOS_USB_DISK_GADGET_NAME:-plumos_usb_disk}"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 FUNCTION_NAME="mass_storage.usb0"
@@ -55,10 +57,16 @@ Commands:
   unmount   Unmount the transfer image from V90S.
   process-commands
             Execute an armed commands/run.sh from the transfer image.
+  import-roms
+            Import PLUMUSB/roms into the active /mnt/plumos/roms storage.
   status    Print USB disk mode state.
 
 The exported disk is a separate image file, not /mnt/plumos itself. This avoids
 sharing the live FAT32 app layer with the PC and V90S at the same time.
+
+ROM transfer:
+  Copy ROM files below roms/<system>/ on PLUMUSB. After host eject and cable
+  disconnect, plumOS atomically imports them into the active ROM storage.
 
 USB command mailbox:
   1. Put a shell script at commands/run.sh on the PLUMUSB drive.
@@ -158,7 +166,23 @@ prepare_transfer_tree() {
   mkdir -p \
     "${MOUNT_DIR}/${COMMAND_DIR_NAME}" \
     "${MOUNT_DIR}/${RESULTS_DIR_NAME}" \
-    "${MOUNT_DIR}/${PROCESSED_DIR_NAME}" 2>/dev/null || true
+    "${MOUNT_DIR}/${PROCESSED_DIR_NAME}" \
+    "${MOUNT_DIR}/${ROM_INBOX_NAME}" 2>/dev/null || true
+
+  if [ ! -f "${MOUNT_DIR}/${ROM_INBOX_NAME}/README.TXT" ]; then
+    cat > "${MOUNT_DIR}/${ROM_INBOX_NAME}/README.TXT" <<'EOF' 2>/dev/null || true
+plumOS V90S ROM inbox
+
+Copy files into a system directory, for example:
+
+  roms/nes/Game.nes
+  roms/FC/Game.nes
+
+After you eject PLUMUSB and disconnect the cable, plumOS imports the files into
+the currently active ROM storage. Successfully imported files are removed from
+this inbox. Existing ROM files with the same path are replaced atomically.
+EOF
+  fi
 
   if [ ! -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/README.TXT" ]; then
     cat > "${MOUNT_DIR}/${COMMAND_DIR_NAME}/README.TXT" <<'EOF' 2>/dev/null || true
@@ -193,6 +217,54 @@ plumos-network-control status 2>/dev/null || true
 df -h
 EOF
   fi
+}
+
+import_roms() {
+  inbox="${MOUNT_DIR}/${ROM_INBOX_NAME}"
+  [ -d "$inbox" ] || return 0
+  [ -d "$ROM_TARGET" ] || {
+    log "rom_import_refused reason=target_missing target=${ROM_TARGET}"
+    return 1
+  }
+  [ -w "$ROM_TARGET" ] || {
+    log "rom_import_refused reason=target_read_only target=${ROM_TARGET}"
+    return 1
+  }
+
+  find "$inbox" -type f ! -path "$inbox/README.TXT" 2>/dev/null |
+  while IFS= read -r src; do
+    rel="${src#"$inbox"/}"
+    case "$rel" in
+      ""|/*|../*|*/../*|*/..)
+        log "rom_import_refused reason=unsafe_path path=${rel}"
+        continue
+        ;;
+    esac
+    dst="${ROM_TARGET}/${rel}"
+    dst_dir="$(dirname "$dst")"
+    tmp="${dst}.plumos-usb-import.$$"
+    if mkdir -p "$dst_dir" 2>/dev/null &&
+        cp "$src" "$tmp" 2>/dev/null &&
+        mv -f "$tmp" "$dst" 2>/dev/null; then
+      rm -f "$src" 2>/dev/null || true
+      log "rom_import_ok path=${rel}"
+    else
+      rm -f "$tmp" 2>/dev/null || true
+      log "rom_import_failed path=${rel}"
+    fi
+  done
+
+  # The loop runs in a subshell on BusyBox, so the remaining files are the
+  # authoritative import result.
+  pending="$(find "$inbox" -type f ! -path "$inbox/README.TXT" 2>/dev/null | wc -l | tr -d ' ')"
+  find "$inbox" -depth -type d ! -path "$inbox" -exec rmdir {} \; 2>/dev/null || true
+  sync
+  if [ "${pending:-0}" -ne 0 ] 2>/dev/null; then
+    log "rom_import_incomplete pending=${pending} target=${ROM_TARGET}"
+    return 1
+  fi
+  log "rom_import_complete target=${ROM_TARGET}"
+  return 0
 }
 
 make_result_dir() {
@@ -477,6 +549,7 @@ enter_mode() {
     ACTIVE=0
     restore_adb
     mount_image || return 1
+    import_roms || true
     process_commands || true
     log "leave_complete mounted=${MOUNT_DIR}"
     return 0
@@ -492,17 +565,22 @@ enter_mode() {
 leave_mode() {
   log "leave_requested"
   teardown_gadget
-  mount_image
+  mount_image || return 1
+  import_roms || true
+  process_commands || true
 }
 
 status_mode() {
   printf 'image=%s\n' "$IMAGE"
   printf 'mount_dir=%s\n' "$MOUNT_DIR"
+  printf 'rom_inbox=%s/%s\n' "$MOUNT_DIR" "$ROM_INBOX_NAME"
+  printf 'rom_target=%s\n' "$ROM_TARGET"
   printf 'image_exists=%s\n' "$( [ -s "$IMAGE" ] && echo 1 || echo 0 )"
   printf 'mounted=%s\n' "$( is_mounted && echo 1 || echo 0 )"
   printf 'gadget_bound=%s\n' "$( gadget_bound && echo 1 || echo 0 )"
   printf 'udc_state=%s\n' "$(udc_state)"
   if is_mounted; then
+    printf 'rom_pending=%s\n' "$(find "${MOUNT_DIR}/${ROM_INBOX_NAME}" -type f ! -path "${MOUNT_DIR}/${ROM_INBOX_NAME}/README.TXT" 2>/dev/null | wc -l | tr -d ' ')"
     printf 'command_script=%s\n' "$( [ -f "${MOUNT_DIR}/${COMMAND_DIR_NAME}/run.sh" ] && echo 1 || echo 0 )"
     printf 'command_armed=%s\n' "$( [ -e "${MOUNT_DIR}/${COMMAND_DIR_NAME}/ALLOW_EXECUTE" ] && echo 1 || echo 0 )"
     printf 'latest_result=%s\n' "$( [ -f "${MOUNT_DIR}/RESULT-LATEST.txt" ] && echo 1 || echo 0 )"
@@ -527,6 +605,9 @@ case "${1:-status}" in
     ;;
   process-commands)
     process_commands
+    ;;
+  import-roms)
+    import_roms
     ;;
   status)
     status_mode
