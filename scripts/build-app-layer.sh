@@ -486,12 +486,20 @@ nextcommander_root="$nextcommander_dir/plumos"
 if require_or_note_missing "$nextcommander_root/apps/nextcommander/bin/NextCommander" "nextcommander"; then
     copy_tree "$nextcommander_root" "$out_dir"
     record_tree "$nextcommander_root" "nextcommander" "$nextcommander_root"
+    if [ -f "$nextcommander_dir/nextcommander.manifest" ]; then
+        copy_file "$nextcommander_dir/nextcommander.manifest" "$out_dir/licenses/nextcommander-manifest.txt"
+        record_file "licenses/nextcommander-manifest.txt" "nextcommander" "$nextcommander_dir/nextcommander.manifest"
+    fi
 fi
 
 music_player_root="$music_player_dir/plumos"
 if require_or_note_missing "$music_player_root/apps/music-player/bin/plumos-music-player.bin" "music-player"; then
     copy_tree "$music_player_root" "$out_dir"
     record_tree "$music_player_root" "music-player" "$music_player_root"
+    if [ -f "$music_player_dir/music-player.manifest" ]; then
+        copy_file "$music_player_dir/music-player.manifest" "$out_dir/licenses/music-player-manifest.txt"
+        record_file "licenses/music-player-manifest.txt" "music-player" "$music_player_dir/music-player.manifest"
+    fi
 fi
 
 portmaster_root="$portmaster_dir/plumos"

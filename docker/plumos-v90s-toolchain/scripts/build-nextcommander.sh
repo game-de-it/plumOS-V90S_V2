@@ -208,6 +208,24 @@ EOF
   } >"${doc_dir}/manifest.txt"
   cp -f "${build_log}" "${doc_dir}/build.log"
 
+  {
+    printf 'artifact_name=nextcommander\n'
+    printf 'artifact_type=application\n'
+    printf 'target=powkiddy-v90s-aarch64\n'
+    printf 'version_or_git_ref=%s\n' "${NEXTCOMMANDER_REF}"
+    printf 'source_url_or_input_path=%s\n' "${NEXTCOMMANDER_REPO}"
+    printf 'patches=nextcommander-v90s.patch\n'
+    printf 'builder_image=%s\n' "${PLUMOS_V90S_DOCKER_IMAGE:-plumos-v90s-toolchain:dev}"
+    printf 'build_timestamp_utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf 'compat_vendor=%s\n' "${PLUMOS_V90S_VENDOR_RUNTIME_ID:-v90s-stockos-r1}"
+    printf 'output_path=%s\n' "${TARGET_DIR}"
+  } >"${TARGET_DIR}/nextcommander.manifest"
+  find "${TARGET_DIR}" -type f ! -name checksums.sha256 | sort |
+    while IFS= read -r file; do
+      rel=${file#"${TARGET_DIR}/"}
+      sha256sum "${file}" | awk -v rel="${rel}" '{print $1 "  " rel}'
+    done >"${TARGET_DIR}/checksums.sha256"
+
   msg "staged ${TARGET_DIR}"
 }
 

@@ -47,7 +47,7 @@ Commands:
   standalone [ID...] Build all standalone emulators, only selected IDs, or launcher-only.
   frontend         Build the V90S frontend ported from plumOS-MMF.
   release          Assemble update-only release packages from the app layer.
-  all              Reserved for the normal release build chain.
+  all              Build the normal release chain in dependency order.
 
 Environment:
   PLUMOS_V90S_DOCKER_IMAGE     Docker image tag. Default: ${IMAGE}
@@ -65,7 +65,10 @@ Environment:
   PLUMOS_STANDALONE_FILTER      Standalone emulator filter used when no IDs are
                                   passed. Default: all.
   PLUMOS_PORTMASTER_AUDIT_JOBS Concurrent PortMaster payload downloads. Default: 4.
-  PLUMOS_V90S_SYSTEM_VERSION  Version embedded in a System SquashFS/update.
+  PLUMOS_V90S_RELEASE_VERSION Version used by the normal release chain.
+  PLUMOS_V90S_APP_LAYER_VERSION
+                                Version embedded in the p3 Runtime app layer.
+  PLUMOS_V90S_SYSTEM_VERSION   Version embedded in a System SquashFS/update.
 
 Porting note:
   This is the V90S equivalent of the MMF Docker build entrypoint. The target
@@ -106,6 +109,8 @@ docker_env=(
     -e PLUMOS_V90S_SSH_AUTHORIZED_KEYS="${PLUMOS_V90S_SSH_AUTHORIZED_KEYS:-}"
     -e PLUMOS_V90S_SSH_ROOT_PASSWORD="${PLUMOS_V90S_SSH_ROOT_PASSWORD:-}"
     -e PLUMOS_V90S_RETROARCH_START_MODE="${PLUMOS_V90S_RETROARCH_START_MODE:-}"
+    -e PLUMOS_V90S_RELEASE_VERSION="${PLUMOS_V90S_RELEASE_VERSION:-}"
+    -e PLUMOS_V90S_APP_LAYER_VERSION="${PLUMOS_V90S_APP_LAYER_VERSION:-}"
     -e PLUMOS_V90S_SYSTEM_VERSION="${PLUMOS_V90S_SYSTEM_VERSION:-}"
     -e CORE_RECIPES="${CORE_RECIPES:-/workspace/docker/plumos-v90s-toolchain/libretro-core-recipes.tsv}"
     -e PLUMOS_CORE_FILTER="${PLUMOS_CORE_FILTER:-plumos}"
@@ -356,9 +361,7 @@ case "$cmd" in
             /workspace/docker/plumos-v90s-toolchain/scripts/build-picoarch.sh "$@"
         ;;
     all)
-        echo "error: $cmd is reserved but not implemented yet for V90S" >&2
-        echo "hint: add docker/plumos-v90s-toolchain/scripts/build-$cmd.sh when the runtime contract is pinned" >&2
-        exit 3
+        "$ROOT_DIR/scripts/build-v90s-all.sh" "$@"
         ;;
     -h|--help|help|"")
         usage
