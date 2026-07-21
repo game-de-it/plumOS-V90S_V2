@@ -250,8 +250,8 @@ missing-factory failure, backup, and restoration.
 
 ## Remaining Hardware Validation
 
-PPSSPP still needs save persistence and clean return to the FE. Its config
-persistence, controller, display, audio, race-start stability, and Ridge Racers
-performance characteristics are validated. ScummVM, EasyRPG Player, OpenBOR,
-DOSBox Staging, and PCSX-ReARMed still need complete real-device display,
-audio, controller, save, and FE-return passes.
+PPSSPP still needs save persistence; normal exit and clean return to the FE are
+validated. ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed now have physical
+display, audio, controller, and exit validation. DOSBox Staging reaches and
+continuously runs the DOOM title screen after its V90S alpha and native PATH
+launch fixes; controller, audio, exit, and FE return remain to be confirmed.

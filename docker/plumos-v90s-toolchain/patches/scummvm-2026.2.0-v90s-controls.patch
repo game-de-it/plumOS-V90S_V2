@@ -1,0 +1,119 @@
+diff --git a/backends/events/sdl/sdl-common-events.cpp b/backends/events/sdl/sdl-common-events.cpp
+index 113665ce6..3c4670723 100644
+--- a/backends/events/sdl/sdl-common-events.cpp
++++ b/backends/events/sdl/sdl-common-events.cpp
+@@ -216,6 +216,40 @@ bool SdlEventSource::handleJoyHatMotion(SDL_Event &ev, Common::Event &event) {
+ 	return false;
+ }
+ 
++#if defined(PLUMOS_V90S)
++bool SdlEventSource::pollV90sHatMouse(Common::Event &event) {
++	if (_lastHatPosition == SDL_HAT_CENTERED || !_graphicsManager)
++		return false;
++
++	const uint32 now = SDL_GetTicks();
++	if (now - _v90sLastHatMouseTime < 16)
++		return false;
++	_v90sLastHatMouseTime = now;
++
++	const int xMax = _graphicsManager->getWindowWidth() - 1;
++	const int yMax = _graphicsManager->getWindowHeight() - 1;
++	if (xMax < 1 || yMax < 1)
++		return false;
++
++	if (!_v90sHatMouseStarted) {
++		_mouseX = xMax / 2;
++		_mouseY = yMax / 2;
++		_v90sHatMouseStarted = true;
++	}
++
++	const int dx = ((_lastHatPosition & SDL_HAT_RIGHT) ? 1 : 0) -
++	               ((_lastHatPosition & SDL_HAT_LEFT) ? 1 : 0);
++	const int dy = ((_lastHatPosition & SDL_HAT_DOWN) ? 1 : 0) -
++	               ((_lastHatPosition & SDL_HAT_UP) ? 1 : 0);
++	const int speed = 8;
++	const int x = CLIP(_mouseX + dx * speed, 0, xMax);
++	const int y = CLIP(_mouseY + dy * speed, 0, yMax);
++
++	event.type = Common::EVENT_MOUSEMOVE;
++	return processMouseEvent(event, x, y, x - _mouseX, y - _mouseY);
++}
++#endif
++
+ bool SdlEventSource::remapKey(SDL_Event &ev, Common::Event &event) {
+ 	return false;
+ }
+diff --git a/backends/events/sdl/sdl-events.h b/backends/events/sdl/sdl-events.h
+index 0a94826df..9992e2771 100644
+--- a/backends/events/sdl/sdl-events.h
++++ b/backends/events/sdl/sdl-events.h
+@@ -140,6 +140,9 @@ protected:
+ 	virtual bool handleJoyAxisMotion(SDL_Event &ev, Common::Event &event);
+ 	virtual bool handleJoyHatMotion(SDL_Event &ev, Common::Event &event);
+ 
++#if defined(PLUMOS_V90S)
++	bool pollV90sHatMouse(Common::Event &event);
++#endif
+ #if SDL_VERSION_ATLEAST(2, 0, 0)
+ 	virtual bool handleJoystickAdded(const SDL_JoyDeviceEvent &device, Common::Event &event);
+ 	virtual bool handleJoystickRemoved(const SDL_JoyDeviceEvent &device, Common::Event &event);
+@@ -214,6 +217,10 @@ protected:
+ 	Common::Event _fakeMouseMove;
+ 
+ 	uint8 _lastHatPosition;
++#if defined(PLUMOS_V90S)
++	uint32 _v90sLastHatMouseTime = 0;
++	bool _v90sHatMouseStarted = false;
++#endif
+ 
+ #if SDL_VERSION_ATLEAST(2, 0, 0)
+ 	/**
+diff --git a/backends/events/sdl/sdl2-events.cpp b/backends/events/sdl/sdl2-events.cpp
+index 4dad90da2..81e73e2d6 100644
+--- a/backends/events/sdl/sdl2-events.cpp
++++ b/backends/events/sdl/sdl2-events.cpp
+@@ -684,6 +684,11 @@ bool SdlEventSource::pollEvent(Common::Event &event) {
+ 			return true;
+ 	}
+ 
++#if defined(PLUMOS_V90S)
++	if (pollV90sHatMouse(event))
++		return true;
++#endif
++
+ 	return false;
+ }
+ 
+@@ -1026,6 +1031,32 @@ bool SdlEventSource::handleControllerButton(const SDL_Event &ev, Common::Event &
+ 	if (button < 0)
+ 		return false;
+ 
++#if defined(PLUMOS_V90S)
++	uint8 hatMask = SDL_HAT_CENTERED;
++	switch (button) {
++	case Common::JOYSTICK_BUTTON_DPAD_UP:
++		hatMask = SDL_HAT_UP;
++		break;
++	case Common::JOYSTICK_BUTTON_DPAD_DOWN:
++		hatMask = SDL_HAT_DOWN;
++		break;
++	case Common::JOYSTICK_BUTTON_DPAD_LEFT:
++		hatMask = SDL_HAT_LEFT;
++		break;
++	case Common::JOYSTICK_BUTTON_DPAD_RIGHT:
++		hatMask = SDL_HAT_RIGHT;
++		break;
++	default:
++		break;
++	}
++	if (hatMask != SDL_HAT_CENTERED) {
++		if (buttonUp)
++			_lastHatPosition &= ~hatMask;
++		else
++			_lastHatPosition |= hatMask;
++	}
++#endif
++
+ 	event.type = buttonUp ? Common::EVENT_JOYBUTTON_UP : Common::EVENT_JOYBUTTON_DOWN;
+ 	event.joystick.button = button;
+ 

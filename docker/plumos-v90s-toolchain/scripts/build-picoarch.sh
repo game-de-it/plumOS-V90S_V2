@@ -58,7 +58,7 @@ git -C "$SRC" apply \
 git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-content-dir.patch"
 
-perl -0pi -e 's/\tjoycount = SDL_NumJoysticks\(\);/\tjoycount = 0; \/\* V90S controller is owned by evdev. \*\// or die "SDL joystick marker missing\n"' \
+perl -0pi -e 's{\tSDL_InitSubSystem\(SDL_INIT_JOYSTICK\);\n\n\tjoycount = SDL_NumJoysticks\(\);}{\t/* V90S controller and HAT input are owned exclusively by evdev. */\n\tjoycount = 0;} or die "SDL joystick initialization marker missing\n"' \
   "$SRC/libpicofe/in_sdl.c"
 
 perl -0pi -e 's{// begin miyoo hardware scaling support.*?// end miyoo hardware scaling support}{static void buffer_init(void) {}\nstatic void buffer_quit(void) {}\nstatic void buffer_scale(unsigned w, unsigned h, size_t pitch, const void *src) {\n\tscale(w, h, pitch, src, screen->pixels);\n}}s or die "Miyoo video block marker missing\n";
@@ -84,6 +84,8 @@ git -C "$SRC" apply \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-frame-audio-callback.patch"
 git -C "$SRC" apply --recount \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-async-audio-callback.patch"
+git -C "$SRC" apply \
+  "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-frame-pacing.patch"
 git -C "$SRC" apply --recount --unidiff-zero \
   "$ROOT/docker/plumos-v90s-toolchain/picoarch/picoarch-v90s-display-audio-rate.patch"
 
@@ -127,6 +129,7 @@ sdl12_compat_ref=$SDL12_REF
 architecture=aarch64
 core_route=/mnt/plumos/cores/*_libretro.so
 video_route=V90S-fbdev-RGB565-to-BGRA8888-double-buffer
+input_route=adc_gamepad-evdev-only
 EOF
 
 find "$OUT" -type f ! -name checksums.sha256 -print0 | sort -z | \

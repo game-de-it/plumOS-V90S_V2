@@ -258,12 +258,19 @@ build_ppsspp() {
 }
 
 build_scummvm() {
-  local src=$1 bin data file
+  local src=$1 bin data file patch_file
   data="${OUT_DIR}/standalone/scummvm/share/scummvm"
+  patch_file="${PATCH_DIR}/scummvm-2026.2.0-v90s-controls.patch"
+  if patch --dry-run -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${patch_file}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    msg "ScummVM V90S controls patch does not apply cleanly"
+    return 1
+  fi
   (
     cd "${src}" || exit 1
     env CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" \
-      CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS}" LDFLAGS="${COMMON_LDFLAGS}" \
+      CFLAGS="${COMMON_CFLAGS}" CXXFLAGS="${COMMON_CXXFLAGS} -DPLUMOS_V90S=1" LDFLAGS="${COMMON_LDFLAGS}" \
       ./configure --backend=sdl --prefix=/mnt/plumos/standalone/scummvm \
         --enable-release --disable-debug --disable-all-engines \
         --enable-engine="${SCUMMVM_ENGINES}" --disable-mt32emu --disable-seq-midi \
@@ -315,9 +322,16 @@ build_easyrpg() {
 }
 
 build_openbor() {
-  local src=$1 engine bin
+  local src=$1 engine bin patch_file
   engine="${src}/engine"
   bin="${src}/engine/OpenBOR"
+  patch_file="${PATCH_DIR}/openbor-v6391-v90s-video.patch"
+  if patch --dry-run -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${patch_file}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    echo "OpenBOR V90S video patch does not apply cleanly" >&2
+    return 1
+  fi
   sed -i 's/-Wall -Werror/-Wall/g' "${engine}/Makefile"
   (
     cd "${engine}" || exit 1
@@ -325,18 +339,27 @@ build_openbor() {
     make -j"${JOBS}" BUILD_LINUX=1 BUILD_MMX= BUILD_OPENGL= BUILD_LOADGL= \
       BUILD_WEBM= NO_STRIP=1 VERSION_NAME=OpenBOR LNXDEV=/usr/bin PREFIX= \
       GCC_TARGET=aarch64-linux-gnu TARGET_ARCH=aarch64 \
-      ARCHFLAGS="${COMMON_CFLAGS} -fcommon -Isource/webmlib" \
+      ARCHFLAGS="${COMMON_CFLAGS} -DPLUMOS_V90S=1 -fcommon -Isource/webmlib" \
       LIBRARIES=/usr/lib/aarch64-linux-gnu CC="${CC}"
   ) || return 1
   stage_binary openbor "${bin}" OpenBOR
 }
 
 build_dosbox() {
-  local src=$1 build bin resources
+  local src=$1 build bin resources patch_file
   build="${src}/build-v90s"
   resources="${OUT_DIR}/standalone/dosbox-staging/resources"
+  patch_file="${PATCH_DIR}/dosbox-staging-0.82.2-v90s-video.patch"
+  if patch --dry-run -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    patch -d "${src}" -p1 <"${patch_file}" || return 1
+  elif ! patch --dry-run -R -d "${src}" -p1 <"${patch_file}" >/dev/null 2>&1; then
+    echo "DOSBox Staging V90S video patch does not apply cleanly" >&2
+    return 1
+  fi
   rm -rf "${build}"
-  meson setup "${build}" "${src}" --prefix=/mnt/plumos/standalone/dosbox-staging \
+  CFLAGS="${COMMON_CFLAGS} -DPLUMOS_V90S=1" \
+  CXXFLAGS="${COMMON_CXXFLAGS} -DPLUMOS_V90S=1" \
+    meson setup "${build}" "${src}" --prefix=/mnt/plumos/standalone/dosbox-staging \
     --buildtype=release -Duse_sdl2_net=false -Duse_opengl=false \
     -Duse_fluidsynth=false -Duse_mt32emu=false -Duse_slirp=false \
     -Duse_alsa=true -Duse_xinput2=false -Ddynamic_core=dynrec \
@@ -729,6 +752,8 @@ case "${cpu_policy}" in
     ;;
 esac
 
+openbor_workdir=
+dosbox_workdir=
 case "${id}" in
   ppsspp)
     exe="${EMU_ROOT}/ppsspp/bin/PPSSPPSDL"
@@ -813,7 +838,32 @@ case "${id}" in
       fi
     done
     ;;
-  scummvm) exe="${EMU_ROOT}/scummvm/bin/scummvm" ;;
+  scummvm)
+    exe="${EMU_ROOT}/scummvm/bin/scummvm"
+    content=${1:-}
+    [ -n "${content}" ] || { echo "missing ScummVM content path" >&2; exit 2; }
+    shift
+    if [ -d "${content}" ]; then
+      game_dir=${content}
+    elif [ -f "${content}" ]; then
+      game_dir=${content%/*}
+      [ "${game_dir}" != "${content}" ] || game_dir=.
+    else
+      echo "missing ScummVM content: ${content}" >&2
+      exit 2
+    fi
+    scummvm_config_dir="${XDG_CONFIG_HOME}/scummvm"
+    scummvm_save_dir="${XDG_DATA_HOME}/scummvm/saves"
+    scummvm_screenshot_dir="${XDG_DATA_HOME}/scummvm/screenshots"
+    mkdir -p "${scummvm_config_dir}" "${scummvm_save_dir}" \
+      "${scummvm_screenshot_dir}"
+    set -- --config="${scummvm_config_dir}/scummvm.ini" \
+      --savepath="${scummvm_save_dir}" \
+      --screenshotpath="${scummvm_screenshot_dir}" \
+      --themepath="${EMU_ROOT}/scummvm/share/scummvm" \
+      --extrapath="${EMU_ROOT}/scummvm/share/scummvm" \
+      --fullscreen --path="${game_dir}" --auto-detect
+    ;;
   easyrpg)
     exe="${EMU_ROOT}/easyrpg/bin/easyrpg-player"
     project=${1:-}
@@ -832,8 +882,78 @@ case "${id}" in
     fi
     set -- --project-path "${project}" "$@"
     ;;
-  openbor) exe="${EMU_ROOT}/openbor/bin/OpenBOR" ;;
-  dosbox-staging) exe="${EMU_ROOT}/dosbox-staging/bin/dosbox" ;;
+  openbor)
+    exe="${EMU_ROOT}/openbor/bin/OpenBOR"
+    pak=${1:-}
+    [ -n "${pak}" ] || { echo "missing OpenBOR PAK path" >&2; exit 2; }
+    [ -f "${pak}" ] || { echo "missing OpenBOR PAK: ${pak}" >&2; exit 2; }
+    shift
+    openbor_state_dir="${XDG_DATA_HOME}/openbor"
+    openbor_workdir="${PLUMOS_RUNTIME_ROOT}/standalone/openbor-work.$$"
+    mkdir -p "${openbor_state_dir}/Saves" "${openbor_state_dir}/Logs" \
+      "${openbor_state_dir}/ScreenShots" "${openbor_workdir}/Paks"
+    for openbor_dir in Saves Logs ScreenShots; do
+      ln -s "${openbor_state_dir}/${openbor_dir}" \
+        "${openbor_workdir}/${openbor_dir}"
+    done
+    pak_name=${pak##*/}
+    ln -s "${pak}" "${openbor_workdir}/Paks/${pak_name}"
+    workdir=${openbor_workdir}
+    set --
+    ;;
+  dosbox-staging)
+    exe="${EMU_ROOT}/dosbox-staging/bin/dosbox"
+    content=${1:-}
+    [ -n "${content}" ] || { echo "missing DOS content path" >&2; exit 2; }
+    shift
+    case "${content}" in
+      *.[zZ][iI][pP])
+        content_name=${content##*/}
+        content_stem=${content_name%.[zZ][iI][pP]}
+        case "${content_stem}" in
+          DOSBOX_*) executable_stem=${content_stem#DOSBOX_} ;;
+          dosbox_*) executable_stem=${content_stem#dosbox_} ;;
+          *) executable_stem=${content_stem} ;;
+        esac
+        safe_stem=$(printf '%s' "${content_stem}" | tr -c 'A-Za-z0-9._-' '_')
+        dosbox_workdir="${XDG_CACHE_HOME}/content/${safe_stem}.$$"
+        mkdir -p "${dosbox_workdir}"
+        if ! unzip -oq "${content}" -d "${dosbox_workdir}"; then
+          echo "failed to extract DOS ZIP: ${content}" >&2
+          exit 78
+        fi
+        dosbox_entry=$(find "${dosbox_workdir}" -type f \
+          -iname "${executable_stem}.exe" -print -quit 2>/dev/null || true)
+        if [ -z "${dosbox_entry}" ]; then
+          dosbox_candidates=$(find "${dosbox_workdir}" -type f \
+            \( -iname '*.exe' -o -iname '*.com' -o -iname '*.bat' \) \
+            -print 2>/dev/null || true)
+          dosbox_candidate_count=$(printf '%s\n' "${dosbox_candidates}" | \
+            sed '/^$/d' | wc -l | tr -d ' ')
+          if [ "${dosbox_candidate_count}" = 1 ]; then
+            dosbox_entry=${dosbox_candidates}
+          else
+            echo "DOS ZIP entry is ambiguous: expected ${executable_stem}.exe, candidates=${dosbox_candidate_count}" >&2
+            exit 78
+          fi
+        fi
+        # Let DOSBox Staging mount the executable's parent and run it via its
+        # native PATH contract. Quoted commands passed with -c are accepted by
+        # the shell but silently skip executable launch on this target.
+        set -- -noconsole --fullscreen "${dosbox_entry}" "$@"
+        ;;
+      *.[eE][xX][eE]|*.[cC][oO][mM]|*.[bB][aA][tT])
+        set -- -noconsole --fullscreen "${content}" "$@"
+        ;;
+      *.[cC][oO][nN][fF])
+        set -- -noconsole -fullscreen -conf "${content}" "$@"
+        ;;
+      *)
+        echo "unsupported standalone DOS content: ${content}" >&2
+        exit 78
+        ;;
+    esac
+    ;;
   pcsx_rearmed)
     exe="${EMU_ROOT}/pcsx_rearmed/bin/pcsx"
     pcsx_sdl12_dir="${EMU_ROOT}/pcsx_rearmed/lib"
@@ -892,6 +1012,14 @@ cleanup_pid_records() {
   recorded_pid=$(cat "${pid_file}" 2>/dev/null || true)
   if [ -n "${child_pid}" ] && [ "${recorded_pid}" = "${child_pid}" ]; then
     rm -f "${pid_file}" "${exe_file}"
+  fi
+  if [ -n "${openbor_workdir}" ]; then
+    find "${openbor_workdir}" -mindepth 1 -maxdepth 2 -type l -delete \
+      2>/dev/null || true
+    rmdir "${openbor_workdir}/Paks" "${openbor_workdir}" 2>/dev/null || true
+  fi
+  if [ -n "${dosbox_workdir}" ]; then
+    rm -rf "${dosbox_workdir}" 2>/dev/null || true
   fi
 }
 trap cleanup_pid_records EXIT

@@ -1,0 +1,137 @@
+diff --git a/engine/sdl/video.c b/engine/sdl/video.c
+index ff4b37e..0e742f9 100644
+--- a/engine/sdl/video.c
++++ b/engine/sdl/video.c
+@@ -159,6 +159,11 @@ int video_set_mode(s_videomodes videomodes)
+ 	stored_videomodes = videomodes;
+ 	yuv_mode = 0;
+ 
++#ifdef PLUMOS_V90S
++	savedata.fullscreen = 1;
++	savedata.stretch = 1;
++#endif
++
+ 	if(videomodes.hRes==0 && videomodes.vRes==0)
+ 	{
+ 		Term_Gfx();
+@@ -193,6 +198,7 @@ int video_set_mode(s_videomodes videomodes)
+ 	                            videomodes.hRes, videomodes.vRes);
+ 
+ 	SDL_ShowCursor(SDL_DISABLE);
++	SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+ 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+ 	video_stretch(savedata.stretch);
+ 
+@@ -209,15 +215,20 @@ void video_fullscreen_flip()
+ 
+ void blit()
+ {
+-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
++	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+ 	SDL_RenderClear(renderer);
+ 	SDL_RenderCopy(renderer, texture, NULL, NULL);
+ 
+ 	if (brightness > 0)
++	{
+ 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, brightness-1);
++		SDL_RenderFillRect(renderer, NULL);
++	}
+ 	else if (brightness < 0)
++	{
+ 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, (-brightness)-1);
+-	SDL_RenderFillRect(renderer, NULL);
++		SDL_RenderFillRect(renderer, NULL);
++	}
+ 
+ 	SDL_RenderPresent(renderer);
+ }
+@@ -227,6 +238,22 @@ int video_copy_screen(s_screen* src)
+ 	// do any needed scaling and color conversion
+ 	s_videosurface *surface = getVideoSurface(src);
+ 
++#ifdef PLUMOS_V90S
++	/*
++	 * The V90S PowerVR scanout honors the framebuffer alpha byte. OpenBOR's
++	 * indexed-to-32-bit conversion leaves it at zero, making valid RGB output
++	 * invisible. Keep the application output opaque without changing SDL2 for
++	 * other plumOS applications.
++	 */
++	if(surface && surface->pitch >= surface->width * 4)
++	{
++		int x, y;
++		for(y = 0; y < surface->height; y++)
++			for(x = 0; x < surface->width; x++)
++				((unsigned int*)((unsigned char*)surface->data + y * surface->pitch))[x] |= 0xFF000000u;
++	}
++#endif
++
+ 	if(opengl) return video_gl_copy_screen(surface);
+ 
+ 	SDL_UpdateTexture(texture, NULL, surface->data, surface->pitch);
+@@ -243,7 +270,7 @@ void video_clearscreen()
+ {
+ 	if(opengl) { video_gl_clearscreen(); return; }
+ 
+-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
++	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+ 	SDL_RenderClear(renderer);
+ 	SDL_RenderPresent(renderer);
+ }
+diff --git a/engine/sdl/control.h b/engine/sdl/control.h
+index 9450fdb..8638982 100644
+--- a/engine/sdl/control.h
++++ b/engine/sdl/control.h
+@@ -17,7 +17,23 @@
+ #endif
+ #include "joysticks.h"
+ 
+-#ifdef OPENDINGUX
++#ifdef PLUMOS_V90S
++	/* adc_gamepad raw SDL joystick order: b0-b10, a0-a3, h0. */
++	#define CONTROL_ESC                 (JOY_LIST_FIRST + 9)
++	#define CONTROL_DEFAULT1_UP         (JOY_LIST_FIRST + 20)
++	#define CONTROL_DEFAULT1_RIGHT      (JOY_LIST_FIRST + 21)
++	#define CONTROL_DEFAULT1_DOWN       (JOY_LIST_FIRST + 22)
++	#define CONTROL_DEFAULT1_LEFT       (JOY_LIST_FIRST + 23)
++	#define CONTROL_DEFAULT1_FIRE1      (JOY_LIST_FIRST + 1)
++	#define CONTROL_DEFAULT1_FIRE2      (JOY_LIST_FIRST + 4)
++	#define CONTROL_DEFAULT1_FIRE3      (JOY_LIST_FIRST + 6)
++	#define CONTROL_DEFAULT1_FIRE4      (JOY_LIST_FIRST + 5)
++	#define CONTROL_DEFAULT1_FIRE5      (JOY_LIST_FIRST + 2)
++	#define CONTROL_DEFAULT1_FIRE6      (JOY_LIST_FIRST + 3)
++	#define CONTROL_DEFAULT1_START      (JOY_LIST_FIRST + 10)
++	#define CONTROL_DEFAULT1_SCREENSHOT (JOY_LIST_FIRST + 11)
++	#define CONTROL_DEFAULT1_ESC        (JOY_LIST_FIRST + 9)
++#elif defined(OPENDINGUX)
+ 	#define	CONTROL_ESC                 OPENDINGUX_BUTTON_SELECT
+ 	#define	CONTROL_DEFAULT1_START		OPENDINGUX_BUTTON_START
+ 	#define	CONTROL_DEFAULT1_UP         OPENDINGUX_BUTTON_UP
+diff --git a/engine/openbor.c b/engine/openbor.c
+index 5aaa7e6..96bdc39 100644
+--- a/engine/openbor.c
++++ b/engine/openbor.c
+@@ -2547,6 +2547,24 @@ void loadsettings()
+     {
+         clearsettings();
+     }
++#ifdef PLUMOS_V90S
++    else if(savedata.keys[0][SDID_MOVEUP] == SDL_SCANCODE_UP &&
++            savedata.keys[0][SDID_MOVEDOWN] == SDL_SCANCODE_DOWN &&
++            savedata.keys[0][SDID_MOVELEFT] == SDL_SCANCODE_LEFT &&
++            savedata.keys[0][SDID_MOVERIGHT] == SDL_SCANCODE_RIGHT &&
++            savedata.keys[0][SDID_ATTACK] == SDL_SCANCODE_A &&
++            savedata.keys[0][SDID_ATTACK2] == SDL_SCANCODE_S &&
++            savedata.keys[0][SDID_ATTACK3] == SDL_SCANCODE_Z &&
++            savedata.keys[0][SDID_ATTACK4] == SDL_SCANCODE_X &&
++            savedata.keys[0][SDID_JUMP] == SDL_SCANCODE_D &&
++            savedata.keys[0][SDID_SPECIAL] == SDL_SCANCODE_F &&
++            savedata.keys[0][SDID_START] == SDL_SCANCODE_RETURN &&
++            savedata.keys[0][SDID_SCREENSHOT] == SDL_SCANCODE_F12)
++    {
++        clearbuttons(0);
++        savesettings();
++    }
++#endif
+ #else
+     clearsettings();
+ #endif

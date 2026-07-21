@@ -362,10 +362,13 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Validate PPSSPP config persistence: app-layer deployment preserves the
     live `ppsspp.ini` and `controls.ini`, and normal launch does not overwrite
     later user changes.
-  - [ ] Validate PPSSPP save persistence and clean FE return.
-  - [ ] Fix the standalone ScummVM directory launch before validation. The
+  - [x] Validate PPSSPP clean FE return after a normal in-emulator exit.
+  - [ ] Validate PPSSPP save persistence.
+  - [x] Fix the standalone ScummVM directory launch. The
     current generic launcher passes the content directory as a game ID;
     `--auto-detect --path=CONTENT_DIR` launches the same game with normal audio.
+    Standalone, PicoArch, and RetroArch ScummVM have all passed physical display,
+    audio, and controller validation.
   - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, DOSBox Staging, and
     PCSX-ReARMed on the physical V90S.
     - [x] Fix standalone PCSX-ReARMed startup, display, controls, and audio.
@@ -377,15 +380,23 @@ Build plumOS V90S as a V90S-specific distribution:
       restored; real-device testing confirmed that FF exceeds normal speed.
       See
       `docs/validation/2026-07-21-v90s-pcsx-rearmed-standalone.md`.
-    - [ ] Make ScummVM resolve a ROM directory to a valid detected game target.
+    - [x] Make ScummVM resolve a ROM directory to a valid detected game target.
     - [x] Make standalone EasyRPG pass the selected game directory through
       `--project-path` instead of opening its empty player browser. The direct
       corrected launch loads `CookieCutterTurnedIntoGirl`, and the generated
       launcher is deployed; see
       `docs/validation/2026-07-15-v90s-easyrpg-standalone-launch.md`.
-    - [ ] Validate standalone EasyRPG controls, audio, exit, and FE return
-      through the normal frontend route.
-    - [ ] Stage or select the chosen OpenBOR PAK in the runtime `Paks` contract.
+    - [x] Validate standalone EasyRPG controls, audio, exit, and FE return
+      through the normal frontend route. EasyRPG is now physically validated
+      through standalone, RetroArch, and PicoArch.
+    - [x] Stage the selected OpenBOR PAK in an isolated runtime `Paks` contract
+      and validate display, audio, controls, and exit on the physical V90S.
+    - [ ] Complete DOSBox Staging physical validation. The V90S build now forces
+      opaque alpha into 32-bit SDL texture uploads, and the launcher uses
+      DOSBox Staging's native executable `PATH` contract instead of quoted
+      `-c` commands. `DOSBOX_DOOM.ZIP` reaches the DOOM title screen and remains
+      active; controller, audio, exit, and FE return still need confirmation.
+      See `docs/validation/2026-07-21-v90s-dosbox-staging-standalone.md`.
   - [ ] Replace or remove the stale `PORTS/tmp/1.sh` entry that writes to the
     unavailable `/dev/cpuset/foreground/tasks` path.
 - [x] Implement `frontend`.
