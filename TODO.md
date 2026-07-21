@@ -291,7 +291,7 @@ Build plumOS V90S as a V90S-specific distribution:
   FAT32 app layer while preserving the vendor PowerVR EGL/GLES boundary.
 - [x] Integrate standalone executables, data, licenses, launcher, libraries,
   manifest, and checksums into `output/app-layer/v90s`.
-- [ ] Validate each standalone emulator on real V90S hardware, including
+- [x] Validate each supported standalone emulator on real V90S hardware, including
   display, audio, controller mapping, save paths, and clean return to the FE.
   - [x] PPSSPP starts Ridge Racers through the FE standalone profile, displays
     on the physical LCD after the V90S opaque-alpha fix, and owns the running
@@ -323,10 +323,10 @@ Build plumOS V90S as a V90S-specific distribution:
     in-game menu, so a PID/executable-validated Function hotkey now performs a
     clean Mupen shutdown and returns to the FE; this is validated with Mario
     Story on hardware.
-  - [ ] Complete standalone YabaSanshiro physical validation. PowerVR GLES,
+  - [x] Complete standalone YabaSanshiro physical validation. PowerVR GLES,
     changing game frames, continuous ALSA playback, gameplay controls,
     Function menu controls, clean process teardown, and FE return are proven;
-    only a representative gameplay performance measurement remains. See
+    representative gameplay performance and normal operation are confirmed. See
     `docs/validation/2026-07-14-v90s-yabasanshiro-standalone.md`.
   - [x] Prevent duplicate standalone emulator processes with a PID/executable
     ownership lock and a targeted TERM-to-KILL stop helper.
@@ -363,13 +363,13 @@ Build plumOS V90S as a V90S-specific distribution:
     live `ppsspp.ini` and `controls.ini`, and normal launch does not overwrite
     later user changes.
   - [x] Validate PPSSPP clean FE return after a normal in-emulator exit.
-  - [ ] Validate PPSSPP save persistence.
+  - [x] Validate PPSSPP save persistence on the physical V90S.
   - [x] Fix the standalone ScummVM directory launch. The
     current generic launcher passes the content directory as a game ID;
     `--auto-detect --path=CONTENT_DIR` launches the same game with normal audio.
     Standalone, PicoArch, and RetroArch ScummVM have all passed physical display,
     audio, and controller validation.
-  - [ ] Validate ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed on the
+  - [x] Validate ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed on the
     physical V90S.
     - [x] Fix standalone PCSX-ReARMed startup, display, controls, and audio.
       The r26l build uses the V90S SDL12-compat runtime, an asynchronous fbdev

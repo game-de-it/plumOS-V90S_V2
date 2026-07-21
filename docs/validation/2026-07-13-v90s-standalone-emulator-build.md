@@ -249,10 +249,15 @@ clear error instead of creating a hidden minimal configuration.
 isolated build test verified first-run seeding, later user-setting preservation,
 missing-factory failure, backup, and restoration.
 
-## Remaining Hardware Validation
+## Hardware Validation Completion
 
-PPSSPP still needs save persistence; normal exit and clean return to the FE are
-validated. ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed now have physical
-display, audio, controller, and exit validation. DOSBox Staging was removed
-from the supported set on 2026-07-21 after the same DOOM content remained slow
-and produced audio breakup while RetroArch DOSBox Pure was smooth and clean.
+On 2026-07-22 the user confirmed PPSSPP save persistence and normal standalone
+YabaSanshiro gameplay on the physical V90S. The supported standalone set has
+now passed its required display, audio, controller, save-path where applicable,
+and FE-return checks. ScummVM, EasyRPG Player, OpenBOR, and PCSX-ReARMed also
+have physical display, audio, controller, and exit validation.
+
+DOSBox Staging was removed from the supported set on 2026-07-21 after the same
+DOOM content remained slow and produced audio breakup while RetroArch DOSBox
+Pure was smooth and clean. Standalone Flycast remains a diagnostic binary and
+is not exposed as a supported FE route.

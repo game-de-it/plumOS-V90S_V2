@@ -210,3 +210,11 @@ the map and 3D background through the physical bottom edge, and the user
 confirmed that both MAP and game-menu screens no longer contain the lower black
 band. This also proves the shared correction does not depend on RetroArch's GL
 context path.
+
+## Final Hardware Acceptance
+
+On 2026-07-22 the user confirmed that standalone YabaSanshiro gameplay and
+performance have no remaining practical issue on the physical V90S. Together
+with the prior video, audio, gameplay input, emulator-menu input, clean exit,
+and FE-return evidence, this completes the standalone YabaSanshiro acceptance
+check.
