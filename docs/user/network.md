@@ -15,6 +15,24 @@ The settings are saved after the connection succeeds. When automatic time is
 enabled in Time Settings, the clock is also set after Wi-Fi connects. If the
 adapter does not reconnect, insert it again and turn Wi-Fi off and on.
 
+### Supported Wi-Fi Drivers
+
+The current release includes these Realtek USB Wi-Fi drivers:
+
+- `8192eu`
+- `8723bu`
+- `8812au`
+- `8821cu`
+- `88x2bu`
+- `rtl8192cu`
+- `rtl8xxxu`
+
+The adapter verified on real hardware uses USB ID `0bda:c820` with the
+`8821cu` driver. Products sold under the same name may use a different USB ID
+or chipset in another hardware revision. A similar product name alone does not
+confirm compatibility. If an adapter does not work, check its USB ID on a
+computer and include that ID in the problem report.
+
 ## Network Services
 
 Open `START -> Network Settings -> NW Service`. Enabling a checkbox starts that

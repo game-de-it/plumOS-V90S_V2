@@ -61,6 +61,19 @@ V90Sに内蔵Wi-Fiはありません。`plumos-network-control`が対応USB Wi-F
 scan・connect・DHCP段階で制御します。`plumos-wifi-recovery`はnetlink ueventを待ち、ON状態の
 dongleが再追加された時に1回だけ制限付きreconnectを行います。dongleがない時にpollし続けません。
 
+`v90s-stockos-r1`に収録し、network controllerが読み込めるUSB Wi-Fi moduleは次の通りです。
+
+| 種別 | kernel module |
+| --- | --- |
+| StockOS由来extra module | `8192eu`, `8723bu`, `8812au`, `8821cu`, `88x2bu` |
+| vendor kernel標準module | `rtl8192cu`, `rtl8xxxu` |
+
+実機確認済みの経路はUSB ID `0bda:c820`、module `8821cu`、interface `wlan0`です。
+controllerには`8188eu`互換処理もありますが、`v90s-stockos-r1`には独立した
+`8188eu.ko`を収録していないため、対応module一覧には含めません。製品名ではなく
+`/sys/bus/usb/devices/*/idVendor`と`idProduct`を既存moduleの`modules.alias`へ照合します。
+新しいmodule・firmwareをvendor runtimeへ追加する場合は、実機検証後にruntime IDを更新します。
+
 network service状態は`/mnt/plumos/config/network/services.conf`へ保存します。controllerは
 OpenSSH/SFTP、BusyBox FTP、Samba SMB2、ADB FunctionFSを所有します。IPv4なしでONになった
 serviceはwaiting状態となり、FEをblockしません。SSH login PATHは

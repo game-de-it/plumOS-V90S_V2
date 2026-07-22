@@ -72,6 +72,22 @@ interfaces with bounded scan/connect/DHCP stages. `plumos-wifi-recovery` sleeps
 on netlink uevents and performs one bounded reconnect when an enabled dongle is
 re-added; it does not poll indefinitely when no dongle exists.
 
+The USB Wi-Fi modules bundled in `v90s-stockos-r1` and loadable by the network
+controller are:
+
+| Source | Kernel modules |
+| --- | --- |
+| StockOS-derived extra modules | `8192eu`, `8723bu`, `8812au`, `8821cu`, `88x2bu` |
+| Vendor kernel standard modules | `rtl8192cu`, `rtl8xxxu` |
+
+The real-device validated route is USB ID `0bda:c820`, module `8821cu`, and
+interface `wlan0`. The controller contains an `8188eu` compatibility path, but
+`v90s-stockos-r1` does not bundle a separate `8188eu.ko`, so it is not listed as
+a supported module. Match `/sys/bus/usb/devices/*/idVendor` and `idProduct`
+against the bundled `modules.alias` data instead of relying on a retail product
+name. Adding a new module or firmware to the vendor runtime requires real-device
+validation followed by a vendor runtime ID revision.
+
 Network service state is stored in
 `/mnt/plumos/config/network/services.conf`. The controller owns OpenSSH/SFTP,
 BusyBox FTP, Samba SMB2, and ADB FunctionFS. Services enabled without IPv4 enter
