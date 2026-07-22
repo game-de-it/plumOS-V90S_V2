@@ -207,7 +207,7 @@ stage_ppsspp_factory_defaults() {
 
 stage_license() {
   local id=$1 src=$2 file
-  for file in COPYING COPYING.txt LICENSE LICENSE.txt LICENSE.md COPYING.md; do
+  for file in COPYING COPYING.txt LICENSE LICENSE.txt LICENSE.md COPYING.md LICENSES; do
     if [ -f "${src}/${file}" ]; then
       install -m 0644 "${src}/${file}" "${OUT_DIR}/licenses/${id}-${file}"
       append_manifest "  license=licenses/${id}-${file}"

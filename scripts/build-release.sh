@@ -99,6 +99,8 @@ if [ -z "$version" ]; then
     fi
     version="$(sed -n '1p' "$app_layer_dir/VERSION")"
 fi
+
+"$(dirname "$0")/audit-v90s-license-bundle.sh" "$app_layer_dir"
 if [ -z "$version" ]; then
     printf 'error: release version is empty\n' >&2
     exit 2
@@ -125,6 +127,10 @@ archive_zip="$dist_dir/$release_name.zip"
 rm -rf "$release_root" "$archive_tgz" "$archive_zip"
 mkdir -p "$release_root" "$dist_dir"
 rsync -a --delete "$app_layer_dir"/ "$release_root"/
+cp "$app_layer_dir/licenses/plumOS-MIT.txt" "$release_root/LICENSE"
+cp "$app_layer_dir/licenses/NOTICE.txt" "$release_root/NOTICE.md"
+cp "$app_layer_dir/licenses/THIRD_PARTY_NOTICES.md" "$release_root/THIRD_PARTY_NOTICES.md"
+cp "$app_layer_dir/licenses/THIRD_PARTY_NOTICES.ja.md" "$release_root/THIRD_PARTY_NOTICES.ja.md"
 
 if find "$release_root" -type l | grep -q .; then
     printf 'error: release output contains symlinks, not FAT32-safe:\n' >&2

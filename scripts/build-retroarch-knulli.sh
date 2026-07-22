@@ -270,6 +270,8 @@ fi
 
 mkdir -p "$out_dir/usr/local/bin"
 install -m 0755 "$work_dir/.stage/usr/bin/retroarch" "$out_dir/usr/local/bin/$binary_name"
+mkdir -p "$out_dir/licenses"
+install -m 0644 "$work_dir/COPYING" "$out_dir/licenses/RetroArch-COPYING"
 if [ "$binary_name" != "retroarch-knulli" ]; then
     ln -sfn "$binary_name" "$out_dir/usr/local/bin/retroarch-knulli"
 fi
@@ -330,6 +332,7 @@ sha256=$(awk '{print $1}' "$out_dir/$binary_name.sha256")
 factory_config_source=$factory_config
 factory_config_output=$factory_config_rel
 factory_config_sha256=$(awk '{print $1}' "$out_dir/retroarch-v90s-factory.cfg.sha256")
+license=licenses/RetroArch-COPYING
 EOF
 
 printf 'created: %s/usr/local/bin/%s\n' "$out_dir" "$binary_name"

@@ -474,7 +474,7 @@ mkdir -p \
 
 cat > "$stage_dir/plumos/apps/portmaster/installed.json" <<EOF
 {
-  "adapter_version": 9,
+  "adapter_version": 10,
   "channel": "stable",
   "official_md5": "${actual_md5}",
   "official_sha256": "${actual_sha256}",
@@ -490,7 +490,7 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
 cat > "$OUT_DIR/portmaster.manifest" <<EOF
 component=portmaster
 target=powkiddy-v90s
-adapter_version=9
+adapter_version=10
 upstream=PortMaster-GUI
 version=${VERSION}
 channel=stable

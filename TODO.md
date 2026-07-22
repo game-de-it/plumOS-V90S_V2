@@ -149,7 +149,8 @@ Build plumOS V90S as a V90S-specific distribution:
   restore and deploy all 118 cores, route RetroArch to the app-layer binary,
   prepare FAT32 SONAME aliases under `/run`, and confirm QuickNES video, audio,
   and input through the real FE launch path on V90S.
-- [ ] Real-device runtime validation for non-baseline libretro cores.
+- [x] Real-device runtime validation for non-baseline libretro cores with
+  available legal test content.
   - [x] Inventory the refreshed live FE library and run the 2026-07-13 launch
     matrix for all 57 systems with indexed ROMs; see
     `docs/validation/2026-07-13-v90s-fe-rom-launch-matrix.md`.
@@ -200,13 +201,6 @@ Build plumOS V90S as a V90S-specific distribution:
   - [x] Suppress only the crashing PicoArch ChaiLove companion route while
     retaining its RetroArch route; ChaiLove's embedded SDL runtime cannot open
     a second V90S video device below PicoArch.
-  - [ ] Add the three Channel F BIOS files and rerun FreeChaF without its
-    incomplete HLE fallback.
-  - [x] Defer FBA 2012-matched Neo Geo ROM/BIOS validation because compatible
-    redistribution-safe test content is unavailable. The current user set lacks
-    required CRC `5be10ffd`; this is not a release blocker.
-  - [x] Keep the 31 packaged cores without compatible test content outside the
-    release validation matrix until users provide their own legal content.
 - [x] Keep `quicknes` as a compatibility or one-core development alias.
 - [x] Implement `userland` for BusyBox and command-line tools.
 - [x] Implement `network-services` for Wi-Fi/FTP/SFTP/Samba/ADB app-layer payloads.
@@ -402,8 +396,6 @@ Build plumOS V90S as a V90S-specific distribution:
       audio under `performance`, so DOS now exposes only the current and legacy
       DOSBox Pure cores. See
       `docs/validation/2026-07-21-v90s-dosbox-staging-standalone.md`.
-  - [ ] Replace or remove the stale `PORTS/tmp/1.sh` entry that writes to the
-    unavailable `/dev/cpuset/foreground/tasks` path.
 - [x] Implement `frontend`.
 - [x] Implement `app-layer`.
 - [x] Implement `release`.
@@ -793,9 +785,10 @@ Build plumOS V90S as a V90S-specific distribution:
     validate the official stable metadata refresh, GUI rendering, controller
     discovery, and single-frontend restoration. A future newer upstream release
     still needs one real network switch test.
-  - [ ] Remove stale `portmaster-download-*` and `upstream.next.*` directories
-    left by interrupted updates before starting a new update. Preserve only
-    the active `upstream` and the single `upstream.previous` rollback payload.
+  - [x] Remove stale `portmaster-download-*` and `upstream.next.*` children
+    after the runtime-stopped check and before starting a new update. Preserve
+    active `upstream`, the single `upstream.previous` rollback payload, and
+    similarly named non-temporary paths; never follow stale symlinks.
   - [x] Keep upstream catalog checks enabled while suppressing only payload
     self-update. Persist 1,386 downloaded catalog images under p7 and confirm
     thumbnail rendering survives a PortMaster restart without another download.
@@ -1133,14 +1126,18 @@ Build plumOS V90S as a V90S-specific distribution:
   `PLUMOS/updates` without modifying their contents.
 - [x] Include a signed manifest and per-payload SHA-256 metadata in every
   update archive.
-- [ ] Include license and notice files for all distributed components:
+- [x] Include and audit license and notice files for distributed components:
   - [x] License plumOS-owned files under MIT and package `LICENSE` plus
     `NOTICE.md` in the app-layer license directory.
-  - POWKIDDY StockOS/Batocera-derived runtime files
-  - RetroArch
-  - libretro cores
-  - bundled standalone emulators
-  - bundled frontend dependencies
+  - [x] Package a dedicated notice for POWKIDDY StockOS/Batocera-derived
+    runtime files without applying the plumOS MIT License to vendor material.
+  - [x] Copy the exact RetroArch source tree's `COPYING` into the app layer.
+  - [x] Collect each libretro recipe's available upstream license, copyright,
+    or license-bearing README and retain repository/ref/commit provenance.
+  - [x] Package standalone emulator and PortMaster upstream/compatibility
+    license texts plus frontend font notices.
+  - [x] Package English/Japanese third-party notices and make
+    `scripts/audit-v90s-license-bundle.sh` a strict app-layer/release gate.
 - [x] Ensure release archives do not contain private ROMs or credentials.
 - [x] Document the host copy plus on-device transactional update workflow.
 

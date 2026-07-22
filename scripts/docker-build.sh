@@ -39,6 +39,7 @@ Commands:
   system-rootfs    Build a V90S system rootfs payload using scripts/build-step1-rootfs.sh.
   rootfs           Transitional alias for system-rootfs.
   app-layer        Assemble the FAT32 plumOS app/update/data layer.
+  license-audit    Audit the assembled app-layer license and notice bundle.
   update-package   Build a signed Runtime or System update archive.
   sd-image         Assemble the compact four-partition provisioning seed image.
   stockos-image    Assemble the legacy StockOS/Batocera-compatible image.
@@ -330,6 +331,10 @@ case "$cmd" in
     app-layer)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/scripts/build-app-layer.sh "$@"
+        ;;
+    license-audit)
+        ensure_image
+        docker run "${docker_run_user[@]}" /workspace/scripts/audit-v90s-license-bundle.sh "$@"
         ;;
     update-package)
         ensure_image

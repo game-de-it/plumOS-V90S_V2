@@ -1657,8 +1657,13 @@ moves the current `upstream` into that single rollback slot. It must not retain
 an unbounded history of old PortMaster payloads. Download and staging paths
 such as `portmaster-download-*` and `upstream.next.*` are temporary, not version
 history. An interrupted update or power loss can leave those temporary paths
-behind, so the updater should remove stale, non-active temporary paths before a
-future update after validating that no PortMaster process is running.
+behind. Adapter version 10 therefore removes only direct children named
+`portmaster-download-*` or `upstream.next.*` after validating that no
+PortMaster process is running and before any new download begins. It does not
+remove `upstream`, `upstream.previous`, the exact non-temporary
+`upstream.next` path, or unrelated similarly named content. A stale symlink is
+unlinked without following its target, and any cleanup failure aborts the
+update before the active payload is changed.
 
 Pre-switch failure leaves the current payload untouched. A switch failure is
 reported explicitly and leaves the previous payload named

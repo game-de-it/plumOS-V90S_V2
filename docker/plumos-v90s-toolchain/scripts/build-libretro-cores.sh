@@ -939,6 +939,73 @@ EOF_STAGE
   [ "$count" -gt 0 ]
 }
 
+stage_license_file() {
+  local id="$1"
+  local src="$2"
+  local file
+  local destination
+
+  mkdir -p "$OUT_DIR/licenses"
+  for file in \
+      COPYING COPYING.txt COPYING.md Copying \
+      LICENSE LICENSE.txt LICENSE.md LICENSES UNLICENSE License.txt license.txt license.mkd \
+      copyright; do
+    if [ -f "$src/$file" ]; then
+      destination="$OUT_DIR/licenses/${id}-${file//\//_}"
+      cp "$src/$file" "$destination"
+      append_manifest "license=${destination#"$OUT_DIR"/}"
+      return 0
+    fi
+  done
+
+  file="$(find "$src" -mindepth 2 -maxdepth 4 -type f \
+      \( -iname 'COPYING*' -o -iname 'LICENSE*' -o -iname 'UNLICENSE' -o -iname 'copyright' \
+         -o -iname 'GPL*' -o -iname 'LGPL*' \) \
+      | sort | sed -n '1p')"
+  if [ -n "$file" ]; then
+    destination="$OUT_DIR/licenses/${id}-$(basename "$file")"
+    cp "$file" "$destination"
+    append_manifest "license=${destination#"$OUT_DIR"/}"
+    append_manifest "license_source=${file#"$src"/}"
+    return 0
+  fi
+
+  for file in README README.txt README.md readme.txt readme.md; do
+    if [ -f "$src/$file" ] && grep -Eiq \
+        'permission is hereby granted|redistribution and use|gnu (lesser )?general public licen[cs]e|licensed under|source form, for non-commercial|public domain|licen[cs]e agreement' \
+        "$src/$file"; then
+      destination="$OUT_DIR/licenses/${id}-${file}"
+      cp "$src/$file" "$destination"
+      append_manifest "license=${destination#"$OUT_DIR"/}"
+      return 0
+    fi
+  done
+
+  case "$id" in
+    daphne) file="daphne/daphne-1.0-src/daphne.h" ;;
+    snes9x2002) file="src/soundux.c" ;;
+    *) file= ;;
+  esac
+  if [ -n "$file" ] && [ -f "$src/$file" ]; then
+    destination="$OUT_DIR/licenses/${id}-license-bearing-$(basename "$file")"
+    cp "$src/$file" "$destination"
+    append_manifest "license=${destination#"$OUT_DIR"/}"
+    append_manifest "license_source=$file"
+    return 0
+  fi
+
+  # libretro-uzem carries its complete MIT text in the primary source file.
+  if [ "$id" = uzem ] && [ -f "$src/uzem_libretro.cpp" ]; then
+    destination="$OUT_DIR/licenses/uzem-license-bearing-source.cpp"
+    cp "$src/uzem_libretro.cpp" "$destination"
+    append_manifest "license=${destination#"$OUT_DIR"/}"
+    return 0
+  fi
+
+  append_manifest "license=not-found-in-source-root"
+  return 1
+}
+
 build_one_core() {
   local id="$1"
   local class="$2"
@@ -997,6 +1064,7 @@ build_one_core() {
   commit="$(git -C "$src" rev-parse HEAD 2>/dev/null || printf unknown)"
   append_manifest "commit=$commit"
   patch_core_source "$id" "$src" "$log"
+  stage_license_file "$id" "$src" || true
 
   if build_special_core "$id" "$src" "$log"; then
     special_status=0
@@ -1126,6 +1194,7 @@ stage_existing_core() {
     FAILED_COUNT=$((FAILED_COUNT + 1))
     return 0
   fi
+  stage_license_file "$id" "$src" || true
   if stage_outputs "$id" "$src"; then
     append_manifest "status=staged-existing"
     BUILT_COUNT=$((BUILT_COUNT + 1))
@@ -1155,7 +1224,7 @@ EOF_LIST
 fi
 
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/cores" "$OUT_DIR/info" "$OUT_DIR/lib/libretro" "$OUT_DIR/logs" "$(dirname "$SRC_ROOT")"
+mkdir -p "$OUT_DIR/cores" "$OUT_DIR/info" "$OUT_DIR/lib/libretro" "$OUT_DIR/logs" "$OUT_DIR/licenses" "$(dirname "$SRC_ROOT")"
 LOG_DIR="$OUT_DIR/logs"
 LOG_DIR_ABS="$(CDPATH= cd -- "$LOG_DIR" && pwd)"
 MANIFEST="$OUT_DIR/libretro-cores.manifest"

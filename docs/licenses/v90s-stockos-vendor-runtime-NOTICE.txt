@@ -1,0 +1,16 @@
+plumOS V90S vendor runtime notice
+
+plumOS V90S uses a POWKIDDY V90S StockOS/Batocera-derived low-level runtime
+identified by plumOS as v90s-stockos-r1. This runtime provides the boot chain,
+Linux 4.9.191 kernel and modules, PowerVR GE8300 firmware and userspace
+libraries, display support, audio support, and hardware-specific input support.
+
+These vendor-derived files are not relicensed under the plumOS MIT License.
+They retain the terms, notices, and restrictions of their original licensors
+and upstream projects. The plumOS repository records their source device,
+file inventory, and hashes in the prepared vendor-runtime manifest and
+SHA256SUMS. plumOS-authored extraction, packaging, configuration, and adapter
+code remains covered by the repository LICENSE.
+
+No ROM or BIOS game content is covered by this notice or distributed as part
+of plumOS releases.

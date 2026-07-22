@@ -42,7 +42,11 @@ EXECUTABLE_FILES = (
     "PortMaster/gptokeyb",
     "PortMaster/gptokeyb2",
 )
-ADAPTER_VERSION = 6
+ADAPTER_VERSION = 10
+STALE_UPDATE_PREFIXES = (
+    "portmaster-download-",
+    "upstream.next.",
+)
 
 
 def fail(message: str) -> NoReturn:
@@ -135,6 +139,30 @@ def ensure_runtime_stopped() -> None:
         pid_file.unlink(missing_ok=True)
 
 
+def cleanup_stale_update_paths() -> list[str]:
+    """Remove only updater-owned temporary children from APP_ROOT."""
+    if not APP_ROOT.is_dir():
+        return []
+
+    removed: list[str] = []
+    for path in sorted(APP_ROOT.iterdir(), key=lambda item: item.name):
+        if not path.name.startswith(STALE_UPDATE_PREFIXES):
+            continue
+        try:
+            if path.is_symlink() or not path.is_dir():
+                path.unlink()
+            else:
+                shutil.rmtree(path)
+        except OSError as error:
+            fail(f"cannot remove stale update path {path.name}: {error}")
+        removed.append(path.name)
+
+    if removed:
+        sync_directory(APP_ROOT)
+        print("Removed stale PortMaster update paths: " + ", ".join(removed))
+    return removed
+
+
 def validate_archive(archive: Path) -> None:
     with zipfile.ZipFile(archive) as zf:
         names = set()
@@ -178,6 +206,7 @@ def download(url: str, destination: Path) -> None:
 
 def install(channel: str, force: bool) -> None:
     ensure_runtime_stopped()
+    cleanup_stale_update_paths()
     version, expected_md5, url = release_record(channel)
     current = installed_version()
     if current == version and not force:

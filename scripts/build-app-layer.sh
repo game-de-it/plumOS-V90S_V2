@@ -25,6 +25,9 @@ retroarch_config_src="${PLUMOS_V90S_RETROARCH_CONFIG_SRC:-configs/retroarch/v90s
 minimum_core_count="${PLUMOS_V90S_MIN_CORE_COUNT:-118}"
 plumos_license="${PLUMOS_V90S_LICENSE_FILE:-LICENSE}"
 plumos_notice="${PLUMOS_V90S_NOTICE_FILE:-NOTICE.md}"
+third_party_notice="${PLUMOS_V90S_THIRD_PARTY_NOTICE_FILE:-THIRD_PARTY_NOTICES.md}"
+third_party_notice_ja="${PLUMOS_V90S_THIRD_PARTY_NOTICE_JA_FILE:-THIRD_PARTY_NOTICES.ja.md}"
+vendor_notice="${PLUMOS_V90S_VENDOR_NOTICE_FILE:-docs/licenses/v90s-stockos-vendor-runtime-NOTICE.txt}"
 strict=0
 
 usage() {
@@ -301,8 +304,23 @@ printf '%s\n' "$mount_path" > "$out_dir/MOUNT_PATH"
     printf 'error: plumOS notice is missing: %s\n' "$plumos_notice" >&2
     exit 1
 }
+[ -f "$third_party_notice" ] || {
+    printf 'error: third-party notice is missing: %s\n' "$third_party_notice" >&2
+    exit 1
+}
+[ -f "$third_party_notice_ja" ] || {
+    printf 'error: Japanese third-party notice is missing: %s\n' "$third_party_notice_ja" >&2
+    exit 1
+}
+[ -f "$vendor_notice" ] || {
+    printf 'error: vendor runtime notice is missing: %s\n' "$vendor_notice" >&2
+    exit 1
+}
 copy_file "$plumos_license" "$out_dir/licenses/plumOS-MIT.txt"
 copy_file "$plumos_notice" "$out_dir/licenses/NOTICE.txt"
+copy_file "$third_party_notice" "$out_dir/licenses/THIRD_PARTY_NOTICES.md"
+copy_file "$third_party_notice_ja" "$out_dir/licenses/THIRD_PARTY_NOTICES.ja.md"
+copy_file "$vendor_notice" "$out_dir/licenses/v90s-stockos-vendor-runtime-NOTICE.txt"
 
 record_file "VERSION" "metadata" "generated"
 record_file "COMPAT_VENDOR" "metadata" "generated"
@@ -310,6 +328,9 @@ record_file "RUNTIME_ABI" "metadata" "generated"
 record_file "MOUNT_PATH" "metadata" "generated"
 record_file "licenses/plumOS-MIT.txt" "license" "$plumos_license"
 record_file "licenses/NOTICE.txt" "notice" "$plumos_notice"
+record_file "licenses/THIRD_PARTY_NOTICES.md" "notice" "$third_party_notice"
+record_file "licenses/THIRD_PARTY_NOTICES.ja.md" "notice" "$third_party_notice_ja"
+record_file "licenses/v90s-stockos-vendor-runtime-NOTICE.txt" "vendor-runtime-notice" "$vendor_notice"
 
 userland_root="$userland_dir/plumos"
 if require_or_note_missing "$userland_root/bin/busybox" "userland"; then
@@ -382,6 +403,10 @@ if require_or_note_missing "$retroarch_src" "retroarch"; then
         copy_file "$retroarch_dir/manifest.txt" "$out_dir/licenses/retroarch-powervr-manifest.txt"
         record_file "licenses/retroarch-powervr-manifest.txt" "retroarch" "$retroarch_dir/manifest.txt"
     fi
+    if [ -d "$retroarch_dir/licenses" ]; then
+        copy_tree "$retroarch_dir/licenses" "$out_dir/licenses/retroarch"
+        record_mapped_tree "$retroarch_dir/licenses" "licenses/retroarch" "retroarch-license" "$retroarch_dir/licenses"
+    fi
 fi
 
 quicknes_src="$cores_dir/quicknes_libretro.so"
@@ -422,6 +447,10 @@ if [ -d "$cores_stage_dir" ]; then
     if [ -f "$cores_dir/checksums.sha256" ]; then
         copy_file "$cores_dir/checksums.sha256" "$out_dir/licenses/libretro-cores-checksums.sha256"
         record_file "licenses/libretro-cores-checksums.sha256" "libretro-core" "$cores_dir/checksums.sha256"
+    fi
+    if [ -d "$cores_dir/licenses" ]; then
+        copy_tree "$cores_dir/licenses" "$out_dir/licenses/libretro-cores"
+        record_mapped_tree "$cores_dir/licenses" "licenses/libretro-cores" "libretro-core-license" "$cores_dir/licenses"
     fi
 elif require_or_note_missing "$quicknes_src" "quicknes"; then
     copy_file "$quicknes_src" "$out_dir/cores/quicknes_libretro.so"
@@ -681,6 +710,10 @@ find "$out_dir" -type f ! -name checksums.sha256 | sort | while IFS= read -r fil
     sha="$(sha256sum "$file" | awk '{print $1}')"
     printf '%s  %s\n' "$sha" "$rel"
 done > "$out_dir/checksums.sha256"
+
+if [ "$strict" -eq 1 ]; then
+    "$(dirname "$0")/audit-v90s-license-bundle.sh" "$out_dir"
+fi
 
 printf 'created: %s\n' "$out_dir"
 printf 'version: %s\n' "$version"
