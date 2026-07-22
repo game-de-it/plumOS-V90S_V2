@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 This TODO follows `docs/plumos-v90s-distribution-policy.md`. Historical Step 1
 and Step 2 bring-up details are preserved in git history and `docs/validation/`.
@@ -10,35 +10,35 @@ Do not use old Armbian-first or KNULLI-first notes as the current plan.
 
 Build plumOS V90S as a V90S-specific distribution:
 
-- StockOS/Batocera-derived vendor runtime provides boot, kernel, PowerVR, audio,
+- [x] StockOS/Batocera-derived vendor runtime provides boot, kernel, PowerVR, audio,
   and low-level input support.
-- plumOS owns userspace behavior, init, launchers, RetroArch, cores, standalone
+- [x] plumOS owns userspace behavior, init, launchers, RetroArch, cores, standalone
   emulators, frontend, configuration, image assembly, and releases.
-- The Linux base lives in a read-only system squashfs.
-- The plumOS-managed runtime lives on p3 ext4 at `/mnt/plumos`; the user-visible
+- [x] The Linux base lives in a read-only system squashfs.
+- [x] The plumOS-managed runtime lives on p3 ext4 at `/mnt/plumos`; the user-visible
   ROM/BIOS/media/import/export layer lives on p4 FAT32 at `/mnt/plumos-user`.
-- Normal updates are copied from Windows or macOS to p4 `PLUMOS/updates` and
+- [x] Normal updates are copied from Windows or macOS to p4 `PLUMOS/updates` and
   are transactionally applied to p3 or the inactive p1 System slot.
-- Global volume uses 12 software-gain steps, with immediate tmpfs updates and
+- [x] Global volume uses 12 software-gain steps, with immediate tmpfs updates and
   delayed persistence so physical-key feedback does not wait for mixer probes
   or FAT32 writes.
 
 ## Working Rules
 
-- Read `docs/plumos-v90s-distribution-policy.md` before design or
+- [x] Read `docs/plumos-v90s-distribution-policy.md` before design or
   implementation work.
-- Keep work in small git commits with clear build, validation, or documentation
+- [x] Keep work in small git commits with clear build, validation, or documentation
   boundaries.
-- Keep `artifacts/`, `.cache/`, `output/`, and `dist/` out of git.
-- Treat `artifacts/` as input-only. It may contain private ROMs, extracted
+- [x] Keep `artifacts/`, `.cache/`, `output/`, and `dist/` out of git.
+- [x] Treat `artifacts/` as input-only. It may contain private ROMs, extracted
   vendor files, credentials, or other local-only material.
-- User performs real-device validation. Record each result under
+- [x] User performs real-device validation. Record each result under
   `docs/validation/`.
-- Do not add hidden runtime fallback paths. Keep validation routes explicit.
-- Stop live device processes only through PID-file based tools that validate
+- [x] Do not add hidden runtime fallback paths. Keep validation routes explicit.
+- [x] Stop live device processes only through PID-file based tools that validate
   `/proc/<pid>/comm` or `/proc/<pid>/cmdline`.
-- Do not use broad process-name kills that can affect SSH or unrelated sessions.
-- Release builds must not contain private ROMs, Wi-Fi credentials, SSH keys, or
+- [x] Do not use broad process-name kills that can affect SSH or unrelated sessions.
+- [x] Release builds must not contain private ROMs, Wi-Fi credentials, SSH keys, or
   root passwords.
 
 ## Completed Baseline
@@ -72,14 +72,14 @@ Build plumOS V90S as a V90S-specific distribution:
   migration.
 - [x] Generate `output/vendor/v90s-stockos-r1/vendor-runtime.manifest`.
 - [x] Ensure the vendor manifest includes:
-  - `id=v90s-stockos-r1`
-  - source image or extraction source
-  - capture date
-  - kernel version
-  - boot model
-  - GPU/display route
-  - hashes
-  - known-good validation document
+  - [x] `id=v90s-stockos-r1`
+  - [x] source image or extraction source
+  - [x] capture date
+  - [x] kernel version
+  - [x] boot model
+  - [x] GPU/display route
+  - [x] hashes
+  - [x] known-good validation document
 - [x] Generate `output/vendor/v90s-stockos-r1/SHA256SUMS`.
 - [x] Make `./scripts/docker-build.sh vendor-runtime` run consistently through
   the Docker entry point.
@@ -91,26 +91,26 @@ Build plumOS V90S as a V90S-specific distribution:
 ## Milestone 2: Build System Targets
 
 - [x] Make `scripts/docker-build.sh` expose the official target set:
-  - `image`
-  - `shell`
-  - `vendor-runtime`
-  - `userland`
-  - `network-services`
-  - `sdl2-powervr`
-  - `retroarch`
-  - `cores`
-  - `quicknes`
-  - `picoarch`
-  - `standalone`
-  - `portmaster`
-  - `pyxel-runtime`
-  - `frontend`
-  - `portmaster-audit`
-  - `system-rootfs`
-  - `app-layer`
-  - `sd-image`
-  - `release`
-  - `all`
+  - [x] `image`
+  - [x] `shell`
+  - [x] `vendor-runtime`
+  - [x] `userland`
+  - [x] `network-services`
+  - [x] `sdl2-powervr`
+  - [x] `retroarch`
+  - [x] `cores`
+  - [x] `quicknes`
+  - [x] `picoarch`
+  - [x] `standalone`
+  - [x] `portmaster`
+  - [x] `pyxel-runtime`
+  - [x] `frontend`
+  - [x] `portmaster-audit`
+  - [x] `system-rootfs`
+  - [x] `app-layer`
+  - [x] `sd-image`
+  - [x] `release`
+  - [x] `all`
 - [x] Keep `rootfs` as a transitional alias for `system-rootfs`.
 - [x] Keep `stockos-image` as a transitional alias for `sd-image` while the
   partition contract remains StockOS/Batocera-compatible.
@@ -121,21 +121,21 @@ Build plumOS V90S as a V90S-specific distribution:
   filtered-output directory.
 - [x] Align V90S libretro recipe IDs, repos, refs, and classes with the MMF
   source-built recipe inventory:
-  - `A`: 37 recipes
-  - `B`: 4 recipes
-  - `O`: 61 initial recipes
+  - [x] `A`: 37 recipes
+  - [x] `B`: 4 recipes
+  - [x] `O`: 61 initial recipes
 - [x] Validate that the V90S A/B output matches MMF's built
   `dist/plumos-libretro-cores` file set: 41 cores and 41 `.info` files.
 - [x] Extend and triage the V90S full catalog against the MMF final package:
-  - V90S recipes: `A`: 37, `B`: 4, `O`: 73, total 114
-  - V90S output: 118 `*_libretro.so`
-  - MMF final package output: 117 `*_libretro.so`
-  - filename comparison: no MMF files missing; one V90S-only Flycast Xtreme
+  - [x] V90S recipes: `A`: 37, `B`: 4, `O`: 73, total 114
+  - [x] V90S output: 118 `*_libretro.so`
+  - [x] MMF final package output: 117 `*_libretro.so`
+  - [x] filename comparison: no MMF files missing; one V90S-only Flycast Xtreme
     output is additional
-  - compatibility aliases:
+  - [x] compatibility aliases:
     `dosbox_pure_0.9.7`, `beetle_saturn`,
     `km_puae_xtreme_amped`, and `uae4arm`
-  - V90S Dreamcast extension: one additional `flycast_xtreme` recipe/output is
+  - [x] V90S Dreamcast extension: one additional `flycast_xtreme` recipe/output is
     kept outside the 117-core MMF parity baseline. The A133-oriented build uses
     the KNULLI-pinned metallic77 commit and stages it as
     `flycast_xtreme_libretro.so` without replacing standard Flycast.
@@ -271,15 +271,15 @@ Build plumOS V90S as a V90S-specific distribution:
     `docs/validation/2026-07-21-v90s-picoarch-km-duckstation-audio.md`.
 - [x] Implement `standalone` for the MMF final-package emulator set plus
   V90S PPSSPP, Dreamcast, and N64:
-  - PPSSPP 1.20.4
-  - ScummVM 2026.2.0
-  - EasyRPG Player 0.8.1.1
-  - OpenBOR v6391
-  - PCSX-ReARMed r26l
-  - Flycast 2.6
-  - Mupen64Plus 2.6.0
-  - NXEngine-evo (`21d8aaf`)
-  - YabaSanshiro 2.10.4 (`8406a5c`)
+  - [x] PPSSPP 1.20.4
+  - [x] ScummVM 2026.2.0
+  - [x] EasyRPG Player 0.8.1.1
+  - [x] OpenBOR v6391
+  - [x] PCSX-ReARMed r26l
+  - [x] Flycast 2.6
+  - [x] Mupen64Plus 2.6.0
+  - [x] NXEngine-evo (`21d8aaf`)
+  - [x] YabaSanshiro 2.10.4 (`8406a5c`)
 - [x] Build all nine standalone executables as native aarch64 binaries with
   zero failed recipes.
 - [x] Support incremental one-emulator builds such as
@@ -427,19 +427,19 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Keep Step 1/Step 2 rootfs profiles as explicit development or diagnostic
   profiles only.
 - [x] Keep release `system-rootfs` focused on:
-  - init
-  - mount policy
-  - `/tmp`, `/run`, `/dev`, `/proc`, `/sys`, `/boot`, `/mnt/plumos`
-  - vendor runtime startup glue
-  - PowerVR startup
-  - audio startup
-  - input startup
-  - app-layer Wi-Fi and SSH service launch hooks without embedded credentials
-  - safe process stop/restart helpers
-  - minimal diagnostics and recovery console
-  - app-layer launch wrappers
-  - default configuration templates
-  - base license and notice files
+  - [x] init
+  - [x] mount policy
+  - [x] `/tmp`, `/run`, `/dev`, `/proc`, `/sys`, `/boot`, `/mnt/plumos`
+  - [x] vendor runtime startup glue
+  - [x] PowerVR startup
+  - [x] audio startup
+  - [x] input startup
+  - [x] app-layer Wi-Fi and SSH service launch hooks without embedded credentials
+  - [x] safe process stop/restart helpers
+  - [x] minimal diagnostics and recovery console
+  - [x] app-layer launch wrappers
+  - [x] default configuration templates
+  - [x] base license and notice files
 - [x] Remove normal RetroArch binaries from release squashfs.
 - [x] Remove normal libretro cores from release squashfs.
 - [x] Remove frontend, PicoArch, and standalone emulators from release squashfs.
@@ -491,38 +491,38 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Define the app-layer tree under `output/app-layer/v90s/`.
 - [x] Define the on-device mount path as `/mnt/plumos`.
 - [x] Include app-layer metadata:
-  - `VERSION`
-  - `manifest.json`
-  - `checksums.sha256`
-  - `COMPAT_VENDOR`
+  - [x] `VERSION`
+  - [x] `manifest.json`
+  - [x] `checksums.sha256`
+  - [x] `COMPAT_VENDOR`
 - [x] Set `COMPAT_VENDOR` to `v90s-stockos-r1`.
 - [x] Add directories for:
-  - `bin/`
-  - `gnu/`
-  - `lib/`
-  - `cores/`
-  - `info/`
-  - `frontend/`
-  - `picoarch/`
-  - `standalone/`
-  - `ssh/`
-  - `samba/`
-  - `config/`
-  - `fonts/`
-  - `share/`
-  - `state/`
-  - `themes/`
-  - `Images/`
-  - `media/`
-  - `music/`
-  - `roms/`
-  - `bios/`
-  - `Saves/`
-  - `States/`
-  - `Screenshots/`
-  - `Logs/`
-  - `updates/`
-  - `licenses/`
+  - [x] `bin/`
+  - [x] `gnu/`
+  - [x] `lib/`
+  - [x] `cores/`
+  - [x] `info/`
+  - [x] `frontend/`
+  - [x] `picoarch/`
+  - [x] `standalone/`
+  - [x] `ssh/`
+  - [x] `samba/`
+  - [x] `config/`
+  - [x] `fonts/`
+  - [x] `share/`
+  - [x] `state/`
+  - [x] `themes/`
+  - [x] `Images/`
+  - [x] `media/`
+  - [x] `music/`
+  - [x] `roms/`
+  - [x] `bios/`
+  - [x] `Saves/`
+  - [x] `States/`
+  - [x] `Screenshots/`
+  - [x] `Logs/`
+  - [x] `updates/`
+  - [x] `licenses/`
 - [x] Copy RetroArch into the app layer.
 - [x] Copy supported libretro cores and libretro `.info` metadata into the app
   layer.
@@ -899,11 +899,11 @@ Build plumOS V90S as a V90S-specific distribution:
   validated.
 - [x] Implement the candidate seed layout on
   `codex/four-partition-provisioning`:
-  - raw vendor-compatible `boot0` and `boot_package` offsets
-  - p1 `boot-resource` / `PLUMBOOT` FAT16, exactly 1024 MiB
-  - p2 `boot` Android boot image, exactly 64 MiB
-  - p3 `runtime` / `PLUMOS_SYS` ext4, exactly 1600 MiB in the seed
-  - no p4 in the downloadable seed
+  - [x] raw vendor-compatible `boot0` and `boot_package` offsets
+  - [x] p1 `boot-resource` / `PLUMBOOT` FAT16, exactly 1024 MiB
+  - [x] p2 `boot` Android boot image, exactly 64 MiB
+  - [x] p3 `runtime` / `PLUMOS_SYS` ext4, exactly 1600 MiB in the seed
+  - [x] no p4 in the downloadable seed
 - [x] Build a fixed-default boot package that loads GPT partition `boot`
   without the old external `env` / `env-redund` partitions.
 - [x] Add a p2 provisioning initramfs that validates the known seed geometry,
@@ -1037,16 +1037,16 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Move the normal RetroArch launch path to `/mnt/plumos`; final-seed process
   evidence uses `/mnt/plumos/bin/retroarch`, the app-layer launcher, and cores.
 - [x] Preserve the known-good V90S defaults:
-  - `video_driver = "gl"`
-  - `video_context_driver = "mali_fbdev"`
-  - `video_refresh_rate = "58.917103"`
-  - `video_threaded = "true"`
-  - `vrr_runloop_enable = "true"`
-  - `audio_driver = "alsa"`
-  - `audio_device = "plumos_output"`
-  - `audio_latency = "64"`
-  - `input_driver = "sdl2"`
-  - `input_joypad_driver = "sdl2"`
+  - [x] `video_driver = "gl"`
+  - [x] `video_context_driver = "mali_fbdev"`
+  - [x] `video_refresh_rate = "58.917103"`
+  - [x] `video_threaded = "true"`
+  - [x] `vrr_runloop_enable = "true"`
+  - [x] `audio_driver = "alsa"`
+  - [x] `audio_device = "plumos_output"`
+  - [x] `audio_latency = "64"`
+  - [x] `input_driver = "sdl2"`
+  - [x] `input_joypad_driver = "sdl2"`
 - [x] Ensure users can save RetroArch settings. The live 2026-07-19 V90S cfg
   keeps `config_save_on_exit=true` and is the tracked factory snapshot.
 - [x] Ensure frontend/config tooling does not overwrite user settings on every
@@ -1144,10 +1144,10 @@ Build plumOS V90S as a V90S-specific distribution:
 ## Milestone 8: Validation
 
 - [x] Build and host-verify the policy-aligned four-partition seed with:
-  - fixed `v90s-stockos-r1` vendor kernel/runtime boundary
-  - A/B System SquashFS on p1
-  - fixed vendor kernel, DTB, and plumOS initramfs on p2
-  - ext4 runtime seed on p3 and first-boot-created FAT32 user data on p4
+  - [x] fixed `v90s-stockos-r1` vendor kernel/runtime boundary
+  - [x] A/B System SquashFS on p1
+  - [x] fixed vendor kernel, DTB, and plumOS initramfs on p2
+  - [x] ext4 runtime seed on p3 and first-boot-created FAT32 user data on p4
 - [x] Record host transaction/image validation under `docs/validation/`.
 - [x] User boot-tests the update-enabled seed image on V90S.
 - [x] Confirm LCD output and frontend draw readiness.
