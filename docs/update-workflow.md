@@ -1,65 +1,119 @@
 # plumOS V90S Update Workflow
 
-> This is the current FAT32 copy-over workflow. A candidate archive-inbox plus
-> ext4 transactional update design is documented in
-> `docs/v90s-ext4-runtime-fat32-userdata-update-design.md`. The candidate is
-> still under discussion and has not replaced this workflow.
+This is the developer workflow for the adopted signed update system. End users
+follow the shorter [System Updates](user/updates.md) manual.
 
-This document describes the intended copy-over update flow for the FAT32 app
-layer.
+## Update Types
 
-## Current Package
+- Runtime Update: transactional update of plumOS-managed p3 ext4 files
+- System Update: complete read-only System SquashFS written to the inactive p1
+  A/B slot
 
-The update-only package is generated with:
+The fixed StockOS-derived boot0, boot package, kernel, DTB, p2 initramfs, and
+matching vendor modules are not normal update targets. Change them only in a
+new fully validated SD image.
+
+## Prepare Build Inputs
+
+Build a complete strict app layer and the matching System SquashFS version:
 
 ```sh
-./scripts/docker-build.sh app-layer --strict
-./scripts/docker-build.sh release
+PLUMOS_V90S_APP_LAYER_VERSION=NEW \
+  ./scripts/docker-build.sh app-layer --strict
+
+PLUMOS_V90S_SYSTEM_VERSION=NEW \
+  ./scripts/docker-build.sh system-rootfs
+
+./scripts/docker-build.sh license-audit output/app-layer/v90s
 ```
 
-Outputs:
+The Runtime input must have `manifest.json.complete=true`, no
+`missing_optional` entries, correct `COMPAT_VENDOR`, and a complete
+`checksums.sha256`. The System embedded version must equal the System package
+target version.
+
+## Signing Key
+
+The tracked verification key is:
 
 ```text
-dist/plumos-v90s-update-VERSION/
-dist/plumos-v90s-update-VERSION.tar.gz
-dist/plumos-v90s-update-VERSION.zip
-dist/plumos-v90s-update-VERSION-SHA256SUMS
+package/system-v90s/plumos-update-public.pem
 ```
 
-The current package is not a full SD image. It is the contents that should be
-copied over the future FAT32 app-layer partition mounted on-device at:
+Keep the Ed25519 private key only at the ignored local path:
 
 ```text
-/mnt/plumos
+artifacts/update-signing/plumos-v90s-ed25519-private.pem
 ```
 
-## macOS
+Never commit or place the private key in an app layer, image, log, or release
+archive.
 
-1. Shut down the V90S before removing the SD card.
-2. Insert the SD card into the Mac.
-3. Open the FAT32 plumOS app-layer volume in Finder.
-4. Extract `plumos-v90s-update-VERSION.zip` or `.tar.gz`.
-5. Copy the extracted package contents onto the FAT32 volume, replacing existing
-   files when prompted.
-6. Eject the SD card from Finder before removing it.
+## Build a Runtime Update
 
-## Windows
+```sh
+./scripts/docker-build.sh update-package \
+  --type runtime \
+  --input output/app-layer/v90s \
+  --base-dir PATH/TO/PREVIOUS/RUNTIME \
+  --base-version OLD \
+  --version NEW \
+  --output-dir dist/updates
+```
 
-1. Shut down the V90S before removing the SD card.
-2. Insert the SD card into the PC.
-3. Open the FAT32 plumOS app-layer drive in Explorer.
-4. Extract `plumos-v90s-update-VERSION.zip`.
-5. Copy the extracted package contents onto the FAT32 drive, replacing existing
-   files when prompted.
-6. Use "Safely Remove Hardware" before removing the SD card.
+The base directory is required to calculate managed additions, replacements,
+and deletions while excluding mutable device-owned paths.
 
-## Safety Rules
+## Build a System Update
 
-- Do not copy private ROMs into release packages.
-- Do not copy Wi-Fi credentials, SSH keys, or root passwords into release
-  packages.
-- Do not rely on symlinks in the app layer; FAT32 does not preserve them.
-- Keep `COMPAT_VENDOR` equal to `v90s-stockos-r1` until the vendor runtime is
-  intentionally revised.
-- Validate `checksums.sha256` or `release-checksums.sha256` when debugging a
-  failed update.
+```sh
+./scripts/docker-build.sh update-package \
+  --type system \
+  --input output/system-rootfs/v90s/plumos-v90s-system-rootfs.squashfs \
+  --base-version OLD \
+  --version NEW \
+  --output-dir dist/updates
+```
+
+## Host Delivery
+
+Copy the signed `.tar.gz` archive without extracting it to:
+
+```text
+PLUMOS:/updates/
+/mnt/plumos-user/updates/
+```
+
+The frontend scans this inbox from `System Settings -> System Update`, verifies
+all candidates, selects the newest compatible signed package, records the
+request under p3, and enters the safe reboot path.
+
+## Boot-Time Application
+
+The updater runs from System SquashFS before FE and normal network writers.
+Runtime packages use staging, a write-ahead rollback journal, atomic renames,
+and renderer-ready health confirmation. System packages write and read back the
+inactive p1 slot, commit pending-slot state, and boot it once. Missing health
+proof causes rollback on the next boot.
+
+Exactly one Runtime backup and two fixed System slots are retained. Stale
+updater staging is removed. Archives in p4 remain user-managed.
+
+## Diagnostics
+
+On device:
+
+```sh
+plumos-system-update scan
+plumos-system-update inspect /mnt/plumos-user/updates/PACKAGE.tar.gz
+```
+
+Persistent update state and full logs remain on p3. The bounded host-readable
+failure summary is copied to:
+
+```text
+/mnt/plumos-user/plumos-logs/update/
+```
+
+For package format, trust checks, path rejection, journaling, A/B state, and
+retention rules, see the [Update Contract](plumos-v90s-update-contract.md).

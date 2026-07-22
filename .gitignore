@@ -1,14 +1,147 @@
+# Repository instructions in AGENTS.md are intentionally tracked on V90S.
+# Local handoff files
+HANDOFF.md
+HANDOFF.local.md
+.git.broken-*/
+.git-backup-*/
+.git-backup-current.txt
+
+# Build inputs downloaded locally and generated outputs
 .cache/
 artifacts/
-output/
 build/
 dist/
 dl/
+out/
+output/
+tmp/
+temp/
+*.log
+!docs/validation/logs/*.log
+*.7z
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.txz
+*.xz
+*.zst
 *.img
 *.img.gz
 *.squashfs
-*.tar.gz
-*.log
-*.pyc
-__pycache__/
+*.materialized
+
+# Local OS, editor, and cache files
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.dataless-backup
+
+# Language and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+node_modules/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Accidental copies of the V90S user volume or an SD-card root. These are
+# anchored so package/frontend-v90s/plumos and other source payloads stay tracked.
+/PLUMOS/
+/Roms/
+/roms/
+/BIOS/
+/bios/
+/Images/
+/Saves/
+/States/
+/Screenshots/
+/Themes/
+/Music/
+/Manuals/
+/Cheats/
+# Do not ignore /Patches/: on case-insensitive hosts it would hide the tracked
+# /patches source directory. User patch payloads are covered by ROM/media rules.
+/Shaders/
+/updates/
+/imports/
+/exports/
+/System Volume Information/
+/autorun.ico
+/autorun.inf
+/cachefile
+/plumos/
+
+# User-owned ROM, BIOS, media, save, and state files copied outside the ignored
+# SD-card directories.
+*.a26
+*.a52
+*.a78
+*.adf
+*.adz
+*.atr
+*.bin
+*.chd
+*.cso
+*.cue
+*.d64
+*.gb
+*.gba
+*.gbc
+*.hdf
+*.iso
+*.m3u
+*.nes
+*.pbp
+*.rom
+*.sfc
+*.smc
+*.st
+*.vb
+*.vpk
+*.wad
+*.bps
+*.ips
+*.ppf
+*.ups
+*.xdelta
+*.xdelta3
+*.cht
+*.sav
+*.srm
+*.state
+*.rtc
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.wav
+
+# Local secrets and device-generated credentials. Public examples must use an
+# explicit suffix such as authorized_keys.example or .env.example.
+.env
+.env.*
+!.env.example
+id_rsa*
+id_ed25519*
+*.pem
+!package/system-v90s/plumos-update-public.pem
+*.p12
+*.pfx
+known_hosts
+authorized_keys
+wpa_supplicant.conf
+plumos/ssh/etc/authorized_keys
+plumos/ssh/etc/dropbear_*_host_key
+plumos/config/network/wpa_supplicant.conf
