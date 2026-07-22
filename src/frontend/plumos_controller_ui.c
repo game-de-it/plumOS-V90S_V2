@@ -8605,6 +8605,9 @@ static void render_roms(struct ui_state *ui) {
   size_t start = 0;
   size_t end;
   const char *title = "ROMS";
+  const char *count_label = "ROMS";
+  const char *display_title;
+  char counted_title[160];
   const char *subtitle =
       "A: launch  Y: favorite  B: TOP  LEFT/RIGHT: page  START: menu  SELECT: core menu  POWER: power menu  Q: quit";
 
@@ -8619,10 +8622,12 @@ static void render_roms(struct ui_state *ui) {
 
   if (ui->screen == SCREEN_FAVORITES) {
     title = "FAVORITES";
+    count_label = "ENTRIES";
     subtitle =
         "A: launch  Y: remove  B: TOP  LEFT/RIGHT: page  START: menu  SELECT: core menu  POWER: power menu  Q: quit";
   } else if (ui->screen == SCREEN_RECENT) {
     title = "RECENT";
+    count_label = "ENTRIES";
     subtitle =
         "A: resume  Y: favorite  B: TOP  LEFT/RIGHT: page  START: menu  SELECT: core menu  POWER: power menu  Q: quit";
   } else if (ui->rom_directory[0]) {
@@ -8638,7 +8643,12 @@ static void render_roms(struct ui_state *ui) {
     return;
   }
 
-  ui_printf(ui, "plumOS controller UI - %s\n", title);
+  display_title = ui->screen == SCREEN_ROMS && ui->current_system_name[0]
+                      ? ui->current_system_name
+                      : title;
+  snprintf(counted_title, sizeof(counted_title), "%s  %s %zu", display_title,
+           count_label, ui->rom_count);
+  ui_printf(ui, "plumOS controller UI - %s\n", counted_title);
   if (ui->screen == SCREEN_ROMS) {
     char prompt_path[PATH_MAX];
     ui_printf(ui, "system=%s ROMs=%zu (%s) dir=%s\n", ui->current_system_id,
