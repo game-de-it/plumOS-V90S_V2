@@ -79,6 +79,20 @@ OpenSSH/SFTP、BusyBox FTP、Samba SMB2、ADB FunctionFSを所有します。IPv
 serviceはwaiting状態となり、FEをblockしません。SSH login PATHは
 `/mnt/plumos/bin:/mnt/plumos/gnu/bin`を優先します。
 
+認証契約は次の通りです。
+
+| service | account | 認証 |
+| --- | --- | --- |
+| SSH/SFTP | `root` | release初期passwordなし。公開鍵または`plumos-ssh-password set`で作成した端末固有password |
+| FTP | anonymous | `ftpd -A`。credentialを検証せず、書き込み可能 |
+| Samba | client名`plumos`からlocal `root`へmap | 初期password `plumos`、guest不可、share名`SDCARD` |
+| ADB | なし | USBローカルtransport、user/passwordなし |
+
+SSHの端末固有shadowはp3の`/mnt/plumos/config/ssh/shadow`にだけ保存し、SquashFSの
+`/etc/shadow`へbindします。release image、app-layer、gitへ生成済みshadowを取り込んでは
+いけません。ユーザー向け資格情報を変更した場合は、実装と日英の`docs/user/network*`を
+同じcommitで更新します。
+
 ADBとUSB Disk Modeは同じUSB gadget controllerを使います。ADB uevent helperは外れたUDCを
 修復できますが、mass storageが所有中のgadgetを奪ってはいけません。USB HUBの相性と供給電力は
 物理的制約として残ります。

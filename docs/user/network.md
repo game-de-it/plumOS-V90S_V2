@@ -41,16 +41,29 @@ service and also enables it for later boots.
 Replace `V90S_IP` below with the IP address shown in
 `Network Settings -> Information`, for example `192.168.1.120`.
 
-| Service | Connection |
-| --- | --- |
-| SSH | `ssh root@V90S_IP` on port 22 |
-| SFTP | Same address, account, and port as SSH |
-| FTP | `ftp://V90S_IP` on port 21; writable anonymous access |
-| Samba | `smb://V90S_IP/SDCARD`; user `plumos`, password `plumos` |
-| ADB | Local USB development connection with `adb shell` |
+| Service | Address | User | Initial password |
+| --- | --- | --- | --- |
+| SSH | `ssh root@V90S_IP` (port 22) | `root` | None; set one with the steps below before the first password login |
+| SFTP | `sftp root@V90S_IP` (port 22) | `root` | Same as SSH |
+| FTP | `ftp://V90S_IP` (port 21) | Anonymous; enter `anonymous` if prompted | None; if the client rejects an empty field, enter any text |
+| Samba | `smb://V90S_IP/SDCARD` | `plumos` | `plumos` |
+| ADB | Run `adb shell` after connecting USB | Not required | Not required |
 
-The SSH password can be changed. Turn off services that are not needed. ADB is
-for development and troubleshooting; use it only with a computer you control.
+SSH and SFTP share one device-local password. Release images do not contain an
+initial SSH password. Set one before the first password login:
+
+1. Connect the V90S to the computer over USB and enable ADB in NW Service.
+2. Run `adb shell` in a terminal on the computer.
+3. Run `/mnt/plumos/bin/plumos-ssh-password set`.
+4. Enter the new password as one line and press Enter.
+5. Run `exit`, then enable SSH or SFTP.
+
+The password is stored in the Linux system area on SD1 and persists across
+reboots. Public-key authentication is also available. FTP allows anonymous
+writes, and the initial Samba password is public information. Use these
+services only on a trusted home network and turn off services that are not
+needed. ADB is for development and troubleshooting; use it only with a
+computer you control.
 
 ## USB Disk Mode
 
