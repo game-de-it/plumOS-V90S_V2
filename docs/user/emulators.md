@@ -1,7 +1,7 @@
 # Systems and Emulators
 
-plumOS can launch a system through RetroArch, PicoArch, or a standalone
-emulator. The available choices depend on the system and the installed runtime.
+plumOS provides several ways to launch games. Depending on the game system, it
+uses RetroArch, PicoArch, or a dedicated standalone emulator.
 
 ## Launch a Game
 
@@ -9,39 +9,40 @@ emulator. The available choices depend on the system and the installed runtime.
 2. Select a game in the ROM list or Gallery.
 3. Press A to launch it.
 
-Press SELECT before launching to choose another available emulator profile.
-The chosen profile is saved per system. Systems with only one supported profile
-start directly.
+Press SELECT before launching to choose another launch method. Your choice is
+saved for that game system. If only one method is available, the game starts
+directly.
 
-## Profiles
+## Launch Methods
 
-- **RetroArch (RA)** provides the widest core coverage and an in-game menu.
-- **PicoArch (PICO)** is a small libretro frontend used only for systems with a
-  compatible V90S profile.
-- **Standalone (SA)** runs an emulator outside RetroArch. Its menu and shortcuts
-  depend on that emulator.
+- **RetroArch (RA)** supports the most game systems and has an in-game settings
+  menu.
+- **PicoArch (PICO)** is a lightweight launch method available for supported
+  systems.
+- **Standalone (SA)** uses a dedicated emulator. Menus and button shortcuts
+  differ between emulators.
 
-Not every core is offered on every frontend. plumOS hides combinations that do
-not have a usable V90S launch profile.
+The available launch methods depend on the game system. plumOS hides choices
+that do not work on the V90S.
 
-## Content Layout
+## Where to Put Game Files
 
-Put content in a system folder below `roms/`. Multi-file disc games should keep
-their cue sheet, playlist, tracks, and subdirectories together. Do not rename
-only one file in a cue/track set.
+Put games in a system folder below `roms/`. For CD games and other multi-file
+games, copy the cue sheet, playlist, tracks, and subfolders together. Do not
+rename only one file from the set.
 
-BIOS files belong below `bios/`. Required names and hashes are defined by the
-emulator, so preserve the original filename and letter case. Arcade ROM sets
-must match the selected core or emulator version.
+BIOS files belong below `bios/`. Each emulator expects specific BIOS files and
+names, so do not change filenames or letter case. Arcade games need a ROM set
+that matches the selected emulator.
 
 ## Performance
 
-The default CPU governor is `ondemand`. Use `START -> Performance Settings` to
-select a system and choose `performance` when a demanding game needs sustained
-CPU speed. Reset to Default returns that system to its normal profile.
+The normal `ondemand` setting adjusts CPU speed automatically. If a demanding
+game runs slowly, select its system in `START -> Performance Settings` and try
+`performance`. Reset to Default restores the normal setting.
 
-Higher-end systems may require game-specific settings, frameskip, or a lighter
-emulator profile. Fast-forward speed also depends on the system and game.
+Some demanding games may still run slowly after changing settings. Fast-forward
+speed also depends on the system and game.
 
 ## Emulator Settings
 
@@ -50,5 +51,5 @@ persist on the system volume. To restore defaults, use:
 
 `START -> System Settings -> Factory Reset`
 
-The reset screen can restore all emulator settings or only RA, PicoArch, or
-standalone settings. Current files are backed up before replacement.
+You can restore all emulator settings or only RA, PicoArch, or standalone
+settings. Current settings are backed up before they are reset.

@@ -1,53 +1,91 @@
 # SD Cards and Folders
 
+The V90S can use two SD cards. SD1 is required. SD2 is needed only when you
+want to keep ROMs and BIOS files on a separate card.
+
+## Overview
+
+```text
+V90S
+├─ SD1 (required: plumOS and user data)
+│  ├─ PLUMBOOT       Startup files. Do not change or delete them
+│  ├─ Linux areas    Usually hidden on a computer. Do not format them
+│  └─ PLUMOS         ROMs, images, music, updates, and other user files
+│
+└─ SD2 (optional: ROMs and BIOS files only)
+   ├─ roms/          Game files
+   └─ bios/          BIOS files
+```
+
+Only the ROM and BIOS locations change when SD2 is inserted.
+
+```text
+Without SD2  -> use PLUMOS/roms/ and PLUMOS/bios/ on SD1
+With SD2     -> use roms/ and bios/ on SD2
+
+The OS, settings, saves, images, and updates always remain on SD1
+```
+
 ## SD1
 
-SD1 contains the operating system and the `PLUMOS` FAT32 user volume. Windows
-and macOS normally show only the user-facing volumes; do not format partitions
-that the computer reports as unknown.
+SD1 contains plumOS and user data. A computer may show both `PLUMBOOT` and
+`PLUMOS`.
 
-Important folders on the `PLUMOS` volume are:
+- `PLUMBOOT` contains startup files. Do not change or delete its contents.
+- Put your files on `PLUMOS` during normal use.
+- If the computer asks to format another partition, cancel the request.
+
+Main folders on `PLUMOS`:
 
 ```text
 PLUMOS/
-  roms/          game content by system
-  bios/          user-provided BIOS files
-  Images/        scraped or copied thumbnails
-  Themes/        user themes
-  Screenshots/   exported screenshots
-  Music/         user media
-  Cheats/        cheat files
-  Patches/       game patches
+  roms/          Game files arranged by system
+  bios/          BIOS files supplied by the user
+  Images/        Thumbnail images
+  Themes/        User themes
+  Screenshots/   Screenshots exported for a computer
+  Music/         Music and other user media
+  Cheats/        Cheat files
+  Patches/       Game patches
   Shaders/       RetroArch shader files
-  updates/       signed plumOS update archives
-  imports/       files waiting for an explicit import
-  exports/       files exported from Linux-managed storage
-  plumos-logs/   host-readable update/recovery logs
+  updates/       plumOS update files
+  imports/       Files waiting to be imported by plumOS
+  exports/       Files exported for copying to a computer
+  plumos-logs/   Logs used when troubleshooting errors
 ```
 
-System settings, emulator binaries, saves, states, and writable runtime data
-are kept on the Linux ext4 system volume and are not directly shown by Windows
-or macOS.
+System settings, emulators, saves, and save states are kept in Linux areas that
+a computer does not normally show. Users do not need to manage those areas in
+normal use.
 
 ## SD2
 
-SD2 is optional and must use FAT32. Create these folders at its root:
+SD2 is optional. Format it as FAT32 and create these two folders at the top of
+the card:
 
 ```text
-roms/
-bios/
+SD2/
+  roms/
+  bios/
 ```
 
-When SD2 is present, plumOS checks the filesystem and mounts those folders as
-the active ROM and BIOS locations. Removing SD2 restores the SD1 locations on
-the next boot or refresh. Shut down before inserting or removing either card.
+When the V90S starts with SD2 inserted, plumOS uses `roms/` and `bios/` on SD2.
+After SD2 is removed, plumOS returns to the SD1 folders on the next start.
+
+Always shut down the V90S before inserting or removing an SD card.
 
 ## ROM Folder Names
 
-plumOS accepts the configured system aliases, including common Miyoo-style
-uppercase names such as `FC`, `SFC`, `GB`, `GBC`, and `GBA`, and
-EmulationStation-style lowercase names such as `nes`, `snes`, `gb`, `gbc`, and
-`gba`. Keep one naming style per system to avoid duplicate entries.
+Create one folder for each system below `roms/`. Both naming styles below are
+supported.
 
-Run `Refresh TOP` after changing content. ROMs and BIOS files are not included
-with plumOS.
+```text
+Miyoo style:             FC  SFC  GB  GBC  GBA
+EmulationStation style:  nes snes gb  gbc  gba
+```
+
+Using both names for the same system can show games twice. Use only one naming
+style for each system.
+
+After adding or removing ROMs, run `START -> UI Settings -> Refresh TOP`.
+ROMs and BIOS files are not included with plumOS.

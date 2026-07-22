@@ -1,7 +1,7 @@
 # plumOS V90S User Guide
 
-This guide explains how to install and use plumOS on a POWKIDDY V90S. It is
-written for normal operation and does not require a development environment.
+This guide explains how to install and use plumOS on a POWKIDDY V90S. No
+programming or Linux knowledge is required.
 
 ## Start Here
 
@@ -17,22 +17,21 @@ written for normal operation and does not require a development environment.
 
 ## Main Features
 
-- text and graphical frontend modes
-- RetroArch, PicoArch, and standalone emulator profiles
+- game lists with text and graphical display modes
+- RetroArch, PicoArch, and standalone emulators
 - optional SD2 ROM/BIOS card
-- gallery thumbnails and network scraping
+- gallery thumbnails and artwork downloads
 - file manager, music player, Pyxel, and PortMaster
 - Wi-Fi through a supported USB Wi-Fi adapter
 - SSH, FTP, SFTP, Samba, ADB, and USB Disk Mode
 - built-in speaker mono mix and stereo USB DAC output
-- safe restart, shutdown, sleep, and signed system updates
+- safe restart, shutdown, sleep, and system updates
 
 ## Important
 
 plumOS does not include ROMs or game BIOS files. Prepare legally obtained
-content yourself. Always use the frontend's Shutdown command before removing
-the SD card. Do not remove power while an update or storage operation is in
-progress.
+content yourself. Always use Shutdown from the START menu before removing the
+SD card. Do not remove power while an update or storage operation is in progress.
 
 plumOS-authored files use the [MIT License](../../LICENSE). Bundled vendor and
 third-party components retain their own terms; see the
