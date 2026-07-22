@@ -15,6 +15,26 @@ image is the clean recovery path when provisioning cannot complete.
 - Enable the option to show empty systems only when you need to inspect every
   configured system.
 
+## Two ROMs Appear to Have the Same Name
+
+Japanese filenames can look identical while using different internal Unicode
+representations. If decomposed names (NFD), commonly produced by macOS, and
+composed names (NFC), commonly used by Windows and Linux, are mixed, FAT32 can
+store both as different names. The frontend may then appear to list the same
+ROM twice. This does not by itself mean that the ROM data is corrupt.
+
+1. Back up the ROMs to a computer.
+2. Remove the visual duplicates and retain the required copy.
+3. Copy the cleaned ROM set back using one computer and one transfer method
+   where practical.
+4. Run `START -> UI Settings -> Refresh TOP`.
+
+Copying a filename with the same Unicode representation through Windows and
+FTP normally overwrites the existing file instead of creating a duplicate. A
+visual duplicate can be created when the source or transfer application mixes
+NFC and NFD names. The scraper may also treat those names as separate files,
+so clean up duplicates before downloading thumbnails.
+
 ## A Game Does Not Start
 
 - Confirm that required BIOS files have the exact expected names.
