@@ -106,8 +106,28 @@ app_layer=ready
 
 Exactly one ADB uevent monitor and one Wi-Fi uevent monitor were running.
 
-## Remaining physical validation
+## Physical hotplug validation
 
-With Wi-Fi ON, unplug and reconnect the OTG hub or Wi-Fi dongle. Confirm that
-IPv4, the default route, SSH, FTP, and SFTP return without toggling Wi-Fi in the
-frontend and without issuing a recovery command over ADB.
+The Wi-Fi dongle was physically unplugged and reconnected while the saved Wi-Fi
+switch remained ON. The V90S automatically reacquired an address without a
+frontend Wi-Fi toggle or an ADB recovery command. The recovery log recorded a
+bounded `recover_begin` / `recover_complete` pair.
+
+Post-recovery state:
+
+```text
+wifi_requested=1
+monitor_running=1
+mode=kernel_uevent
+wifi=on
+iface=wlan0
+ip=192.0.2.120
+dongle=present
+wpa_supplicant=running
+default via 192.0.2.1 dev wlan0
+ssh=running
+ftp=running
+sftp=running
+```
+
+This completes the physical USB Wi-Fi hotplug recovery check.

@@ -613,8 +613,10 @@ Build plumOS V90S as a V90S-specific distribution:
   is ON, a blocking kernel-uevent monitor handles one wireless-interface add
   event with one bounded WPA/DHCP recovery; Wi-Fi OFF stops the monitor and no
   dongle-absent polling loop is used.
-- [ ] Physically unplug and reconnect the OTG hub/Wi-Fi dongle and confirm that
-  IPv4, SSH, FTP, and SFTP return without using the FE Wi-Fi toggle or ADB.
+- [x] Physically unplug and reconnect the OTG hub/Wi-Fi dongle and confirm that
+  IPv4, SSH, FTP, and SFTP return without using the FE Wi-Fi toggle or ADB. The
+  V90S reacquired `192.0.2.120` after the dongle was reconnected; the default
+  route and all three enabled services were restored automatically.
 - [x] Restore Wi-Fi scanning and connection in the release-system image: keep
   `wpa_supplicant`, `wpa_cli`, `iw`, and regulatory data in p5; poll Realtek
   scan results for up to eight seconds; and apply BusyBox `udhcpc` leases with
