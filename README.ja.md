@@ -1,5 +1,26 @@
 # plumOS V90S
 
+<p align="center">
+  <img src="docs/assets/screenshots/plumos-v90s-hero01.png" alt="plumOSのスプラッシュ画面" width="720">
+</p>
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <img src="docs/assets/screenshots/plumos-v90s-hero02.jpg" alt="POWKIDDY V90S上のplumOSグラフィックシステム一覧" width="100%"><br>
+      <sub>グラフィックモード</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/assets/screenshots/plumos-v90s-hero03.jpg" alt="POWKIDDY V90S上のplumOSギャラリーROM一覧" width="100%"><br>
+      <sub>ギャラリーモード</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/assets/screenshots/plumos-v90s-hero04.jpg" alt="POWKIDDY V90S上のplumOSテキストシステム一覧" width="100%"><br>
+      <sub>テキストモード</sub>
+    </td>
+  </tr>
+</table>
+
 plumOS V90Sは、POWKIDDY V90S専用のSDカード起動Linuxディストリビューションです。
 StockOS由来のブート、カーネル、PowerVRハードウェアランタイムを基盤にしながら、
 フロントエンド、エミュレータ、アプリ、設定、アップデート機能をplumOSで管理します。

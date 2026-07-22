@@ -1,5 +1,26 @@
 # plumOS V90S
 
+<p align="center">
+  <img src="docs/assets/screenshots/plumos-v90s-hero01.png" alt="plumOS splash screen" width="720">
+</p>
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <img src="docs/assets/screenshots/plumos-v90s-hero02.jpg" alt="plumOS graphic system grid on a POWKIDDY V90S" width="100%"><br>
+      <sub>Graphic system grid</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/assets/screenshots/plumos-v90s-hero03.jpg" alt="plumOS gallery ROM list on a POWKIDDY V90S" width="100%"><br>
+      <sub>Gallery ROM list</sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="docs/assets/screenshots/plumos-v90s-hero04.jpg" alt="plumOS text mode system list on a POWKIDDY V90S" width="100%"><br>
+      <sub>Text system list</sub>
+    </td>
+  </tr>
+</table>
+
 plumOS V90S is an SD-card Linux distribution for the POWKIDDY V90S. It combines
 the device's StockOS-derived boot, kernel, and PowerVR hardware runtime with a
 plumOS-managed frontend, emulators, applications, settings, and update system.
