@@ -2091,6 +2091,11 @@ static int plumos_fbdev_title_is_settings_family(const char *title) {
                    strstr(title, "Network") || strstr(title, "NETWORK"));
 }
 
+static int plumos_fbdev_title_is_rom_list(const char *title) {
+  return title && (strstr(title, "ROMS") || strstr(title, "FAVORITES") ||
+                   strstr(title, "RECENT"));
+}
+
 static int plumos_fbdev_has_prefixed_line(
     char lines[][PLUMOS_FBDEV_RENDER_LINE_MAX], size_t line_count,
     const char *prefix) {
@@ -2135,6 +2140,12 @@ static int plumos_fbdev_entry_head(const char *line, int *selected,
   }
   while (*p == ' ') {
     p++;
+  }
+  if (*p == '*') {
+    p++;
+    while (*p == ' ') {
+      p++;
+    }
   }
   while (isdigit((unsigned char)*p) && number && n + 1 < number_size) {
     number[n++] = *p++;
@@ -3257,7 +3268,7 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
                                        size_t line_count,
                                        const struct plumos_fbdev_palette *p) {
   char title[128];
-  char items[18][160];
+  char items[18][PLUMOS_FBDEV_RENDER_LINE_MAX];
   int selected[18];
   size_t item_count = 0;
   size_t i;
@@ -3266,6 +3277,7 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
   int settings_family;
   int settings_page;
   int core_settings_page;
+  int rom_list_page;
   int entry_scale;
   int line_height;
   int cursor_x;
@@ -3283,6 +3295,7 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
 
   memset(selected, 0, sizeof(selected));
   plumos_fbdev_screen_title(title, sizeof(title), lines, line_count);
+  rom_list_page = plumos_fbdev_title_is_rom_list(title);
   core_settings_page = plumos_fbdev_has_prefixed_line(lines, line_count,
                                                      "core_settings_screen=1");
   settings_page = core_settings_page ||
@@ -3373,8 +3386,20 @@ static int plumos_fbdev_render_generic(struct plumos_fbdev_renderer *r,
         plumos_fbdev_draw_text(r, name_x, y, items[i], entry_scale, fg, w - 8);
       }
     } else {
-      plumos_fbdev_draw_text_font(r, name_x, y, items[i], entry_scale,
-                                  wifi_connect_page, fg, w - 8);
+      int scroll_px = 0;
+      int prefer_freetype = wifi_connect_page || rom_list_page;
+      if (rom_list_page && selected[i] && right_x > name_x) {
+        int name_width = plumos_fbdev_text_width_font(
+            r, items[i], entry_scale, prefer_freetype);
+        int available_width = right_x - name_x;
+        if (name_width > available_width) {
+          scroll_px = plumos_fbdev_marquee_offset(
+              r, name_width, available_width, cell_width / 2);
+        }
+      }
+      plumos_fbdev_draw_text_clipped(
+          r, name_x - scroll_px, y, items[i], entry_scale, prefer_freetype,
+          name_x, right_x, fg);
     }
     y += line_height;
   }
