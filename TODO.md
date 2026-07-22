@@ -649,9 +649,11 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Replace the capacity-limited 64 MiB ROM inbox with direct SD1 p4 export.
   Stop p4 network writers and ADB, release SD2/p4 content bindings, unmount p4,
   export its block device, then fsck/remount and restore bindings/services.
-- [ ] Physically validate USB Disk Mode from macOS with a data-capable USB
-  cable and confirm the full-size `PLUMOS` drive appears, accepts a large disc
-  image/update archive, can be ejected, and remounts at `/mnt/plumos-user`.
+- [x] Physically validate USB Disk Mode from macOS with a data-capable USB
+  cable. The full-size 114 GB `PLUMOS` drive accepted test files under both
+  `roms/` and `updates/`; after macOS eject and SSH-controlled leave, both
+  hashes matched on the remounted `/mnt/plumos-user`, SD2 bindings returned,
+  and ADB plus enabled network services recovered.
 - [x] Confirm the USB command mailbox execution path. A live V90S smoke test
   executed an armed command, captured stdout and exit status, verified timeout
   handling, and prevented automatic re-execution; see the USB validation note.

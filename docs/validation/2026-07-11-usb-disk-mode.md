@@ -313,24 +313,62 @@ previously enabled FTP/SFTP/Samba services when `leave` runs in a new helper
 process. The mass-storage LUN keeps FUA handling enabled (`nofua=0`); users
 must still eject `PLUMOS` on the host before unplugging the cable.
 
-## User Validation Needed
+## Physical macOS Direct-p4 Validation
 
-Actual Mac-side direct-p4 detection still needs physical validation:
+The live V90S initially still carried the old 64 MiB transfer-image helper.
+Only `bin/plumos-usb-disk-mode` and its matching live manifest/checksum entries
+were updated. The app-layer validator returned `ready` before the test.
 
-1. Connect V90S to the Mac with a data-capable USB cable.
-2. Open `Network Settings -> NW Service -> USB Disk Mode`.
-3. Press A on `READY TO ENTER`.
-4. The full-size `PLUMOS` drive should appear on the Mac.
-5. Copy a disc image to `roms/<system>/` and an update archive to `updates/`.
-6. Eject the drive on macOS.
-7. Unplug the USB cable.
-8. V90S should return and remount p4 at:
+USB Disk Mode was started over SSH so that ADB could stop when the shared USB
+controller changed from FunctionFS to mass storage. macOS detected and mounted:
 
 ```text
-/mnt/plumos-user
+/dev/disk5 (external, physical)
+name: PLUMOS
+size: 114.0 GB
+mount: /Volumes/PLUMOS
+filesystem: msdos
 ```
-9. Confirm p4 and any SD2 overlay are restored, the FE remains responsive, and
-   the copied files are visible through their normal paths.
+
+While the host owned p4, live status correctly reported:
+
+```text
+export_device=/dev/mmcblk0p4
+mount_dir=/mnt/plumos-user
+mounted=0
+gadget_bound=1
+```
+
+Two lightweight files were written and read back on macOS:
+
+```text
+566c4e9dd81d173b7175955e79e0d93f0038e704c3f4b610a8da41e881111934  roms/USB-DISK-MODE-ROM-TEST.txt
+63344492c34c35c640a7a4ddd9147220af7e9ce450e78480f6ea3453617ce897  updates/USB-DISK-MODE-UPDATE-TEST.txt
+```
+
+After `diskutil eject`, USB Disk Mode was left over SSH. The helper checked and
+remounted p4, restored the SD2 content bindings, and restored the previously
+enabled services. Both hashes matched from `/mnt/plumos-user`, then the test
+files were removed.
+
+Final state:
+
+```text
+/dev/mmcblk0p4 on /mnt/plumos-user type vfat (rw)
+/dev/mmcblk1p1 on /mnt/plumos/roms type vfat (rw)
+ssh=running
+ftp=running
+sftp=running
+adb=running
+app_layer=ready
+```
+
+This validates direct writes to the SD1 p4 `roms/` directory and the System
+Update inbox at `updates/`. USB Disk Mode does not export SD2. When SD2 is
+inserted, the frontend's active `/mnt/plumos/roms` bind points to SD2, so a ROM
+copied to p4 is retained on SD1 but is not the active FE ROM source until SD2 is
+removed. This bounded physical check used small files; the earlier Linux host
+simulation remains the 96 MiB sustained-transfer evidence.
 
 ## Remaining Work
 
