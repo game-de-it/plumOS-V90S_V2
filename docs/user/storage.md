@@ -12,18 +12,20 @@ V90S
 │  ├─ Linux areas    Usually hidden on a computer. Do not format them
 │  └─ PLUMOS         ROMs, images, music, updates, and other user files
 │
-└─ SD2 (optional: ROMs and BIOS files only)
-   ├─ roms/          Game files
+└─ SD2 (optional: ROMs and BIOS files)
+   ├─ roms/          Game files and RetroArch saves
    └─ bios/          BIOS files
 ```
 
-Only the ROM and BIOS locations change when SD2 is inserted.
+The ROM and BIOS locations change when SD2 is inserted. RetroArch saves and
+save states follow the ROMs because they are stored below the active ROM folder.
 
 ```text
 Without SD2  -> use PLUMOS/roms/ and PLUMOS/bios/ on SD1
 With SD2     -> use roms/ and bios/ on SD2
 
-The OS, settings, saves, images, and updates always remain on SD1
+RetroArch saves and states -> stored below the active roms/ folder
+OS, settings, PicoArch/standalone saves, images, and updates -> remain on SD1
 ```
 
 ## SD1
@@ -54,9 +56,9 @@ PLUMOS/
   plumos-logs/   Logs used when troubleshooting errors
 ```
 
-System settings, emulators, saves, and save states are kept in Linux areas that
-a computer does not normally show. Users do not need to manage those areas in
-normal use.
+System settings and PicoArch/standalone saves are kept in Linux areas that a
+computer does not normally show. RetroArch saves and save states are stored
+below `roms/`. See [Save Data](save-data.md) for the exact layout.
 
 ## SD2
 
@@ -70,6 +72,7 @@ SD2/
 ```
 
 When the V90S starts with SD2 inserted, plumOS uses `roms/` and `bios/` on SD2.
+RetroArch saves and save states are also written below `roms/` on SD2.
 After SD2 is removed, plumOS returns to the SD1 folders on the next start.
 
 Always shut down the V90S before inserting or removing an SD card.

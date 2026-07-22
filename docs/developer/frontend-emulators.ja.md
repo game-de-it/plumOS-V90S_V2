@@ -47,6 +47,25 @@ input_joypad_driver = sdl2
 factory reset時だけwritable configへコピーし、通常buildとlive deployでは使用中user configを
 上書きしません。
 
+factory configでは`savefiles_in_content_dir`と`savestates_in_content_dir`を有効にし、
+save/stateをactive ROM filesystemへ置きます。さらに`sort_savefiles_enable`、
+`sort_savefiles_by_content_enable`、`sort_savestates_enable`、
+`sort_savestates_by_content_enable`を有効にします。例えばGB/Gambatteは
+`roms/GB/GB/Gambatte/<ROM名>.srm`と`<ROM名>.state*`を生成します。launcherがappend configで
+渡す`/mnt/plumos/Saves/<system>`と`States/<system>`は、userがcontent-directory保存をOFFにした
+場合の保存先です。SD2がactive ROM rootなら、defaultのRA save/state ownershipもSD2になります。
+
+```text
+autosave_interval = 10
+savefiles_in_content_dir = true
+savestates_in_content_dir = true
+savestate_auto_index = true
+savestate_auto_load = false
+savestate_auto_save = true
+savestate_max_keep = 20
+savestate_thumbnail_enable = true
+```
+
 ## PicoArch
 
 PicoArchはAArch64で`/mnt/plumos/cores`を共用し、2組目のcore setは持ちません。V90S patchが

@@ -24,8 +24,10 @@ imageはGPT partitionより前のvendor必須raw boot dataも維持します。p
   manifest.json checksums.sha256 VERSION COMPAT_VENDOR RUNTIME_ABI
 ```
 
-POSIX permission、runtimeで生成するlink、実機固有設定、active save、service credential、
-transactional update状態を保存します。Runtime package管理はmutable subtreeを消しません。
+POSIX permission、runtimeで生成するlink、実機固有設定、PicoArch・standaloneなどの
+content-localではないsave、service credential、transactional update状態を保存します。
+`Saves/`と`States/`はRetroArchでcontent-directory保存を無効にした場合のfallbackでもあります。
+Runtime package管理はmutable subtreeを消しません。
 
 ### p4 FAT32
 
@@ -37,6 +39,8 @@ transactional update状態を保存します。Runtime package管理はmutable s
 ```
 
 bootstrap時に`roms`、`bios`、`Images`を`/mnt/plumos`以下の互換パスへbindします。
+現行RetroArch factory cfgはsave/stateをactiveな`roms/`内へcontent directory名とcore名で
+分類するため、RAのsave/stateもp4またはactiveなSD2が所有します。
 USB Disk Modeはloopback中継imageではなく、p4 block deviceを直接公開します。
 
 ### SD2
@@ -44,7 +48,7 @@ USB Disk Modeはloopback中継imageではなく、p4 block deviceを直接公開
 `plumos-sd2-content-mount`はFAT32の2枚目を検出し、制限時間付きfilesystem repairを行い、
 直下`roms`と`bios`の大文字小文字variantを受け入れ、`/mnt/plumos/roms`と
 `/mnt/plumos/bios`へbind mountします。helper停止時はp4 bindingへ戻します。
-Imagesとupdate archiveはSD1 p4に残ります。
+RA save/stateはactive ROM rootと共にSD2へ移ります。Imagesとupdate archiveはSD1 p4に残ります。
 
 ## Runtime Update transaction
 

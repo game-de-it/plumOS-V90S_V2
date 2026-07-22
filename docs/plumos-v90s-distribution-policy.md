@@ -245,13 +245,15 @@ The storage rationale and migration history are recorded in:
 docs/v90s-ext4-runtime-fat32-userdata-update-design.md
 ```
 
-The adopted storage direction reserves ext4 for the
-device-managed runtime, Linux-specific state, configuration, active saves, and
-save states. FAT32 is the user-managed interchange area for ROMs, BIOS,
+The adopted storage direction reserves ext4 for the device-managed runtime,
+Linux-specific state, configuration, and emulator state that is not explicitly
+content-local. FAT32 is the user-managed interchange area for ROMs, BIOS,
 scraped images, user themes, screenshots, media, custom content, update
-packages, and explicit import/export directories. Active saves stay on ext4;
-the frontend provides confirmed save export and import flows, including manual
-ROM selection when an imported save filename does not match a ROM.
+packages, and explicit import/export directories. The authoritative RetroArch
+factory configuration deliberately keeps saves and states below the active ROM
+directory, sorted by content directory and core. RA saves therefore live on SD2
+when SD2 supplies the ROMs, and on p4 when SD1 supplies them. PicoArch and
+standalone save ownership remains runtime-specific on p3.
 
 The adopted partition layout is deliberately smaller than the historical
 StockOS-compatible layout:
@@ -374,8 +376,8 @@ chosen by the user must be preserved. The canonical layout is:
 /mnt/plumos/config/retroarch   RA configuration, playlists, overlays, filters
 /mnt/plumos/config/shaders     GLSL shader presets and source files
 /mnt/plumos/bios               system/BIOS files
-/mnt/plumos/Saves              save files, with per-system launch subdirectory
-/mnt/plumos/States             save states, with per-system launch subdirectory
+/mnt/plumos/Saves              RA fallback and PicoArch save root
+/mnt/plumos/States             RA fallback state root
 /mnt/plumos/Screenshots        screenshots
 /mnt/plumos/Recordings         recordings
 /mnt/plumos/Images/retroarch   RetroArch thumbnails
@@ -386,6 +388,12 @@ chosen by the user must be preserved. The canonical layout is:
 Read-only system assets and databases may remain under `/usr/share/libretro`.
 The launcher must create writable targets before starting RetroArch and keep
 `config_save_on_exit` compatible with this layout.
+
+The factory default enables content-directory and both content/core sorting for
+RA saves and states. A GB ROM launched with Gambatte therefore writes below
+`roms/GB/GB/Gambatte/`. The append-config paths under `/mnt/plumos/Saves` and
+`/mnt/plumos/States` remain valid fallbacks when a user disables content-local
+storage; the launcher must not override that user choice.
 
 Normal RetroArch launch must not run the early bring-up diagnostic sweep or
 force repeated full-filesystem synchronization. Mount/input/ALSA/PowerVR,

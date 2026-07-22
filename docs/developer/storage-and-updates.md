@@ -26,8 +26,10 @@ partitions. p1 is normally mounted read-only at `/mnt/plumos-boot`, p3 at
 ```
 
 This partition contains POSIX permissions, links materialized at runtime,
-device-local settings, active saves, service credentials, and transactional
-update state. Runtime package management must not erase mutable subtrees.
+device-local settings, non-content-local saves from PicoArch and standalone
+emulators, service credentials, and transactional update state. `Saves/` and
+`States/` also remain RetroArch fallbacks when content-directory storage is
+disabled. Runtime package management must not erase mutable subtrees.
 
 ### p4 FAT32
 
@@ -39,15 +41,18 @@ update state. Runtime package management must not erase mutable subtrees.
 ```
 
 At bootstrap, `roms`, `bios`, and `Images` are bound to their compatibility
-paths under `/mnt/plumos`. USB Disk Mode exports the p4 block device directly,
-not a loopback staging image.
+paths under `/mnt/plumos`. The current RetroArch factory configuration sorts
+saves and states below the active `roms/` by content-directory and core name, so
+RA saves belong to p4 or the active SD2. USB Disk Mode exports the p4 block
+device directly, not a loopback staging image.
 
 ### SD2
 
 `plumos-sd2-content-mount` finds a FAT32 second card, runs bounded filesystem
 repair, accepts case variants of root `roms` and `bios`, and bind-mounts them
 over `/mnt/plumos/roms` and `/mnt/plumos/bios`. Stopping the helper restores the
-p4 bindings. Images and update archives remain on SD1 p4.
+p4 bindings. RA saves and states follow the active ROM root onto SD2. Images and
+update archives remain on SD1 p4.
 
 ## Runtime Update Transaction
 

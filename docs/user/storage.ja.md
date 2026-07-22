@@ -12,18 +12,20 @@ V90S
 │  ├─ Linux用領域    通常はPCから見えない。フォーマットしない
 │  └─ PLUMOS         ROM、画像、音楽、アップデートなど
 │
-└─ SD2（任意：ROMとBIOS専用）
-   ├─ roms/          ゲームデータ
+└─ SD2（任意：ROMとBIOS用）
+   ├─ roms/          ゲームデータとRetroArchのセーブ
    └─ bios/          BIOSデータ
 ```
 
-SD2の有無で、ROMとBIOSの読み込み先だけが変わります。
+SD2の有無で、ROMとBIOSの読み込み先が変わります。RetroArchのセーブと
+ステートはROM側へ保存されるため、ROMと一緒に移動します。
 
 ```text
 SD2なし  →  SD1の PLUMOS/roms/ と PLUMOS/bios/ を使う
 SD2あり  →  SD2の roms/ と bios/ を使う
 
-OS、設定、セーブ、画像、アップデートは常にSD1を使う
+RetroArchのセーブとステート → 使用中の roms/ 内へ保存
+OS、設定、PicoArch・スタンドアローンのセーブ、画像、アップデート → SD1
 ```
 
 ## SD1
@@ -55,8 +57,9 @@ PLUMOS/
   plumos-logs/   エラー調査用のログ
 ```
 
-システム設定、エミュレータ、セーブ、ステートなどは、PCから見えない
-Linux用領域へ保存されます。通常はユーザーが管理する必要はありません。
+システム設定と、PicoArch・スタンドアローンエミュレータのセーブなどは、
+PCから見えないLinux用領域へ保存されます。RetroArchのセーブとステートは
+`roms/`内へ保存されます。詳しくは[セーブデータ](save-data.ja.md)を参照してください。
 
 ## SD2
 
@@ -70,6 +73,7 @@ SD2/
 ```
 
 SD2を入れて起動すると、plumOSはSD2の`roms/`と`bios/`を使います。
+RetroArchのセーブとステートもSD2の`roms/`内へ書き込まれます。
 SD2を取り外して起動すると、SD1側へ戻ります。
 
 SDカードを抜き差しする前に、必ずV90Sをシャットダウンしてください。

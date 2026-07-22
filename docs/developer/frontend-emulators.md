@@ -52,6 +52,28 @@ The known-good factory configuration is a versioned build input and is staged
 under `factory-defaults/ra/`. Factory reset copies it to the writable config;
 normal builds and live deploys do not overwrite an active user config.
 
+The factory configuration enables `savefiles_in_content_dir` and
+`savestates_in_content_dir`, placing saves and states on the active ROM
+filesystem. It also enables `sort_savefiles_enable`,
+`sort_savefiles_by_content_enable`, `sort_savestates_enable`, and
+`sort_savestates_by_content_enable`. For example, GB/Gambatte produces
+`roms/GB/GB/Gambatte/<ROM name>.srm` and `<ROM name>.state*`. The launcher still
+passes `/mnt/plumos/Saves/<system>` and `States/<system>` in its append config;
+these become fallback destinations when the user disables content-directory
+storage. When SD2 is the active ROM root, it also owns the default RA saves and
+states.
+
+```text
+autosave_interval = 10
+savefiles_in_content_dir = true
+savestates_in_content_dir = true
+savestate_auto_index = true
+savestate_auto_load = false
+savestate_auto_save = true
+savestate_max_keep = 20
+savestate_thumbnail_enable = true
+```
+
 ## PicoArch
 
 PicoArch is AArch64 and reuses `/mnt/plumos/cores`; it does not maintain a
