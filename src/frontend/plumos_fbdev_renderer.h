@@ -2116,7 +2116,7 @@ static int plumos_fbdev_has_prefixed_line(
 
 static int plumos_fbdev_entry_head(const char *line, int *selected,
                                    char *number, size_t number_size,
-                                   const char **rest) {
+                                   const char **rest, int *favorite) {
   const char *p = line;
   size_t n = 0;
 
@@ -2128,6 +2128,9 @@ static int plumos_fbdev_entry_head(const char *line, int *selected,
   }
   if (rest) {
     *rest = "";
+  }
+  if (favorite) {
+    *favorite = 0;
   }
   if (!line || !rest) {
     return 0;
@@ -2142,6 +2145,9 @@ static int plumos_fbdev_entry_head(const char *line, int *selected,
     p++;
   }
   if (*p == '*') {
+    if (favorite) {
+      *favorite = 1;
+    }
     p++;
     while (*p == ' ') {
       p++;
@@ -2167,16 +2173,22 @@ static void plumos_fbdev_compact_menu_entry(const char *line, char *out,
                                             size_t out_size, int *selected) {
   char number[16];
   const char *rest;
+  int favorite = 0;
 
   if (!out || out_size == 0) {
     return;
   }
   out[0] = '\0';
-  if (!plumos_fbdev_entry_head(line, selected, number, sizeof(number), &rest)) {
+  if (!plumos_fbdev_entry_head(line, selected, number, sizeof(number), &rest,
+                               &favorite)) {
     plumos_fbdev_copy_text(out, out_size, line);
     return;
   }
-  plumos_fbdev_copy_text(out, out_size, rest);
+  if (favorite) {
+    snprintf(out, out_size, "* %s", rest);
+  } else {
+    plumos_fbdev_copy_text(out, out_size, rest);
+  }
 }
 
 static int plumos_fbdev_parse_graphic_entry(const char *line, const char *prefix,
