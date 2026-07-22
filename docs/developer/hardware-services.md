@@ -98,16 +98,18 @@ The authentication contract is:
 
 | Service | Account | Authentication |
 | --- | --- | --- |
-| SSH/SFTP | `root` | No release-image password; use a public key or a device-local password created by `plumos-ssh-password set` |
+| SSH/SFTP | `root` | Public initial password `plumos`; public keys and a changed device-local password from `plumos-ssh-password set` are also supported |
 | FTP | Anonymous | `ftpd -A`; credentials are not verified and writes are allowed |
 | Samba | Client name `plumos`, mapped to local `root` | Initial password `plumos`, no guest access, share name `SDCARD` |
 | ADB | None | Local USB transport without a user or password |
 
 The device-local SSH shadow is stored only at
 `/mnt/plumos/config/ssh/shadow` on p3 and bind-mounted over SquashFS
-`/etc/shadow`. Never copy a generated shadow into a release image, app layer,
-or git. Any user-facing credential change must update the implementation and
-both `docs/user/network*` documents in the same commit.
+`/etc/shadow`. When the shadow is absent, `ensure-default` generates a uniquely
+salted hash from the public initial password. It never replaces an existing
+shadow. Never copy a generated shadow into a release image, app layer, or git.
+Any user-facing credential change must update the implementation and both
+`docs/user/network*` documents in the same commit.
 
 ADB and USB Disk Mode share the USB gadget controller. The ADB uevent helper may
 repair a detached UDC, but it must not steal the gadget while mass storage owns

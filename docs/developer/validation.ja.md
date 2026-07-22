@@ -60,6 +60,8 @@ screenshot、ALSA route、input event、終了動作、FE復帰が有効です�
 ### NetworkとUpdate
 
 - 7月11日から22日のWi-Fi、network-information、FTP/SFTP/Samba、SSH password、ADB、USB復旧記録
+- `2026-07-23-v90s-default-ssh-credential.md`: 公開初期資格情報`root / plumos`の
+  端末固有shadow生成、保持、System SquashFS、実機password login検証
 - `2026-07-22-v90s-transactional-update-host-validation.md`と採用済み
   [アップデート契約](../plumos-v90s-update-contract.md)
 

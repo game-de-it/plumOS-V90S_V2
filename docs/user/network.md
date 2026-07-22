@@ -43,14 +43,14 @@ Replace `V90S_IP` below with the IP address shown in
 
 | Service | Address | User | Initial password |
 | --- | --- | --- | --- |
-| SSH | `ssh root@V90S_IP` (port 22) | `root` | None; set one with the steps below before the first password login |
+| SSH | `ssh root@V90S_IP` (port 22) | `root` | `plumos` |
 | SFTP | `sftp root@V90S_IP` (port 22) | `root` | Same as SSH |
 | FTP | `ftp://V90S_IP` (port 21) | Anonymous; enter `anonymous` if prompted | None; if the client rejects an empty field, enter any text |
 | Samba | `smb://V90S_IP/SDCARD` | `plumos` | `plumos` |
 | ADB | Run `adb shell` after connecting USB | Not required | Not required |
 
-SSH and SFTP share one device-local password. Release images do not contain an
-initial SSH password. Set one before the first password login:
+SSH and SFTP share one device-local password. Its initial value is `plumos`.
+Because this initial password is public, change it when appropriate:
 
 1. Connect the V90S to the computer over USB and enable ADB in NW Service.
 2. Run `adb shell` in a terminal on the computer.
@@ -58,12 +58,12 @@ initial SSH password. Set one before the first password login:
 4. Enter the new password as one line and press Enter.
 5. Run `exit`, then enable SSH or SFTP.
 
-The password is stored in the Linux system area on SD1 and persists across
-reboots. Public-key authentication is also available. FTP allows anonymous
-writes, and the initial Samba password is public information. Use these
-services only on a trusted home network and turn off services that are not
-needed. ADB is for development and troubleshooting; use it only with a
-computer you control.
+The changed password is stored in the Linux system area on SD1, persists across
+reboots, and is not reset by an OS update. Public-key authentication is also
+available. FTP allows anonymous writes, and the initial SSH and Samba passwords
+are public information. Use these services only on a trusted home network and
+turn off services that are not needed. ADB is for development and
+troubleshooting; use it only with a computer you control.
 
 ## USB Disk Mode
 

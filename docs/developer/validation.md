@@ -69,6 +69,9 @@ Start with these records:
 
 - Wi-Fi, network-information, FTP/SFTP/Samba, SSH-password, ADB, and USB recovery
   records dated July 11-22
+- `2026-07-23-v90s-default-ssh-credential.md`: public initial credential
+  `root / plumos`, device-local shadow preservation, System SquashFS, and
+  real-device password-login validation
 - `2026-07-22-v90s-transactional-update-host-validation.md` plus the adopted
   [update contract](../plumos-v90s-update-contract.md)
 

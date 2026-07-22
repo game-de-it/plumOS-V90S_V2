@@ -917,15 +917,19 @@ The build system must keep path ownership strict:
 Secrets and private content must not be baked into normal release artifacts:
 
 - Wi-Fi SSID and password are development-profile inputs only
-- SSH keys and root passwords are development-profile inputs only
+- private SSH keys, authorized keys, and non-default root passwords are
+  development-profile or device-local inputs only
 - commercial ROMs are development/test inputs only and stay under `artifacts/`
 
-A password explicitly configured on a running device is device-local state,
-not a release credential. `plumos-ssh-password` stores only its generated
-shadow entry under `/mnt/plumos/config/ssh/` on the p3 ext4 system partition.
-The app-layer bootstrap and SSH launcher bind that file over the read-only
-SquashFS `/etc/shadow` before password authentication is used. The generated
-file must not be copied into app-layer releases, seed images, or git.
+The public initial SSH account is `root` with password `plumos`. When no
+device-local shadow exists, `plumos-ssh-password ensure-default` generates a
+uniquely salted SHA-512 shadow entry under `/mnt/plumos/config/ssh/` on the p3
+ext4 system partition. It must never replace a valid existing shadow. A password
+explicitly changed on a running device remains device-local state. The app-layer
+bootstrap and SSH launcher bind that file over the read-only SquashFS
+`/etc/shadow` before password authentication is used. The generated file must
+not be copied into app-layer releases, seed images, or git. User documentation
+must disclose the public initial credential and recommend trusted-LAN use.
 
 Interactive root state follows the same device-local rule. The writable root
 home lives at `/mnt/plumos/config/ssh/root` on p3 ext4 and is bind mounted over

@@ -38,8 +38,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Stop live device processes only through PID-file based tools that validate
   `/proc/<pid>/comm` or `/proc/<pid>/cmdline`.
 - [x] Do not use broad process-name kills that can affect SSH or unrelated sessions.
-- [x] Release builds must not contain private ROMs, Wi-Fi credentials, SSH keys, or
-  root passwords.
+- [x] Release builds must not contain private ROMs, Wi-Fi credentials, private
+  SSH keys, authorized keys, non-default root passwords, or reusable generated
+  shadow files. The public initial SSH credential is documented as
+  `root` / `plumos` and receives a unique salt on each device.
 
 ## Completed Baseline
 

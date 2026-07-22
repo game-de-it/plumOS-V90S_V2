@@ -141,7 +141,7 @@ start_frontend() {
     }
   fi
   if [ -x "$PLUMOS_ROOT/bin/plumos-ssh-password" ]; then
-    "$PLUMOS_ROOT/bin/plumos-ssh-password" apply >> "$LOG_FILE" 2>&1 || {
+    "$PLUMOS_ROOT/bin/plumos-ssh-password" ensure-default >> "$LOG_FILE" 2>&1 || {
       report_error "persistent SSH password setup failed"
       return 1
     }

@@ -146,7 +146,7 @@ if [ -x "$HOME_CONTROL" ]; then
 fi
 install_login_environment
 if [ -x "$PASSWORD_CONTROL" ]; then
-  if ! "$PASSWORD_CONTROL" apply >> "$LOG_FILE" 2>&1; then
+  if ! "$PASSWORD_CONTROL" ensure-default >> "$LOG_FILE" 2>&1; then
     log "persistent SSH password setup failed"
     exit 1
   fi
