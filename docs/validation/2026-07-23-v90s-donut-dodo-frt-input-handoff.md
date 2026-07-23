@@ -65,6 +65,6 @@ gptokeyb -> /dev/uinput, /dev/input/event4
 frt_3.5.2 -> /dev/input/event0, event1, event3, event5
 ```
 
-This proves the previously missing game-input route is attached. Physical
-button-response confirmation remains a user-facing hardware check; it is not
-inferred from process presence alone.
+This proves the previously missing game-input route is attached. The user then
+confirmed on the physical V90S that Donut Dodo responded normally to the
+controls.
