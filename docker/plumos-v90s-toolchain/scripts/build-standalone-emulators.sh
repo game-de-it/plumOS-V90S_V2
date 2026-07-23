@@ -197,6 +197,19 @@ stage_ppsspp_factory_defaults() {
       echo "missing V90S PPSSPP factory config: ${src}" >&2
       return 1
     fi
+    if [ "${name}" = ppsspp.ini ] && ! awk '
+      BEGIN { count = 0; invalid = 0 }
+      /^[[:space:]]*MacAddress[[:space:]]*=/ {
+        count++
+        value = $0
+        sub(/^[[:space:]]*MacAddress[[:space:]]*=[[:space:]]*/, "", value)
+        if (value != "") invalid = 1
+      }
+      END { exit !(count == 1 && invalid == 0) }
+    ' "${src}"; then
+      echo "V90S PPSSPP factory config must leave MacAddress empty: ${src}" >&2
+      return 1
+    fi
     install -m 0644 "${src}" "${dst}/${name}" || return 1
     sha=$(sha256sum "${dst}/${name}" | awk '{print $1}')
     append_manifest "ppsspp_factory_${name%.ini}_source=${src}"

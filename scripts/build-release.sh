@@ -119,6 +119,22 @@ if find "$app_layer_dir/roms" -type f 2>/dev/null | grep -q .; then
     exit 1
 fi
 
+ppsspp_factory_config="$app_layer_dir/factory-defaults/sa/state/standalone/ppsspp/config/ppsspp/PSP/SYSTEM/ppsspp.ini"
+if [ ! -f "$ppsspp_factory_config" ] || ! awk '
+    BEGIN { count = 0; invalid = 0 }
+    /^[[:space:]]*MacAddress[[:space:]]*=/ {
+        count++
+        value = $0
+        sub(/^[[:space:]]*MacAddress[[:space:]]*=[[:space:]]*/, "", value)
+        if (value != "") invalid = 1
+    }
+    END { exit !(count == 1 && invalid == 0) }
+' "$ppsspp_factory_config"; then
+    printf 'error: release PPSSPP factory config must contain exactly one empty MacAddress entry: %s\n' \
+        "$ppsspp_factory_config" >&2
+    exit 1
+fi
+
 release_name="plumos-v90s-update-$version"
 release_root="$dist_dir/$release_name"
 archive_tgz="$dist_dir/$release_name.tar.gz"

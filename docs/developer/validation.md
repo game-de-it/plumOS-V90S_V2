@@ -60,6 +60,8 @@ Start with these records:
   canonical libretro set and deployment
 - standalone records for YabaSanshiro, PPSSPP, PCSX-ReARMed, OpenBOR, ScummVM,
   EasyRPG, N64, Dreamcast, and removed DOSBox-staging route
+- `2026-07-23-v90s-ppsspp-factory-identity.md`: removal of the captured PPSSPP
+  network identity and release gates requiring per-installation MAC generation
 - `2026-07-16-v90s-pyxel-*`, `2026-07-19-v90s-pyxel-*`: Python/Pyxel setup,
   aspect fit, inclusion, and pygame audio
 - `2026-07-20-v90s-portmaster-*`: static audit, common ABI, architecture boundary,

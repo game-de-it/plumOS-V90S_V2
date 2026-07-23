@@ -53,6 +53,8 @@ screenshot、ALSA route、input event、終了動作、FE復帰が有効です�
   正式libretro setとdeploy
 - YabaSanshiro、PPSSPP、PCSX-ReARMed、OpenBOR、ScummVM、EasyRPG、N64、Dreamcast、
   廃止したDOSBox-staging経路のstandalone記録
+- `2026-07-23-v90s-ppsspp-factory-identity.md`: 取得済みPPSSPP network identityの
+  除去と、installごとのMAC生成を必須にするrelease gate
 - `2026-07-16-v90s-pyxel-*`、`2026-07-19-v90s-pyxel-*`: Python/Pyxel setup、
   aspect fit、image同梱、pygame audio
 - `2026-07-20-v90s-portmaster-*`: 静的監査、共通ABI、architecture境界、代表実機sample
