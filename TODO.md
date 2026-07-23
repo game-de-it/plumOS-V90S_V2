@@ -819,6 +819,10 @@ Build plumOS V90S as a V90S-specific distribution:
     V90S buttons. On the ext4 runtime, repair official ZIP mode `0644` to
     `0755` for `gptokeyb`/`gptokeyb2`; Donut Dodo then ran with its owned
     GPTokeYB process and the user confirmed controls.
+  - [x] Remove the FRT/GPTokeYB startup race exposed by a clean 1.0.0 image.
+    Adapter version 11 layers a bounded FRT launcher over the extracted runtime
+    so Godot enumerates GPTokeYB's `Fake Keyboard`; the runtime cache and
+    PortMaster-installed game files remain unchanged.
   - [x] Keep ARMHF-only ports unavailable. The V90S has no 32-bit PowerVR
     userspace driver; the Maldita Castilla ARMHF probe rendered and accepted
     input through Mesa llvmpipe but ran at roughly 10 fps. Reject installed

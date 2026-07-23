@@ -4,15 +4,19 @@ set -eu
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 APP_ROOT="${PLUMOS_PORTMASTER_APP_ROOT:-${PLUMOS_ROOT}/apps/portmaster}"
 STATE_ROOT="${PLUMOS_ROOT}/state/portmaster"
+RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
 PM_DIR="${APP_ROOT}/upstream/PortMaster"
 UNSQUASHFS="${APP_ROOT}/adapter/bin/aarch64/unsquashfs"
 MOUNTS_FILE="${PLUMOS_PORTMASTER_MOUNTS_FILE:-/run/plumos/portmaster/port.mounts}"
+MOUNT_BIN="${PLUMOS_PORTMASTER_MOUNT_BIN:-/bin/mount}"
+UMOUNT_BIN="${PLUMOS_PORTMASTER_UMOUNT_BIN:-/bin/umount}"
+FRT_WRAPPER="${PLUMOS_PORTMASTER_FRT_WRAPPER:-${PLUMOS_ROOT}/bin/plumos-portmaster-frt}"
 
 source_path="${1:-}"
 target_path="${2:-}"
 case "${source_path}:${target_path}" in
   "${PM_DIR}"/libs/*.squashfs:"${STATE_ROOT}"/home/*) ;;
-  *) exec /bin/mount "$@" ;;
+  *) exec "$MOUNT_BIN" "$@" ;;
 esac
 
 [ -f "$source_path" ] || {
@@ -45,5 +49,33 @@ if [ ! -f "$ready_file" ]; then
 fi
 
 mkdir -p "$target_path"
-/bin/mount --bind "$cache_dir" "$target_path"
+"$MOUNT_BIN" --bind "$cache_dir" "$target_path"
 printf '%s\n' "$target_path" >> "$MOUNTS_FILE"
+
+runtime_exec="${runtime_name%.squashfs}"
+case "$runtime_exec" in
+  frt_*)
+    real="${cache_dir}/${runtime_exec}"
+    wrapper="$FRT_WRAPPER"
+    wrapper_target="${target_path}/${runtime_exec}"
+    real_file="${RUN_ROOT}/frt-real.path"
+    real_file_tmp="${real_file}.tmp.$$"
+    [ -x "$real" ] || {
+      printf 'plumos-portmaster-mount: missing FRT executable: %s\n' "$real" >&2
+      exit 1
+    }
+    [ -x "$wrapper" ] || {
+      printf 'plumos-portmaster-mount: missing FRT wrapper: %s\n' "$wrapper" >&2
+      exit 1
+    }
+    mkdir -p "$RUN_ROOT"
+    printf '%s\n' "$real" > "$real_file_tmp"
+    mv -f "$real_file_tmp" "$real_file"
+    if ! "$MOUNT_BIN" --bind "$wrapper" "$wrapper_target"; then
+      rm -f "$real_file"
+      "$UMOUNT_BIN" "$target_path" 2>/dev/null || true
+      exit 1
+    fi
+    printf '%s\n' "$wrapper_target" >> "$MOUNTS_FILE"
+    ;;
+esac

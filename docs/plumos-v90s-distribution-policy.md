@@ -1699,6 +1699,14 @@ This runtime check protects an existing installation as well as future online
 updates. A rendered game without its GPTokeYB process is an input failure, not
 successful Port compatibility.
 
+FRT/Godot ports launch GPTokeYB asynchronously immediately before their
+runtime. The userspace runtime mount therefore layers a plumOS FRT wrapper over
+the extracted executable without changing the checksum-addressed cache. The
+wrapper waits a bounded interval for GPTokeYB's `Fake Keyboard` input device,
+then starts the original runtime. This guarantees that FRT enumerates the
+port-specific keyboard mapping. If the virtual device is not created, the
+runtime still starts after the timeout. Non-FRT runtimes are unchanged.
+
 The StockOS kernel SquashFS implementation does not support the zlib-compressed
 runtimes currently distributed by PortMaster. The V90S adapter therefore uses
 a packaged AArch64 `unsquashfs` and extracts PortMaster runtime images into
