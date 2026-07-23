@@ -117,6 +117,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Keep `stockos-image` as a transitional alias for `sd-image` while the
   partition contract remains StockOS/Batocera-compatible.
 - [x] Keep `knulli-image` as a legacy investigation target only.
+- [x] Add a safe incremental release-image mode. After the first full build,
+  checksum-verified RetroArch, full libretro, PicoArch, and standalone outputs
+  can be reused independently; the app-layer, boot payloads, SD image, and
+  complete image verification still run every time.
 - [x] Implement `cores` as the normal libretro-core build target.
 - [x] Make the normal `cores` target build the complete V90S catalog. Keep the
   MMF-compatible A/B subset available through `--filter plumos` in an isolated
