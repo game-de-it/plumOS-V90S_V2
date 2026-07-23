@@ -25,8 +25,8 @@ KNULLI・GE8300 hardware入力を含みます。
 正式なclean-clone入口は次です。
 
 ```sh
-git clone REPOSITORY_URL
-cd plumOS-V90S_v2
+git clone https://github.com/game-de-it/plumOS-V90S_V2.git
+cd plumOS-V90S_V2
 ./scripts/docker-build.sh release-image --version 1.0.0
 ```
 

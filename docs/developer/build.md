@@ -26,8 +26,8 @@ minimal KNULLI/GE8300 hardware inputs used by the existing build scripts.
 The supported clean-clone entry point is:
 
 ```sh
-git clone REPOSITORY_URL
-cd plumOS-V90S_v2
+git clone https://github.com/game-de-it/plumOS-V90S_V2.git
+cd plumOS-V90S_V2
 ./scripts/docker-build.sh release-image --version 1.0.0
 ```
 

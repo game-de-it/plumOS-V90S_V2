@@ -3,7 +3,7 @@
 Date: 2026-07-23
 Implementation commit: `eadf55c`
 Host result: PASS
-plumOS real-device result: pending
+plumOS real-device result: PASS (user-confirmed)
 
 ## Confirmed StockOS Reference
 
@@ -99,10 +99,11 @@ sha256=ded3c2db2439bab6e2595ba12d218ec160b8e046c64a327ec0fe23356c854ea9
 verification=PASS
 ```
 
-## Required Physical Validation
+## Physical Validation
 
-This host result does not claim that the exact image has passed hardware
-validation. After flashing, confirm:
+The user flashed the exact release image and confirmed on 2026-07-23 that it
+boots and that the requested backlight behavior passes on the V90S. The
+physical validation scope was:
 
 - `sunxi_backlight` is present in `/proc/modules`
 - the backlight brightness file exists and is writable
@@ -110,3 +111,6 @@ validation. After flashing, confirm:
 - level 1 remains dimly visible instead of turning the display off
 - Lumination still changes `enhance_bright` independently
 - the hotkey works in FE, RetroArch, PicoArch, standalone, and Apps
+
+The result is a user-reported PASS. No new device command transcript was
+captured for this final confirmation.
