@@ -17,6 +17,7 @@ screenshot、ALSA route、input event、終了動作、FE復帰が有効です�
 - [clean clone release-image契約](../validation/2026-07-23-v90s-clean-clone-release-image.md)
 - [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
 - [Release 1.0.0準備](../validation/2026-07-23-v90s-release-1.0.0-preparation.md)
+- [Release 1.0.0公開](../validation/2026-07-23-v90s-release-1.0.0-publication.md)
 - [StockOSバックライト経路](../validation/2026-07-23-v90s-stockos-backlight.md)
 - [最終seed自動検査](../validation/2026-07-22-v90s-final-seed-automated-validation.md)
 - [4パーティションimage](../validation/2026-07-22-v90s-four-partition-image.md)
