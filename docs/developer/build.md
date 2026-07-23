@@ -31,6 +31,16 @@ cd plumOS-V90S_v2
 ./scripts/docker-build.sh release-image --version 1.0.0
 ```
 
+After the first full build, pass `--incremental` to check RetroArch, the full
+libretro core set, PicoArch, and the standalone emulator set independently.
+An output is reused only when its input fingerprint and artifact checksums
+match. The app layer, boot payloads, SD image, and final verification are never
+skipped.
+
+```sh
+./scripts/docker-build.sh release-image --version 1.0.0 --incremental
+```
+
 This command:
 
 1. verifies and materializes the tracked non-emulator 1.0.0 baseline

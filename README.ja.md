@@ -64,6 +64,14 @@ clean cloneから署名鍵不要の完全なSDイメージを生成する場合�
 ./scripts/docker-build.sh release-image --version 1.0.0
 ```
 
+初回のフルビルド後は、検証済みのエミュレータ成果物を再利用できます。
+入力または成果物チェックサムが変わったコンポーネントだけを再ビルドし、
+app-layer、boot payload、SDイメージと最終検証は毎回再実行します。
+
+```sh
+./scripts/docker-build.sh release-image --version 1.0.0 --incremental
+```
+
 cloneにはchecksum済みの非エミュレータrelease baselineが含まれます。このcommandは
 それを展開し、RetroArch、118 libretro core、PicoArch、standalone emulatorだけを
 再buildして生成imageを検証します。非公開のupdate署名鍵は必要ありません。

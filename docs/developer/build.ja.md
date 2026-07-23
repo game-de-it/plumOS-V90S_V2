@@ -30,6 +30,15 @@ cd plumOS-V90S_v2
 ./scripts/docker-build.sh release-image --version 1.0.0
 ```
 
+初回以降は`--incremental`を指定できます。RetroArch、全libretroコア、
+PicoArch、スタンドアロンエミュレータをコンポーネント別に判定し、入力
+フィンガープリントと既存成果物のチェックサムが一致するものだけ再利用
+します。app-layer、boot payload、SDイメージと最終検証は省略しません。
+
+```sh
+./scripts/docker-build.sh release-image --version 1.0.0 --incremental
+```
+
 このcommandは次を実行します。
 
 1. 追跡済み非エミュレータ1.0.0 baselineをchecksum検査して展開

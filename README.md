@@ -67,6 +67,14 @@ From a clean clone, a complete unsigned SD image can be built with:
 ./scripts/docker-build.sh release-image --version 1.0.0
 ```
 
+After the first full build, verified emulator outputs can be reused. Only
+components with changed inputs or invalid output checksums are rebuilt;
+the app layer, boot payloads, SD image, and final verification always run.
+
+```sh
+./scripts/docker-build.sh release-image --version 1.0.0 --incremental
+```
+
 The clone already contains the checksummed non-emulator release baseline. The
 command materializes it, rebuilds only the emulator-related components
 (RetroArch, 118 libretro cores, PicoArch, and standalone emulators), and
