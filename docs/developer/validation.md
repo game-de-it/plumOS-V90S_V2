@@ -17,6 +17,7 @@ and FE recovery.
 
 Start with these records:
 
+- [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
 - [Final automated seed validation](../validation/2026-07-22-v90s-final-seed-automated-validation.md)
 - [Four-partition image](../validation/2026-07-22-v90s-four-partition-image.md)
 - [Transactional update host validation](../validation/2026-07-22-v90s-transactional-update-host-validation.md)
