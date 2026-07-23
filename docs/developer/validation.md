@@ -17,6 +17,7 @@ and FE recovery.
 
 Start with these records:
 
+- [Clean-clone release-image contract](../validation/2026-07-23-v90s-clean-clone-release-image.md)
 - [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
 - [Final automated seed validation](../validation/2026-07-22-v90s-final-seed-automated-validation.md)
 - [Four-partition image](../validation/2026-07-22-v90s-four-partition-image.md)
