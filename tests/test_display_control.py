@@ -141,6 +141,25 @@ class DisplayControlTests(unittest.TestCase):
         self.assertIn("module_load=modprobe-ok", result.stdout)
         self.assertEqual(self.calls.read_text().splitlines(), ["modprobe sunxi_backlight"])
 
+    def test_failed_modprobe_falls_back_to_versioned_module(self):
+        self.backlight.unlink()
+        self.write_command(
+            self.insmod,
+            (
+                f"printf 'insmod %s\\n' \"$*\" >>'{self.calls}'\n"
+                'printf "255\\n" >"$PLUMOS_V90S_BACKLIGHT"\n'
+            ),
+        )
+        result = self.assert_success("status")
+        self.assertIn("module_load=insmod-ok", result.stdout)
+        self.assertEqual(
+            self.calls.read_text().splitlines(),
+            [
+                "modprobe sunxi_backlight",
+                f"insmod {self.module}",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

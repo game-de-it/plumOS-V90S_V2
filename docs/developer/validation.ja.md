@@ -16,6 +16,7 @@ screenshot、ALSA route、input event、終了動作、FE復帰が有効です�
 
 - [clean clone release-image契約](../validation/2026-07-23-v90s-clean-clone-release-image.md)
 - [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
+- [StockOSバックライト経路](../validation/2026-07-23-v90s-stockos-backlight.md)
 - [最終seed自動検査](../validation/2026-07-22-v90s-final-seed-automated-validation.md)
 - [4パーティションimage](../validation/2026-07-22-v90s-four-partition-image.md)
 - [transactional update host検査](../validation/2026-07-22-v90s-transactional-update-host-validation.md)
@@ -47,6 +48,8 @@ screenshot、ALSA route、input event、終了動作、FE復帰が有効です�
 - `2026-07-15-v90s-alsa-mono-usb-audio.md`: 内蔵monoとUSB-DAC経路
 - `2026-07-16-v90s-global-volume-brightness-hotkeys.md`と
   `2026-07-19-v90s-volume-response-12-step.md`: system control
+- `2026-07-23-v90s-stockos-backlight.md`: 6段階の実バックライトと独立した
+  Lumination契約
 - PicoArch、standalone、core別の日付付き記録: pacing、audio、rendering、input、performance判断
 
 ### EmulatorとApps

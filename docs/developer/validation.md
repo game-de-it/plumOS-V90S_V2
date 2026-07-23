@@ -19,6 +19,7 @@ Start with these records:
 
 - [Clean-clone release-image contract](../validation/2026-07-23-v90s-clean-clone-release-image.md)
 - [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
+- [StockOS backlight route](../validation/2026-07-23-v90s-stockos-backlight.md)
 - [Final automated seed validation](../validation/2026-07-22-v90s-final-seed-automated-validation.md)
 - [Four-partition image](../validation/2026-07-22-v90s-four-partition-image.md)
 - [Transactional update host validation](../validation/2026-07-22-v90s-transactional-update-host-validation.md)
@@ -53,6 +54,8 @@ Start with these records:
 - `2026-07-15-v90s-alsa-mono-usb-audio.md`: internal mono and USB-DAC routing
 - `2026-07-16-v90s-global-volume-brightness-hotkeys.md` and
   `2026-07-19-v90s-volume-response-12-step.md`: system controls
+- `2026-07-23-v90s-stockos-backlight.md`: six-step hardware backlight and
+  independent Lumination contract
 - PicoArch, standalone, and core-specific dated files: pacing, audio, rendering,
   input, and performance decisions
 

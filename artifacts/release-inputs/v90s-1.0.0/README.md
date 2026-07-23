@@ -3,7 +3,7 @@
 This directory contains the validated, non-emulator build baseline consumed by
 `scripts/docker-build.sh release-image --version 1.0.0`.
 
-- component source commit: 2955f6ee181272fc6bbc254fc2e0057c4102ef81
+- component source commit: eadf55c1e7d349cbee72dce0e6883b6b570b3b56
 - KNULLI commit: ac2ededdd3999443da4ba514dac22145d628f735
 - GE8300 commit: 3213ecb88a9e9c6813a7a6aafe78da1f055aa050
 
