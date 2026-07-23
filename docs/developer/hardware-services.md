@@ -15,6 +15,21 @@ on a dedicated path without changing core audio pitch. Framebuffer page count,
 pitch, pixel format, and visible dimensions must be preserved by overlays and
 direct renderers.
 
+The V90S hardware backlight follows the StockOS kernel route. System startup
+loads `sunxi_backlight` before the app layer and uses:
+
+```text
+/sys/class/backlight/sunxi_backlight/brightness
+max_brightness=255
+```
+
+`plumos-display-control` exposes this as the persistent `brightness` setting
+with levels `1..6`, mapped to raw values `1, 51, 102, 153, 204, 255`.
+Level 1 deliberately remains dimly visible instead of turning the panel off.
+The frontend `Brightness` entry and `SELECT + volume` use this backend.
+`Lumination` remains a separate display-processing control backed by
+`enhance_bright`; it is not an alias for panel backlight power.
+
 ## Audio
 
 All normal clients open ALSA `default` or the `plumos_output` alias. The generated

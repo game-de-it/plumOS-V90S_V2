@@ -12,6 +12,19 @@ display clockへ固定してはいけません。各runtimeがpacingを所有し
 threaded-video・sync設定、PicoArchはcore audio pitchを変えない専用presentation経路を使います。
 overlayとdirect rendererはframebuffer page数、pitch、pixel format、visible dimensionを保持します。
 
+V90Sの実バックライトはStockOSと同じkernel経路を使います。System起動時にapp-layerより先に
+`sunxi_backlight`をloadし、次を制御します。
+
+```text
+/sys/class/backlight/sunxi_backlight/brightness
+max_brightness=255
+```
+
+`plumos-display-control`は永続設定`brightness`を`1..6`で公開し、
+raw値`1, 51, 102, 153, 204, 255`へ対応させます。level 1でもpanelを消灯せず、
+うっすら表示を残します。frontendの`Brightness`と`SELECT + volume`はこのbackendを使います。
+`Lumination`は`enhance_bright`を使う表示色補正として独立し、実バックライト電力とは混同しません。
+
 ## Audio
 
 通常clientはALSA `default`または`plumos_output` aliasを開きます。生成設定は

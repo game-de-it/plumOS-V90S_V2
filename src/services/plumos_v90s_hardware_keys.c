@@ -276,7 +276,7 @@ static int apply_key_action(int direction, int select_down,
         result = change_runtime_volume(volume_state_path, direction);
     }
     fprintf(stderr, "hardware-keys: action=%s direction=%s rc=%d\n",
-            select_down ? "display-lumination" : "volume",
+            select_down ? "display-brightness" : "volume",
             direction > 0 ? "up" : "down", result);
     return result;
 }
@@ -291,7 +291,7 @@ static void persist_pending(int *volume_pending, int *display_pending)
     }
     if (*display_pending) {
         int result = run_helper("plumos-display-control", "persist-runtime");
-        fprintf(stderr, "hardware-keys: persist=display-lumination rc=%d\n",
+        fprintf(stderr, "hardware-keys: persist=display-brightness rc=%d\n",
                 result);
         if (result == 0)
             *display_pending = 0;

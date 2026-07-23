@@ -259,6 +259,7 @@ struct input_event {
 #define MMF_PWM_DUTY_PATH "/sys/class/pwm/pwmchip0/pwm0/duty_cycle"
 #define MMF_MI_DISP0_PATH "/proc/mi_modules/mi_disp/mi_disp0"
 #define MMF_STOCK_SYSTEM_JSON_PATH "/mnt/plumos/system.json"
+#define V90S_BACKLIGHT_PATH "/sys/class/backlight/sunxi_backlight/brightness"
 #define V90S_ENHANCE_BRIGHT_PATH "/sys/class/disp/disp/attr/enhance_bright"
 #define V90S_ENHANCE_CONTRAST_PATH "/sys/class/disp/disp/attr/enhance_contrast"
 #define V90S_ENHANCE_SATURATION_PATH "/sys/class/disp/disp/attr/enhance_saturation"
@@ -2354,8 +2355,58 @@ static int runtime_lcd_backend_available(void) {
   return access(A30_LCD_BACKLIGHT_PATH, W_OK) == 0;
 }
 
+static int run_display_control_command(const char *action, long brightness,
+                                       int include_brightness) {
+  char helper[PATH_MAX];
+  char brightness_buf[32];
+  char cmd[PATH_MAX + 256];
+  size_t pos = 0;
+
+  if (!action ||
+      !join_path(helper, sizeof(helper), runtime_plumos_root(),
+                 "bin/plumos-display-control") ||
+      access(helper, X_OK) != 0) {
+    return 0;
+  }
+  if (include_brightness) {
+    snprintf(brightness_buf, sizeof(brightness_buf), "%ld",
+             clamp_long(brightness, 1, 6));
+  } else {
+    brightness_buf[0] = '\0';
+  }
+  if (!append_string(cmd, sizeof(cmd), &pos, "PLUMOS_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, runtime_plumos_root()) ||
+      !append_string(cmd, sizeof(cmd), &pos, " ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, helper) ||
+      !append_string(cmd, sizeof(cmd), &pos, " ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, action)) {
+    return 0;
+  }
+  if (include_brightness &&
+      (!append_string(cmd, sizeof(cmd), &pos, " ") ||
+       !append_shell_quoted(cmd, sizeof(cmd), &pos, brightness_buf))) {
+    return 0;
+  }
+  if (!append_string(cmd, sizeof(cmd), &pos,
+                     " >/tmp/.plumos_brightness_set 2>&1")) {
+    return 0;
+  }
+  return system_command_succeeded(system(cmd));
+}
+
+static int runtime_v90s_backlight_available(void) {
+  return access(V90S_BACKLIGHT_PATH, W_OK) == 0 ||
+         run_display_control_command("status", 0, 0);
+}
+
 static int runtime_enhance_backend_available(void) {
   return access(A30_DISPLAY_ENHANCE_PATH, W_OK) == 0;
+}
+
+static int runtime_device_is_v90s(void) {
+  const char *device_id = getenv("PLUMOS_DEVICE_ID");
+
+  return !device_id || !device_id[0] || strcmp(device_id, "v90s") == 0;
 }
 
 static int runtime_device_is_mmf(void) {
@@ -2413,7 +2464,8 @@ static int system_number_setting_runtime_available(const char *id) {
     return runtime_volume_backend_available();
   }
   if (strcmp(id, "system_brightness") == 0) {
-    return runtime_lcd_backend_available() || runtime_mmf_lcd_backend_available();
+    return runtime_v90s_backlight_available() ||
+           runtime_lcd_backend_available() || runtime_mmf_lcd_backend_available();
   }
   if (strcmp(id, "system_lumination") == 0) {
     return runtime_enhance_backend_available() ||
@@ -2470,6 +2522,7 @@ static void update_device_backend_status(struct device_settings *device) {
   int enhance_available;
   int mmf_lcd_available;
   int mmf_enhance_available;
+  int v90s_backlight_available;
 
   if (!device) {
     return;
@@ -2497,7 +2550,14 @@ static void update_device_backend_status(struct device_settings *device) {
   enhance_available = runtime_enhance_backend_available();
   mmf_lcd_available = runtime_mmf_lcd_backend_available();
   mmf_enhance_available = runtime_mmf_enhance_backend_available();
-  if (runtime_v90s_enhance_backend_available()) {
+  v90s_backlight_available = runtime_v90s_backlight_available();
+  if (v90s_backlight_available && runtime_v90s_enhance_backend_available()) {
+    copy_string(device->brightness_backend, sizeof(device->brightness_backend),
+                "sunxi backlight + disp enhance");
+  } else if (v90s_backlight_available) {
+    copy_string(device->brightness_backend, sizeof(device->brightness_backend),
+                "sunxi backlight");
+  } else if (runtime_v90s_enhance_backend_available()) {
     copy_string(device->brightness_backend, sizeof(device->brightness_backend),
                 lcd_available ? "disp enhance+lcdbl" : "disp enhance");
   } else if (lcd_available && enhance_available) {
@@ -2574,6 +2634,9 @@ static long brightness_setting_from_raw(long raw) {
 }
 
 static long brightness_setting_from_stored(long stored) {
+  if (runtime_device_is_v90s()) {
+    return clamp_long(stored, 1, 6);
+  }
   if (stored >= 1 && stored <= 20) {
     return stored;
   }
@@ -2581,6 +2644,15 @@ static long brightness_setting_from_stored(long stored) {
     return 1;
   }
   return brightness_setting_from_raw(stored);
+}
+
+static int apply_runtime_v90s_brightness(
+    const struct device_settings *device) {
+  if (!device || !runtime_device_is_v90s()) {
+    return 0;
+  }
+  return run_display_control_command(
+      "apply", clamp_long(device->brightness, 1, 6), 1);
 }
 
 static int apply_runtime_brightness(const struct device_settings *device) {
@@ -2800,7 +2872,12 @@ static int apply_device_runtime_settings(const struct device_settings *device,
       ok = 0;
     }
   }
-  if (needs_brightness && runtime_lcd_backend_available()) {
+  if (needs_brightness && runtime_v90s_backlight_available()) {
+    attempted = 1;
+    if (!apply_runtime_v90s_brightness(device)) {
+      ok = 0;
+    }
+  } else if (needs_brightness && runtime_lcd_backend_available()) {
     attempted = 1;
     if (!apply_runtime_brightness(device)) {
       ok = 0;
@@ -4144,7 +4221,7 @@ static void init_device_settings(struct device_settings *device) {
   device->volume = PLUMOS_VOLUME_DEFAULT;
   device->wifi_enabled = 1;
   device->automatic_time_enabled = 1;
-  device->brightness = 10;
+  device->brightness = runtime_device_is_v90s() ? 6 : 10;
   device->lumination = 5;
   device->contrast = 10;
   device->hue = 10;
@@ -9064,7 +9141,8 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line2, line2_size, "Applies to the validated device mixer backend.");
     } else if (strcmp(id, "system_brightness") == 0) {
       copy_string(line1, line1_size, "Screen brightness setting.");
-      copy_string(line2, line2_size, "Unavailable when the vendor runtime exposes no backlight control.");
+      copy_string(line2, line2_size,
+                  "Uses the V90S StockOS sunxi backlight in six steps.");
     } else if (strcmp(id, "system_lumination") == 0) {
       copy_string(line1, line1_size, "Display lumination setting.");
       copy_string(line2, line2_size, "Applies to V90S display enhance brightness when available.");
@@ -12741,7 +12819,7 @@ static int save_setting_number(struct ui_state *ui, const char *id,
   } else if (strcmp(id, "system_brightness") == 0) {
     system_key = "brightness";
     min_value = 1;
-    max_value = 20;
+    max_value = runtime_device_is_v90s() ? 6 : 20;
   } else if (strcmp(id, "system_lumination") == 0) {
     system_key = "lumination";
     min_value = 0;

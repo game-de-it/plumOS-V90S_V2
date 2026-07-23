@@ -122,6 +122,24 @@ class ReleaseImageBuildTests(unittest.TestCase):
                 for pattern in patterns:
                     self.assertIsNone(pattern.search(text), (member, pattern.pattern))
 
+    def test_system_boot_loads_stockos_backlight_before_app_layer(self) -> None:
+        script = (ROOT / "scripts/build-step1-rootfs.sh").read_text()
+        runtime_start = script.index("mount -t sysfs sysfs /sys")
+        load_call = script.index("\nload_v90s_backlight\n", runtime_start)
+        app_layer = script.index("\nif prepare_plumos_app_layer; then", load_call)
+        self.assertLess(runtime_start, load_call)
+        self.assertLess(load_call, app_layer)
+        self.assertIn("modprobe sunxi_backlight", script)
+        self.assertIn(
+            "module=/lib/modules/$(uname -r)/sunxi-backlight.ko",
+            script,
+        )
+        self.assertIn('insmod "$module"', script)
+        self.assertIn(
+            "/sys/class/backlight/sunxi_backlight/brightness",
+            script,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

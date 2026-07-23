@@ -7,6 +7,12 @@ Date: 2026-07-16
 > `2026-07-19-v90s-volume-response-12-step.md` for the current implementation
 > and real-device validation. The older values remain here as historical test
 > evidence.
+>
+> Backlight correction, 2026-07-23: the earlier conclusion that the vendor
+> kernel exposed no hardware backlight was caused by `sunxi_backlight` not
+> being loaded. Current behavior is documented in
+> `2026-07-23-v90s-stockos-backlight.md`. The older `display-lumination` log
+> lines below remain historical evidence only.
 
 ## Goal
 
@@ -17,9 +23,9 @@ RetroArch, PicoArch, and standalone-emulator process lifetime:
 - `Select + Volume -` / `Select + Volume +`: change the visible display
   luminance.
 
-The vendor kernel does not expose a hardware backlight endpoint. The display
-combo therefore controls the supported V90S `enhance_bright` endpoint, which
-is the same backend as the frontend `Lumination` setting.
+The display combo now controls the StockOS
+`/sys/class/backlight/sunxi_backlight/brightness` endpoint. Frontend
+`Lumination` continues to control `enhance_bright` independently.
 
 ## Runtime design
 
@@ -87,17 +93,18 @@ SHA-256: 1cfc816c6568256e56cfbbfe0afe5e6d3ca28db390ba982e95bf0667f274d958
 
 ## Display routing
 
-`plumos-display-control` owns runtime and persistent luminance changes:
+`plumos-display-control` now owns runtime and persistent hardware-backlight
+changes:
 
 ```text
-setting: /mnt/plumos/config/system/settings.json -> lumination 0..10
-runtime: /run/plumos/display/lumination
-backend: /sys/class/disp/disp/attr/enhance_bright -> 0..100
+setting: /mnt/plumos/config/system/settings.json -> brightness 1..6
+runtime: /run/plumos/display/brightness
+backend: /sys/class/backlight/sunxi_backlight/brightness
+raw values: 1,51,102,153,204,255
 ```
 
-This is display processing rather than PWM/backlight power control. The
-distinction remains visible in the frontend: unsupported hardware
-`Brightness` stays `N/A`, while `Lumination` is writable.
+`Lumination` remains display processing through `enhance_bright` and is not
+changed by the backlight hotkey.
 
 ## Live validation
 
@@ -119,7 +126,8 @@ version=0.1.0-dev
 vendor=v90s-stockos-r1
 ```
 
-The physical sequence `Volume -`, then `Select + Volume +`, produced:
+The following physical sequence records the superseded pre-correction route.
+`Volume -`, then `Select + Volume +`, produced:
 
 ```text
 hardware-keys: action=volume direction=down rc=0
@@ -168,9 +176,9 @@ The following completed successfully:
 ./scripts/docker-build.sh system-rootfs
 ```
 
-The rebuilt release-system squashfs is 73.13 MiB. A host-side fake-sysfs test
-also confirmed `plumos-display-control runtime-up` changes `5 -> 6`, writes
-`50 -> 60`, persists the JSON setting atomically, and removes transient state.
+The rebuilt release-system squashfs was 73.13 MiB. The fake-sysfs result from
+this historical build exercised `enhance_bright`; the current six-step
+backlight test is recorded in the 2026-07-23 validation document.
 
 ## Internal volume correction
 

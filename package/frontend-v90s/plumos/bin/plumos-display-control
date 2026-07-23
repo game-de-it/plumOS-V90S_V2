@@ -3,19 +3,25 @@ set -u
 
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 SYSTEM_SETTINGS="${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/settings.json}"
-RUNTIME_STATE="${PLUMOS_DISPLAY_RUNTIME_STATE:-/run/plumos/display/lumination}"
+RUNTIME_STATE="${PLUMOS_DISPLAY_RUNTIME_STATE:-/run/plumos/display/brightness}"
 LOG="${PLUMOS_DISPLAY_LOG:-/run/plumos/display/last-apply.log}"
-ENHANCE_BRIGHT="${PLUMOS_V90S_ENHANCE_BRIGHT:-/sys/class/disp/disp/attr/enhance_bright}"
+BACKLIGHT="${PLUMOS_V90S_BACKLIGHT:-/sys/class/backlight/sunxi_backlight/brightness}"
+MAX_BRIGHTNESS="${PLUMOS_V90S_MAX_BRIGHTNESS:-${BACKLIGHT%/*}/max_brightness}"
+KERNEL_RELEASE="${PLUMOS_V90S_KERNEL_RELEASE:-$(uname -r 2>/dev/null || printf 4.9.191)}"
+BACKLIGHT_MODULE="${PLUMOS_V90S_BACKLIGHT_MODULE:-/lib/modules/$KERNEL_RELEASE/sunxi-backlight.ko}"
+MODPROBE="${PLUMOS_V90S_MODPROBE:-modprobe}"
+INSMOD="${PLUMOS_V90S_INSMOD:-insmod}"
+BACKLIGHT_LOAD_RESULT=not-tried
 
 mkdir -p "${RUNTIME_STATE%/*}" "${LOG%/*}" 2>/dev/null || true
 
 usage() {
   cat <<USAGE
-Usage: plumos-display-control apply [0..10]|up|down|get|status
+Usage: plumos-display-control apply [1..6]|up|down|get|status
        plumos-display-control runtime-up|runtime-down|persist-runtime
 
-Controls V90S display luminance through enhance_bright. The vendor kernel does
-not expose a hardware backlight control.
+Controls the V90S StockOS sunxi backlight in six steps. Display Lumination and
+enhance_bright remain separate color-processing controls.
 USAGE
 }
 
@@ -26,16 +32,59 @@ normalize_level() {
   esac
   value="$(printf '%s' "$value" | sed 's/^0*//')"
   [ -n "$value" ] || value=0
-  [ "$value" -gt 10 ] && value=10
+  [ "$value" -lt 1 ] && value=1
+  [ "$value" -gt 6 ] && value=6
   printf '%s\n' "$value"
+}
+
+raw_for_level() {
+  case "$(normalize_level "$1")" in
+    1) printf '%s\n' 1 ;;
+    2) printf '%s\n' 51 ;;
+    3) printf '%s\n' 102 ;;
+    4) printf '%s\n' 153 ;;
+    5) printf '%s\n' 204 ;;
+    6) printf '%s\n' 255 ;;
+  esac
+}
+
+write_saved_level() {
+  level="$(normalize_level "$1")" || return 2
+  settings_dir="${SYSTEM_SETTINGS%/*}"
+  mkdir -p "$settings_dir" 2>/dev/null || return 1
+  tmp="$SYSTEM_SETTINGS.tmp.$$"
+  if [ -r "$SYSTEM_SETTINGS" ] &&
+     grep -q '"brightness"[[:space:]]*:' "$SYSTEM_SETTINGS" 2>/dev/null; then
+    sed 's/"brightness"[[:space:]]*:[[:space:]]*[0-9][0-9]*/"brightness": '"$level"'/' \
+      "$SYSTEM_SETTINGS" >"$tmp" || { rm -f "$tmp"; return 1; }
+  else
+    cat >"$tmp" <<EOF
+{
+  "version": 1,
+  "brightness": $level
+}
+EOF
+  fi
+  mv -f "$tmp" "$SYSTEM_SETTINGS"
 }
 
 read_saved_level() {
   value=""
   if [ -r "$SYSTEM_SETTINGS" ]; then
-    value="$(sed -n 's/.*"lumination"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$SYSTEM_SETTINGS" 2>/dev/null | head -n 1)"
+    value="$(sed -n 's/.*"brightness"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$SYSTEM_SETTINGS" 2>/dev/null | head -n 1)"
   fi
-  normalize_level "${value:-5}" || printf '%s\n' 5
+  case "$value" in
+    ""|*[!0-9]*)
+      printf '%s\n' 6
+      ;;
+    *)
+      normalized="$(normalize_level "$value")" || normalized=6
+      if [ "$value" != "$normalized" ]; then
+        write_saved_level "$normalized" 2>/dev/null || true
+      fi
+      printf '%s\n' "$normalized"
+      ;;
+  esac
 }
 
 read_runtime_level() {
@@ -56,45 +105,64 @@ write_runtime_level() {
   mv -f "$tmp" "$RUNTIME_STATE" || { rm -f "$tmp"; return 1; }
 }
 
-write_saved_level() {
-  level="$(normalize_level "$1")" || return 2
-  settings_dir="${SYSTEM_SETTINGS%/*}"
-  mkdir -p "$settings_dir" 2>/dev/null || return 1
-  tmp="$SYSTEM_SETTINGS.tmp.$$"
-  if [ -r "$SYSTEM_SETTINGS" ] && grep -q '"lumination"[[:space:]]*:' "$SYSTEM_SETTINGS" 2>/dev/null; then
-    sed 's/"lumination"[[:space:]]*:[[:space:]]*[0-9][0-9]*/"lumination": '"$level"'/' \
-      "$SYSTEM_SETTINGS" >"$tmp" || { rm -f "$tmp"; return 1; }
-  else
-    cat >"$tmp" <<EOF
-{
-  "version": 1,
-  "lumination": $level
-}
-EOF
+ensure_backlight() {
+  if [ -e "$BACKLIGHT" ]; then
+    BACKLIGHT_LOAD_RESULT=already-present
+    return 0
   fi
-  mv -f "$tmp" "$SYSTEM_SETTINGS"
+
+  if "$MODPROBE" sunxi_backlight >/dev/null 2>&1; then
+    BACKLIGHT_LOAD_RESULT=modprobe-ok
+  else
+    BACKLIGHT_LOAD_RESULT=modprobe-failed
+  fi
+  if [ -e "$BACKLIGHT" ]; then
+    return 0
+  fi
+
+  if [ -f "$BACKLIGHT_MODULE" ] &&
+     "$INSMOD" "$BACKLIGHT_MODULE" >/dev/null 2>&1; then
+    BACKLIGHT_LOAD_RESULT=insmod-ok
+  else
+    BACKLIGHT_LOAD_RESULT="${BACKLIGHT_LOAD_RESULT}+insmod-failed"
+  fi
+  [ -e "$BACKLIGHT" ]
+}
+
+write_apply_log() {
+  level="$1"
+  raw="$2"
+  {
+    printf 'backend=v90s-sunxi-backlight\n'
+    printf 'module_load=%s\n' "$BACKLIGHT_LOAD_RESULT"
+    printf 'brightness=%s\n' "$level"
+    printf 'backlight_raw=%s\n' "$raw"
+    if [ -r "$MAX_BRIGHTNESS" ]; then
+      printf 'max_brightness='
+      cat "$MAX_BRIGHTNESS"
+    fi
+  } >"$LOG"
 }
 
 apply_level() {
   level="$(normalize_level "${1:-$(read_runtime_level)}")" || return 2
-  [ -w "$ENHANCE_BRIGHT" ] || {
-    printf 'backend=unavailable\n' >"$LOG"
+  if ! ensure_backlight || [ ! -w "$BACKLIGHT" ]; then
+    {
+      printf 'backend=unavailable\n'
+      printf 'module_load=%s\n' "$BACKLIGHT_LOAD_RESULT"
+    } >"$LOG"
     return 1
-  }
-  raw=$((level * 10))
-  printf '%s\n' "$raw" >"$ENHANCE_BRIGHT" || return 1
-  {
-    printf 'backend=v90s-disp-enhance\n'
-    printf 'lumination=%s\n' "$level"
-    printf 'enhance_bright=%s\n' "$raw"
-  } >"$LOG"
+  fi
+  raw="$(raw_for_level "$level")"
+  printf '%s\n' "$raw" >"$BACKLIGHT" || return 1
+  write_apply_log "$level" "$raw"
 }
 
 change_runtime() {
   current="$(read_runtime_level)"
   next=$((current + $1))
-  [ "$next" -lt 0 ] && next=0
-  [ "$next" -gt 10 ] && next=10
+  [ "$next" -lt 1 ] && next=1
+  [ "$next" -gt 6 ] && next=6
   write_runtime_level "$next" || return 1
   apply_level "$next"
 }
@@ -102,8 +170,8 @@ change_runtime() {
 change_saved() {
   current="$(read_saved_level)"
   next=$((current + $1))
-  [ "$next" -lt 0 ] && next=0
-  [ "$next" -gt 10 ] && next=10
+  [ "$next" -lt 1 ] && next=1
+  [ "$next" -gt 6 ] && next=6
   write_saved_level "$next" || return 1
   rm -f "$RUNTIME_STATE" 2>/dev/null || true
   apply_level "$next"
@@ -123,13 +191,19 @@ case "${1:-}" in
     ;;
   get) read_saved_level ;;
   status)
-    if [ -w "$ENHANCE_BRIGHT" ]; then
-      printf 'backend=v90s-disp-enhance\n'
-      printf 'lumination=%s\n' "$(read_runtime_level)"
-      printf 'enhance_bright='
-      cat "$ENHANCE_BRIGHT"
+    if ensure_backlight && [ -w "$BACKLIGHT" ]; then
+      printf 'backend=v90s-sunxi-backlight\n'
+      printf 'module_load=%s\n' "$BACKLIGHT_LOAD_RESULT"
+      printf 'brightness=%s\n' "$(read_runtime_level)"
+      printf 'backlight_raw='
+      cat "$BACKLIGHT"
+      if [ -r "$MAX_BRIGHTNESS" ]; then
+        printf 'max_brightness='
+        cat "$MAX_BRIGHTNESS"
+      fi
     else
       printf 'backend=unavailable\n'
+      printf 'module_load=%s\n' "$BACKLIGHT_LOAD_RESULT"
       exit 1
     fi
     ;;

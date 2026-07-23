@@ -551,10 +551,10 @@ Build plumOS V90S as a V90S-specific distribution:
 - [x] Add the MMF-compatible default `config/system/settings.json` so frontend
   system settings such as `wifi_enabled` can persist on V90S.
 - [x] Make START menu `System Settings` use validated V90S runtime backends:
-  volume uses the StockOS ALSA speaker path, display enhance controls back
-  Lumination/Contrast/Color Temp/Saturation, unsupported Brightness shows
-  `N/A` and does not save misleading values, and Factory Reset exposes only
-  installed default sets.
+  volume uses the StockOS ALSA speaker path, the loaded StockOS
+  `sunxi_backlight` route backs six-step Brightness, display enhance controls
+  independently back Lumination/Contrast/Color Temp/Saturation, and Factory
+  Reset exposes only installed default sets.
 - [x] Fix `System Settings -> INFORMATION` for the V90S distribution split:
   show `POWKIDDY V90S`, plumOS `VERSION`, compatible vendor runtime,
   kernel, PowerVR GPU, display/audio runtime backends, ROM-storage capacity,

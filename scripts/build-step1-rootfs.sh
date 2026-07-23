@@ -571,6 +571,52 @@ persist_debian_log() {
     boot_log_sync
 }
 
+load_v90s_backlight() {
+    backlight=/sys/class/backlight/sunxi_backlight/brightness
+    max_brightness=/sys/class/backlight/sunxi_backlight/max_brightness
+    module=/lib/modules/$(uname -r)/sunxi-backlight.ko
+
+    if [ -e "$backlight" ]; then
+        log "debian-init: sunxi_backlight already available"
+    else
+        log "debian-init: loading sunxi_backlight with modprobe"
+        if modprobe sunxi_backlight >> "$LOG" 2>&1; then
+            log "debian-init: sunxi_backlight modprobe succeeded"
+        else
+            rc=$?
+            log "debian-init: sunxi_backlight modprobe failed rc=$rc"
+        fi
+        if [ ! -e "$backlight" ]; then
+            if [ -f "$module" ]; then
+                log "debian-init: loading sunxi_backlight with insmod module=$module"
+                if insmod "$module" >> "$LOG" 2>&1; then
+                    log "debian-init: sunxi_backlight insmod succeeded"
+                else
+                    rc=$?
+                    log "debian-init: sunxi_backlight insmod failed rc=$rc"
+                fi
+            else
+                log "debian-init: sunxi_backlight module missing path=$module"
+            fi
+        fi
+    fi
+
+    if [ -e "$backlight" ]; then
+        current="$(cat "$backlight" 2>/dev/null || echo unreadable)"
+        maximum="$(cat "$max_brightness" 2>/dev/null || echo unreadable)"
+        if [ -w "$backlight" ]; then
+            writable=yes
+        else
+            writable=no
+        fi
+        log "debian-init: sunxi_backlight ready brightness=$current max_brightness=$maximum writable=$writable"
+        return 0
+    fi
+
+    log "debian-init: sunxi_backlight unavailable"
+    return 1
+}
+
 ensure_fb0_node() {
     if [ ! -c /dev/fb0 ] && [ -d /sys/class/graphics/fb0 ]; then
         mknod /dev/fb0 c 29 0 2>/dev/null || true
@@ -916,6 +962,7 @@ prepare_runtime_resolver
 prepare_fat_logs
 
 log "debian-init: init entered before tty setup"
+load_v90s_backlight
 persist_debian_log
 
 for tty in /dev/tty0 /dev/tty1 /dev/console /dev/ttyS0; do

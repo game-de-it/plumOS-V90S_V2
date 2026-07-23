@@ -2,6 +2,11 @@
 
 Date: 2026-07-12
 
+> Correction, 2026-07-23: V90S does expose the StockOS hardware backlight
+> after loading `sunxi_backlight`. `Brightness` now uses that six-step backend.
+> The observations below describe the earlier state in which the module was not
+> loaded. See `2026-07-23-v90s-stockos-backlight.md`.
+
 ## Scope
 
 Make the START menu `System Settings` entries use real V90S runtime backends
@@ -18,7 +23,7 @@ PLUMOS_ROOT=/mnt/plumos
 
 ## Backend Findings
 
-V90S does not expose the A30-style backlight path:
+V90S does not use the A30-style backlight path:
 
 ```text
 /sys/devices/virtual/disp/disp/attr/lcdbl: missing
@@ -41,8 +46,8 @@ neutral value succeeds.
 
 - `Volume`: backed by `/mnt/plumos/bin/plumos-volume-control`, using the V90S
   StockOS ALSA `Headphone` and `HpSpeaker` controls.
-- `Brightness`: shown as `N/A`; LEFT/RIGHT does not change
-  `config/system/settings.json` while no backlight backend is exposed.
+- `Brightness`: this historical build showed `N/A` because
+  `sunxi_backlight` had not been loaded.
 - `Lumination`: writes `enhance_bright`.
 - `Display Color -> Contrast`: writes `enhance_contrast`.
 - `Display Color -> Color Temp`: uses the existing `system_hue` setting ID but
