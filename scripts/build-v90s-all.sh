@@ -49,7 +49,7 @@ run_target network-services
 run_target audio-router
 run_target sdl2-powervr
 run_target retroarch
-run_target cores
+run_target cores --filter all
 run_target picoarch
 run_target standalone
 run_target nextcommander

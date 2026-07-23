@@ -12,5 +12,10 @@ file inventory, and hashes in the prepared vendor-runtime manifest and
 SHA256SUMS. plumOS-authored extraction, packaging, configuration, and adapter
 code remains covered by the repository LICENSE.
 
+The public repository carries a sanitized copy of this fixed vendor input so a
+clean clone can reproduce the SD-image build. Active StockOS password material,
+boot random seed, Wi-Fi values, ROMs, game BIOS files, saves, and personal keys
+are excluded from that copy.
+
 No ROM or BIOS game content is covered by this notice or distributed as part
 of plumOS releases.

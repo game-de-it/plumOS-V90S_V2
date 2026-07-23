@@ -94,6 +94,32 @@ rm -rf "$WORK_DIR/root/media/BATOCERA/lost+found"
     > "$WORK_DIR/vendor-files.tar.gz"
 tar --no-xattrs -xzf "$WORK_DIR/vendor-files.tar.gz" -C "$WORK_DIR/root"
 
+sanitize_stockos_config() {
+    config_path="$1"
+    [ -f "$config_path" ] || return 0
+    temp_path="$config_path.sanitized"
+    awk '
+        /^[[:space:]#]*rootshadowpassword=/ {
+            print "# rootshadowpassword removed from redistributable vendor artifact"
+            next
+        }
+        /^[[:space:]]*randomseed=/ {
+            print "# randomseed removed from redistributable vendor artifact"
+            next
+        }
+        /^[[:space:]]*wifi([0-9]+)?\.(ssid|key)=/ {
+            split($0, parts, "=")
+            print parts[1] "="
+            next
+        }
+        { print }
+    ' "$config_path" > "$temp_path"
+    mv "$temp_path" "$config_path"
+}
+
+sanitize_stockos_config "$WORK_DIR/root/media/BATOCERA/batocera-boot.conf"
+sanitize_stockos_config "$WORK_DIR/root/media/BATOCERA/preinstall/batocera.conf"
+
 tar --no-xattrs -czf "$CAPTURE_DIR/files/stockos-selected-files.tar.gz" -C "$WORK_DIR/root" .
 tar -tzf "$CAPTURE_DIR/files/stockos-selected-files.tar.gz" | sort > "$CAPTURE_DIR/file-list.txt"
 

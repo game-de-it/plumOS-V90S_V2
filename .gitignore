@@ -145,3 +145,17 @@ wpa_supplicant.conf
 plumos/ssh/etc/authorized_keys
 plumos/ssh/etc/dropbear_*_host_key
 plumos/config/network/wpa_supplicant.conf
+
+# The sanitized, checksum-pinned V90S vendor baseline is the one build input
+# intentionally carried by the public repository. Other artifacts, including
+# update signing keys, remain ignored.
+!artifacts/
+artifacts/*
+!artifacts/vendor/
+artifacts/vendor/*
+!artifacts/vendor/v90s-stockos-r1/
+!artifacts/vendor/v90s-stockos-r1/**
+!artifacts/release-inputs/
+artifacts/release-inputs/*
+!artifacts/release-inputs/v90s-1.0.0/
+!artifacts/release-inputs/v90s-1.0.0/**

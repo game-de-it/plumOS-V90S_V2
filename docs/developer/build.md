@@ -3,12 +3,54 @@
 ## Requirements
 
 - Git
-- Docker with enough free space for AArch64 sources and images
-- vendor input under `artifacts/vendor/v90s-stockos-r1/`
+- Docker with at least 80 GiB of free space for AArch64 sources and images
+- Internet access for Docker and emulator-source downloads
 - release signing key only when producing official update packages
 
 All target builds enter through `scripts/docker-build.sh`. The Docker image is
 `plumos-v90s-toolchain:dev` by default and targets `linux/arm64`.
+
+The sanitized and checksummed `v90s-stockos-r1` vendor input is tracked under
+`artifacts/vendor/v90s-stockos-r1/`. It contains no ROM, game BIOS, save data,
+personal network configuration, SSH key, or update-signing key. Vendor files
+retain their original terms and are not relicensed under the plumOS MIT
+license.
+
+The checksummed non-emulator 1.0.0 baseline is also tracked under
+`artifacts/release-inputs/v90s-1.0.0/`. It contains the System SquashFS,
+frontend, userland, services, applications, PowerVR SDL2 runtime, and the
+minimal KNULLI/GE8300 hardware inputs used by the existing build scripts.
+
+## Clean-Clone Release Image
+
+The supported clean-clone entry point is:
+
+```sh
+git clone REPOSITORY_URL
+cd plumOS-V90S_v2
+./scripts/docker-build.sh release-image --version 1.0.0
+```
+
+This command:
+
+1. verifies and materializes the tracked non-emulator 1.0.0 baseline
+2. validates and prepares the tracked vendor runtime
+3. rebuilds only RetroArch, all 118 libretro cores, PicoArch, and standalone
+   emulators from their existing pinned recipes
+4. assembles the versioned strict app-layer from the local baseline and rebuilt
+   emulator payloads
+5. assembles and verifies
+   `output/images/plumos-v90s-release-1.0.0-vendor-r1.img`
+
+The target stops after the verified image and does not create signed update
+packages. KNULLI and GE8300 are not downloaded by this target; the required
+local subsets are part of the clone. The bundled subsets retain these source
+identities:
+
+| Input | Commit |
+| --- | --- |
+| KNULLI | `ac2ededdd3999443da4ba514dac22145d628f735` |
+| GE8300 drivers | `3213ecb88a9e9c6813a7a6aafe78da1f055aa050` |
 
 ## Build Image and Inspect Targets
 
@@ -18,9 +60,11 @@ All target builds enter through `scripts/docker-build.sh`. The Docker image is
 ./scripts/docker-build.sh shell
 ```
 
-`artifacts/` is input-only and ignored. Generated files go to `output/` or
-`dist/`, also ignored. Build scripts, recipes, pins, patches, manifest schemas,
-and public update keys stay tracked.
+The sanitized `artifacts/vendor/v90s-stockos-r1/` and versioned
+`artifacts/release-inputs/` baselines are tracked. All other `artifacts/` paths
+are ignored, including the private update-signing key. Generated files go to
+`output/` or `dist/`, also ignored. Build scripts, recipes, pins, patches,
+manifest schemas, and the public update key stay tracked.
 
 ## Component Targets
 

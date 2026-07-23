@@ -61,6 +61,18 @@ Developers use the Docker build entry point:
 ./scripts/docker-build.sh --help
 ```
 
+From a clean clone, a complete unsigned SD image can be built with:
+
+```sh
+./scripts/docker-build.sh release-image --version 1.0.0
+```
+
+The clone already contains the checksummed non-emulator release baseline. The
+command materializes it, rebuilds only the emulator-related components
+(RetroArch, 118 libretro cores, PicoArch, and standalone emulators), and
+verifies the generated image. It does not require the private update-signing
+key.
+
 Start with the [developer build guide](docs/developer/build.md) before creating
 an image or update package.
 

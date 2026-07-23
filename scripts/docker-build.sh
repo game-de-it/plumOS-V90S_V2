@@ -48,6 +48,7 @@ Commands:
   standalone [ID...] Build all standalone emulators, only selected IDs, or launcher-only.
   frontend         Build the V90S frontend ported from plumOS-MMF.
   release          Assemble update-only release packages from the app layer.
+  release-image    Build a verified SD image from a clean checkout.
   all              Build the normal release chain in dependency order.
 
 Environment:
@@ -348,6 +349,9 @@ case "$cmd" in
     release)
         ensure_image
         docker run "${docker_run_user[@]}" /workspace/scripts/build-release.sh "$@"
+        ;;
+    release-image)
+        "$ROOT_DIR/scripts/build-v90s-release-image.sh" "$@"
         ;;
     standalone|standalone-emulators)
         ensure_image

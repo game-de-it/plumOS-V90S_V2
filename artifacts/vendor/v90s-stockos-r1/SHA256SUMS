@@ -1,0 +1,8 @@
+77dff20665520e10cc9658f0abc3927a210d3fd4735ef3a72d320c1e5b3b4856  ./README.txt
+49a82ba19d0aa4f28c1a7fb9d427d2b3b3eb6b81e91c3e45869c1833499d4437  ./file-list.txt
+a7a4c158e5cb284fc95d8b0d665087fba123476d091e5975bec906275f819acb  ./files/stockos-selected-files.tar.gz
+69587a6ee20b4e6e7ad0f916f964e578660799370326d72fd53f8728ec2d41e9  ./raw-boot-chain/boot-package-offset-16793600.bin
+638d5d75f9d348a4fbcadb901a2c102fd88148900c3d186acc7ae6d4095784c4  ./raw-boot-chain/boot0-offset-131072.bin
+1567d9b746eca10ccd02d284faf46d3df7cd763debae994925bbcbc9e6a822c4  ./raw-partitions/mmcblk0p2-env.bin
+1567d9b746eca10ccd02d284faf46d3df7cd763debae994925bbcbc9e6a822c4  ./raw-partitions/mmcblk0p3-env-redund.bin
+7730529b17c85f530fb4b9efc4a2606bcfdae31f0594aaa5a7ed727c7a3d973e  ./raw-partitions/mmcblk0p4-boot.bin

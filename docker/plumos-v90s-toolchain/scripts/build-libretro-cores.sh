@@ -298,8 +298,9 @@ clone_or_update_repo() {
       fi
     else
       git fetch --quiet origin "$ref"
-      git checkout --quiet --detach FETCH_HEAD
-      [ "$(git rev-parse HEAD)" = "$(git rev-parse "$ref^{commit}")" ] || exit 1
+      fetched_commit="$(git rev-parse "FETCH_HEAD^{commit}")"
+      git checkout --quiet --detach "$fetched_commit"
+      [ "$(git rev-parse HEAD)" = "$fetched_commit" ] || exit 1
     fi
     git submodule update --init --recursive >> "$log" 2>&1 || true
     git clean -fdx --quiet

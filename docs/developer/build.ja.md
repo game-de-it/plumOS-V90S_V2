@@ -3,12 +3,50 @@
 ## 必要環境
 
 - Git
-- AArch64ソースとイメージ用の空き容量があるDocker
-- `artifacts/vendor/v90s-stockos-r1/`のvendor入力
+- AArch64ソースとイメージ用に80 GiB以上の空き容量があるDocker
+- Dockerとemulator sourceを取得するInternet接続
 - 公式アップデートを生成する場合だけrelease署名鍵
 
 すべてのtargetは`scripts/docker-build.sh`から実行します。Docker imageの初期値は
 `plumos-v90s-toolchain:dev`、対象platformは`linux/arm64`です。
+
+sanitize・checksum済みの`v90s-stockos-r1` vendor入力は
+`artifacts/vendor/v90s-stockos-r1/`で追跡します。ROM、game BIOS、save data、
+個人network設定、SSH鍵、update署名鍵は含みません。vendor fileには元の条件が残り、
+plumOSのMIT Licenseへ変更されません。
+
+checksum済みの非エミュレータ1.0.0 baselineも
+`artifacts/release-inputs/v90s-1.0.0/`で追跡します。System SquashFS、frontend、
+userland、service、Apps、PowerVR SDL2 runtime、既存build scriptが必要とする最小限の
+KNULLI・GE8300 hardware入力を含みます。
+
+## clean cloneからのrelease image
+
+正式なclean-clone入口は次です。
+
+```sh
+git clone REPOSITORY_URL
+cd plumOS-V90S_v2
+./scripts/docker-build.sh release-image --version 1.0.0
+```
+
+このcommandは次を実行します。
+
+1. 追跡済み非エミュレータ1.0.0 baselineをchecksum検査して展開
+2. 追跡済みvendor runtimeをchecksum検査して準備
+3. RetroArch、118 libretro core、PicoArch、standalone emulatorだけを既存の
+   固定recipeから再build
+4. ローカルbaselineと再buildしたemulator payloadからversion付きstrict app-layerを生成
+5. `output/images/plumos-v90s-release-1.0.0-vendor-r1.img`を組み立てて検証
+
+署名付きupdate packageを作らずimage検証後に終了するため、非公開release署名鍵は
+不要です。このtargetはKNULLI・GE8300をdownloadせず、必要なlocal subsetをcloneから
+使用します。同梱subsetのsource identityは次です。
+
+| 入力 | commit |
+| --- | --- |
+| KNULLI | `ac2ededdd3999443da4ba514dac22145d628f735` |
+| GE8300 drivers | `3213ecb88a9e9c6813a7a6aafe78da1f055aa050` |
 
 ## Docker imageとtargetの確認
 
@@ -18,9 +56,11 @@
 ./scripts/docker-build.sh shell
 ```
 
-`artifacts/`は入力専用でgit管理外です。生成物は同じくgit管理外の`output/`または
-`dist/`へ出します。ビルドスクリプト、レシピ、バージョン固定、パッチ、manifest
-schema、公開更新鍵は追跡します。
+sanitize済み`artifacts/vendor/v90s-stockos-r1/`とversion別
+`artifacts/release-inputs/` baselineを追跡します。非公開update署名鍵を含む他の
+`artifacts/`はgit管理外です。生成物は同じくgit管理外の`output/`または`dist/`へ
+出します。ビルドスクリプト、レシピ、バージョン固定、パッチ、manifest schema、
+公開更新鍵は追跡します。
 
 ## component target
 

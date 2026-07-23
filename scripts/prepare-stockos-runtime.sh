@@ -122,6 +122,19 @@ if [ ! -d "$raw_dir" ]; then
     printf 'error: raw StockOS partition directory not found: %s\n' "$raw_dir" >&2
     exit 1
 fi
+if [ ! -f "$src_dir/SHA256SUMS" ]; then
+    printf 'error: vendor source checksum manifest not found: %s/SHA256SUMS\n' \
+        "$src_dir" >&2
+    exit 1
+fi
+(
+    cd "$src_dir"
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -c SHA256SUMS
+    else
+        shasum -a 256 -c SHA256SUMS
+    fi
+)
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir/root" "$out_dir/raw-partitions"

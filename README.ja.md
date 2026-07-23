@@ -58,6 +58,16 @@ ROMおよびゲームBIOSは同梱しません。合法的に入手したデー�
 ./scripts/docker-build.sh --help
 ```
 
+clean cloneから署名鍵不要の完全なSDイメージを生成する場合は、次を実行します。
+
+```sh
+./scripts/docker-build.sh release-image --version 1.0.0
+```
+
+cloneにはchecksum済みの非エミュレータrelease baselineが含まれます。このcommandは
+それを展開し、RetroArch、118 libretro core、PicoArch、standalone emulatorだけを
+再buildして生成imageを検証します。非公開のupdate署名鍵は必要ありません。
+
 イメージや更新パッケージを作る前に、
 [開発者向けビルドガイド](docs/developer/build.ja.md)を参照してください。
 
