@@ -95,12 +95,20 @@ controller are:
 | StockOS-derived extra modules | `8192eu`, `8723bu`, `8812au`, `8821cu`, `88x2bu` |
 | Vendor kernel standard modules | `rtl8192cu`, `rtl8xxxu` |
 
-The real-device validated route is USB ID `0bda:c820`, module `8821cu`, and
-interface `wlan0`. The controller contains an `8188eu` compatibility path, but
-`v90s-stockos-r1` does not bundle a separate `8188eu.ko`, so it is not listed as
-a supported module. Match `/sys/bus/usb/devices/*/idVendor` and `idProduct`
-against the bundled `modules.alias` data instead of relying on a retail product
-name. Adding a new module or firmware to the vendor runtime requires real-device
+The real-device validated routes are USB IDs `0bda:c820` and `0bda:c811`,
+module `8821cu`, and interface `wlan0`. The tested UGREEN AC650 / RTL8811CU
+unit initially enumerates as `0bda:1a2b`, product `Realtek DISK`, with
+`/dev/sr0`. `plumos-network-control` ejects the matching `sr*` device only for
+this exact USB ID, waits for re-enumeration as `0bda:c811`, then continues
+normal module-alias detection. It never ejects generic USB storage. A `1a2b`
+USB add event while Wi-Fi is enabled also enters the existing one-shot hotplug
+recovery path.
+
+The controller contains an `8188eu` compatibility path, but `v90s-stockos-r1`
+does not bundle a separate `8188eu.ko`, so it is not listed as a supported
+module. Match `/sys/bus/usb/devices/*/idVendor` and `idProduct` against the
+bundled `modules.alias` data instead of relying on a retail product name.
+Adding a new module or firmware to the vendor runtime requires real-device
 validation followed by a vendor runtime ID revision.
 
 Network service state is stored in

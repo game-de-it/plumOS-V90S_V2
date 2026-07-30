@@ -27,11 +27,15 @@ The current release includes these Realtek USB Wi-Fi drivers:
 - `rtl8192cu`
 - `rtl8xxxu`
 
-The adapter verified on real hardware uses USB ID `0bda:c820` with the
-`8821cu` driver. Products sold under the same name may use a different USB ID
-or chipset in another hardware revision. A similar product name alone does not
-confirm compatibility. If an adapter does not work, check its USB ID on a
-computer and include that ID in the problem report.
+The USB IDs verified on real hardware are `0bda:c820` and `0bda:c811`; both
+use the `8821cu` driver. The tested UGREEN AC650 / RTL8811CU unit first appears
+as the driver disk `0bda:1a2b Realtek DISK`. plumOS v1.0.1 and later
+automatically switch it to the `0bda:c811` Wi-Fi mode.
+
+Products sold under the same name may use a different USB ID or chipset in
+another hardware revision. A similar product name alone does not confirm
+compatibility. If an adapter does not work, check its USB ID on a computer and
+include that ID in the problem report.
 
 ## Network Services
 

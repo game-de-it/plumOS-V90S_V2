@@ -20,6 +20,14 @@ WIFI_IFACE_WAIT_SECONDS="${PLUMOS_WIFI_IFACE_WAIT_SECONDS:-5}"
 WPA_WAIT_SECONDS="${PLUMOS_WPA_WAIT_SECONDS:-15}"
 DHCP_WAIT_SECONDS="${PLUMOS_DHCP_WAIT_SECONDS:-10}"
 SCAN_WAIT_SECONDS="${PLUMOS_WIFI_SCAN_WAIT_SECONDS:-8}"
+USB_SYSFS_ROOT="${PLUMOS_USB_SYSFS_ROOT:-/sys/bus/usb/devices}"
+NET_SYSFS_ROOT="${PLUMOS_NET_SYSFS_ROOT:-/sys/class/net}"
+DEV_ROOT="${PLUMOS_DEV_ROOT:-/dev}"
+KERNEL_RELEASE="${PLUMOS_KERNEL_RELEASE:-4.9.191}"
+MODULES_DIR="${PLUMOS_MODULES_DIR:-/lib/modules/${KERNEL_RELEASE}}"
+ALT_MODULES_DIR="${PLUMOS_ALT_MODULES_DIR:-/usr/lib/modules/${KERNEL_RELEASE}}"
+USB_MODE_SWITCH_WAIT_ATTEMPTS="${PLUMOS_USB_MODE_SWITCH_WAIT_ATTEMPTS:-5}"
+EJECT_BIN="${PLUMOS_EJECT_BIN:-eject}"
 UDHCPC_SCRIPT="${PLUMOS_UDHCPC_SCRIPT:-${PLUMOS_ROOT}/bin/plumos-udhcpc-script}"
 WPA_PID_FILE="${RUN_DIR}/wpa_supplicant.pid"
 ENSURE_WIFI_STAGE_FILE="${RUN_DIR}/ensure-wifi-stage.$$"
@@ -103,13 +111,13 @@ ip_tool() {
 }
 
 iface_exists() {
-  [ -n "${1:-}" ] && [ -e "/sys/class/net/$1" ]
+  [ -n "${1:-}" ] && [ -e "${NET_SYSFS_ROOT}/$1" ]
 }
 
 iface_is_wifi() {
   iface="$1"
-  [ -d "/sys/class/net/$iface/wireless" ] && return 0
-  [ -e "/sys/class/net/$iface/phy80211" ] && return 0
+  [ -d "${NET_SYSFS_ROOT}/$iface/wireless" ] && return 0
+  [ -e "${NET_SYSFS_ROOT}/$iface/phy80211" ] && return 0
   case "$iface" in
     wlan*|mlan*|p2p*) return 0 ;;
   esac
@@ -127,7 +135,7 @@ find_wifi_iface() {
     return 1
   fi
 
-  for net in /sys/class/net/*; do
+  for net in "${NET_SYSFS_ROOT}"/*; do
     [ -e "$net" ] || continue
     iface="$(basename "$net")"
     [ "$iface" = lo ] && continue
@@ -148,9 +156,90 @@ find_wifi_iface() {
 }
 
 usb_device_seen() {
-  for dev in /sys/bus/usb/devices/*; do
+  for dev in "${USB_SYSFS_ROOT}"/*; do
     [ -r "$dev/idVendor" ] && [ -r "$dev/idProduct" ] && return 0
   done
+  return 1
+}
+
+find_known_usb_wifi_storage() {
+  for dev in "${USB_SYSFS_ROOT}"/*; do
+    [ -r "$dev/idVendor" ] || continue
+    [ -r "$dev/idProduct" ] || continue
+    vendor="$(trim_cr < "$dev/idVendor" 2>/dev/null | tr '[:lower:]' '[:upper:]' || true)"
+    product="$(trim_cr < "$dev/idProduct" 2>/dev/null | tr '[:lower:]' '[:upper:]' || true)"
+    if [ "$vendor" = 0BDA ] && [ "$product" = 1A2B ]; then
+      printf '%s\n' "$dev"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_switched_rtl8811cu() {
+  for dev in "${USB_SYSFS_ROOT}"/*; do
+    [ -r "$dev/idVendor" ] || continue
+    [ -r "$dev/idProduct" ] || continue
+    vendor="$(trim_cr < "$dev/idVendor" 2>/dev/null | tr '[:lower:]' '[:upper:]' || true)"
+    product="$(trim_cr < "$dev/idProduct" 2>/dev/null | tr '[:lower:]' '[:upper:]' || true)"
+    if [ "$vendor" = 0BDA ] && [ "$product" = C811 ]; then
+      printf '%s\n' "$dev"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_usb_cdrom_block() {
+  dev="$1"
+  for block_path in "$dev":*/host*/target*/*/block/sr*; do
+    [ -e "$block_path" ] || continue
+    basename "$block_path"
+    return 0
+  done
+  return 1
+}
+
+switch_known_usb_wifi_mode() {
+  storage_dev="$(find_known_usb_wifi_storage 2>/dev/null || true)"
+  [ -n "$storage_dev" ] || return 0
+
+  log "usb wifi mode-switch detected id=0bda:1a2b sysfs=$(basename "$storage_dev")"
+  if [ ! -x "$EJECT_BIN" ] && ! command -v "$EJECT_BIN" >/dev/null 2>&1; then
+    log "usb wifi mode-switch failed reason=eject_missing"
+    return 1
+  fi
+
+  attempt=0
+  block=
+  while [ "$attempt" -lt "$USB_MODE_SWITCH_WAIT_ATTEMPTS" ]; do
+    block="$(find_usb_cdrom_block "$storage_dev" 2>/dev/null || true)"
+    [ -n "$block" ] && break
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  if [ -z "$block" ] || [ ! -e "${DEV_ROOT}/${block}" ]; then
+    log "usb wifi mode-switch failed reason=cdrom_missing"
+    return 1
+  fi
+
+  log "usb wifi mode-switch eject begin block=${block}"
+  if ! run_limited 5 "$EJECT_BIN" -s "${DEV_ROOT}/${block}" >> "$LOG_FILE" 2>&1; then
+    log "usb wifi mode-switch failed reason=eject_nonzero block=${block}"
+    return 1
+  fi
+
+  attempt=0
+  while [ "$attempt" -lt "$USB_MODE_SWITCH_WAIT_ATTEMPTS" ]; do
+    switched_dev="$(find_switched_rtl8811cu 2>/dev/null || true)"
+    if [ -n "$switched_dev" ]; then
+      log "usb wifi mode-switch complete id=0bda:c811 sysfs=$(basename "$switched_dev")"
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  log "usb wifi mode-switch failed reason=c811_timeout"
   return 1
 }
 
@@ -158,7 +247,7 @@ detect_usb_wifi_modules() {
   tmp="${RUN_DIR}/usb-wifi-modules.$$"
   : > "$tmp" 2>/dev/null || true
 
-  for dev in /sys/bus/usb/devices/*; do
+  for dev in "${USB_SYSFS_ROOT}"/*; do
     [ -r "$dev/idVendor" ] || continue
     [ -r "$dev/idProduct" ] || continue
     vendor="$(trim_cr < "$dev/idVendor" 2>/dev/null | tr '[:lower:]' '[:upper:]' || true)"
@@ -167,12 +256,12 @@ detect_usb_wifi_modules() {
     [ -n "$product" ] || continue
 
     for alias_file in \
-      /lib/modules/4.9.191/modules.alias \
-      /lib/modules/4.9.191/modules.alias.standard \
-      /lib/modules/4.9.191/modules.alias.v90s \
-      /usr/lib/modules/4.9.191/modules.alias \
-      /usr/lib/modules/4.9.191/modules.alias.standard \
-      /usr/lib/modules/4.9.191/modules.alias.v90s; do
+      "${MODULES_DIR}/modules.alias" \
+      "${MODULES_DIR}/modules.alias.standard" \
+      "${MODULES_DIR}/modules.alias.v90s" \
+      "${ALT_MODULES_DIR}/modules.alias" \
+      "${ALT_MODULES_DIR}/modules.alias.standard" \
+      "${ALT_MODULES_DIR}/modules.alias.v90s"; do
       [ -r "$alias_file" ] || continue
       grep -i "usb:v${vendor}p${product}" "$alias_file" 2>/dev/null |
         awk '{ print $3 }' >> "$tmp" 2>/dev/null || true
@@ -212,23 +301,23 @@ load_wifi_driver() {
 
   case "$driver" in
     rtl8192cu)
-      load_module_file /lib/modules/4.9.191/rtlwifi.ko
-      load_module_file /lib/modules/4.9.191/rtl_usb.ko
-      load_module_file /lib/modules/4.9.191/rtl8192c-common.ko
-      load_module_file /lib/modules/4.9.191/rtl8192cu.ko
+      load_module_file "${MODULES_DIR}/rtlwifi.ko"
+      load_module_file "${MODULES_DIR}/rtl_usb.ko"
+      load_module_file "${MODULES_DIR}/rtl8192c-common.ko"
+      load_module_file "${MODULES_DIR}/rtl8192cu.ko"
       ;;
     rtl8xxxu)
-      load_module_file /lib/modules/4.9.191/rtl8xxxu.ko
+      load_module_file "${MODULES_DIR}/rtl8xxxu.ko"
       ;;
     8192eu|8723bu|8812au|8821cu|88x2bu)
-      load_module_file "/lib/modules/4.9.191/extra/${driver}.ko"
+      load_module_file "${MODULES_DIR}/extra/${driver}.ko"
       ;;
     8188eu)
-      if [ -f /lib/modules/4.9.191/extra/8188eu.ko ]; then
-        load_module_file /lib/modules/4.9.191/extra/8188eu.ko
+      if [ -f "${MODULES_DIR}/extra/8188eu.ko" ]; then
+        load_module_file "${MODULES_DIR}/extra/8188eu.ko"
       else
         log "driver candidate 8188eu missing; trying 8192eu overlay"
-        load_module_file /lib/modules/4.9.191/extra/8192eu.ko
+        load_module_file "${MODULES_DIR}/extra/8192eu.ko"
       fi
       ;;
     *)
@@ -245,6 +334,8 @@ ensure_wifi_iface() {
     printf '%s\n' "$iface"
     return 0
   fi
+
+  switch_known_usb_wifi_mode || true
 
   drivers="$(detect_usb_wifi_modules | tr '\n' ' ')"
   if [ -z "$drivers" ]; then

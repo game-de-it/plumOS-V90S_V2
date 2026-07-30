@@ -81,7 +81,13 @@ dongleが再追加された時に1回だけ制限付きreconnectを行います�
 | StockOS由来extra module | `8192eu`, `8723bu`, `8812au`, `8821cu`, `88x2bu` |
 | vendor kernel標準module | `rtl8192cu`, `rtl8xxxu` |
 
-実機確認済みの経路はUSB ID `0bda:c820`、module `8821cu`、interface `wlan0`です。
+実機確認済みの経路はUSB ID `0bda:c820`と`0bda:c811`、module `8821cu`、
+interface `wlan0`です。UGREEN AC650 / RTL8811CUの確認個体は接続直後に
+`0bda:1a2b`、`Realtek DISK`、`/dev/sr0`として列挙されます。
+`plumos-network-control`はこの完全一致するUSB IDだけを対象に対応する`sr*`をejectし、
+`0bda:c811`への再列挙を待ってから通常のmodule alias検出を続けます。一般のUSB
+storageはejectしません。Wi-Fi ON中の`1a2b` USB add eventも、既存の一回限りの
+hotplug recoveryへ渡します。
 controllerには`8188eu`互換処理もありますが、`v90s-stockos-r1`には独立した
 `8188eu.ko`を収録していないため、対応module一覧には含めません。製品名ではなく
 `/sys/bus/usb/devices/*/idVendor`と`idProduct`を既存moduleの`modules.alias`へ照合します。

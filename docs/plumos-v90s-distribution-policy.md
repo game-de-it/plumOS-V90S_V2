@@ -726,6 +726,16 @@ recovery after a short settle delay. Turning Wi-Fi OFF must stop the monitor,
 and an absent dongle must not cause periodic polling or an unbounded reconnect
 loop.
 
+Some Realtek USB Wi-Fi adapters expose a read-only driver disk before exposing
+their wireless interface. The verified UGREEN AC650 / RTL8811CU path starts as
+USB ID `0bda:1a2b`, product `Realtek DISK`, then changes to `0bda:c811` after a
+SCSI eject. The app-layer network controller may perform this bounded mode
+switch before module-alias detection, but only for this exact USB ID and only
+for the `sr*` device below the matching USB sysfs node. Generic USB storage
+must never be ejected. A matching USB `add` event may trigger the existing
+coalesced recovery path while Wi-Fi is enabled; no new periodic polling loop is
+introduced.
+
 The system-rootfs OpenSSH configuration must route the SFTP subsystem through
 `/mnt/plumos/ssh/libexec/sftp-server`. This lets the SFTP checkbox enable or
 disable the app-layer server path without stopping the shared SSH listener.
