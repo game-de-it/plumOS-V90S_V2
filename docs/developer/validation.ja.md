@@ -15,6 +15,7 @@ screenshot、ALSA route、input event、終了動作、FE復帰が有効です�
 最初に次を参照します。
 
 - [Release 1.0.1準備](../validation/2026-07-31-v90s-release-1.0.1-preparation.md)
+- [Release 1.0.1公開](../validation/2026-07-31-v90s-release-1.0.1-publication.md)
 - [RTL8811CU driver disk mode切替](../validation/2026-07-31-v90s-rtl8811cu-mode-switch.md)
 - [clean clone release-image契約](../validation/2026-07-23-v90s-clean-clone-release-image.md)
 - [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
