@@ -21,11 +21,27 @@ Place the update file directly in:
 PLUMOS/updates/
 ```
 
+The equivalent destination for each connection method is:
+
+| Connection method | Destination |
+| --- | --- |
+| Windows/macOS card reader or USB Disk Mode | `PLUMOS/updates/` |
+| SFTP, SSH, or ADB | `/mnt/plumos-user/updates/` |
+| FTP | Do not use for update placement |
+
 The separate Linux ext4 volume `PLUMOS_SYS` is not normally mounted as a drive
 by Windows. It contains the updater's internal
 `/mnt/plumos/updates/staging` directory. If an ext4-capable tool exposes this
 volume or its `staging` directory, do not add, modify, or delete anything
 there. It is different from the user-facing `PLUMOS/updates/` inbox.
+The `/mnt/plumos/updates/` directory visible from the SFTP/SSH starting
+location is also this internal area; do not place an update archive there.
+
+The FTP share root is also `/mnt/plumos`, so the `updates/` directory visible
+over FTP is the internal area. FTP cannot navigate to the FAT32 update inbox.
+Use a card reader, USB Disk Mode, SFTP, SSH, or ADB instead. In FileZilla,
+connect with SFTP rather than FTP and enter `/mnt/plumos-user/updates/` as the
+remote path.
 
 Only the `.tar.gz` file is required on the SD card. The accompanying `.sha256`
 file is optional and is provided for checking download integrity on the
@@ -35,8 +51,9 @@ computer; the updater does not require it.
 
 1. Download the update file for POWKIDDY V90S. Do not extract it.
 2. Without extracting it, copy the `.tar.gz` file directly to
-   `PLUMOS/updates/` on SD1. Do not put it in `staging`. You can use a card
-   reader, USB Disk Mode, SFTP, or SSH.
+   `PLUMOS/updates/` when using a card reader or USB Disk Mode, or to
+   `/mnt/plumos-user/updates/` when using SFTP, SSH, or ADB. Do not use FTP,
+   `/mnt/plumos/updates/`, or `staging`.
 3. Eject or disconnect safely.
 4. Open `START -> System Settings -> System Update`.
 5. Press A to select the newest available update.

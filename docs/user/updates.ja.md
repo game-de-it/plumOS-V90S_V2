@@ -19,10 +19,25 @@ Windows標準でSD1を開いた時に使用するのは、FAT32の`PLUMOS`ドラ
 PLUMOS/updates/
 ```
 
+接続方法ごとの同じ配置先は次のとおりです。
+
+| 接続方法 | 配置先 |
+| --- | --- |
+| Windows/macOSのカードリーダー、USB Disk Mode | `PLUMOS/updates/` |
+| SFTP、SSH、ADB | `/mnt/plumos-user/updates/` |
+| FTP | 更新ファイルの配置には使用しない |
+
 別のLinux用ext4領域`PLUMOS_SYS`は、Windows標準ではドライブとして表示されません。
 この領域にはupdater内部専用の`/mnt/plumos/updates/staging`があります。ext4対応
 ソフトなどでこの領域や`staging`が見えても、ファイルを追加、変更、削除しないで
 ください。これはユーザーが更新ファイルを置く`PLUMOS/updates/`とは別の場所です。
+SFTP/SSHの開始位置で見える`/mnt/plumos/updates/`も同じ内部領域なので、更新ファイルを
+置かないでください。
+
+FTPの公開ルートも`/mnt/plumos`であり、FTP画面に見える`updates/`は内部領域です。
+FTPからFAT32の更新受信箱へは移動できないため、更新ファイルの配置にはカードリーダー、
+USB Disk Mode、SFTP、SSH、ADBのいずれかを使用してください。FileZillaを使う場合は
+FTPではなくSFTPで接続し、リモートパスへ`/mnt/plumos-user/updates/`を指定できます。
 
 配置に必要なのは`.tar.gz`ファイルだけです。同梱の`.sha256`はPCでダウンロード破損を
 確認するための任意ファイルであり、SDカードへコピーする必要はありません。
@@ -30,9 +45,9 @@ PLUMOS/updates/
 ## アップデート手順
 
 1. POWKIDDY V90S用のアップデートファイルを取得します。展開しないでください。
-2. `.tar.gz`を展開せず、SD1の`PLUMOS/updates/`直下へコピーします。`staging`には
-   入れないでください。カードリーダー、USB Disk Mode、SFTP、SSHのどれでも
-   使用できます。
+2. `.tar.gz`を展開せず、カードリーダーまたはUSB Disk Modeでは
+   `PLUMOS/updates/`、SFTP、SSH、ADBでは`/mnt/plumos-user/updates/`の直下へ
+   コピーします。FTP、`/mnt/plumos/updates/`、`staging`は使用しないでください。
 3. 安全に取り外すか切断します。
 4. `START -> システム設定 -> システムアップデート`を開きます。
 5. Aボタンで最新の使用可能なアップデートを選びます。
