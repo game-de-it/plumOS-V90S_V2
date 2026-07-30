@@ -4,7 +4,7 @@ Date: 2026-07-31
 Target release: `1.0.1`
 Host result: PASS
 Real-device diagnosis: PASS
-Real-device v1.0.1 update result: pending
+Real-device provisional v1.0.1 update result: PASS with cold-boot gap found
 
 ## Failure evidence
 
@@ -94,9 +94,9 @@ The fake-sysfs tests cover:
 - preservation of the existing wireless net add event;
 - rejection of unrelated USB add events.
 
-## Signed Runtime Update
+## Provisional signed Runtime Update
 
-The final package is a signed delta from the verified 5,766-file `1.0.0`
+The provisional package was a signed delta from the verified 5,766-file `1.0.0`
 app-layer baseline:
 
 ```text
@@ -152,6 +152,61 @@ sha256=1b3a2f372e30ddb4477f8ce9e53305316e980c59d471e7c1f629f4135774521e
 device_inspect=PASS
 ```
 
-This is artifact-specific host proof. Automatic cold-plug and hot-plug after
-installing the `1.0.1` Runtime Update remain the final real-device acceptance
-checks.
+## Provisional update device result
+
+The provisional `1.0.1` Runtime Update installed successfully on the physical
+V90S. The frontend reported `1.0.1`, the transaction reached
+`runtime_healthy`, no pending state remained, and the seven installed payload
+files matched the host build.
+
+Toggling Wi-Fi OFF and ON switched the attached UGREEN adapter from
+`0bda:1a2b` to `0bda:c811`, loaded `8821cu`, created `wlan0`, and obtained an
+IPv4 address. A cold boot with the saved setting already ON exposed one final
+gap: USB enumeration completed before the frontend-started uevent monitor, so
+no add event remained to trigger recovery.
+
+The final `1.0.1` correction keeps frontend startup non-blocking. After syncing
+the monitor to a saved ON state, `plumos-wifi-recovery` now schedules one
+background bounded recovery. Hot-plug event recovery remains unchanged and
+coalesced by the existing lock.
+
+## Final signed Runtime Update
+
+The corrected archive replaced the provisional artifact while retaining the
+public version `1.0.1` and compatibility route `1.0.0 -> 1.0.1`:
+
+```text
+path=dist/updates/plumos-v90s-runtime-1.0.1.tar.gz
+size=571371
+sha256=ff48b93aa6ee2d3b575f3e799a39f95bc0208b5baea67eb559416db8b7100d1e
+package_type=runtime
+source_version=1.0.0
+version=1.0.1
+full_payload=false
+payload_files=8
+payload_uncompressed_bytes=2465070
+deleted_files=0
+```
+
+The payload contains only:
+
+```text
+VERSION
+bin/plumos-network-control
+bin/plumos-wifi-recovery
+bin/plumos-wifi-uevent
+checksums.sha256
+licenses/network-services-manifest.txt
+manifest.json
+share/doc/network-services/SHA256SUMS
+```
+
+Rebuilt BusyBox and adbd outputs were deliberately excluded because they are
+unrelated to this correction. The archive SHA-256 and public-key signature
+passed verification. All 40 host tests passed, including saved-ON initial
+recovery and saved-OFF suppression. An isolated clone of the `1.0.0` runtime
+completed request, apply, and mark-healthy with all eight installed hashes
+matching the final app layer and no pending state.
+
+Physical cold-boot acceptance of this final archive remains pending because the
+device already has the provisional package with the same public version.

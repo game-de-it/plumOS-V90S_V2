@@ -85,7 +85,9 @@ responsible for idle GPU clock and suspend behavior.
 V90S has no internal Wi-Fi. `plumos-network-control` drives supported USB Wi-Fi
 interfaces with bounded scan/connect/DHCP stages. `plumos-wifi-recovery` sleeps
 on netlink uevents and performs one bounded reconnect when an enabled dongle is
-re-added; it does not poll indefinitely when no dongle exists.
+re-added; it does not poll indefinitely when no dongle exists. When boot starts
+the monitor after USB enumeration, a saved Wi-Fi ON state also schedules one
+background bounded recovery so an already attached dongle is not missed.
 
 The USB Wi-Fi modules bundled in `v90s-stockos-r1` and loadable by the network
 controller are:

@@ -73,6 +73,8 @@ vendor PowerVR stackはFEから制御できる標準devfreq governorを公開し
 V90Sに内蔵Wi-Fiはありません。`plumos-network-control`が対応USB Wi-Fi interfaceを、制限時間付き
 scan・connect・DHCP段階で制御します。`plumos-wifi-recovery`はnetlink ueventを待ち、ON状態の
 dongleが再追加された時に1回だけ制限付きreconnectを行います。dongleがない時にpollし続けません。
+USB列挙後にboot処理がmonitorを開始した場合も、保存設定がWi-Fi ONならbackgroundで1回だけ
+制限付きrecoveryを予約し、接続済みdongleを見落としません。
 
 `v90s-stockos-r1`に収録し、network controllerが読み込めるUSB Wi-Fi moduleは次の通りです。
 

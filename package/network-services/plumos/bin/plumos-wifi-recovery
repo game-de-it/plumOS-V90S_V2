@@ -4,6 +4,7 @@ set -u
 PLUMOS_ROOT="${PLUMOS_ROOT:-/mnt/plumos}"
 PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-$PLUMOS_ROOT}"
 RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+PROC_ROOT="${PLUMOS_PROC_ROOT:-/proc}"
 PATH="${PLUMOS_ROOT}/bin:${PLUMOS_ROOT}/gnu/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH PLUMOS_ROOT PLUMOS_SDCARD_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
 
@@ -42,7 +43,8 @@ USAGE
 wifi_requested() {
   [ -r "$SYSTEM_SETTINGS" ] || return 1
   value="$(sed -n \
-    's/.*"wifi_enabled"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+    -e 's/.*"wifi_enabled"[[:space:]]*:[[:space:]]*true.*/true/p' \
+    -e 's/.*"wifi_enabled"[[:space:]]*:[[:space:]]*false.*/false/p' \
     "$SYSTEM_SETTINGS" 2>/dev/null | tail -n 1)"
   [ "$value" = true ]
 }
@@ -60,7 +62,7 @@ monitor_running() {
   pid="$(read_monitor_pid 2>/dev/null || true)"
   [ -n "$pid" ] || return 1
   kill -0 "$pid" 2>/dev/null || return 1
-  cmdline="$(tr '\000' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
+  cmdline="$(tr '\000' ' ' < "${PROC_ROOT}/${pid}/cmdline" 2>/dev/null || true)"
   case "$cmdline" in
     *"busybox uevent ${UEVENT_HELPER}"*) return 0 ;;
   esac
@@ -69,7 +71,7 @@ monitor_running() {
 
 close_inherited_display_fds() {
   for fd in 3 4 5 6 7 8 9; do
-    target="$(readlink "/proc/$$/fd/${fd}" 2>/dev/null || true)"
+    target="$(readlink "${PROC_ROOT}/$$/fd/${fd}" 2>/dev/null || true)"
     case "$target" in
       /dev/fb0) eval "exec ${fd}<&- ${fd}>&-" 2>/dev/null || true ;;
     esac
@@ -147,6 +149,17 @@ recover_once() {
   fi
 }
 
+schedule_initial_recovery() {
+  (
+    cd /
+    close_inherited_display_fds
+    export PLUMOS_ROOT PLUMOS_SDCARD_ROOT PLUMOS_RUNTIME_ROOT
+    exec /bin/sh "$0" recover >> "$LOG_FILE" 2>&1 < /dev/null
+  ) &
+  pid="$!"
+  log "initial_recovery_scheduled pid=${pid}"
+}
+
 status_mode() {
   printf 'wifi_requested=%s\n' "$(wifi_requested && echo 1 || echo 0)"
   printf 'monitor_running=%s\n' "$(monitor_running && echo 1 || echo 0)"
@@ -158,7 +171,12 @@ case "${1:-status}" in
   start) start_monitor ;;
   stop) stop_monitor ;;
   sync)
-    if wifi_requested; then start_monitor; else stop_monitor; fi
+    if wifi_requested; then
+      start_monitor || exit $?
+      schedule_initial_recovery
+    else
+      stop_monitor
+    fi
     ;;
   recover) recover_once ;;
   status) status_mode ;;

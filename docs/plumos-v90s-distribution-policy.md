@@ -724,7 +724,9 @@ a blocking kernel-uevent monitor for wireless-interface `add` events. Each
 event is coalesced and invokes one bounded `plumos-network-control --wifi on`
 recovery after a short settle delay. Turning Wi-Fi OFF must stop the monitor,
 and an absent dongle must not cause periodic polling or an unbounded reconnect
-loop.
+loop. Starting the monitor after boot enumeration must also schedule one
+background recovery when the saved Wi-Fi state is ON. This initial recovery
+closes the cold-plug event gap without delaying frontend startup.
 
 Some Realtek USB Wi-Fi adapters expose a read-only driver disk before exposing
 their wireless interface. The verified UGREEN AC650 / RTL8811CU path starts as
