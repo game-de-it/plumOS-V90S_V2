@@ -5,6 +5,7 @@ Target release: `1.0.1`
 Host result: PASS
 Real-device diagnosis: PASS
 Real-device provisional v1.0.1 update result: PASS with cold-boot gap found
+Real-device final v1.0.1 update result: PASS
 
 ## Failure evidence
 
@@ -208,5 +209,38 @@ recovery and saved-OFF suppression. An isolated clone of the `1.0.0` runtime
 completed request, apply, and mark-healthy with all eight installed hashes
 matching the final app layer and no pending state.
 
-Physical cold-boot acceptance of this final archive remains pending because the
-device already has the provisional package with the same public version.
+## Final physical cold-boot result
+
+The provisional update was rolled back through the transactional updater to
+the verified `1.0.0` Runtime baseline. The final archive was then installed
+through the frontend and reached:
+
+```text
+runtime=1.0.1
+system=1.0.0
+transaction_status=healthy
+package_sha256=ff48b93aa6ee2d3b575f3e799a39f95bc0208b5baea67eb559416db8b7100d1e
+operations=8
+pending=absent
+frontend=running
+```
+
+All eight installed files matched the final host app layer. On the fresh boot,
+the saved Wi-Fi ON state produced:
+
+```text
+uptime=12.10  usb wifi mode-switch detected id=0bda:1a2b
+uptime=13.26  usb wifi mode-switch complete id=0bda:c811
+module=8821cu
+driver=rtl8821cu
+iface=wlan0
+ip=192.168.10.117
+gateway=192.168.10.1
+gateway_ping=10/10, 0% loss
+rx_errors=0
+tx_errors=0
+```
+
+The initial recovery was logged as scheduled and the USB re-enumeration event
+was coalesced by the existing lock. The frontend remained operational. This
+closes the final physical acceptance gate for `v1.0.1`.

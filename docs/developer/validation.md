@@ -17,6 +17,8 @@ and FE recovery.
 
 Start with these records:
 
+- [Release 1.0.1 preparation](../validation/2026-07-31-v90s-release-1.0.1-preparation.md)
+- [RTL8811CU driver-disk mode switch](../validation/2026-07-31-v90s-rtl8811cu-mode-switch.md)
 - [Clean-clone release-image contract](../validation/2026-07-23-v90s-clean-clone-release-image.md)
 - [Release 1.0.0 SD image](../validation/2026-07-23-v90s-release-1.0.0-image.md)
 - [Release 1.0.0 preparation](../validation/2026-07-23-v90s-release-1.0.0-preparation.md)
